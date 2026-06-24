@@ -59,9 +59,7 @@ describe('useMotionSubscriber', () => {
     expect(gsap.set).toHaveBeenCalledWith(mockElement, {
       x: 120,
       y: 340,
-      rotation: 90,
-      xPercent: -50,
-      yPercent: -50
+      rotation: 90
     });
   });
 
@@ -87,8 +85,6 @@ describe('useMotionSubscriber', () => {
 
     // Verify gsap.set was called with custom transformed properties
     expect(gsap.set).toHaveBeenCalledWith(mockElement, {
-      xPercent: -50,
-      yPercent: -50,
       x: 200,
       y: 150,
       rotation: 30,

@@ -58,6 +58,8 @@ function Rocket() {
     x: data.x,
     y: data.y,
     rotation: data.rotation,
+    xPercent: -50,
+    yPercent: -50,
     scale: 0.8 + data.progress * 0.5,
     opacity: 0.4 + data.progress * 0.6,
   }), []);
@@ -69,8 +71,17 @@ function Rocket() {
 
 function Cloud() {
   const ref = useRef(null);
-  // No transformFn → defaults to x, y, rotation
-  useMotionSubscriber('cloud', ref);
+  
+  // transformFn: centers the cloud on its coordinates
+  const transform = useCallback((data) => ({
+    x: data.x,
+    y: data.y,
+    rotation: data.rotation,
+    xPercent: -50,
+    yPercent: -50,
+  }), []);
+
+  useMotionSubscriber('cloud', ref, transform);
   return <div ref={ref} className="element cloud">☁️</div>;
 }
 
@@ -82,6 +93,8 @@ function Orbiter() {
     x: data.x,
     y: data.y,
     rotation: data.rotation,
+    xPercent: -50,
+    yPercent: -50,
     scale: 0.8 + Math.cos(data.progress * 2 * Math.PI) * 0.4,
   }), []);
 
