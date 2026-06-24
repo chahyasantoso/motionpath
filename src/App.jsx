@@ -48,6 +48,35 @@ const timerScene = {
   ],
 };
 
+const carouselScene = {
+  sceneId: 'carousel-storytelling',
+  triggerType: 'scroll',
+  scrollConfig: { scrub: 1.2, pin: '.carousel-stage' },
+  elements: [
+    {
+      id: 'carousel-track',
+      pathNodes: [
+        { x: -350, y: 400 },
+        { x: 300, y: 150, ctrlX: -20, ctrlY: 100 },
+        { x: 950, y: 500, ctrlX: 620, ctrlY: 200 },
+        { x: 1600, y: 200, ctrlX: 1280, ctrlY: 800 },
+        { x: 2200, y: 400, ctrlX: 1920, ctrlY: -400 },
+      ],
+    },
+  ],
+};
+
+const MOCK_CARDS = [
+  { id: 1, badge: '01 / IMAGINATION', title: 'Fluid Motion Engine', desc: 'Harnessing the power of GSAP Pub/Sub for sub-millisecond DOM updates.' },
+  { id: 2, badge: '02 / ARCHITECTURE', title: 'Zero Re-renders', desc: 'No React component updates during animation cycles for maximum 60FPS performance.' },
+  { id: 3, badge: '03 / CREATIVE', title: 'Bezier Interpolation', desc: 'Custom paths calculated dynamically with tangent-aligned rotations.' },
+  { id: 4, badge: '04 / INTERACTIVE', title: 'Interactive Cards', desc: 'Cards respond to mouse hover with smooth glassmorphic highlighting.' },
+  { id: 5, badge: '05 / DESIGN', title: 'Vibrant Aesthetics', desc: 'Deep cosmic palettes, glassmorphism, and smooth typography curves.' },
+  { id: 6, badge: '06 / PERFORMANCE', title: 'Scrubbed Timelines', desc: 'Perfect synchronization between page scroll and complex motion paths.' },
+  { id: 7, badge: '07 / AWWWARDS', title: 'Storytelling Layouts', desc: 'Create immersive cinematic scrollytelling experiences that engage users.' },
+  { id: 8, badge: '08 / ANTIGRAVITY', title: 'Endless Horizons', desc: 'Scaling up to unlimited items on custom paths without duplicating nodes.' },
+];
+
 // ─── Animated Elements ─────────────────────────────────────────
 
 function Rocket({ offset = 0 }) {
@@ -105,6 +134,68 @@ function Orbiter() {
 
   useMotionSubscriber('orbiter', ref, transform);
   return <div ref={ref} className="element orbiter">🛰️</div>;
+}
+
+function CarouselCard({ index, totalCards, cardData }) {
+  const ref = useRef(null);
+
+  const cardSpacing = 0.14; // spacing between cards along the path
+  const totalOffsetSpan = (totalCards - 1) * cardSpacing;
+
+  const transform = useCallback((data) => {
+    const pathEl = document.querySelector('#path-guide-carousel-track');
+    if (!pathEl) return {};
+
+    // Map global progress to this card's segment
+    const cardProgress = (data.progress * (1 + totalOffsetSpan)) - (index * cardSpacing);
+
+    // Filter visibility
+    if (cardProgress < 0 || cardProgress > 1) {
+      return {
+        display: 'none',
+        opacity: 0,
+      };
+    }
+
+    const point = getPointOnPath(pathEl, cardProgress);
+
+    // Fade-in / Fade-out near edges
+    let opacity = 1;
+    if (cardProgress < 0.15) {
+      opacity = cardProgress / 0.15;
+    } else if (cardProgress > 0.85) {
+      opacity = (1 - cardProgress) / 0.15;
+    }
+
+    // Scale peaks in the middle of the screen
+    const scale = 0.75 + Math.sin(cardProgress * Math.PI) * 0.35;
+
+    // Premium 3D rotation: lean the card slightly based on curve tangent
+    const targetTilt = Math.max(-20, Math.min(20, point.rotation * 0.35));
+
+    return {
+      display: 'flex',
+      x: point.x,
+      y: point.y,
+      xPercent: -50,
+      yPercent: -50,
+      rotation: targetTilt,
+      scale: scale,
+      opacity: opacity,
+      transformPerspective: 1000,
+      rotateY: targetTilt * -0.6,
+    };
+  }, [index, totalOffsetSpan]);
+
+  useMotionSubscriber('carousel-track', ref, transform);
+
+  return (
+    <div ref={ref} className="element carousel-card">
+      <div className="card-badge">{cardData.badge}</div>
+      <h3>{cardData.title}</h3>
+      <p>{cardData.desc}</p>
+    </div>
+  );
 }
 
 // ─── Scene Containers ──────────────────────────────────────────
@@ -183,6 +274,44 @@ function TimerDemo() {
   );
 }
 
+function CarouselDemo() {
+  const containerRef = useRef(null);
+  useMotionPlayer(carouselScene, containerRef);
+
+  return (
+    <section ref={containerRef} className="carousel-scene">
+      <div className="scene-label">
+        <h2>Unlimited Carousel Scene (Scroll)</h2>
+        <p>Dynamic mock cards flowing smoothly on a single Bezier S-curve track <code>carousel-track</code></p>
+      </div>
+      <div className="carousel-stage">
+        {MOCK_CARDS.map((card, i) => (
+          <CarouselCard
+            key={card.id}
+            index={i}
+            totalCards={MOCK_CARDS.length}
+            cardData={card}
+          />
+        ))}
+        {/* Path guides generated from scene data */}
+        <svg className="path-guide" width="100%" height="100%">
+          {carouselScene.elements.map(el => (
+            <path
+              key={el.id}
+              id={`path-guide-${el.id}`}
+              d={buildMotionPath(el.pathNodes)}
+              fill="none"
+              stroke="rgba(124, 92, 255, 0.08)"
+              strokeWidth="2"
+              strokeDasharray="10 8"
+            />
+          ))}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
 // ─── App ───────────────────────────────────────────────────────
 
 export default function App() {
@@ -194,6 +323,10 @@ export default function App() {
       </header>
 
       <ScrollDemo />
+
+      <div className="spacer" />
+
+      <CarouselDemo />
 
       <div className="spacer" />
 
