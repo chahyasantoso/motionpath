@@ -11,7 +11,7 @@ const scrollScene = {
   scrollConfig: { scrub: 1, pin: '.stage' },
   elements: [
     {
-      id: 'rocket',
+      id: 'rocket-track',
       pathNodes: [
         { x: 50, y: 300 },
         { x: 400, y: 100, ctrlX: 200, ctrlY: -50 },
@@ -50,21 +50,48 @@ const timerScene = {
 
 // ─── Animated Elements ─────────────────────────────────────────
 
-function Rocket() {
+function Rocket({ offset = 0 }) {
   const ref = useRef(null);
 
-  // transformFn: uses progress to drive opacity & scale
-  const transform = useCallback((data) => ({
-    x: data.x,
-    y: data.y,
-    rotation: data.rotation,
-    xPercent: -50,
-    yPercent: -50,
-    scale: 0.8 + data.progress * 0.5,
-    opacity: 0.4 + data.progress * 0.6,
-  }), []);
+  // transformFn: uses progress to drive opacity & scale, mapping coordinates from SVG path
+  const transform = useCallback((data) => {
+    // Find the SVG path element in the DOM
+    const pathEl = document.querySelector('#path-guide-rocket-track');
+    if (!pathEl) return {};
 
-  useMotionSubscriber('rocket', ref, transform);
+    const totalLength = pathEl.getTotalLength();
+
+    // Calculate offset progress, clamp between 0 and 1
+    let p = data.progress + offset;
+    p = Math.max(0, Math.min(1, p));
+
+    // Get x & y at target progress
+    const point = pathEl.getPointAtLength(p * totalLength);
+
+    // Calculate rotation angle (tangent) dynamically
+    const delta = 0.001;
+    let nextP = p + delta;
+    let prevP = p - delta;
+    if (nextP > 1) {
+      nextP = 1;
+      prevP = 1 - delta;
+    }
+    const pt1 = pathEl.getPointAtLength(Math.max(0, prevP) * totalLength);
+    const pt2 = pathEl.getPointAtLength(nextP * totalLength);
+    const angle = Math.atan2(pt2.y - pt1.y, pt2.x - pt1.x) * (180 / Math.PI);
+
+    return {
+      x: point.x,
+      y: point.y,
+      rotation: angle,
+      xPercent: -50,
+      yPercent: -50,
+      scale: 0.8 + p * 0.5,
+      opacity: 0.4 + p * 0.6,
+    };
+  }, [offset]);
+
+  useMotionSubscriber('rocket-track', ref, transform);
 
   return <div ref={ref} className="element rocket">🚀</div>;
 }
@@ -112,16 +139,21 @@ function ScrollDemo() {
     <section ref={containerRef} className="scroll-scene">
       <div className="scene-label">
         <h2>Scroll Scene</h2>
-        <p>Scroll down to animate — rocket uses <code>transformFn</code> with progress</p>
+        <p>Scroll down to animate — 5 rockets follow the same track with offsets</p>
       </div>
       <div className="stage">
-        <Rocket />
+        <Rocket offset={0} />
+        <Rocket offset={-0.04} />
+        <Rocket offset={-0.08} />
+        <Rocket offset={-0.12} />
+        <Rocket offset={-0.16} />
         <Cloud />
         {/* Path guides generated from scene data */}
         <svg className="path-guide" width="100%" height="100%">
           {scrollScene.elements.map(el => (
             <path
               key={el.id}
+              id={`path-guide-${el.id}`}
               d={buildMotionPath(el.pathNodes)}
               fill="none"
               stroke="rgba(255,255,255,0.1)"
