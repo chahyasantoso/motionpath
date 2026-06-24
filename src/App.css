@@ -1,0 +1,210 @@
+/* ─── Reset & Base ──────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+:root {
+  --bg: #0a0a1a;
+  --surface: #12122a;
+  --text: #e4e4f0;
+  --text-muted: #8888aa;
+  --accent: #7c5cff;
+  --accent-glow: rgba(124, 92, 255, 0.35);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+/* ─── Header ────────────────────────────────────────────────── */
+.header {
+  text-align: center;
+  padding: 4rem 2rem 2rem;
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.header .accent {
+  background: linear-gradient(135deg, var(--accent), #ff6bca);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ─── Scene Shared ──────────────────────────────────────────── */
+.scene-label {
+  position: absolute;
+  top: 2rem;
+  left: 2rem;
+  z-index: 10;
+}
+
+.scene-label h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.scene-label p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.scene-label code {
+  background: rgba(124, 92, 255, 0.15);
+  color: var(--accent);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+/* ─── Scroll Scene ──────────────────────────────────────────── */
+.scroll-scene {
+  position: relative;
+  height: 300vh; /* tall container for scroll scrubbing */
+  background: var(--surface);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.path-guide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ─── Animated Elements ─────────────────────────────────────── */
+.element {
+  position: absolute;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.rocket {
+  font-size: 3rem;
+  filter: drop-shadow(0 0 12px var(--accent-glow));
+  top: 0;
+  left: 0;
+}
+
+.cloud {
+  font-size: 2.5rem;
+  opacity: 0.5;
+  top: 0;
+  left: 0;
+}
+
+.orbiter {
+  font-size: 2rem;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 202, 0.4));
+}
+
+/* ─── Timer Scene ───────────────────────────────────────────── */
+.timer-scene {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 4rem 2rem;
+}
+
+.timer-scene .scene-label {
+  position: relative;
+  top: auto;
+  left: auto;
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.orbit-stage {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orbit-center {
+  font-size: 1.5rem;
+  color: var(--accent);
+  text-shadow: 0 0 20px var(--accent-glow);
+}
+
+.orbit-stage .orbiter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+}
+
+.toggle-btn {
+  margin-top: 1rem;
+  padding: 0.6rem 1.6rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(124, 92, 255, 0.15);
+  border: 1px solid rgba(124, 92, 255, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+  background: rgba(124, 92, 255, 0.3);
+  border-color: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+/* ─── Spacer & Footer ───────────────────────────────────────── */
+.spacer {
+  height: 20vh;
+  background: linear-gradient(to bottom, var(--surface), var(--bg));
+}
+
+.footer {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}

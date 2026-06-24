@@ -1,0 +1,15 @@
+i want to create an animation editor for html/react components.
+create this component called motion path:
+- it looks like a line i can drag and drop and bend(just like in path vector editing software)
+- when played/animated it will broadcast its path (x and y)
+- other component can listen to this motion path and animates based on the position that is broadcasted
+- i also want this motion path can listen to scroll controlled
+- use gsap, lenis or framer motion for the animation sequencing and smooth scrolling functionality.
+
+with this requirements, i want to know if this is something good to implement, or do you have any  other suggestion on the motion path component on how the behavior especially about the broadcast and listenable nature of it. will the broadcasting stuff cause performance overhead?
+
+Optimize the motion path component's broadcasting mechanism to minimize performance overhead. Implement strategies such as throttling coordinate updates or debouncing them to send data only when significant changes occur or at a controlled rate. Document the chosen optimization strategy.
+
+Add easing options to the motion path component. Allow the user to select from various easing functions (e.g., linear, ease-in, ease-out, ease-in-out) to control the speed and acceleration of the animated object following the path. Ensure these easing functions are applied correctly when the path's coordinates are broadcast.
+
+Implement Bezier curve control for the motion path component. Allow users to drag control points to bend and shape the path, similar to vector editing software. Ensure the component can still broadcast its X and Y coordinates accurately along the defined Bezier curve.
