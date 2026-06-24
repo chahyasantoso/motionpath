@@ -26,15 +26,6 @@ export default function useMotionPlayer(sceneData, containerRef, options = {}) {
 
     motionEngine.initScene(sceneData, containerEl);
 
-    // If initially paused, apply immediately
-    if (paused) {
-      if (sceneData.triggerType === 'scroll') {
-        motionEngine.disableScroll(sceneData.sceneId);
-      } else if (sceneData.triggerType === 'timer') {
-        motionEngine.pauseTimer(sceneData.sceneId);
-      }
-    }
-
     // Cleanup: destroyScene handles kill timeline, kill tweens,
     // kill ScrollTrigger, and clear cache (motionEngine.js:244-272)
     return () => {
