@@ -32,14 +32,20 @@ export default function useMotionSubscriber(elementId, ref, transformFn) {
 
       if (typeof transformFnRef.current === 'function') {
         // Custom transform: consumer has full access to { x, y, rotation, progress }
-        gsap.set(ref.current, transformFnRef.current(data));
+        gsap.set(ref.current, {
+          xPercent: -50,
+          yPercent: -50,
+          ...transformFnRef.current(data),
+        });
       } else {
-        // Default: apply spatial properties only. progress is NOT set to DOM
-        // because it is not a valid CSS property.
+        // Default: apply spatial properties and center the element.
+        // progress is NOT set to DOM because it is not a valid CSS property.
         gsap.set(ref.current, {
           x: data.x,
           y: data.y,
           rotation: data.rotation,
+          xPercent: -50,
+          yPercent: -50,
         });
       }
     });
