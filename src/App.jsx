@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useState } from 'react';
 import useMotionPlayer from './hooks/useMotionPlayer';
 import useMotionSubscriber from './hooks/useMotionSubscriber';
-import { buildMotionPath } from './lib/motionEngine';
+import { buildMotionPath, getPointOnPath } from './lib/motionEngine';
 import './App.css';
 
 // ─── Scene Data ────────────────────────────────────────────────
@@ -53,41 +53,19 @@ const timerScene = {
 function Rocket({ offset = 0 }) {
   const ref = useRef(null);
 
-  // transformFn: uses progress to drive opacity & scale, mapping coordinates from SVG path
+  // transformFn: uses progress to drive opacity & scale, mapping coordinates using the helper utility
   const transform = useCallback((data) => {
-    // Find the SVG path element in the DOM
     const pathEl = document.querySelector('#path-guide-rocket-track');
-    if (!pathEl) return {};
-
-    const totalLength = pathEl.getTotalLength();
-
-    // Calculate offset progress, clamp between 0 and 1
-    let p = data.progress + offset;
-    p = Math.max(0, Math.min(1, p));
-
-    // Get x & y at target progress
-    const point = pathEl.getPointAtLength(p * totalLength);
-
-    // Calculate rotation angle (tangent) dynamically
-    const delta = 0.001;
-    let nextP = p + delta;
-    let prevP = p - delta;
-    if (nextP > 1) {
-      nextP = 1;
-      prevP = 1 - delta;
-    }
-    const pt1 = pathEl.getPointAtLength(Math.max(0, prevP) * totalLength);
-    const pt2 = pathEl.getPointAtLength(nextP * totalLength);
-    const angle = Math.atan2(pt2.y - pt1.y, pt2.x - pt1.x) * (180 / Math.PI);
+    const point = getPointOnPath(pathEl, data.progress, offset);
 
     return {
       x: point.x,
       y: point.y,
-      rotation: angle,
+      rotation: point.rotation,
       xPercent: -50,
       yPercent: -50,
-      scale: 0.8 + p * 0.5,
-      opacity: 0.4 + p * 0.6,
+      scale: 0.8 + point.progress * 0.5,
+      opacity: 0.4 + point.progress * 0.6,
     };
   }, [offset]);
 

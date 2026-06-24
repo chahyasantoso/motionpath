@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import motionEngine, { buildMotionPath, MotionEngineError } from '../motionEngine.js';
+import motionEngine, { buildMotionPath, MotionEngineError, getPointOnPath } from '../motionEngine.js';
 import { gsap } from 'gsap';
 
 // Mock GSAP and its plugins
@@ -472,6 +472,59 @@ describe('GsapPubSub - Specialized Playback Controls', () => {
         invalidateOnRefresh: true
       }
     });
+  });
+});
+
+describe('getPointOnPath', () => {
+  it('should return default values if pathEl is missing', () => {
+    const result = getPointOnPath(null, 0.5);
+    expect(result).toEqual({ x: 0, y: 0, rotation: 0, progress: 0 });
+  });
+
+  it('should calculate coordinates and rotation correctly', () => {
+    // Mock pathEl with native methods
+    const mockPathEl = {
+      getTotalLength: vi.fn(() => 1000),
+      getPointAtLength: vi.fn((distance) => {
+        // If distance is around progress 0.5 (length 500)
+        if (distance === 500) return { x: 50, y: 100 };
+        // If distance is near nextP (length 501)
+        if (distance === 501) return { x: 51, y: 101 };
+        // If distance is near prevP (length 499)
+        if (distance === 499) return { x: 49, y: 99 };
+        return { x: 0, y: 0 };
+      })
+    };
+
+    const result = getPointOnPath(mockPathEl, 0.5, 0);
+
+    expect(mockPathEl.getTotalLength).toHaveBeenCalled();
+    expect(mockPathEl.getPointAtLength).toHaveBeenCalledWith(500); // 0.5 * 1000
+
+    expect(result.x).toBe(50);
+    expect(result.y).toBe(100);
+    expect(result.progress).toBe(0.5);
+    // Math.atan2(101 - 99, 51 - 49) * 180 / Math.PI = Math.atan2(2, 2) * 180 / Math.PI = 45 degrees
+    expect(result.rotation).toBeCloseTo(45);
+  });
+
+  it('should respect offset and clamp values correctly', () => {
+    const mockPathEl = {
+      getTotalLength: vi.fn(() => 100),
+      getPointAtLength: vi.fn(() => ({ x: 10, y: 20 }))
+    };
+
+    // Progress 0.8 + offset 0.3 = 1.1, clamped to 1.0 (length 100)
+    const resultMax = getPointOnPath(mockPathEl, 0.8, 0.3);
+
+    expect(resultMax.progress).toBe(1.0);
+    expect(mockPathEl.getPointAtLength).toHaveBeenCalledWith(100);
+
+    // Progress 0.2 + offset -0.3 = -0.1, clamped to 0.0 (length 0)
+    const resultMin = getPointOnPath(mockPathEl, 0.2, -0.3);
+
+    expect(resultMin.progress).toBe(0.0);
+    expect(mockPathEl.getPointAtLength).toHaveBeenCalledWith(0);
   });
 });
 

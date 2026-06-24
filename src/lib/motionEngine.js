@@ -356,3 +356,36 @@ class GsapPubSub {
 // Export singleton instance as default
 const motionEngine = new GsapPubSub();
 export default motionEngine;
+
+/**
+ * Calculates the x, y coordinates and tangent rotation at a given progress along an SVG path.
+ * @param {SVGPathElement} pathEl The SVG path element
+ * @param {number} progress Progress along the path (0 to 1)
+ * @param {number} [offset] Optional offset progress to add
+ * @returns {Object} { x, y, rotation, progress }
+ */
+export function getPointOnPath(pathEl, progress, offset = 0) {
+  if (!pathEl) {
+    return { x: 0, y: 0, rotation: 0, progress: 0 };
+  }
+
+  const totalLength = pathEl.getTotalLength();
+  let p = progress + offset;
+  p = Math.max(0, Math.min(1, p));
+
+  const point = pathEl.getPointAtLength(p * totalLength);
+
+  // Calculate tangent rotation angle using delta step
+  const delta = 0.001;
+  let nextP = p + delta;
+  let prevP = p - delta;
+  if (nextP > 1) {
+    nextP = 1;
+    prevP = 1 - delta;
+  }
+  const pt1 = pathEl.getPointAtLength(Math.max(0, prevP) * totalLength);
+  const pt2 = pathEl.getPointAtLength(nextP * totalLength);
+  const rotation = Math.atan2(pt2.y - pt1.y, pt2.x - pt1.x) * (180 / Math.PI);
+
+  return { x: point.x, y: point.y, rotation, progress: p };
+}
