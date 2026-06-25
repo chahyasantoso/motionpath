@@ -13,8 +13,8 @@ This document summarizes the changes made to the codebase to allow future agents
 
 ### B. Implemented Tilted 3D Z-Depth scaling Demo
 *   **Goal**: Create a demo showing native 3D depth scaling (card growth/shrinkage) where the start and end coordinates have the same X/Y positions but different Z positions.
-*   **Path Setup**: Defined a diagonal tilted trajectory:
-    `{-100, -100, -350} -> {100, 100, 350} -> {-100, -100, -350}`
+*   **Path Setup**: Defined a tilted 3D curved Bezier trajectory:
+    `{-150, -120, -300} -> {150, 120, 300, ctrlX: 100, ctrlY: -100, ctrlZ: 0} -> {-150, -120, -300, ctrlX: -100, ctrlY: 100, ctrlZ: 0}`
 *   **Zero Re-renders**: Subscriber component updates the card transform natively via GSAP and updates text readouts directly in the DOM using refs.
 *   **Unified Projection Math**: Updated `project3DTo2D` and `projectPathNodes3DTo2D` in [`projection3d.js`](file:///d:/dev/motionpath/src/lib/projection3d.js) to support perspective division scaling natively:
     $$\text{scale} = \frac{\text{perspective}}{\text{perspective} - Z}$$
