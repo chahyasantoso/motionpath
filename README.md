@@ -84,11 +84,12 @@ Houses all the geometry and Bezier interpolation computations:
 
 Handles trigonometric projection of coordinates from a 3D coordinate space onto a tilted 2D perspective layout:
 
-*   **`project3DTo2D(x3d, y3d, z3d, cx, cy, tiltDeg, invertTilt = false)`**:
-    Projects coordinate $(x,y,z)$ centered around $(cx, cy)$ using a tilt angle $\theta$:
-    $$x_{2D} = cx + x_{3D}$$
-    $$y_{2D} = cy + y_{3D} \cos(\theta) \pm z_{3D} \sin(\theta)$$
-*   **`projectPathNodes3DTo2D(pathNodes, cx, cy, tiltDeg, invertTilt = false)`**: Projects an entire array of path nodes (and their quadratic control points) to 2D coordinates so that they can be drawn as SVG path guides via `buildMotionPath()`.
+*   **`project3DTo2D(x3d, y3d, z3d, cx, cy, tiltDeg, invertTilt = false, perspective = 1000)`**:
+    Projects coordinate $(x,y,z)$ centered around $(cx, cy)$ using a tilt angle $\theta$ and a perspective division factor:
+    $$\text{scale} = \frac{\text{perspective}}{\text{perspective} - Z}$$
+    $$x_{2D} = cx + x_{3D} \times \text{scale}$$
+    $$y_{2D} = cy + (y_{3D} \cos(\theta) \pm z_{3D} \sin(\theta)) \times \text{scale}$$
+*   **`projectPathNodes3DTo2D(pathNodes, cx, cy, tiltDeg, invertTilt = false, perspective = 1000)`**: Projects an entire array of path nodes (and their quadratic control points) to 2D coordinates so that they can be drawn as SVG path guides via `buildMotionPath()`.
 *   **`shapeGenerators`**:
     *   `helix(config)`: Generates a helical coordinate pathway wrapping a vertical cylinder.
     *   `cone(config)`: Generates a spiral pathway wrapping a vertical cone.
@@ -189,15 +190,14 @@ interface MotionScene {
 1.  **ScrollDemo**: Low-friction timeline scrubbing showing 5 rockets trailing along a dashed SVG track with distinct offset multipliers.
 2.  **CarouselDemo**: Multi-card horizontal glassmorphic showcase moving on a complex cubic Bezier S-curve track. Cards tilt dynamically depending on the local path tangent.
 3.  **HelixDemo**: Scroll-controlled 3D vertical spring simulation where cards scale, blur, change opacity, and rotate around the Y-axis according to cylinder depth.
-4.  **ConeDemo**: Auto-playing orbiter element describing a conical spiral trajectory moving in-front and behind a central vector cone drawing.
+4.  **GrowthDemo**: True 3D Z-depth scaling demo. A single card translates diagonally along a tilted 3D Bezier curve from $Z = -300$ to $Z = 300$ and back. The browser's native CSS perspective engine handles visual enlargement and depth, aligned with a perspective-projected SVG guide line.
 5.  **TimerDemo**: Simple auto-playing orbiting satellite showcasing timer play/pause features.
-6.  **DepthDemo**: True 3D Z-axis interpolations. A glowing sphere travels on a path with varying Z coordinates, projecting its location to 2D and utilizing Z values to drive focal blur, scale, and opacity.
 
 ---
 
 ## 7. Testing & Verification
 
-The suite runs **55 unit tests** using **Vitest** covering edge cases, curve configurations, pub/sub event distributions, caching, and 3D projection formulas.
+The suite runs **58 unit tests** using **Vitest** covering edge cases, curve configurations, pub/sub event distributions, caching, and 3D projection formulas.
 
 To execute tests:
 ```bash
