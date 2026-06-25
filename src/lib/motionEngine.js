@@ -1,6 +1,7 @@
 import { gsap } from 'gsap';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { convertToCubicPath } from './pathUtils.js';
 
 // Register plugins for browser environments (safe for SSR)
 if (typeof window !== 'undefined') {
@@ -14,27 +15,8 @@ export class MotionEngineError extends Error {
   }
 }
 
-/**
- * Converts path nodes (including optional Bezier controls) to an SVG path string.
- * @param {Array} pathNodes Array of { x, y, ctrlX, ctrlY }
- * @returns {string} SVG Path string (e.g. "M 0 0 Q 150 -50 300 150 L 800 400")
- */
-export function buildMotionPath(pathNodes) {
-  if (!pathNodes || pathNodes.length === 0) return '';
-  
-  let path = `M ${pathNodes[0].x} ${pathNodes[0].y}`;
-  
-  for (let i = 1; i < pathNodes.length; i++) {
-    const node = pathNodes[i];
-    if (node.ctrlX !== undefined && node.ctrlY !== undefined) {
-      path += ` Q ${node.ctrlX} ${node.ctrlY} ${node.x} ${node.y}`;
-    } else {
-      path += ` L ${node.x} ${node.y}`;
-    }
-  }
-  
-  return path;
-}
+
+
 
 class GsapPubSub {
   constructor() {
@@ -154,13 +136,14 @@ class GsapPubSub {
     });
 
     sceneData.elements.forEach(element => {
-      const pathString = buildMotionPath(element.pathNodes);
-      if (!pathString) return;
+      const cubicPath = convertToCubicPath(element.pathNodes);
+      if (cubicPath.length === 0) return;
 
-      const startNode = element.pathNodes[0] || { x: 0, y: 0 };
+      const startNode = element.pathNodes[0] || { x: 0, y: 0, z: 0 };
       const proxy = {
         x: startNode.x,
         y: startNode.y,
+        z: startNode.z !== undefined ? startNode.z : 0,
         rotation: 0,
         progress: 0,
       };
@@ -174,8 +157,10 @@ class GsapPubSub {
       tl.to(proxy, {
         progress: 1,
         motionPath: {
-          path: pathString,
+          path: cubicPath,
+          type: 'cubic',
           autoRotate: true,
+          properties: { x: 'x', y: 'y', z: 'z' },
         },
         ease: 'none', // Strict requirement: scroll trigger MUST use ease: "none"
         duration: 1,  // Normalized timeline duration
@@ -183,6 +168,7 @@ class GsapPubSub {
           this._broadcast(element.id, {
             x: proxy.x,
             y: proxy.y,
+            z: proxy.z,
             rotation: proxy.rotation,
             progress: proxy.progress,
           });
@@ -208,13 +194,14 @@ class GsapPubSub {
     const tweens = [];
 
     sceneData.elements.forEach(element => {
-      const pathString = buildMotionPath(element.pathNodes);
-      if (!pathString) return;
+      const cubicPath = convertToCubicPath(element.pathNodes);
+      if (cubicPath.length === 0) return;
 
-      const startNode = element.pathNodes[0] || { x: 0, y: 0 };
+      const startNode = element.pathNodes[0] || { x: 0, y: 0, z: 0 };
       const proxy = {
         x: startNode.x,
         y: startNode.y,
+        z: startNode.z !== undefined ? startNode.z : 0,
         rotation: 0,
         progress: 0,
       };
@@ -233,8 +220,10 @@ class GsapPubSub {
       const tween = gsap.to(proxy, {
         progress: 1,
         motionPath: {
-          path: pathString,
+          path: cubicPath,
+          type: 'cubic',
           autoRotate: true,
+          properties: { x: 'x', y: 'y', z: 'z' },
         },
         ease: ease,
         duration: duration,
@@ -244,6 +233,7 @@ class GsapPubSub {
           this._broadcast(element.id, {
             x: proxy.x,
             y: proxy.y,
+            z: proxy.z,
             rotation: proxy.rotation,
             progress: proxy.progress,
           });
@@ -357,35 +347,4 @@ class GsapPubSub {
 const motionEngine = new GsapPubSub();
 export default motionEngine;
 
-/**
- * Calculates the x, y coordinates and tangent rotation at a given progress along an SVG path.
- * @param {SVGPathElement} pathEl The SVG path element
- * @param {number} progress Progress along the path (0 to 1)
- * @param {number} [offset] Optional offset progress to add
- * @returns {Object} { x, y, rotation, progress }
- */
-export function getPointOnPath(pathEl, progress, offset = 0) {
-  if (!pathEl) {
-    return { x: 0, y: 0, rotation: 0, progress: 0 };
-  }
 
-  const totalLength = pathEl.getTotalLength();
-  let p = progress + offset;
-  p = Math.max(0, Math.min(1, p));
-
-  const point = pathEl.getPointAtLength(p * totalLength);
-
-  // Calculate tangent rotation angle using delta step
-  const delta = 0.001;
-  let nextP = p + delta;
-  let prevP = p - delta;
-  if (nextP > 1) {
-    nextP = 1;
-    prevP = 1 - delta;
-  }
-  const pt1 = pathEl.getPointAtLength(Math.max(0, prevP) * totalLength);
-  const pt2 = pathEl.getPointAtLength(nextP * totalLength);
-  const rotation = Math.atan2(pt2.y - pt1.y, pt2.x - pt1.x) * (180 / Math.PI);
-
-  return { x: point.x, y: point.y, rotation, progress: p };
-}

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import motionEngine, { buildMotionPath, MotionEngineError, getPointOnPath } from '../motionEngine.js';
+import motionEngine, { MotionEngineError } from '../motionEngine.js';
+import { convertToCubicPath } from '../pathUtils.js';
 import { gsap } from 'gsap';
 
 // Mock GSAP and its plugins
@@ -51,53 +52,6 @@ vi.mock('gsap/ScrollTrigger', () => ({
     getAll: vi.fn(() => []),
   }
 }));
-
-describe('buildMotionPath', () => {
-  it('should return empty string for null or empty input', () => {
-    expect(buildMotionPath(null)).toBe('');
-    expect(buildMotionPath(undefined)).toBe('');
-    expect(buildMotionPath([])).toBe('');
-  });
-
-  it('should build simple path with only M and L commands', () => {
-    const pathNodes = [
-      { x: 10, y: 20 },
-      { x: 100, y: 200 }
-    ];
-    expect(buildMotionPath(pathNodes)).toBe('M 10 20 L 100 200');
-  });
-
-  it('should build bezier curves with Q command when ctrlX and ctrlY are provided', () => {
-    const pathNodes = [
-      { x: 0, y: 0 },
-      { x: 300, y: 150, ctrlX: 150, ctrlY: -50 }
-    ];
-    expect(buildMotionPath(pathNodes)).toBe('M 0 0 Q 150 -50 300 150');
-  });
-
-  it('should build mixed straight and curved paths correctly', () => {
-    const pathNodes = [
-      { x: 0, y: 0 },
-      { x: 300, y: 150, ctrlX: 150, ctrlY: -50 },
-      { x: 800, y: 400 }
-    ];
-    expect(buildMotionPath(pathNodes)).toBe('M 0 0 Q 150 -50 300 150 L 800 400');
-  });
-
-  it('should produce only M command for a single node', () => {
-    const pathNodes = [{ x: 42, y: 99 }];
-    expect(buildMotionPath(pathNodes)).toBe('M 42 99');
-  });
-
-  it('should match expected output for scene.json "motor-utama" element', () => {
-    const pathNodes = [
-      { x: 0, y: 0 },
-      { x: 300, y: 150, ctrlX: 150, ctrlY: -50 },
-      { x: 800, y: 400, ctrlX: 600, ctrlY: 500 }
-    ];
-    expect(buildMotionPath(pathNodes)).toBe('M 0 0 Q 150 -50 300 150 Q 600 500 800 400');
-  });
-});
 
 describe('GsapPubSub - Pub/Sub and Caching', () => {
   beforeEach(() => {
@@ -287,8 +241,13 @@ describe('GsapPubSub - initScene with GSAP mocking', () => {
     expect(callArgs.ease).toBe('power2.out');
     expect(callArgs.repeat).toBe(-1);
     expect(callArgs.motionPath).toEqual({
-      path: 'M 0 0 L 100 100',
-      autoRotate: true
+      path: convertToCubicPath([
+        { x: 0, y: 0 },
+        { x: 100, y: 100 }
+      ]),
+      type: 'cubic',
+      autoRotate: true,
+      properties: { x: 'x', y: 'y', z: 'z' },
     });
   });
 
@@ -334,8 +293,13 @@ describe('GsapPubSub - initScene with GSAP mocking', () => {
     expect(callArgs.ease).toBe('none');
     expect(callArgs.duration).toBe(1);
     expect(callArgs.motionPath).toEqual({
-      path: 'M 0 0 L 50 50',
-      autoRotate: true
+      path: convertToCubicPath([
+        { x: 0, y: 0 },
+        { x: 50, y: 50 }
+      ]),
+      type: 'cubic',
+      autoRotate: true,
+      properties: { x: 'x', y: 'y', z: 'z' },
     });
   });
 
@@ -475,56 +439,43 @@ describe('GsapPubSub - Specialized Playback Controls', () => {
   });
 });
 
-describe('getPointOnPath', () => {
-  it('should return default values if pathEl is missing', () => {
-    const result = getPointOnPath(null, 0.5);
-    expect(result).toEqual({ x: 0, y: 0, rotation: 0, progress: 0 });
+
+
+describe('GsapPubSub - Z coordinate in broadcasts', () => {
+  beforeEach(() => {
+    motionEngine.destroy();
+    vi.clearAllMocks();
   });
 
-  it('should calculate coordinates and rotation correctly', () => {
-    // Mock pathEl with native methods
-    const mockPathEl = {
-      getTotalLength: vi.fn(() => 1000),
-      getPointAtLength: vi.fn((distance) => {
-        // If distance is around progress 0.5 (length 500)
-        if (distance === 500) return { x: 50, y: 100 };
-        // If distance is near nextP (length 501)
-        if (distance === 501) return { x: 51, y: 101 };
-        // If distance is near prevP (length 499)
-        if (distance === 499) return { x: 49, y: 99 };
-        return { x: 0, y: 0 };
-      })
+  it('should include z=0 in initial cache when pathNodes have no z', () => {
+    const sceneData = {
+      sceneId: 'z-test-scene',
+      triggerType: 'timer',
+      elements: [
+        { id: 'z-el', pathNodes: [{ x: 0, y: 0 }, { x: 10, y: 10 }] }
+      ]
     };
+    motionEngine.initScene(sceneData);
 
-    const result = getPointOnPath(mockPathEl, 0.5, 0);
-
-    expect(mockPathEl.getTotalLength).toHaveBeenCalled();
-    expect(mockPathEl.getPointAtLength).toHaveBeenCalledWith(500); // 0.5 * 1000
-
-    expect(result.x).toBe(50);
-    expect(result.y).toBe(100);
-    expect(result.progress).toBe(0.5);
-    // Math.atan2(101 - 99, 51 - 49) * 180 / Math.PI = Math.atan2(2, 2) * 180 / Math.PI = 45 degrees
-    expect(result.rotation).toBeCloseTo(45);
+    const cached = motionEngine._cache.get('z-el');
+    expect(cached).toHaveProperty('z', 0);
   });
 
-  it('should respect offset and clamp values correctly', () => {
-    const mockPathEl = {
-      getTotalLength: vi.fn(() => 100),
-      getPointAtLength: vi.fn(() => ({ x: 10, y: 20 }))
+  it('should include explicit z in initial cache', () => {
+    const sceneData = {
+      sceneId: 'z-test-scene-2',
+      triggerType: 'timer',
+      elements: [
+        { id: 'z-el-2', pathNodes: [{ x: 0, y: 0, z: 42 }, { x: 10, y: 10, z: 100 }] }
+      ]
     };
+    motionEngine.initScene(sceneData);
 
-    // Progress 0.8 + offset 0.3 = 1.1, clamped to 1.0 (length 100)
-    const resultMax = getPointOnPath(mockPathEl, 0.8, 0.3);
-
-    expect(resultMax.progress).toBe(1.0);
-    expect(mockPathEl.getPointAtLength).toHaveBeenCalledWith(100);
-
-    // Progress 0.2 + offset -0.3 = -0.1, clamped to 0.0 (length 0)
-    const resultMin = getPointOnPath(mockPathEl, 0.2, -0.3);
-
-    expect(resultMin.progress).toBe(0.0);
-    expect(mockPathEl.getPointAtLength).toHaveBeenCalledWith(0);
+    const cached = motionEngine._cache.get('z-el-2');
+    expect(cached).toHaveProperty('z', 42);
   });
 });
+
+
+
 

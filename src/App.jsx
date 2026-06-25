@@ -1,8 +1,10 @@
-import React, { useRef, useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import './App.css';
 import useMotionPlayer from './hooks/useMotionPlayer';
 import useMotionSubscriber from './hooks/useMotionSubscriber';
-import { buildMotionPath, getPointOnPath } from './lib/motionEngine';
-import './App.css';
+import { buildMotionPath, convertToCubicPath, getPointOnCubicPath, getPointOnPath } from './lib/pathUtils';
+import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from './lib/projection3d';
+
 
 // ─── Scene Data ────────────────────────────────────────────────
 const scrollScene = {
@@ -66,6 +68,36 @@ const carouselScene = {
   ],
 };
 
+// ─── 3D Helix Path Generator & Scene ───────────────────────────
+const HELIX_CONFIG = {
+  cx: 640,
+  cy: 100,
+  radius: 220,
+  height: 520,
+  turns: 3.0,
+  tiltDeg: 0,
+};
+
+const helixPathNodes = shapeGenerators.helix({
+  radius: HELIX_CONFIG.radius,
+  height: HELIX_CONFIG.height,
+  turns: HELIX_CONFIG.turns,
+});
+
+const helixCubicPath = convertToCubicPath(helixPathNodes);
+
+const helixScene = {
+  sceneId: 'helix-storytelling',
+  triggerType: 'scroll',
+  scrollConfig: { scrub: 1.2, pin: '.helix-stage' },
+  elements: [
+    {
+      id: 'helix-track',
+      pathNodes: helixPathNodes,
+    },
+  ],
+};
+
 const MOCK_CARDS = [
   { id: 1, badge: '01 / IMAGINATION', title: 'Fluid Motion Engine', desc: 'Harnessing the power of GSAP Pub/Sub for sub-millisecond DOM updates.' },
   { id: 2, badge: '02 / ARCHITECTURE', title: 'Zero Re-renders', desc: 'No React component updates during animation cycles for maximum 60FPS performance.' },
@@ -76,6 +108,8 @@ const MOCK_CARDS = [
   { id: 7, badge: '07 / AWWWARDS', title: 'Storytelling Layouts', desc: 'Create immersive cinematic scrollytelling experiences that engage users.' },
   { id: 8, badge: '08 / ANTIGRAVITY', title: 'Endless Horizons', desc: 'Scaling up to unlimited items on custom paths without duplicating nodes.' },
 ];
+
+
 
 // ─── Animated Elements ─────────────────────────────────────────
 
@@ -136,6 +170,8 @@ function Orbiter() {
   return <div ref={ref} className="element orbiter">🛰️</div>;
 }
 
+
+
 function CarouselCard({ index, totalCards, cardData }) {
   const ref = useRef(null);
 
@@ -191,6 +227,84 @@ function CarouselCard({ index, totalCards, cardData }) {
 
   return (
     <div ref={ref} className="element carousel-card">
+      <div className="card-badge">{cardData.badge}</div>
+      <h3>{cardData.title}</h3>
+      <p>{cardData.desc}</p>
+    </div>
+  );
+}
+
+function HelixCard({ index, totalCards, cardData }) {
+  const ref = useRef(null);
+
+  const cardSpacing = 0.16; // spacing between cards along the spiral
+  const totalOffsetSpan = (totalCards - 1) * cardSpacing;
+
+  const transform = useCallback((data) => {
+    // Map global scroll progress to this card's segment
+    const cardProgress = (data.progress * (1 + totalOffsetSpan)) - (index * cardSpacing);
+
+    if (cardProgress < 0 || cardProgress > 1) {
+      return {
+        display: 'none',
+        opacity: 0,
+      };
+    }
+
+    // Get 3D coordinate on path natively
+    const point3D = getPointOnCubicPath(helixCubicPath, cardProgress);
+
+    // Project 3D coordinate to 2D
+    const projected = project3DTo2D(
+      point3D.x,
+      point3D.y,
+      point3D.z,
+      HELIX_CONFIG.cx,
+      HELIX_CONFIG.cy,
+      HELIX_CONFIG.tiltDeg,
+      true // invertTilt
+    );
+
+    // Normalize depth: 0 (furthest back) to 1 (closest front)
+    // point3D.z goes from -radius to +radius
+    const depthFactor = (point3D.z + HELIX_CONFIG.radius) / (2 * HELIX_CONFIG.radius);
+
+    const scale = 0.6 + depthFactor * 0.65;
+    const opacityBase = 0.4 + depthFactor * 0.6;
+    const blur = Math.max(0, (1 - depthFactor) * 4);
+    
+    // Y-axis rotation based on theta
+    const theta = cardProgress * HELIX_CONFIG.turns * 2 * Math.PI;
+    const rotateY = -(theta - Math.PI / 2) * (180 / Math.PI);
+    const zIndex = Math.round(depthFactor * 100);
+
+    // Fade cards near the ends
+    let opacity = opacityBase;
+    if (cardProgress < 0.1) {
+      opacity *= (cardProgress / 0.1);
+    } else if (cardProgress > 0.9) {
+      opacity *= ((1 - cardProgress) / 0.1);
+    }
+
+    return {
+      display: 'flex',
+      x: projected.x,
+      y: projected.y,
+      xPercent: -50,
+      yPercent: -50,
+      scale: scale,
+      opacity: opacity,
+      filter: `blur(${blur}px)`,
+      zIndex: zIndex,
+      transformPerspective: 1000,
+      rotateY: rotateY,
+    };
+  }, [index, totalOffsetSpan]);
+
+  useMotionSubscriber('helix-track', ref, transform);
+
+  return (
+    <div ref={ref} className="element helix-card">
       <div className="card-badge">{cardData.badge}</div>
       <h3>{cardData.title}</h3>
       <p>{cardData.desc}</p>
@@ -312,6 +426,198 @@ function CarouselDemo() {
   );
 }
 
+
+
+function HelixDemo() {
+  const containerRef = useRef(null);
+  useMotionPlayer(helixScene, containerRef);
+
+  const { cx, cy, radius, height, tiltDeg } = HELIX_CONFIG;
+  const tiltRad = (tiltDeg * Math.PI) / 180;
+  const cylinderHeight2D = height * Math.cos(tiltRad);
+
+  // Project 3D path nodes to 2D for the SVG guide
+  const projectedHelixNodes = projectPathNodes3DTo2D(
+    helixScene.elements[0].pathNodes,
+    cx, cy, tiltDeg, true
+  );
+
+  return (
+    <section ref={containerRef} className="helix-scene">
+      <div className="scene-label">
+        <h2>3D Helix Card Flow (Scroll)</h2>
+        <p>Content cards flowing down a vertical spring, rotating 3D tangent to the cylinder surface</p>
+      </div>
+
+      <div className="helix-stage">
+        {/* SVG guides for the cylinder outlines */}
+        <svg className="path-guide" width="100%" height="100%">
+          <defs>
+            <linearGradient id="helix-path-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.05" />
+              <stop offset="50%" stopColor="#ff6bca" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.75" />
+            </linearGradient>
+          </defs>
+
+          {/* Dotted path of the spring track */}
+          <path
+            id="path-guide-helix-track"
+            d={buildMotionPath(projectedHelixNodes)}
+            fill="none"
+            stroke="url(#helix-path-gradient)"
+            strokeWidth="1.5"
+            strokeDasharray="6 4"
+          />
+
+          {/* Virtual cylinder visual boundaries */}
+          <line
+            x1={cx - radius}
+            y1={cy}
+            x2={cx - radius}
+            y2={cy + cylinderHeight2D}
+            stroke="rgba(255, 255, 255, 0.04)"
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+          />
+          <line
+            x1={cx + radius}
+            y1={cy}
+            x2={cx + radius}
+            y2={cy + cylinderHeight2D}
+            stroke="rgba(255, 255, 255, 0.04)"
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+          />
+          <line
+            x1={cx}
+            y1={cy}
+            x2={cx}
+            y2={cy + cylinderHeight2D}
+            stroke="rgba(255, 255, 255, 0.015)"
+            strokeWidth="1"
+            strokeDasharray="8 6"
+          />
+        </svg>
+
+        {/* The list of cards flowing down the spiral */}
+        {MOCK_CARDS.slice(0, 6).map((card, i) => (
+          <HelixCard
+            key={card.id}
+            index={i}
+            totalCards={6}
+            cardData={card}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ─── Z-Depth Card Growth Demo ─────────────────────────────────
+const growthScene = {
+  sceneId: 'growth-demo-scene',
+  triggerType: 'timer',
+  elements: [
+    {
+      id: 'growth-card',
+      pathNodes: [
+        { x: -100, y: -100, z: -350 },
+        { x: -100, y: -100, z: 350 },
+        { x: -100, y: -100, z: -350 },
+      ],
+      duration: 4,
+      ease: 'power1.inOut',
+      repeat: -1,
+    },
+  ],
+};
+
+
+
+function GrowthCard() {
+  const ref = useRef(null);
+  const readoutRef = useRef(null);
+
+  const transform = useCallback((data) => {
+
+    // Update readout text directly in the DOM (Zero Re-render)
+    if (readoutRef.current) {
+      readoutRef.current.textContent = `X: ${Math.round(data.x)} | Y: ${Math.round(data.y)} | Z: ${Math.round(data.z)}px`;
+    }
+
+    // Return the properties to GSAP
+    return {
+      x: data.x,
+      y: data.y,
+      z: data.z,
+      xPercent: -50,
+      yPercent: -50,
+    };
+  }, []);
+
+  useMotionSubscriber('growth-card', ref, transform);
+
+  return (
+    <div ref={ref} className="element growth-card">
+      <div className="card-badge">3D PERSPECTIVE</div>
+      <h3>Tilted 3D Path</h3>
+      <p>This card translates diagonally across X, Y, and Z axes. The browser's native perspective engine automatically scales the card based on its actual Z depth.</p>
+      <div ref={readoutRef} className="growth-readout">X: 0 | Y: 0 | Z: 0px</div>
+    </div>
+  );
+}
+
+function GrowthDemo() {
+  const containerRef = useRef(null);
+  useMotionPlayer(growthScene, containerRef);
+
+  const stageWidth = 500;
+  const stageHeight = 550;
+  const cx = stageWidth / 2; // 250
+  const cy = stageHeight / 2; // 275
+  const PERSPECTIVE = 1000; // Single source of truth for 3D perspective depth
+
+  // Project the 3D path nodes into 2D matching the browser's native 3D perspective translation
+  const projectedNodes = projectPathNodes3DTo2D(
+    growthScene.elements[0].pathNodes,
+    cx,
+    cy,
+    0,     // tiltDeg (0 for direct perspective)
+    false, // invertTilt
+    PERSPECTIVE
+  );
+  const pathD = buildMotionPath(projectedNodes);
+
+  return (
+    <section ref={containerRef} className="growth-scene">
+      <div className="scene-label">
+        <h2>Tilted 3D Z-Axis scaling</h2>
+        <p>Path goes diagonally from (-100, -100, -350) to (100, 100, 350) with native browser-calculated 3D projection.</p>
+      </div>
+
+      {/* Set perspective via inline styles to ensure JS math and CSS projection match perfectly */}
+      <div className="growth-stage" style={{ perspective: `${PERSPECTIVE}px` }}>
+        {/* SVG guides representing the projected path of the 3D line */}
+        <svg className="path-guide" width="100%" height="100%">
+          <path
+            d={pathD}
+            fill="none"
+            stroke="rgba(255, 107, 202, 0.25)"
+            strokeWidth="2"
+            strokeDasharray="6 4"
+          />
+          {/* Endpoint markers */}
+          <circle cx={projectedNodes[0].x} cy={projectedNodes[0].y} r="4" fill="rgba(124, 92, 255, 0.6)" />
+          <circle cx={projectedNodes[1].x} cy={projectedNodes[1].y} r="4" fill="#ff6bca" />
+        </svg>
+        
+        <GrowthCard />
+      </div>
+    </section>
+  );
+}
+
 // ─── App ───────────────────────────────────────────────────────
 
 export default function App() {
@@ -327,6 +633,14 @@ export default function App() {
       <div className="spacer" />
 
       <CarouselDemo />
+
+      <div className="spacer" />
+
+      <HelixDemo />
+
+      <div className="spacer" />
+
+      <GrowthDemo />
 
       <div className="spacer" />
 

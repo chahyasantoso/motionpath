@@ -39,6 +39,7 @@ export default function useMotionSubscriber(elementId, ref, transformFn) {
         gsap.set(ref.current, {
           x: data.x,
           y: data.y,
+          z: data.z,
           rotation: data.rotation,
         });
       }
