@@ -522,11 +522,11 @@ const growthScene = {
     {
       id: 'growth-card',
       pathNodes: [
-        { x: -100, y: -100, z: -350 },
-        { x: -100, y: -100, z: 350 },
-        { x: -100, y: -100, z: -350 },
+        { x: -150, y: -120, z: -300 },
+        { x: 150, y: 120, z: 300, ctrlX: 100, ctrlY: -100, ctrlZ: 0 },
+        { x: -150, y: -120, z: -300, ctrlX: -100, ctrlY: 100, ctrlZ: 0 },
       ],
-      duration: 4,
+      duration: 5, // Slightly longer duration for smooth curved movement
       ease: 'power1.inOut',
       repeat: -1,
     },
