@@ -33,3 +33,20 @@ This document summarizes the changes made to the codebase to allow future agents
     ```bash
     npm run test
     ```
+
+---
+
+## 3. Future Roadmap: Path Editor Design Brainstorm
+
+We brainstormed the design of the interactive Path Editor for web section animations, aligning on a **Flat Vector Canvas with Depth Overlay (Hybrid)** approach:
+
+### Core Concepts
+1.  **Context-Aware Overlay Canvas**:
+    *   The editor canvas acts as a transparent overlay directly on top of the actual website layout.
+    *   Users draw motion paths using a standard **Pen Tool** (clicking nodes, dragging control handles) directly matching Webflow, Figma, or Illustrator. This represents $X$ and $Y$ layout mapping.
+2.  **Opt-in 3D Z-Depth Handles**:
+    *   Instead of a cluttered 3D camera orbit that distorts text readability, the layout canvas remains flat.
+    *   When a node is selected, a dedicated **Z-Depth slider or helper handle** is rendered next to the node (or updated via modifier key drags e.g. `Ctrl + drag`).
+    *   Modifying the Z-depth natively scales/blurs the test card and shifts the projected SVG guide line in real-time, giving immediate depth cues while keeping the page readable.
+3.  **Responsive Layout Scaling**:
+    *   Since paths are drawn directly over the website section grid, coordinate parameters can be exported in percentages or viewport units (`%`, `vw`, `vh`) for fully responsive 3D animations across devices.
