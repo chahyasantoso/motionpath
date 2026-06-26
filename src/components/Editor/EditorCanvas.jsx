@@ -45,6 +45,7 @@ export default function EditorCanvas({
   };
 
   const handlePointerDown = (e, type, elementId, nodeIndex) => {
+    e.preventDefault();
     e.stopPropagation();
     const coords = getRelativeCoords(e);
 
