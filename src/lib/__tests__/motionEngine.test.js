@@ -9,6 +9,7 @@ vi.mock('gsap', () => {
     to: vi.fn().mockReturnThis(),
     kill: vi.fn(),
     progress: vi.fn(),
+    addLabel: vi.fn().mockReturnThis(),
     scrollTrigger: {
       kill: vi.fn(),
       disable: vi.fn(),
@@ -473,6 +474,62 @@ describe('GsapPubSub - Z coordinate in broadcasts', () => {
 
     const cached = motionEngine._cache.get('z-el-2');
     expect(cached).toHaveProperty('z', 42);
+  });
+});
+
+describe('GsapPubSub - Timeframe configuration', () => {
+  beforeEach(() => {
+    motionEngine.destroy();
+    vi.clearAllMocks();
+  });
+
+  it('should apply correct duration and start position to tween in scroll scene with timeframe', () => {
+    const sceneData = {
+      sceneId: 'scroll-tf-scene',
+      triggerType: 'scroll',
+      elements: [
+        {
+          id: 'scroll-tf-el',
+          pathNodes: [{ x: 0, y: 0 }, { x: 10, y: 10 }],
+          timeframe: [0.25, 0.75]
+        }
+      ]
+    };
+
+    motionEngine.initScene(sceneData, {});
+
+    const mockTimeline = gsap.timeline.mock.results[0].value;
+    expect(mockTimeline.to).toHaveBeenCalled();
+
+    const callArgs = mockTimeline.to.mock.calls[0][1];
+    const position = mockTimeline.to.mock.calls[0][2];
+
+    expect(callArgs.duration).toBe(0.5); // 0.75 - 0.25
+    expect(position).toBe(0.25); // start position
+  });
+
+  it('should apply correct duration and delay to tween in timer scene with timeframe', () => {
+    const sceneData = {
+      sceneId: 'timer-tf-scene',
+      triggerType: 'timer',
+      elements: [
+        {
+          id: 'timer-tf-el',
+          pathNodes: [{ x: 0, y: 0 }, { x: 10, y: 10 }],
+          duration: 4,
+          delay: 2,
+          timeframe: [0.1, 0.6]
+        }
+      ]
+    };
+
+    motionEngine.initScene(sceneData);
+
+    expect(gsap.to).toHaveBeenCalled();
+    const callArgs = gsap.to.mock.calls[0][1];
+
+    expect(callArgs.duration).toBe(2); // 4 * (0.6 - 0.1)
+    expect(callArgs.delay).toBe(2.4); // 2 + 4 * 0.1
   });
 });
 

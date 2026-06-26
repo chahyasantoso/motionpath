@@ -451,22 +451,23 @@ const STRAW_PERSPECTIVE = 800;
 const strawberryScene = {
   sceneId: 'strawberry-burst-scroll',
   triggerType: 'scroll',
-  scrollConfig: { scrub: 1, pin: '.burst-stage' },
+  scrollConfig: { scrub: 0.5, pin: '.burst-stage' },
   elements: [
-    { id: 'strawberry-1', pathNodes: [{ x: 0, y: 0, z: -1420 }, { x: -160, y: -120, z: 200 }] },
-    { id: 'strawberry-2', pathNodes: [{ x: 0, y: 0, z: -280 }, { x: 160, y: -120, z: 150 }] },
-    { id: 'strawberry-3', pathNodes: [{ x: 0, y: 0, z: -1350 }, { x: -40, y: 140, z: 250 }] },
-    { id: 'strawberry-4', pathNodes: [{ x: 0, y: 0, z: -1220 }, { x: -200, y: 30, z: 180 }] },
-    { id: 'strawberry-5', pathNodes: [{ x: 0, y: 0, z: -400 }, { x: 200, y: 60, z: 220 }] },
-    { id: 'strawberry-6', pathNodes: [{ x: 0, y: 0, z: -1310 }, { x: -100, y: -180, z: 120 }] },
-    { id: 'strawberry-7', pathNodes: [{ x: 0, y: 0, z: -450 }, { x: 100, y: -180, z: 240 }] },
-    { id: 'strawberry-8', pathNodes: [{ x: 0, y: 0, z: -1260 }, { x: 80, y: 160, z: 160 }] },
-    { id: 'strawberry-9', pathNodes: [{ x: 0, y: 0, z: -370 }, { x: -120, y: 100, z: 300 }] },
-    { id: 'strawberry-10', pathNodes: [{ x: 0, y: 0, z: -200 }, { x: 180, y: -50, z: 100 }] },
+    { id: 'strawberry-1', timeframe: [0.0, 0.45], pathNodes: [{ x: 0, y: 0, z: -1420 }, { x: -160, y: -120, z: 200 }] },
+    { id: 'strawberry-2', timeframe: [0.0, 0.45], pathNodes: [{ x: 0, y: 0, z: -280 }, { x: 160, y: -120, z: 150 }] },
+    { id: 'strawberry-3', timeframe: [0.15, 0.6], pathNodes: [{ x: 0, y: 0, z: -1350 }, { x: -40, y: 140, z: 250 }] },
+    { id: 'strawberry-4', timeframe: [0.15, 0.6], pathNodes: [{ x: 0, y: 0, z: -1220 }, { x: -200, y: 30, z: 180 }] },
+    { id: 'strawberry-5', timeframe: [0.3, 0.75], pathNodes: [{ x: 0, y: 0, z: -400 }, { x: 200, y: 60, z: 220 }] },
+    { id: 'strawberry-6', timeframe: [0.3, 0.75], pathNodes: [{ x: 0, y: 0, z: -1310 }, { x: -100, y: -180, z: 120 }] },
+    { id: 'strawberry-7', timeframe: [0.45, 0.9], pathNodes: [{ x: 0, y: 0, z: -450 }, { x: 100, y: -180, z: 240 }] },
+    { id: 'strawberry-8', timeframe: [0.45, 0.9], pathNodes: [{ x: 0, y: 0, z: -1260 }, { x: 80, y: 160, z: 160 }] },
+    { id: 'strawberry-9', timeframe: [0.6, 1.0], pathNodes: [{ x: 0, y: 0, z: -370 }, { x: -120, y: 100, z: 300 }] },
+    { id: 'strawberry-10', timeframe: [0.6, 1.0], pathNodes: [{ x: 0, y: 0, z: -200 }, { x: 180, y: -50, z: 100 }] },
     {
       id: 'ice-cream-center',
+      timeframe: [0.0, 0.7],
       pathNodes: [
-        { x: 0, y: 0, z: 100 },
+        { x: 0, y: 0, z: 400 },
         { x: 0, y: -35, z: 0 } // Starts huge close to the screen, recedes to normal size at z = 0
       ]
     }
@@ -479,6 +480,7 @@ const iceCreamCardScene = {
   elements: [
     {
       id: 'strawberry-card',
+      timeframe: [0.3, 1.0],
       pathNodes: [
         { x: 0, y: 300 },
         { x: 0, y: 0 }
@@ -516,6 +518,14 @@ function Strawberry({ elementId, emoji }) {
       blur = Math.min(8, (data.z - 50) / 20);
     }
 
+    // Fade in when starting, fade out when leaving timeframe
+    let opacity = 1;
+    if (data.progress < 0.15) {
+      opacity = data.progress / 0.15;
+    } else if (data.progress > 0.85) {
+      opacity = (1 - data.progress) / 0.15;
+    }
+
     return {
       x: data.x,
       y: data.y,
@@ -524,6 +534,7 @@ function Strawberry({ elementId, emoji }) {
       filter: `blur(${Math.round(blur * 10) / 10}px)`,
       xPercent: -50,
       yPercent: -50,
+      opacity: opacity,
     };
   }, [startRotation]);
 
@@ -655,8 +666,8 @@ function BurstDemo() {
     <section ref={containerRef} className="burst-scene">
       <div ref={stageRef} className="burst-stage">
         <div className="scene-label">
-          <h2>Multi-Scene Orchestration (Scroll + Timer)</h2>
-          <p>Ten scroll-triggered strawberries of varying sizes burst out of the ice cream, while a timer-triggered card slides in once.</p>
+          <h2>Multi-Scene Orchestration (Scroll + Timer with Timeframes)</h2>
+          <p>Ten scroll-triggered strawberries burst sequentially using staggered timeframes, while a timer-triggered card slides in with a delayed timeframe.</p>
         </div>
 
         <div className="burst-inner" style={{ perspective: `${STRAW_PERSPECTIVE}px`, perspectiveOrigin: `${strawCx}px ${strawCy}px` }}>

@@ -154,6 +154,20 @@ class GsapPubSub {
       // Broadcast initial position so subscribers already mounted can render at the start node
       this._broadcast(element.id, { ...proxy });
 
+      let startTime = 0;
+      let duration = 1;
+      if (element.timeframe && Array.isArray(element.timeframe) && element.timeframe.length === 2) {
+        let [s, e] = element.timeframe;
+        s = Math.max(0, Math.min(1, s));
+        e = Math.max(0, Math.min(1, e));
+        if (s < e) {
+          startTime = s;
+          duration = e - s;
+        } else {
+          console.warn(`[GsapPubSub] Invalid timeframe order for element "${element.id}":`, element.timeframe);
+        }
+      }
+
       tl.to(proxy, {
         progress: 1,
         motionPath: {
@@ -163,7 +177,7 @@ class GsapPubSub {
           properties: { x: 'x', y: 'y', z: 'z' },
         },
         ease: 'none', // Strict requirement: scroll trigger MUST use ease: "none"
-        duration: 1,  // Normalized timeline duration
+        duration: duration,  // Normalized timeline duration
         onUpdate: () => {
           this._broadcast(element.id, {
             x: proxy.x,
@@ -173,8 +187,11 @@ class GsapPubSub {
             progress: proxy.progress,
           });
         }
-      }, 0);
+      }, startTime);
     });
+
+    // Force timeline to span exactly [0, 1] regardless of element timeframes
+    tl.addLabel('end', 1);
 
     // Force timeline to evaluate at progress 0 to calculate GSAP auto-rotation
     tl.progress(0);
@@ -212,10 +229,27 @@ class GsapPubSub {
       // Broadcast initial position so subscribers already mounted can render at the start node
       this._broadcast(element.id, { ...proxy });
 
+      let startTime = 0;
+      let durationFactor = 1;
+      if (element.timeframe && Array.isArray(element.timeframe) && element.timeframe.length === 2) {
+        let [s, e] = element.timeframe;
+        s = Math.max(0, Math.min(1, s));
+        e = Math.max(0, Math.min(1, e));
+        if (s < e) {
+          startTime = s;
+          durationFactor = e - s;
+        } else {
+          console.warn(`[GsapPubSub] Invalid timeframe order for element "${element.id}":`, element.timeframe);
+        }
+      }
+
       const ease = element.ease || 'power1.inOut';
-      const duration = element.duration !== undefined ? element.duration : 1;
-      const delay = element.delay || 0;
+      const baseDuration = element.duration !== undefined ? element.duration : 1;
+      const baseDelay = element.delay || 0;
       const repeat = element.repeat !== undefined ? element.repeat : 0;
+
+      const duration = baseDuration * durationFactor;
+      const delay = baseDelay + baseDuration * startTime;
 
       const tween = gsap.to(proxy, {
         progress: 1,

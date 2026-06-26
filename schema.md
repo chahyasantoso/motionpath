@@ -21,6 +21,7 @@ interface SceneElement {
   delay?: number;        // Opsional untuk mode timer (dalam detik)
   ease?: string;         // Opsional untuk mode timer (Format string GSAP, misal: "power2.out")
   repeat?: number;       // Opsional untuk mode timer (-1 untuk infinite loop)
+  timeframe?: [number, number]; // Opsional, rentang waktu/scroll elemen [start, end] dari 0.0 sampai 1.0 (default [0, 1])
 }
 
 interface ScrollConfig {
