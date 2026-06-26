@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildMotionPath, convertToCubicPath, getPointOnCubicPath, getPointOnPath } from '../pathUtils.js';
+import { buildMotionPath, convertToCubicPath, getPointOnCubicPath, getPointOnPath, splitQuadraticBezier, findClosestPointOnSegment } from '../pathUtils.js';
 
 describe('buildMotionPath', () => {
   it('should return empty string for null or empty input', () => {
@@ -192,3 +192,57 @@ describe('getPointOnPath', () => {
     expect(mockPathEl.getPointAtLength).toHaveBeenCalledWith(0);
   });
 });
+
+describe('splitQuadraticBezier', () => {
+  it('should mathematically split a quadratic curve in two at t=0.5', () => {
+    const p0 = { x: 0, y: 0, z: 0 };
+    const q = { x: 100, y: 200, z: 10 };
+    const p2 = { x: 200, y: 0, z: 20 };
+
+    const { C_L, P_split, C_R } = splitQuadraticBezier(p0, q, p2, 0.5);
+
+    // C_L = 0.5*P0 + 0.5*Q = (50, 100, 5)
+    expect(C_L.x).toBe(50);
+    expect(C_L.y).toBe(100);
+    expect(C_L.z).toBe(5);
+
+    // C_R = 0.5*Q + 0.5*P2 = (150, 100, 15)
+    expect(C_R.x).toBe(150);
+    expect(C_R.y).toBe(100);
+    expect(C_R.z).toBe(15);
+
+    // P_split = 0.5*C_L + 0.5*C_R = (100, 100, 10)
+    expect(P_split.x).toBe(100);
+    expect(P_split.y).toBe(100);
+    expect(P_split.z).toBe(10);
+  });
+});
+
+describe('findClosestPointOnSegment', () => {
+  it('should find closest t on a straight line segment', () => {
+    const p0 = { x: 0, y: 0 };
+    const p2 = { x: 100, y: 100 };
+
+    // Point exactly at (30, 30) should be at t=0.3
+    const result = findClosestPointOnSegment(p0, p2, 30, 30);
+    expect(result.t).toBeCloseTo(0.3);
+    expect(result.x).toBeCloseTo(30);
+    expect(result.y).toBeCloseTo(30);
+    expect(result.distance).toBeCloseTo(0);
+  });
+
+  it('should find closest t on a curved segment', () => {
+    const p0 = { x: 0, y: 0 };
+    const q = { x: 50, y: 100 };
+    const p2 = { x: 100, y: 0 };
+
+    // Sample the peak at t=0.5: x = 50, y = 50
+    // If we query (50, 48), the closest point on curve should be very close to t=0.5
+    const result = findClosestPointOnSegment(p0, p2, 50, 48, q);
+    expect(result.t).toBeCloseTo(0.5);
+    expect(result.x).toBeCloseTo(50);
+    expect(result.y).toBeCloseTo(50);
+    expect(result.distance).toBeCloseTo(2);
+  });
+});
+

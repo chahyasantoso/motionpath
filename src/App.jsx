@@ -4,6 +4,7 @@ import useMotionPlayer from './hooks/useMotionPlayer';
 import useMotionSubscriber from './hooks/useMotionSubscriber';
 import { buildMotionPath, convertToCubicPath, getPointOnCubicPath, getPointOnPath } from './lib/pathUtils';
 import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from './lib/projection3d';
+import PathEditor from './components/Editor/PathEditor';
 
 
 // ─── Scene Data ────────────────────────────────────────────────
@@ -705,8 +706,16 @@ function BurstDemo() {
 // ─── App ───────────────────────────────────────────────────────
 
 export default function App() {
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+
   return (
     <div className="app">
+      <div className="editor-toggle-header-container">
+        <button className="enter-editor-btn" onClick={() => setIsEditorOpen(true)}>
+          Open Interactive Path Editor 🎨
+        </button>
+      </div>
+
       <header className="header">
         <h1>MotionPath <span className="accent">Hooks Demo</span></h1>
         <p className="subtitle">Zero Re-render • GSAP Pub/Sub • Direct DOM</p>
@@ -729,6 +738,10 @@ export default function App() {
       <footer className="footer">
         <p>Scroll back up to replay the scroll scene</p>
       </footer>
+
+      {isEditorOpen && (
+        <PathEditor onClose={() => setIsEditorOpen(false)} />
+      )}
     </div>
   );
 }

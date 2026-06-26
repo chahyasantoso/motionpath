@@ -183,3 +183,94 @@ export function getPointOnPath(pathEl, progress, offset = 0) {
 
   return { x: point.x, y: point.y, rotation, progress: p };
 }
+
+/**
+ * Splits a quadratic Bezier curve at parameter t into two quadratic curves
+ * using de Casteljau's algorithm.
+ * 
+ * @param {Object} p0 Start point {x, y, z?}
+ * @param {Object} q Control point {x, y, z?} (representing ctrlX, ctrlY, ctrlZ)
+ * @param {Object} p2 End point {x, y, z?}
+ * @param {number} t Splitting progress parameter (0 to 1)
+ * @returns {Object} { C_L, P_split, C_R }
+ */
+export function splitQuadraticBezier(p0, q, p2, t) {
+  const z0 = p0.z !== undefined ? p0.z : 0;
+  const zQ = q.z !== undefined ? q.z : (z0 + (p2.z !== undefined ? p2.z : 0)) / 2;
+  const z2 = p2.z !== undefined ? p2.z : 0;
+
+  // C_L = (1 - t)*P0 + t*Q
+  const C_L = {
+    x: p0.x + t * (q.x - p0.x),
+    y: p0.y + t * (q.y - p0.y),
+    z: z0 + t * (zQ - z0),
+  };
+
+  // C_R = (1 - t)*Q + t*P2
+  const C_R = {
+    x: q.x + t * (p2.x - q.x),
+    y: q.y + t * (p2.y - q.y),
+    z: zQ + t * (z2 - zQ),
+  };
+
+  // P_split = (1 - t)*C_L + t*C_R
+  const P_split = {
+    x: (1 - t) * C_L.x + t * C_R.x,
+    y: (1 - t) * C_L.y + t * C_R.y,
+    z: (1 - t) * C_L.z + t * C_R.z,
+  };
+
+  return { C_L, P_split, C_R };
+}
+
+/**
+ * Finds the parameter t on a straight line or quadratic Bezier segment
+ * that minimizes the distance to a given target coordinate (mouseX, mouseY).
+ * 
+ * @param {Object} p0 Start point {x, y}
+ * @param {Object} p2 End point {x, y}
+ * @param {number} mouseX Target X coordinate
+ * @param {number} mouseY Target Y coordinate
+ * @param {Object} [q] Optional quadratic control point {x, y}
+ * @returns {Object} { t, x, y, distance }
+ */
+export function findClosestPointOnSegment(p0, p2, mouseX, mouseY, q) {
+  let minDistanceSq = Infinity;
+  let bestT = 0;
+  let bestX = p0.x;
+  let bestY = p0.y;
+
+  // Sample the segment at 101 points
+  const steps = 100;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    let x, y;
+    if (q && q.x !== undefined && q.y !== undefined) {
+      const mt = 1 - t;
+      x = mt * mt * p0.x + 2 * mt * t * q.x + t * t * p2.x;
+      y = mt * mt * p0.y + 2 * mt * t * q.y + t * t * p2.y;
+    } else {
+      x = p0.x + t * (p2.x - p0.x);
+      y = p0.y + t * (p2.y - p0.y);
+    }
+
+    const dx = x - mouseX;
+    const dy = y - mouseY;
+    const distSq = dx * dx + dy * dy;
+
+    if (distSq < minDistanceSq) {
+      minDistanceSq = distSq;
+      bestT = t;
+      bestX = x;
+      bestY = y;
+    }
+  }
+
+  return {
+    t: bestT,
+    x: bestX,
+    y: bestY,
+    distance: Math.sqrt(minDistanceSq),
+  };
+}
+
