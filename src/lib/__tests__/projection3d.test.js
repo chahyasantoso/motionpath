@@ -97,3 +97,28 @@ describe('projectPathNodes3DTo2D', () => {
   });
 });
 
+describe('project3DTo2D', () => {
+  it('should return scale along with x and y coordinates', () => {
+    const result = project3DTo2D(100, 100, 200, 500, 500, 0, false, 1000);
+    // scale = 1000 / (1000 - 200) = 1.25
+    // x = 500 + 100 * 1.25 = 625
+    // y = 500 + 100 * 1.25 = 625
+    expect(result.x).toBeCloseTo(625);
+    expect(result.y).toBeCloseTo(625);
+    expect(result.scale).toBeCloseTo(1.25);
+  });
+
+  it('should handle distance <= 0 when z is equal to or greater than perspective', () => {
+    const result = project3DTo2D(100, 100, 1000, 500, 500, 0, false, 1000);
+    expect(result.x).toBe(500);
+    expect(result.y).toBe(500);
+    expect(result.scale).toBe(0);
+
+    const result2 = project3DTo2D(100, 100, 1200, 500, 500, 0, false, 1000);
+    expect(result2.x).toBe(500);
+    expect(result2.y).toBe(500);
+    expect(result2.scale).toBe(0);
+  });
+});
+
+

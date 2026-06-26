@@ -15,14 +15,20 @@
  */
 export function project3DTo2D(x3d, y3d, z3d, cx, cy, tiltDeg, invertTilt = false, perspective = 1000) {
   const tiltRad = (tiltDeg * Math.PI) / 180;
-  const scale = perspective / (perspective - z3d);
+  const distance = perspective - z3d;
+  if (distance <= 0) {
+    return { x: cx, y: cy, scale: 0 };
+  }
+
+  const scale = perspective / distance;
   
   const x2d = cx + x3d * scale;
   const y2d = cy + (y3d * Math.cos(tiltRad) + (invertTilt ? -z3d : z3d) * Math.sin(tiltRad)) * scale;
   
   return { 
     x: Math.round(x2d * 100) / 100, 
-    y: Math.round(y2d * 100) / 100 
+    y: Math.round(y2d * 100) / 100,
+    scale: Math.round(scale * 10000) / 10000
   };
 }
 
@@ -76,74 +82,5 @@ export const shapeGenerators = {
       nodes.push({ x: x3d, y: y3d, z: z3d });
     }
     return nodes;
-  },
-
-  /**
-   * Generates a spiral path wrapping a vertical cone.
-   */
-  cone({ cx, cy, radius, height, turns, tiltDeg, segments = 120 }) {
-    const nodes = [];
-    for (let i = 0; i <= segments; i++) {
-      const p = i / segments;
-      const theta = p * turns * 2 * Math.PI;
-      const r = radius * (1 - p);
-      const x3d = r * Math.cos(theta);
-      const y3d = -p * height;
-      const z3d = r * Math.sin(theta);
-      
-      nodes.push(project3DTo2D(x3d, y3d, z3d, cx, cy, tiltDeg, false));
-    }
-    return nodes;
   }
 };
-
-/**
- * Resolves 3D visual styles (scale, opacity, blur, rotateY, zIndex)
- * based on the current progress along the 3D shape.
- * @returns {Object} Proportional transform properties for CSS styling
- */
-export function resolve3DTransforms({
-  progress,
-  shapeType,
-  config,
-  options = {}
-}) {
-  const { radius, turns } = config;
-  const {
-    baseScale = 0.5,
-    scaleRange = 0.75,
-    baseOpacity = 0.3,
-    opacityRange = 0.7,
-    maxBlur = 4
-  } = options;
-
-  let theta = 0;
-  let z3d = 0;
-
-  if (shapeType === 'helix') {
-    theta = progress * turns * 2 * Math.PI;
-    z3d = radius * Math.sin(theta);
-  } else if (shapeType === 'cone') {
-    theta = progress * turns * 2 * Math.PI;
-    const r = radius * (1 - progress);
-    z3d = r * Math.sin(theta);
-  }
-
-  // Normalize depth: 0 (furthest back) to 1 (closest front)
-  const depthFactor = (z3d + radius) / (2 * radius);
-
-  const scale = baseScale + depthFactor * scaleRange;
-  const opacity = baseOpacity + depthFactor * opacityRange;
-  const blur = Math.max(0, (1 - depthFactor) * maxBlur);
-  const rotateY = -(theta - Math.PI / 2) * (180 / Math.PI);
-  const zIndex = Math.round(depthFactor * 100);
-
-  return {
-    scale: Math.round(scale * 100) / 100,
-    opacity: Math.round(opacity * 100) / 100,
-    blur: Math.round(blur * 100) / 100,
-    rotateY: Math.round(rotateY * 100) / 100,
-    zIndex,
-    z3d
-  };
-}
