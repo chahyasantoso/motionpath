@@ -719,6 +719,8 @@ body {
   stroke-width: 1.5;
   pointer-events: auto;
   cursor: pointer;
+  transform-origin: center;
+  transform-box: fill-box;
   transition: transform 0.1s ease;
 }
 
