@@ -24,11 +24,20 @@ This document summarizes the changes made to the codebase to allow future agents
     `style={{ perspective: `${PERSPECTIVE}px` }}`
     This ensures that browser-native 3D transforms (`translate3d(x,y,z)`) and JS projected dotted SVG guides match up pixel-perfectly without duplicating constants in CSS.
 
+### C. Added Timeframe Support for Staggered Sequencing
+*   **Goal**: Add support for a `timeframe` property (`[startFraction, endFraction]`) to both scroll-driven and timer-driven scenes to enable staggered animations and cinematic sequencing.
+*   **Result**: 
+    *   Updated the motion engine ([`motionEngine.js`](file:///d:/dev/motionpath/src/lib/motionEngine.js)) to compute tween offsets and durations based on the timeframe.
+    *   For scroll scenes, tweens are positioned at `startTime` on a normalized `[0, 1]` timeline duration. A dummy label `tl.addLabel('end', 1)` keeps the master timeline duration at exactly `1.0`.
+    *   For timer scenes, delay and duration are dynamically adjusted relative to the element's base duration (e.g. `duration = baseDuration * (end - start)` and `delay = baseDelay + baseDuration * start`).
+    *   Documented the property in [`schema.md`](file:///d:/dev/motionpath/schema.md).
+*   **Staggered Burst Demo**: Refactored the Strawberry burst demo in [`App.jsx`](file:///d:/dev/motionpath/src/App.jsx) to launch strawberries sequentially using custom timeframes, fading in and out using local timeline progress.
+
 ---
 
 ## 2. Verification
 
-*   All **58 unit tests** in `vitest` pass successfully.
+*   All **62 unit tests** in `vitest` pass successfully.
 *   Run the test runner at any time using:
     ```bash
     npm run test
