@@ -73,9 +73,13 @@ export default function PathEditor({ onClose }) {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedElementId && selectedNodeIndex >= 0) {
           const el = sceneData.elements.find(item => item.id === selectedElementId);
-          if (el && el.pathNodes.length > 1) {
+          if (el) {
             e.preventDefault();
-            handleDeleteNode(selectedElementId, selectedNodeIndex);
+            if (el.pathNodes.length > 1) {
+              handleDeleteNode(selectedElementId, selectedNodeIndex);
+            } else {
+              handleDeleteElement(selectedElementId);
+            }
           }
         }
       }
