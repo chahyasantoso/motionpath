@@ -31,7 +31,17 @@ This document summarizes the changes made to the codebase to allow future agents
     *   For scroll scenes, tweens are positioned at `startTime` on a normalized `[0, 1]` timeline duration. A dummy label `tl.addLabel('end', 1)` keeps the master timeline duration at exactly `1.0`.
     *   For timer scenes, delay and duration are dynamically adjusted relative to the element's base duration (e.g. `duration = baseDuration * (end - start)` and `delay = baseDelay + baseDuration * start`).
     *   Documented the property in [`schema.md`](file:///d:/dev/motionpath/schema.md).
-*   **Staggered Burst Demo**: Refactored the Strawberry burst demo in [`App.jsx`](file:///d:/dev/motionpath/src/App.jsx) to launch strawberries sequentially using custom timeframes, fading in and out using local timeline progress.
+    *   Refactored the Strawberry burst demo in [`App.jsx`](file:///d:/dev/motionpath/src/App.jsx) to launch strawberries sequentially using custom timeframes, fading in and out using local timeline progress.
+
+### D. Resolved 3D Perspective Projection Drift for Editor Guides
+*   **Goal**: Align SVG guide paths, node handles, and control points in the Interactive Path Editor with elements when their Z depth $Z \ne 0$.
+*   **The Cause**: The browser natively perspective-projects translated elements (e.g. centerpiece ice cream at $Z = 400$) using the parent's CSS `perspective` and `perspectiveOrigin`, but the editor's SVG paths and handles were rendered as flat 2D elements in raw coordinates.
+*   **Result**: 
+    *   Updated [`EditorCanvas.jsx`](file:///d:/dev/motionpath/src/components/Editor/EditorCanvas.jsx) to parse dynamic parent perspective values (`perspectiveVal = parseFloat(style.perspective) || 1000`).
+    *   Defined a `projectPoint` helper that projects raw 3D coordinates $(X,Y,Z)$ into 2D canvas coordinates using the parsed perspective properties.
+    *   Projected paths, node handles, control guides, tangent lines, extrusion guides, and fallback preview items.
+    *   Updated `handlePointerMove` to dynamically reverse the 3D perspective projection during drags using the correct perspective values, eliminating node jumps when clicking/dragging.
+    *   Anchored `.editor-preview-item` at `top: 0; left: 0` in [`App.css`](file:///d:/dev/motionpath/src/App.css) to establish a clean coordinate baseline.
 
 ---
 
