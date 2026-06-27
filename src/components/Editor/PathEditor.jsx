@@ -33,7 +33,9 @@ const defaultScene = {
 };
 
 export default function PathEditor({ onClose }) {
-  const [sceneData, setSceneData] = useState(defaultScene);
+  motionEngine.isEditorMode = true;
+
+  const [allScenes, setAllScenes] = useState([defaultScene]);
   const [selectedElementId, setSelectedElementId] = useState('strawberry-editor-1');
   const [selectedNodeIndex, setSelectedNodeIndex] = useState(1);
   const [timelineProgress, setTimelineProgress] = useState(0);
@@ -45,8 +47,22 @@ export default function PathEditor({ onClose }) {
   const [importedComponent, setImportedComponent] = useState(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [customTransforms, setCustomTransforms] = useState({});
+  // Bumped on window resize (debounced) to force the sync effect to re-run
+  // and rebroadcast element positions after the layout has changed.
+  const [syncKey, setSyncKey] = useState(0);
 
-  // Dynamic Babel injection
+  // Flat list of all elements across all scenes, each tagged with their parent sceneId
+  const allElements = allScenes.flatMap(scene =>
+    scene.elements.map(el => ({ ...el, _sceneId: scene.sceneId }))
+  );
+
+  // Helper: find which scene owns a given elementId
+  const getSceneForElement = (elementId) =>
+    allScenes.find(scene => scene.elements.some(el => el.id === elementId));
+
+
+
+
   useEffect(() => {
     if (window.Babel) {
       setIsBabelLoaded(true);
@@ -59,21 +75,31 @@ export default function PathEditor({ onClose }) {
     document.body.appendChild(script);
   }, []);
 
-  // Sync manual timeline scrubbing and live path coordinate updates with motionEngine
+  // Sync manual timeline scrubbing and live path coordinate updates with motionEngine.
+  // We force all scenes to run as scroll-triggered scenes inside the editor so they
+  // respond to the timeline slider and update their layouts instantly when dragged,
+  // without losing their original metadata configs (which are exported as-is).
   useEffect(() => {
-    if (sceneData && sceneData.sceneId) {
-      try {
-        motionEngine.initScene(sceneData);
-        motionEngine.setProgress(sceneData.sceneId, timelineProgress);
-      } catch (err) {
-        console.warn('[PathEditor] Failed to sync scene updates on engine:', err);
+    allScenes.forEach(scene => {
+      if (scene && scene.sceneId) {
+        try {
+          motionEngine.initScene({
+            ...scene,
+            triggerType: 'scroll'
+          });
+          motionEngine.setProgress(scene.sceneId, timelineProgress);
+        } catch (err) {
+          console.warn('[PathEditor] Failed to sync scene updates on engine:', err);
+        }
       }
-    }
-  }, [timelineProgress, sceneData]);
+    });
+  }, [timelineProgress, allScenes, syncKey]);
+
 
   // Cleanup overrides when Editor unmounts
   useEffect(() => {
     return () => {
+      motionEngine.isEditorMode = false;
       motionEngine._transformOverrides.clear();
     };
   }, []);
@@ -84,7 +110,7 @@ export default function PathEditor({ onClose }) {
       setCompileError(null);
       setImportedComponent(null);
       setCustomTransforms({});
-      setSceneData(defaultScene);
+      setAllScenes([defaultScene]);
       motionEngine._transformOverrides.clear();
       return;
     }
@@ -139,13 +165,12 @@ export default function PathEditor({ onClose }) {
 
       const scenes = parseSceneConfigs(cleanedCode);
       if (scenes) {
-        const firstSceneName = Object.keys(scenes)[0];
-        const parsedScene = scenes[firstSceneName];
-        
-        setSceneData(parsedScene);
-        
-        if (parsedScene.elements && parsedScene.elements.length > 0) {
-          setSelectedElementId(parsedScene.elements[0].id);
+        const parsedScenes = Object.values(scenes);
+        setAllScenes(parsedScenes);
+
+        const firstScene = parsedScenes[0];
+        if (firstScene.elements && firstScene.elements.length > 0) {
+          setSelectedElementId(firstScene.elements[0].id);
           setSelectedNodeIndex(0);
         }
       } else {
@@ -154,7 +179,7 @@ export default function PathEditor({ onClose }) {
           triggerType: 'scroll',
           elements: []
         };
-        setSceneData(fallbackScene);
+        setAllScenes([fallbackScene]);
         setSelectedElementId(null);
         setSelectedNodeIndex(-1);
       }
@@ -258,7 +283,7 @@ export default function PathEditor({ onClose }) {
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedElementId && selectedNodeIndex >= 0) {
-          const el = sceneData.elements.find(item => item.id === selectedElementId);
+          const el = allElements.find(item => item.id === selectedElementId);
           if (el) {
             e.preventDefault();
             if (el.pathNodes.length > 1) {
@@ -273,13 +298,13 @@ export default function PathEditor({ onClose }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementId, selectedNodeIndex, sceneData.elements]);
+  }, [selectedElementId, selectedNodeIndex, allElements]);
 
   // Handlers
   const handleAddElement = (type) => {
-    const count = sceneData.elements.filter(el => el.id.startsWith(type)).length + 1;
+    const count = allElements.filter(el => el.id.startsWith(type)).length + 1;
     const newId = `${type}-editor-${count}`;
-    
+
     // Add default template path nodes
     const newElement = {
       id: newId,
@@ -290,20 +315,22 @@ export default function PathEditor({ onClose }) {
       ]
     };
 
-    setSceneData(prev => ({
-      ...prev,
-      elements: [...prev.elements, newElement]
-    }));
+    // Add to the first scene by default
+    setAllScenes(prev => {
+      const updated = [...prev];
+      updated[0] = { ...updated[0], elements: [...updated[0].elements, newElement] };
+      return updated;
+    });
 
     setSelectedElementId(newId);
     setSelectedNodeIndex(1);
   };
 
   const handleDeleteElement = (elementId) => {
-    setSceneData(prev => ({
-      ...prev,
-      elements: prev.elements.filter(el => el.id !== elementId)
-    }));
+    setAllScenes(prev => prev.map(scene => ({
+      ...scene,
+      elements: scene.elements.filter(el => el.id !== elementId)
+    })));
     if (selectedElementId === elementId) {
       setSelectedElementId(null);
       setSelectedNodeIndex(-1);
@@ -311,15 +338,12 @@ export default function PathEditor({ onClose }) {
   };
 
   const handleUpdateElementTimeframe = (elementId, timeframe) => {
-    setSceneData(prev => ({
-      ...prev,
-      elements: prev.elements.map(el => {
-        if (el.id === elementId) {
-          return { ...el, timeframe };
-        }
-        return el;
-      })
-    }));
+    setAllScenes(prev => prev.map(scene => ({
+      ...scene,
+      elements: scene.elements.map(el =>
+        el.id === elementId ? { ...el, timeframe } : el
+      )
+    })));
   };
 
   const handleUpdateElementProperty = (elementId, propName, value) => {
@@ -328,85 +352,71 @@ export default function PathEditor({ onClose }) {
       setSelectedNodeIndex(-1); // Only selected element
       return;
     }
-    setSceneData(prev => ({
-      ...prev,
-      elements: prev.elements.map(el => {
-        if (el.id === elementId) {
-          return { ...el, [propName]: value };
-        }
-        return el;
-      })
-    }));
+    setAllScenes(prev => prev.map(scene => ({
+      ...scene,
+      elements: scene.elements.map(el =>
+        el.id === elementId ? { ...el, [propName]: value } : el
+      )
+    })));
   };
 
   const handleUpdateNodeCoordinates = (elementId, nodeIndex, coords) => {
-    setSceneData(prev => ({
-      ...prev,
-      elements: prev.elements.map(el => {
+    setAllScenes(prev => prev.map(scene => ({
+      ...scene,
+      elements: scene.elements.map(el => {
         if (el.id === elementId) {
           const pathNodes = [...el.pathNodes];
-          pathNodes[nodeIndex] = {
-            ...pathNodes[nodeIndex],
-            ...coords
-          };
+          pathNodes[nodeIndex] = { ...pathNodes[nodeIndex], ...coords };
           return { ...el, pathNodes };
         }
         return el;
       })
-    }));
+    })));
   };
 
   const handleAddNode = (elementId, coords) => {
-    setSceneData(prev => ({
-      ...prev,
-      elements: prev.elements.map(el => {
+    setAllScenes(prev => prev.map(scene => ({
+      ...scene,
+      elements: scene.elements.map(el => {
         if (el.id === elementId) {
-          return {
-            ...el,
-            pathNodes: [...el.pathNodes, coords]
-          };
+          return { ...el, pathNodes: [...el.pathNodes, coords] };
         }
         return el;
       })
-    }));
-    
+    })));
+
     // Select the newly added node
-    const el = sceneData.elements.find(item => item.id === elementId);
+    const el = allElements.find(item => item.id === elementId);
     if (el) {
       setSelectedNodeIndex(el.pathNodes.length);
     }
   };
 
   const handleSplitSegment = (elementId, segmentIndex, splitData) => {
-    setSceneData(prev => ({
-      ...prev,
-      elements: prev.elements.map(el => {
+    setAllScenes(prev => prev.map(scene => ({
+      ...scene,
+      elements: scene.elements.map(el => {
         if (el.id === elementId) {
           const pathNodes = [...el.pathNodes];
-          
           if (splitData.updatedNextNode) {
             // Bezier curve split
-            pathNodes[segmentIndex] = {
-              ...pathNodes[segmentIndex],
-              ...splitData.updatedNextNode
-            };
+            pathNodes[segmentIndex] = { ...pathNodes[segmentIndex], ...splitData.updatedNextNode };
           }
-          
           // Insert split node into pathNodes array
           pathNodes.splice(segmentIndex, 0, splitData.newNode);
           return { ...el, pathNodes };
         }
         return el;
       })
-    }));
+    })));
 
     setSelectedNodeIndex(segmentIndex);
   };
 
   const handleToggleCurve = (elementId, nodeIndex) => {
-    setSceneData(prev => ({
-      ...prev,
-      elements: prev.elements.map(el => {
+    setAllScenes(prev => prev.map(scene => ({
+      ...scene,
+      elements: scene.elements.map(el => {
         if (el.id === elementId) {
           const pathNodes = [...el.pathNodes];
           const node = pathNodes[nodeIndex];
@@ -419,33 +429,27 @@ export default function PathEditor({ onClose }) {
           } else {
             // Make Curve (inject control point at midpoint)
             const ctrlX = (prevNode.x + node.x) / 2;
-            const ctrlY = (prevNode.y + node.y) / 2 - 50; // offset slightly upward for curve shape
+            const ctrlY = (prevNode.y + node.y) / 2 - 50;
             const ctrlZ = ((prevNode.z || 0) + (node.z || 0)) / 2;
-            pathNodes[nodeIndex] = {
-              ...node,
-              ctrlX,
-              ctrlY,
-              ctrlZ
-            };
+            pathNodes[nodeIndex] = { ...node, ctrlX, ctrlY, ctrlZ };
           }
           return { ...el, pathNodes };
         }
         return el;
       })
-    }));
+    })));
   };
 
   const handleDeleteNode = (elementId, nodeIndex) => {
-    const el = sceneData.elements.find(item => item.id === elementId);
+    const el = allElements.find(item => item.id === elementId);
     if (!el || el.pathNodes.length <= 1) return;
 
-    setSceneData(prev => ({
-      ...prev,
-      elements: prev.elements.map(el => {
+    setAllScenes(prev => prev.map(scene => ({
+      ...scene,
+      elements: scene.elements.map(el => {
         if (el.id === elementId) {
           const pathNodes = [...el.pathNodes];
           pathNodes.splice(nodeIndex, 1);
-          
           // If first node deleted, clear control coordinates of the new first node
           if (nodeIndex === 0 && pathNodes.length > 0) {
             const { ctrlX, ctrlY, ctrlZ, ...rest } = pathNodes[0];
@@ -455,13 +459,13 @@ export default function PathEditor({ onClose }) {
         }
         return el;
       })
-    }));
+    })));
 
     setSelectedNodeIndex(prev => Math.max(0, prev - 1));
   };
 
   const handleAddPathToElement = useCallback((elementId) => {
-    const exists = sceneData.elements.some(el => el.id === elementId);
+    const exists = allElements.some(el => el.id === elementId);
     if (exists) {
       setSelectedElementId(elementId);
       setSelectedNodeIndex(0);
@@ -477,13 +481,15 @@ export default function PathEditor({ onClose }) {
       ]
     };
 
-    setSceneData(prev => ({
-      ...prev,
-      elements: [...prev.elements, newElement]
-    }));
+    // Add to the first scene by default
+    setAllScenes(prev => {
+      const updated = [...prev];
+      updated[0] = { ...updated[0], elements: [...updated[0].elements, newElement] };
+      return updated;
+    });
     setSelectedElementId(elementId);
     setSelectedNodeIndex(0);
-  }, [sceneData]);
+  }, [allElements]);
 
   const activeSubscribers = Array.from(motionEngine._domRefs?.keys() || []);
 
@@ -515,19 +521,20 @@ export default function PathEditor({ onClose }) {
           >
             Import Component 📂
           </button>
-          <div className="trigger-toggle">
-            <button 
-              className={sceneData.triggerType === 'scroll' ? 'active' : ''}
-              onClick={() => setSceneData(prev => ({ ...prev, triggerType: 'scroll' }))}
-            >
-              Scroll Mode
-            </button>
-            <button 
-              className={sceneData.triggerType === 'timer' ? 'active' : ''}
-              onClick={() => setSceneData(prev => ({ ...prev, triggerType: 'timer' }))}
-            >
-              Timer Mode
-            </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {allScenes.map(scene => (
+              <span key={scene.sceneId} style={{
+                padding: '0.3rem 0.8rem',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                background: scene.triggerType === 'scroll' ? 'rgba(100,200,255,0.15)' : 'rgba(255,180,100,0.15)',
+                color: scene.triggerType === 'scroll' ? '#64c8ff' : '#ffb464',
+                border: `1px solid ${scene.triggerType === 'scroll' ? 'rgba(100,200,255,0.3)' : 'rgba(255,180,100,0.3)'}`,
+              }}>
+                {scene.triggerType === 'scroll' ? '🖱 Scroll' : '⏱ Timer'}: {scene.sceneId}
+              </span>
+            ))}
           </div>
           <button className="close-editor-btn" onClick={onClose}>
             Exit Editor Mode
@@ -606,7 +613,7 @@ export default function PathEditor({ onClose }) {
         )}
 
         <EditorCanvas
-          sceneData={sceneData}
+          allElements={allElements}
           selectedElementId={selectedElementId}
           selectedNodeIndex={selectedNodeIndex}
           onSelectElement={setSelectedElementId}
@@ -617,10 +624,11 @@ export default function PathEditor({ onClose }) {
           timelineProgress={timelineProgress}
           isPlayPreview={isPlayPreview}
           importedComponent={importedComponent}
+          onResize={() => setSyncKey(k => k + 1)}
         />
         
         <Inspector
-          sceneData={sceneData}
+          allScenes={allScenes}
           selectedElementId={selectedElementId}
           selectedNodeIndex={selectedNodeIndex}
           onAddElement={handleAddElement}

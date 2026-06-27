@@ -56,7 +56,7 @@ function NumericInput({ label, value, onChange, min, max, step = 1, isFloat = fa
 }
 
 export default function Inspector({
-  sceneData,
+  allScenes,
   selectedElementId,
   selectedNodeIndex,
   onAddElement,
@@ -78,11 +78,15 @@ export default function Inspector({
 }) {
   const [copyStatus, setCopyStatus] = useState('Copy JSON');
 
-  const selectedElement = sceneData.elements.find(el => el.id === selectedElementId);
+  const allElements = allScenes.flatMap(scene =>
+    scene.elements.map(el => ({ ...el, _sceneId: scene.sceneId }))
+  );
+
+  const selectedElement = allElements.find(el => el.id === selectedElementId);
   const selectedNode = selectedElement ? selectedElement.pathNodes[selectedNodeIndex] : null;
 
   const handleCopyJSON = () => {
-    const jsonStr = JSON.stringify(sceneData, null, 2);
+    const jsonStr = JSON.stringify(allScenes.length === 1 ? allScenes[0] : allScenes, null, 2);
     navigator.clipboard.writeText(jsonStr)
       .then(() => {
         setCopyStatus('Copied! ✓');
@@ -113,13 +117,24 @@ export default function Inspector({
         </div>
 
         <ul className="inspector-element-list" style={{ maxHeight: '180px' }}>
-          {sceneData.elements.map(el => (
+          {allElements.map(el => (
             <li 
               key={el.id} 
               className={`element-list-item ${el.id === selectedElementId ? 'active' : ''}`}
               onClick={() => onSelectElement ? onSelectElement(el.id) : null}
             >
               <span className="element-name">🍓 {el.id}</span>
+              <span style={{
+                fontSize: '0.6rem',
+                padding: '0.1rem 0.4rem',
+                borderRadius: '4px',
+                background: 'rgba(255,255,255,0.07)',
+                color: 'var(--text-muted)',
+                marginLeft: '0.4rem',
+                flexShrink: 0
+              }}>
+                {el._sceneId}
+              </span>
               <button 
                 className="delete-item-btn" 
                 onClick={(e) => {
@@ -134,7 +149,7 @@ export default function Inspector({
           ))}
 
           {activeSubscribers && activeSubscribers
-            .filter(subId => !sceneData.elements.some(el => el.id === subId))
+            .filter(subId => !allElements.some(el => el.id === subId))
             .map(subId => (
               <li 
                 key={subId} 
@@ -194,7 +209,9 @@ export default function Inspector({
             </select>
           </div>
 
-          {sceneData.triggerType === 'timer' && (
+          {(() => {
+            const owningScene = allScenes.find(s => s.sceneId === selectedElement._sceneId);
+            return owningScene?.triggerType === 'timer' && (
             <div className="input-group-row">
               <NumericInput
                 label="Base Duration (s)"
@@ -213,7 +230,8 @@ export default function Inspector({
                 onChange={(val) => onUpdateElementProperty(selectedElement.id, 'delay', val)}
               />
             </div>
-          )}
+            );
+          })()}
 
           {customTransforms && customTransforms[selectedElement.id] !== undefined && (
             <div className="input-group" style={{ marginTop: '1rem' }}>
@@ -366,7 +384,8 @@ export default function Inspector({
         <textarea 
           className="json-output-area" 
           readOnly 
-          value={JSON.stringify(sceneData, null, 2)}
+          value={JSON.stringify(allScenes.length === 1 ? allScenes[0] : allScenes, null, 2)}
+
         />
       </div>
 

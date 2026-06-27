@@ -24,6 +24,7 @@ class GsapPubSub {
     this._cache = new Map();     // elementId -> last proxy coordinates { x, y, rotation, progress }
     this._scenes = new Map();    // sceneId -> scene configuration { timeline, tweens, elementIds }
     this._transformOverrides = new Map(); // elementId -> custom transformFn compiled override
+    this.isEditorMode = false;
   }
 
   /**
@@ -49,12 +50,14 @@ class GsapPubSub {
 
     const elementIds = sceneData.elements.map(el => el.id);
 
-    if (sceneData.triggerType === 'scroll') {
+    const triggerType = this.isEditorMode ? 'scroll' : sceneData.triggerType;
+
+    if (triggerType === 'scroll') {
       this._createScrollScene(sceneData, resolvedContainer, elementIds);
-    } else if (sceneData.triggerType === 'timer') {
-      this._createTimerScene(sceneData, elementIds);
+    } else if (triggerType === 'timer') {
+      this._createTimerScene(sceneData, elementIds, resolvedContainer);
     } else {
-      throw new MotionEngineError(`[GsapPubSub] Unsupported triggerType: "${sceneData.triggerType}".`);
+      throw new MotionEngineError(`[GsapPubSub] Unsupported triggerType: "${triggerType}".`);
     }
   }
 
@@ -118,7 +121,8 @@ class GsapPubSub {
    */
   _createScrollScene(sceneData, containerEl, elementIds) {
     if (!containerEl) {
-      throw new MotionEngineError(`[GsapPubSub] Container element missing for scroll-triggered scene "${sceneData.sceneId}". ScrollTrigger requires a container element to function.`);
+      console.warn(`[GsapPubSub] Container element missing for scroll-triggered scene "${sceneData.sceneId}". Skipping initialization.`);
+      return;
     }
 
     const scrollConfig = sceneData.scrollConfig || { scrub: true, pin: false };
@@ -132,17 +136,22 @@ class GsapPubSub {
       pinElement = containerEl.querySelector(scrollConfig.pin) || scrollConfig.pin;
     }
 
-    // Create master timeline bound to scroll progress
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: containerEl,
-        start: 'top top',
-        end: 'bottom bottom',
-        scrub: scrollConfig.scrub,
-        pin: pinElement,
-        invalidateOnRefresh: true,
-      }
-    });
+    // In editor mode: create a plain paused timeline driven exclusively by manual setProgress() calls.
+    // This prevents GSAP's automatic ScrollTrigger.refresh() on window resize from overriding
+    // the editor's timeline progress and scrambling element positions.
+    // In normal mode: create a scroll-driven timeline via ScrollTrigger as usual.
+    const tl = this.isEditorMode
+      ? gsap.timeline({ paused: true })
+      : gsap.timeline({
+          scrollTrigger: {
+            trigger: containerEl,
+            start: 'top top',
+            end: 'bottom bottom',
+            scrub: scrollConfig.scrub,
+            pin: pinElement,
+            invalidateOnRefresh: true,
+          }
+        });
 
     sceneData.elements.forEach(element => {
       const cubicPath = convertToCubicPath(element.pathNodes);
@@ -217,7 +226,7 @@ class GsapPubSub {
    * Sets up time-driven individual tweens.
    * @private
    */
-  _createTimerScene(sceneData, elementIds) {
+  _createTimerScene(sceneData, elementIds, containerEl = null) {
     const tweens = [];
 
     sceneData.elements.forEach(element => {
@@ -294,7 +303,7 @@ class GsapPubSub {
       timeline: null,
       tweens,
       elementIds,
-      containerEl: null,
+      containerEl,
     });
   }
 

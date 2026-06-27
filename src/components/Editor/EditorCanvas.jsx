@@ -6,7 +6,7 @@ import { buildMotionPath, convertToCubicPath, findClosestPointOnSegment, getPoin
 const PERSPECTIVE = 1000;
 
 export default function EditorCanvas({
-  sceneData,
+  allElements,
   selectedElementId,
   selectedNodeIndex,
   onSelectElement,
@@ -16,7 +16,8 @@ export default function EditorCanvas({
   onSplitSegment,
   timelineProgress,
   isPlayPreview,
-  importedComponent: ImportedComponent
+  importedComponent: ImportedComponent,
+  onResize
 }) {
   const containerRef = useRef(null);
   const [dragState, setDragState] = useState(null); // { type: 'node'|'control'|'extrude'|'z-depth', elementId, nodeIndex, startX, startY }
@@ -32,17 +33,26 @@ export default function EditorCanvas({
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let timeout;
     const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         setStageSize({
           width: entry.contentRect.width,
           height: entry.contentRect.height,
         });
+
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          if (onResize) onResize();
+        }, 150);
       }
     });
     resizeObserver.observe(containerRef.current);
-    return () => resizeObserver.disconnect();
-  }, []);
+    return () => {
+      resizeObserver.disconnect();
+      clearTimeout(timeout);
+    };
+  }, [onResize]);
 
   // Watch for imported component mounting to refresh and capture subscriber refs
   useEffect(() => {
@@ -189,7 +199,7 @@ export default function EditorCanvas({
 
     if (dragState) {
       e.preventDefault();
-      const el = sceneData.elements.find(item => item.id === dragState.elementId);
+      const el = allElements.find(item => item.id === dragState.elementId);
       if (!el) return;
 
       const origin = getActiveOrigin(dragState.elementId);
@@ -265,7 +275,7 @@ export default function EditorCanvas({
   const handlePathMouseMove = (e, elementId, segmentIndex) => {
     if (dragState) return;
     const coords = getRelativeCoords(e);
-    const el = sceneData.elements.find(item => item.id === elementId);
+    const el = allElements.find(item => item.id === elementId);
     if (!el) return;
 
     const origin = getActiveOrigin(elementId);
@@ -301,7 +311,7 @@ export default function EditorCanvas({
   const handlePathClick = (e, elementId, segmentIndex) => {
     e.stopPropagation();
     if (hoverPath && hoverPath.elementId === elementId && hoverPath.segmentIndex === segmentIndex) {
-      const el = sceneData.elements.find(item => item.id === elementId);
+      const el = allElements.find(item => item.id === elementId);
       if (!el) return;
 
       const node0 = el.pathNodes[segmentIndex - 1];
@@ -413,7 +423,7 @@ export default function EditorCanvas({
     );
   };
 
-  const selectedElement = sceneData.elements.find(el => el.id === selectedElementId);
+  const selectedElement = allElements.find(el => el.id === selectedElementId);
   const selectedNode = selectedElement ? selectedElement.pathNodes[selectedNodeIndex] : null;
 
   return (
@@ -429,7 +439,7 @@ export default function EditorCanvas({
 
       {/* SVG guides overlay */}
       <svg className="editor-svg-layer" width="100%" height="100%">
-        {sceneData.elements.map(el => {
+        {allElements.map(el => {
           if (el.pathNodes.length === 0) return null;
           const isSelectedEl = el.id === selectedElementId;
           const origin = getActiveOrigin(el.id);
@@ -536,7 +546,7 @@ export default function EditorCanvas({
       </svg>
 
       {/* HTML interactive elements: Nodes & Z-sliders overlay */}
-      {sceneData.elements.map(el => {
+      {allElements.map(el => {
         const isSelectedEl = el.id === selectedElementId;
         const origin = getActiveOrigin(el.id);
 
@@ -619,7 +629,7 @@ export default function EditorCanvas({
           </div>
         </div>
       ) : (
-        sceneData.elements.map(renderPreviewElement)
+        allElements.map(renderPreviewElement)
       )}
     </div>
   );
