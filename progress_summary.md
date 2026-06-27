@@ -45,7 +45,32 @@ This document summarizes the changes made to the codebase to allow future agents
 
 ---
 
-## 2. Verification
+## 2. Multi-Scene Sandbox & Stability Fixes
+
+### A. Live Component Sandbox & Multi-Scene Infrastructure
+*   **Goal**: Allow pasting arbitrary React page code (e.g. `BurstPage.jsx`) into the Path Editor, parsing its multiple scene configurations dynamically, and rendering them in an interactive canvas sandbox.
+*   **Result**: 
+    *   Refactored the editor ([PathEditor.jsx](file:///d:/dev/motionpath/src/components/Editor/PathEditor.jsx)) to hold and manage `allScenes` instead of a single scene config.
+    *   Implemented full runtime Babel transpilation inside the sandbox, injecting mock dependency hooks (`useState`, `useEffect`, `useMotionPlayer`, etc.) to run the pasted page code inside the canvas.
+    *   Updated the Inspector ([Inspector.jsx](file:///d:/dev/motionpath/src/components/Editor/Inspector.jsx)) to show scene-specific JSON configurations and control parameters.
+
+### B. Timer-based Scene Resetting on Drag
+*   **Problem**: Dragging coordinates on the canvas was causing the timer-based `IceCreamCard` scene to restart its GSAP animation timeline from 0 on every drag step.
+*   **Cause**: Dragging updated the coordinate state of `allScenes`, triggering the synchronization `useEffect` inside the editor. This effect called `motionEngine.initScene(scene)` for every scene, which destroyed and recreated the GSAP timelines/tweens from scratch, resetting timer-based animations.
+*   **Cure**: Added a global `motionEngine.isEditorMode = true` flag when the editor is mounted. The engine automatically forces all active scenes (including timer-based ones) to act as scroll-triggered/scrubbable sequences inside the editor session. The editor container persists `containerEl` for timer scenes so they can rebuild seamlessly on drag without restarting, and all scenes are scrubbed in unison by the timeline slider.
+
+### C. Canvas & Window Resize Position Scrambling
+*   **Problem**: Resizing the browser window, or toggling layout panels (such as opening the Import Component panel) scrambled element positions on the canvas until manually scrubbed or played.
+*   **Cause**: 
+    1. GSAP's `ScrollTrigger.refresh()` was firing globally on window resize. Because scroll-triggered timelines recalculated start/end triggers relative to scroll viewports, they overrode the editor's manual timeline progress with the viewport scroll offset (which was static).
+    2. Side-panel toggles changed the container width of `EditorCanvas.jsx` without resizing the window itself. Since coordinates are projected relative to the responsive canvas stage size, the elements did not adapt to the new aspect ratios/projection centers.
+*   **Cure**:
+    1. Bypassed `ScrollTrigger` registration inside `_createScrollScene` when `isEditorMode` is active, creating a plain, paused GSAP timeline driven exclusively by manual progress setting.
+    2. Linked a debounced parent notification callback to `EditorCanvas.jsx`'s internal `ResizeObserver`. The parent editor is notified on any layout shift of the canvas container, re-evaluating the scene projection instantly and aligning elements to their correct positions.
+
+---
+
+## 3. Verification
 
 *   All **62 unit tests** in `vitest` pass successfully.
 *   Run the test runner at any time using:
@@ -55,7 +80,7 @@ This document summarizes the changes made to the codebase to allow future agents
 
 ---
 
-## 3. Future Roadmap: Path Editor Design Brainstorm
+## 4. Future Roadmap: Path Editor Design Brainstorm
 
 We brainstormed the design of the interactive Path Editor for web section animations, aligning on a **Flat Vector Canvas with Depth Overlay (Hybrid)** approach:
 
