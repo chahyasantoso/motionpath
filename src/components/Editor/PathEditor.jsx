@@ -55,6 +55,36 @@ export default function PathEditor({ onClose }) {
     return () => cancelAnimationFrame(animId);
   }, [isPlayPreview]);
 
+  // Handle Delete/Backspace keys to delete the selected node
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore if user is typing in form inputs
+      const activeEl = document.activeElement;
+      if (
+        activeEl && 
+        (activeEl.tagName === 'INPUT' || 
+         activeEl.tagName === 'SELECT' || 
+         activeEl.tagName === 'TEXTAREA' || 
+         activeEl.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedElementId && selectedNodeIndex >= 0) {
+          const el = sceneData.elements.find(item => item.id === selectedElementId);
+          if (el && el.pathNodes.length > 1) {
+            e.preventDefault();
+            handleDeleteNode(selectedElementId, selectedNodeIndex);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedElementId, selectedNodeIndex, sceneData.elements]);
+
   // Handlers
   const handleAddElement = (type) => {
     const count = sceneData.elements.filter(el => el.id.startsWith(type)).length + 1;
