@@ -531,6 +531,32 @@ describe('GsapPubSub - Timeframe configuration', () => {
     expect(callArgs.duration).toBe(2); // 4 * (0.6 - 0.1)
     expect(callArgs.delay).toBe(2.4); // 2 + 4 * 0.1
   });
+
+  it('should set progress manually for a scroll scene (via timeline)', () => {
+    const sceneData = {
+      sceneId: 'scroll-progress-scene',
+      triggerType: 'scroll',
+      elements: [{ id: 'el-1', pathNodes: [{ x: 0, y: 0 }, { x: 10, y: 10 }] }]
+    };
+    motionEngine.initScene(sceneData, { querySelector: () => null });
+    
+    const mockTimeline = gsap.timeline.mock.results[0].value;
+    motionEngine.setProgress('scroll-progress-scene', 0.55);
+    expect(mockTimeline.progress).toHaveBeenCalledWith(0.55);
+  });
+
+  it('should set progress manually for a timer scene (via tweens)', () => {
+    const sceneData = {
+      sceneId: 'timer-progress-scene',
+      triggerType: 'timer',
+      elements: [{ id: 'el-2', pathNodes: [{ x: 0, y: 0 }, { x: 10, y: 10 }] }]
+    };
+    motionEngine.initScene(sceneData);
+    
+    const mockTween = gsap.to.mock.results[0].value;
+    motionEngine.setProgress('timer-progress-scene', 0.72);
+    expect(mockTween.progress).toHaveBeenCalledWith(0.72);
+  });
 });
 
 

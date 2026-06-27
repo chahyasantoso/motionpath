@@ -23,6 +23,7 @@ class GsapPubSub {
     this._listeners = new Map(); // elementId -> Set of callbacks
     this._cache = new Map();     // elementId -> last proxy coordinates { x, y, rotation, progress }
     this._scenes = new Map();    // sceneId -> scene configuration { timeline, tweens, elementIds }
+    this._transformOverrides = new Map(); // elementId -> custom transformFn compiled override
   }
 
   /**
@@ -30,9 +31,17 @@ class GsapPubSub {
    * @param {Object} sceneData MotionScene object following schema.md
    * @param {HTMLElement} containerEl DOM container element for scroll trigger pinning/scrubbing
    */
-  initScene(sceneData, containerEl) {
+  initScene(sceneData, containerEl = null) {
     if (!sceneData || !sceneData.sceneId) {
       throw new MotionEngineError('[GsapPubSub] Scene initialization failed: sceneData or sceneId is missing.');
+    }
+
+    let resolvedContainer = containerEl;
+    if (!resolvedContainer) {
+      const existing = this._scenes.get(sceneData.sceneId);
+      if (existing) {
+        resolvedContainer = existing.containerEl;
+      }
     }
 
     // Clean up existing scene with same ID to prevent duplicates/leaks
@@ -41,7 +50,7 @@ class GsapPubSub {
     const elementIds = sceneData.elements.map(el => el.id);
 
     if (sceneData.triggerType === 'scroll') {
-      this._createScrollScene(sceneData, containerEl, elementIds);
+      this._createScrollScene(sceneData, resolvedContainer, elementIds);
     } else if (sceneData.triggerType === 'timer') {
       this._createTimerScene(sceneData, elementIds);
     } else {
@@ -200,6 +209,7 @@ class GsapPubSub {
       timeline: tl,
       tweens: null,
       elementIds,
+      containerEl,
     });
   }
 
@@ -284,6 +294,7 @@ class GsapPubSub {
       timeline: null,
       tweens,
       elementIds,
+      containerEl: null,
     });
   }
 
@@ -359,6 +370,25 @@ class GsapPubSub {
     }
 
     this._scenes.delete(sceneId);
+  }
+
+  /**
+   * Sets the timeline progress manually for a scene (0 to 1).
+   * Useful for editor scrubbing and previews.
+   * @param {string} sceneId
+   * @param {number} progress
+   */
+  setProgress(sceneId, progress) {
+    const scene = this._scenes.get(sceneId);
+    if (!scene) return;
+
+    if (scene.timeline) {
+      scene.timeline.progress(progress);
+    } else if (scene.tweens) {
+      scene.tweens.forEach(tween => {
+        tween.progress(progress);
+      });
+    }
   }
 
   /**

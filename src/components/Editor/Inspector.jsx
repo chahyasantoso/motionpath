@@ -69,7 +69,12 @@ export default function Inspector({
   timelineProgress,
   onChangeTimelineProgress,
   isPlayPreview,
-  onTogglePlayPreview
+  onTogglePlayPreview,
+  customTransforms,
+  onUpdateTransformCode,
+  activeSubscribers,
+  onAddPathToElement,
+  onSelectElement
 }) {
   const [copyStatus, setCopyStatus] = useState('Copy JSON');
 
@@ -107,14 +112,14 @@ export default function Inspector({
           </button>
         </div>
 
-        <ul className="inspector-element-list">
+        <ul className="inspector-element-list" style={{ maxHeight: '180px' }}>
           {sceneData.elements.map(el => (
             <li 
               key={el.id} 
               className={`element-list-item ${el.id === selectedElementId ? 'active' : ''}`}
-              onClick={() => onUpdateElementProperty(el.id, null, null)} // Selects element
+              onClick={() => onSelectElement ? onSelectElement(el.id) : null}
             >
-              <span className="element-name">{el.id}</span>
+              <span className="element-name">🍓 {el.id}</span>
               <button 
                 className="delete-item-btn" 
                 onClick={(e) => {
@@ -127,10 +132,24 @@ export default function Inspector({
               </button>
             </li>
           ))}
+
+          {activeSubscribers && activeSubscribers
+            .filter(subId => !sceneData.elements.some(el => el.id === subId))
+            .map(subId => (
+              <li 
+                key={subId} 
+                className={`element-list-item ${subId === selectedElementId ? 'active' : ''}`}
+                style={{ opacity: 0.5, borderStyle: 'dashed', borderColor: 'rgba(255, 255, 255, 0.15)' }}
+                onClick={() => onSelectElement ? onSelectElement(subId) : null}
+              >
+                <span className="element-name" style={{ fontStyle: 'italic' }}>❓ {subId} (no path)</span>
+              </li>
+            ))
+          }
         </ul>
       </div>
 
-      {selectedElement && (
+      {selectedElement ? (
         <div className="inspector-section">
           <h3>Element Config: <code className="accent-text">{selectedElement.id}</code></h3>
           
@@ -195,7 +214,62 @@ export default function Inspector({
               />
             </div>
           )}
+
+          {customTransforms && customTransforms[selectedElement.id] !== undefined && (
+            <div className="input-group" style={{ marginTop: '1rem' }}>
+              <label>Transform Function (transformFn)</label>
+              <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '0.4rem', lineHeight: '1.2' }}>
+                Customize visual translations (scale, opacity, rotation, etc.) dynamically based on <code>{`{ x, y, z, rotation, progress }`}</code>.
+              </p>
+              <textarea
+                value={customTransforms[selectedElement.id]}
+                onChange={(e) => onUpdateTransformCode(selectedElement.id, e.target.value)}
+                style={{
+                  width: '100%',
+                  minHeight: '120px',
+                  background: '#060613',
+                  color: '#00ffaa',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '8px',
+                  padding: '0.5rem',
+                  fontFamily: 'monospace',
+                  fontSize: '0.7rem',
+                  outline: 'none',
+                  resize: 'vertical',
+                  lineHeight: '1.4'
+                }}
+              />
+            </div>
+          )}
         </div>
+      ) : (
+        selectedElementId && (
+          <div className="inspector-section" style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
+            <h3 style={{ fontSize: '0.8rem', marginBottom: '0.5rem' }}>Element Config: <code className="accent-text">{selectedElementId}</code></h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: '1.4' }}>
+              This element is active in the React component but has no motion path configured.
+            </p>
+            <button 
+              onClick={() => onAddPathToElement && onAddPathToElement(selectedElementId)}
+              style={{
+                width: '100%',
+                padding: '0.6rem 1rem',
+                background: 'var(--accent)',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'background 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.background = '#8c6eff'}
+              onMouseOut={(e) => e.target.style.background = 'var(--accent)'}
+            >
+              Create Motion Path ➕
+            </button>
+          </div>
+        )
       )}
 
       {selectedNode && (
@@ -295,6 +369,49 @@ export default function Inspector({
           value={JSON.stringify(sceneData, null, 2)}
         />
       </div>
+
+      {selectedElement && customTransforms && customTransforms[selectedElement.id] !== undefined && (
+        <div className="inspector-section hook-exporter-section" style={{ marginTop: '1rem' }}>
+          <div className="exporter-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h3>Subscriber Hook Snippet</h3>
+            <button 
+              className="copy-json-btn"
+              onClick={() => {
+                const snippet = `useMotionSubscriber('${selectedElement.id}', ref, useCallback(${customTransforms[selectedElement.id]}, []));`;
+                navigator.clipboard.writeText(snippet);
+              }}
+              style={{
+                fontSize: '0.7rem',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                cursor: 'pointer',
+                color: 'var(--text)'
+              }}
+            >
+              Copy Hook
+            </button>
+          </div>
+          <textarea
+            readOnly
+            value={`useMotionSubscriber('${selectedElement.id}', ref, useCallback(${customTransforms[selectedElement.id]}, []));`}
+            style={{
+              width: '100%',
+              minHeight: '80px',
+              background: '#060613',
+              color: '#e4e4f0',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '8px',
+              padding: '0.5rem',
+              fontFamily: 'monospace',
+              fontSize: '0.7rem',
+              outline: 'none',
+              resize: 'none'
+            }}
+          />
+        </div>
+      )}
     </aside>
   );
 }

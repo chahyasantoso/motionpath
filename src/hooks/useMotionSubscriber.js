@@ -24,15 +24,23 @@ export default function useMotionSubscriber(elementId, ref, transformFn) {
       return;
     }
 
+    if (ref.current) {
+      motionEngine._domRefs = motionEngine._domRefs || new Map();
+      motionEngine._domRefs.set(elementId, ref.current);
+    }
+
     // Subscribe to coordinate broadcasts for this element.
     // The engine handles late-subscriber caching — it immediately sends
     // the last known proxy position to prevent jumping visual bugs (motionEngine.js:84-86).
     const unsubscribe = motionEngine.subscribe(elementId, (data) => {
       if (!ref.current) return;
 
-      if (typeof transformFnRef.current === 'function') {
+      const overrideFn = motionEngine._transformOverrides?.get(elementId);
+      const activeTransformFn = overrideFn || transformFnRef.current;
+
+      if (typeof activeTransformFn === 'function') {
         // Custom transform: consumer has full access to { x, y, rotation, progress }
-        gsap.set(ref.current, transformFnRef.current(data));
+        gsap.set(ref.current, activeTransformFn(data));
       } else {
         // Default: apply spatial properties only. progress is NOT set to DOM
         // because it is not a valid CSS property.
@@ -47,6 +55,9 @@ export default function useMotionSubscriber(elementId, ref, transformFn) {
 
     // Cleanup: remove listener from engine's internal Set to prevent memory leaks
     // (motionEngine.js:89-97)
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      motionEngine._domRefs?.delete(elementId);
+    };
   }, [elementId]); // ref is a stable React ref, transformFnRef is a stable useRef
 }

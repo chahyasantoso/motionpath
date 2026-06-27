@@ -15,6 +15,7 @@ vi.mock('gsap', () => ({
 vi.mock('../../lib/motionEngine', () => ({
   default: {
     subscribe: vi.fn(),
+    _transformOverrides: new Map()
   }
 }));
 
@@ -104,5 +105,29 @@ describe('useMotionSubscriber', () => {
     // Should not throw error
     expect(() => mockSubscribeCallback(data)).not.toThrow();
     expect(gsap.set).not.toHaveBeenCalled();
+  });
+
+  it('should use transform overrides from motionEngine if registered', () => {
+    const mockElement = document.createElement('div');
+    const mockRef = { current: mockElement };
+    const baseTransformFn = vi.fn(() => ({ x: 0 }));
+    
+    // Register override on mock motionEngine
+    const overrideTransformFn = vi.fn((data) => ({ x: data.x * 2, y: data.y * 2 }));
+    motionEngine._transformOverrides.set('rocket-id', overrideTransformFn);
+
+    renderHook(() => useMotionSubscriber('rocket-id', mockRef, baseTransformFn));
+
+    // Broadcast coordinate
+    const data = { x: 50, y: 80, rotation: 0, progress: 0.5 };
+    mockSubscribeCallback(data);
+
+    // Verify override was called instead of the base function
+    expect(overrideTransformFn).toHaveBeenCalledWith(data);
+    expect(baseTransformFn).not.toHaveBeenCalled();
+    expect(gsap.set).toHaveBeenCalledWith(mockElement, { x: 100, y: 160 });
+
+    // Cleanup override
+    motionEngine._transformOverrides.clear();
   });
 });
