@@ -216,17 +216,17 @@ export default function Inspector({
             <NumericInput
               label="X Position"
               value={selectedNode.x}
-              onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'x', val)}
+              onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, { x: val })}
             />
             <NumericInput
               label="Y Position"
               value={selectedNode.y}
-              onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'y', val)}
+              onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, { y: val })}
             />
             <NumericInput
               label="Z Depth"
               value={selectedNode.z || 0}
-              onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'z', val)}
+              onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, { z: val })}
             />
           </div>
 
@@ -247,12 +247,12 @@ export default function Inspector({
               <NumericInput
                 label="Control X"
                 value={selectedNode.ctrlX}
-                onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'ctrlX', val)}
+                onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, { ctrlX: val })}
               />
               <NumericInput
                 label="Control Y"
                 value={selectedNode.ctrlY}
-                onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'ctrlY', val)}
+                onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, { ctrlY: val })}
               />
             </div>
           )}
