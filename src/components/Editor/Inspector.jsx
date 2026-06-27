@@ -1,4 +1,59 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+// Reusable numeric input helper that manages its own local string state
+// to prevent cursor jumping, digit locking, or sign-typing bugs.
+function NumericInput({ label, value, onChange, min, max, step = 1, isFloat = false }) {
+  const [localVal, setLocalVal] = useState(value !== undefined ? String(value) : '');
+
+  // Update local string value when external state changes (e.g. from canvas drag)
+  useEffect(() => {
+    if (value === undefined) {
+      setLocalVal('');
+    } else {
+      const formatted = isFloat ? String(value) : String(Math.round(value));
+      setLocalVal(formatted);
+    }
+  }, [value, isFloat]);
+
+  const handleChange = (e) => {
+    const valStr = e.target.value;
+    setLocalVal(valStr);
+
+    let parsed = parseFloat(valStr);
+    if (!isNaN(parsed)) {
+      if (min !== undefined) parsed = Math.max(min, parsed);
+      if (max !== undefined) parsed = Math.min(max, parsed);
+      onChange(parsed);
+    }
+  };
+
+  const handleBlur = () => {
+    let parsed = parseFloat(localVal);
+    if (isNaN(parsed)) {
+      parsed = 0;
+    }
+    if (min !== undefined) parsed = Math.max(min, parsed);
+    if (max !== undefined) parsed = Math.min(max, parsed);
+    
+    onChange(parsed);
+    setLocalVal(isFloat ? String(parsed) : String(Math.round(parsed)));
+  };
+
+  return (
+    <div className="input-group">
+      <label>{label}</label>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={localVal}
+        onChange={handleChange}
+        onBlur={handleBlur}
+      />
+    </div>
+  );
+}
 
 export default function Inspector({
   sceneData,
@@ -80,36 +135,30 @@ export default function Inspector({
           <h3>Element Config: <code className="accent-text">{selectedElement.id}</code></h3>
           
           <div className="input-group-row">
-            <div className="input-group">
-              <label>Timeframe Start</label>
-              <input 
-                type="number" 
-                min="0" 
-                max="1" 
-                step="0.05"
-                value={selectedElement.timeframe ? selectedElement.timeframe[0] : 0}
-                onChange={(e) => {
-                  const start = Math.max(0, Math.min(1, parseFloat(e.target.value) || 0));
-                  const end = selectedElement.timeframe ? selectedElement.timeframe[1] : 1;
-                  onUpdateElementTimeframe(selectedElement.id, [start, Math.max(start, end)]);
-                }}
-              />
-            </div>
-            <div className="input-group">
-              <label>Timeframe End</label>
-              <input 
-                type="number" 
-                min="0" 
-                max="1" 
-                step="0.05"
-                value={selectedElement.timeframe ? selectedElement.timeframe[1] : 1}
-                onChange={(e) => {
-                  const start = selectedElement.timeframe ? selectedElement.timeframe[0] : 0;
-                  const end = Math.max(0, Math.min(1, parseFloat(e.target.value) || 0));
-                  onUpdateElementTimeframe(selectedElement.id, [Math.min(start, end), end]);
-                }}
-              />
-            </div>
+            <NumericInput
+              label="Timeframe Start"
+              min={0}
+              max={1}
+              step={0.05}
+              isFloat={true}
+              value={selectedElement.timeframe ? selectedElement.timeframe[0] : 0}
+              onChange={(val) => {
+                const end = selectedElement.timeframe ? selectedElement.timeframe[1] : 1;
+                onUpdateElementTimeframe(selectedElement.id, [val, Math.max(val, end)]);
+              }}
+            />
+            <NumericInput
+              label="Timeframe End"
+              min={0}
+              max={1}
+              step={0.05}
+              isFloat={true}
+              value={selectedElement.timeframe ? selectedElement.timeframe[1] : 1}
+              onChange={(val) => {
+                const start = selectedElement.timeframe ? selectedElement.timeframe[0] : 0;
+                onUpdateElementTimeframe(selectedElement.id, [Math.min(start, val), val]);
+              }}
+            />
           </div>
 
           <div className="input-group">
@@ -128,26 +177,22 @@ export default function Inspector({
 
           {sceneData.triggerType === 'timer' && (
             <div className="input-group-row">
-              <div className="input-group">
-                <label>Base Duration (s)</label>
-                <input 
-                  type="number" 
-                  min="0.1" 
-                  step="0.5"
-                  value={selectedElement.duration !== undefined ? selectedElement.duration : 1}
-                  onChange={(e) => onUpdateElementProperty(selectedElement.id, 'duration', parseFloat(e.target.value) || 1)}
-                />
-              </div>
-              <div className="input-group">
-                <label>Base Delay (s)</label>
-                <input 
-                  type="number" 
-                  min="0" 
-                  step="0.5"
-                  value={selectedElement.delay || 0}
-                  onChange={(e) => onUpdateElementProperty(selectedElement.id, 'delay', parseFloat(e.target.value) || 0)}
-                />
-              </div>
+              <NumericInput
+                label="Base Duration (s)"
+                min={0.1}
+                step={0.5}
+                isFloat={true}
+                value={selectedElement.duration !== undefined ? selectedElement.duration : 1}
+                onChange={(val) => onUpdateElementProperty(selectedElement.id, 'duration', val)}
+              />
+              <NumericInput
+                label="Base Delay (s)"
+                min={0}
+                step={0.5}
+                isFloat={true}
+                value={selectedElement.delay || 0}
+                onChange={(val) => onUpdateElementProperty(selectedElement.id, 'delay', val)}
+              />
             </div>
           )}
         </div>
@@ -168,30 +213,21 @@ export default function Inspector({
           </div>
 
           <div className="input-group-row">
-            <div className="input-group">
-              <label>X Position</label>
-              <input 
-                type="number" 
-                value={Math.round(selectedNode.x)}
-                onChange={(e) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'x', parseFloat(e.target.value) || 0)}
-              />
-            </div>
-            <div className="input-group">
-              <label>Y Position</label>
-              <input 
-                type="number" 
-                value={Math.round(selectedNode.y)}
-                onChange={(e) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'y', parseFloat(e.target.value) || 0)}
-              />
-            </div>
-            <div className="input-group">
-              <label>Z Depth</label>
-              <input 
-                type="number" 
-                value={Math.round(selectedNode.z || 0)}
-                onChange={(e) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'z', parseFloat(e.target.value) || 0)}
-              />
-            </div>
+            <NumericInput
+              label="X Position"
+              value={selectedNode.x}
+              onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'x', val)}
+            />
+            <NumericInput
+              label="Y Position"
+              value={selectedNode.y}
+              onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'y', val)}
+            />
+            <NumericInput
+              label="Z Depth"
+              value={selectedNode.z || 0}
+              onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'z', val)}
+            />
           </div>
 
           <div className="curve-toggle-container">
@@ -200,7 +236,7 @@ export default function Inspector({
                 type="checkbox"
                 checked={selectedNode.ctrlX !== undefined && selectedNode.ctrlY !== undefined}
                 onChange={() => onToggleCurve(selectedElement.id, selectedNodeIndex)}
-                disabled={selectedNodeIndex === 0} // First node cannot be curved relative to previous
+                disabled={selectedNodeIndex === 0}
               />
               <span>Bezier Curve Segment</span>
             </label>
@@ -208,22 +244,16 @@ export default function Inspector({
 
           {selectedNode.ctrlX !== undefined && selectedNode.ctrlY !== undefined && (
             <div className="input-group-row control-points-block">
-              <div className="input-group">
-                <label>Control X</label>
-                <input 
-                  type="number" 
-                  value={Math.round(selectedNode.ctrlX)}
-                  onChange={(e) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'ctrlX', parseFloat(e.target.value) || 0)}
-                />
-              </div>
-              <div className="input-group">
-                <label>Control Y</label>
-                <input 
-                  type="number" 
-                  value={Math.round(selectedNode.ctrlY)}
-                  onChange={(e) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'ctrlY', parseFloat(e.target.value) || 0)}
-                />
-              </div>
+              <NumericInput
+                label="Control X"
+                value={selectedNode.ctrlX}
+                onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'ctrlX', val)}
+              />
+              <NumericInput
+                label="Control Y"
+                value={selectedNode.ctrlY}
+                onChange={(val) => onUpdateNodeProperty(selectedElement.id, selectedNodeIndex, 'ctrlY', val)}
+              />
             </div>
           )}
         </div>
