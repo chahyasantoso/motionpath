@@ -1,4 +1,4 @@
-# Progress Summary — Modularization & 3D Z-Depth scaling Demo
+# Progress Summary — Staggered Scrollytelling & Schema Consolidation
 
 This document summarizes the changes made to the codebase to allow future agents to quickly resume context without re-reading the entire history.
 
@@ -43,6 +43,16 @@ This document summarizes the changes made to the codebase to allow future agents
     *   Updated `handlePointerMove` to dynamically reverse the 3D perspective projection during drags using the correct perspective values, eliminating node jumps when clicking/dragging.
     *   Anchored `.editor-preview-item` at `top: 0; left: 0` in [`App.css`](file:///d:/dev/motionpath/src/App.css) to establish a clean coordinate baseline.
 
+### E. Dynamic Engine-Level Stagger in DemoPage
+*   **Goal**: Refactor the Carousel and Helix animations in `DemoPage.jsx` to utilize the engine's declarative `stagger` setting instead of manual React component Javascript offset calculations.
+*   **Result**: 
+    *   Removed index-based offset calculations (`index * cardSpacing`) and total offset span math from `CarouselCard` and `HelixCard` hooks.
+    *   Updated `DemoPage.jsx` to build scenarios dynamically using `useMemo` based on array lengths, registering card elements with unique IDs.
+    *   Configured the scene staggers (`stagger: { each: 0.14 }` for Carousel and `stagger: { each: 0.16 }` for Helix) inside the scenario definitions.
+    *   Subscribers bind directly to their unique element IDs, obtaining staggered `__pathProgress` natively from the engine.
+    *   Migrated CarouselCard opacity fade transitions to declarative keyframe stops inside the JSON schema.
+    *   Aligned 3D stage perspectives to use a single project-level configuration `PROJECT_CONFIG.perspective` (1000px), applied inline on container divs and to child cards.
+
 ---
 
 ## 2. Multi-Scene Sandbox & Stability Fixes
@@ -72,25 +82,8 @@ This document summarizes the changes made to the codebase to allow future agents
 
 ## 3. Verification
 
-*   All **62 unit tests** in `vitest` pass successfully.
+*   All **82 unit tests** in `vitest` pass successfully.
 *   Run the test runner at any time using:
     ```bash
     npm run test
     ```
-
----
-
-## 4. Future Roadmap: Path Editor Design Brainstorm
-
-We brainstormed the design of the interactive Path Editor for web section animations, aligning on a **Flat Vector Canvas with Depth Overlay (Hybrid)** approach:
-
-### Core Concepts
-1.  **Context-Aware Overlay Canvas**:
-    *   The editor canvas acts as a transparent overlay directly on top of the actual website layout.
-    *   Users draw motion paths using a standard **Pen Tool** (clicking nodes, dragging control handles) directly matching Webflow, Figma, or Illustrator. This represents $X$ and $Y$ layout mapping.
-2.  **Opt-in 3D Z-Depth Handles**:
-    *   Instead of a cluttered 3D camera orbit that distorts text readability, the layout canvas remains flat.
-    *   When a node is selected, a dedicated **Z-Depth slider or helper handle** is rendered next to the node (or updated via modifier key drags e.g. `Ctrl + drag`).
-    *   Modifying the Z-depth natively scales/blurs the test card and shifts the projected SVG guide line in real-time, giving immediate depth cues while keeping the page readable.
-3.  **Responsive Layout Scaling**:
-    *   Since paths are drawn directly over the website section grid, coordinate parameters can be exported in percentages or viewport units (`%`, `vw`, `vh`) for fully responsive 3D animations across devices.

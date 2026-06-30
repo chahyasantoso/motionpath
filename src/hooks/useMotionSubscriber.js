@@ -9,13 +9,12 @@ import motionEngine from '../lib/motionEngine';
  *
  * @param {string} elementId - ID of the element to subscribe to (matches elements[].id in scene JSON)
  * @param {React.RefObject} ref - React ref to the target DOM element
- * @param {Function} [transformFn] - Optional transform function. Receives data ({ x, y, rotation, progress })
- *   and must return an object of CSS properties for gsap.set(). Should be wrapped in useCallback by the consumer.
- *   When absent, defaults to { x, y, rotation }. `progress` (0.0–1.0) is only accessible through this function.
+ * @param {Function} [transformFn] - Optional transform function. Receives data (rawData)
+ *   and compose function (rawData => patch) and must return an object of CSS properties for gsap.set().
+ *   Should be wrapped in useCallback by the consumer.
+ *   When absent, defaults to applying motionEngine.compose(elementId, rawData).
  */
 export default function useMotionSubscriber(elementId, ref, transformFn) {
-  // Store transformFn in a ref to avoid stale closures without causing re-subscribe.
-  // This lets the consumer update transformFn without triggering useEffect cleanup/re-run.
   const transformFnRef = useRef(transformFn);
   transformFnRef.current = transformFn;
 
@@ -24,40 +23,22 @@ export default function useMotionSubscriber(elementId, ref, transformFn) {
       return;
     }
 
-    if (ref.current) {
-      motionEngine._domRefs = motionEngine._domRefs || new Map();
-      motionEngine._domRefs.set(elementId, ref.current);
-    }
-
     // Subscribe to coordinate broadcasts for this element.
-    // The engine handles late-subscriber caching — it immediately sends
-    // the last known proxy position to prevent jumping visual bugs (motionEngine.js:84-86).
-    const unsubscribe = motionEngine.subscribe(elementId, (data) => {
+    const unsubscribe = motionEngine.subscribe(elementId, (rawData) => {
       if (!ref.current) return;
 
-      const overrideFn = motionEngine._transformOverrides?.get(elementId);
-      const activeTransformFn = overrideFn || transformFnRef.current;
+      const activeTransformFn = transformFnRef.current;
 
       if (typeof activeTransformFn === 'function') {
-        // Custom transform: consumer has full access to { x, y, rotation, progress }
-        gsap.set(ref.current, activeTransformFn(data));
+        gsap.set(ref.current, activeTransformFn(rawData, (data) => motionEngine.compose(elementId, data)));
       } else {
-        // Default: apply spatial properties only. progress is NOT set to DOM
-        // because it is not a valid CSS property.
-        gsap.set(ref.current, {
-          x: data.x,
-          y: data.y,
-          z: data.z,
-          rotation: data.rotation,
-        });
+        // Default: compose raw data to target DOM-ready values and apply
+        gsap.set(ref.current, motionEngine.compose(elementId, rawData));
       }
     });
 
-    // Cleanup: remove listener from engine's internal Set to prevent memory leaks
-    // (motionEngine.js:89-97)
     return () => {
       unsubscribe();
-      motionEngine._domRefs?.delete(elementId);
     };
-  }, [elementId]); // ref is a stable React ref, transformFnRef is a stable useRef
+  }, [elementId, ref]);
 }

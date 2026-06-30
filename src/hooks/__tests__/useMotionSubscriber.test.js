@@ -15,7 +15,11 @@ vi.mock('gsap', () => ({
 vi.mock('../../lib/motionEngine', () => ({
   default: {
     subscribe: vi.fn(),
-    _transformOverrides: new Map()
+    compose: vi.fn((elementId, rawData) => ({
+      x: rawData.x,
+      y: rawData.y,
+      rotation: rawData.rotation
+    }))
   }
 }));
 
@@ -46,7 +50,7 @@ describe('useMotionSubscriber', () => {
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
 
-  it('should apply spatial properties (x, y, rotation) via gsap.set when coordinate broadcasts occur', () => {
+  it('should apply spatial properties via compose when no custom transformFn is provided', () => {
     const mockElement = document.createElement('div');
     const mockRef = { current: mockElement };
 
@@ -56,7 +60,10 @@ describe('useMotionSubscriber', () => {
     const data = { x: 120, y: 340, rotation: 90, progress: 0.5 };
     mockSubscribeCallback(data);
 
-    // Verify gsap.set was called with default properties
+    // Verify compose was called
+    expect(motionEngine.compose).toHaveBeenCalledWith('rocket-id', data);
+
+    // Verify gsap.set was called with composed properties
     expect(gsap.set).toHaveBeenCalledWith(mockElement, {
       x: 120,
       y: 340,
@@ -64,16 +71,17 @@ describe('useMotionSubscriber', () => {
     });
   });
 
-  it('should apply custom styling and animation configurations via transformFn if provided', () => {
+  it('should apply custom styling and animation configurations via transformFn if provided, passing compose as the second arg', () => {
     const mockElement = document.createElement('div');
     const mockRef = { current: mockElement };
-    const transformFn = vi.fn((data) => ({
-      x: data.x,
-      y: data.y,
-      rotation: data.rotation,
-      scale: 0.5 + data.progress * 0.5,
-      opacity: data.progress
-    }));
+    const transformFn = vi.fn((data, compose) => {
+      const composed = compose(data);
+      return {
+        ...composed,
+        scale: 0.5 + data.progress * 0.5,
+        opacity: data.progress
+      };
+    });
 
     renderHook(() => useMotionSubscriber('rocket-id', mockRef, transformFn));
 
@@ -81,8 +89,8 @@ describe('useMotionSubscriber', () => {
     const data = { x: 200, y: 150, rotation: 30, progress: 0.8 };
     mockSubscribeCallback(data);
 
-    // Verify custom transformFn was executed
-    expect(transformFn).toHaveBeenCalledWith(data);
+    // Verify custom transformFn was executed with data and compose function
+    expect(transformFn).toHaveBeenCalledWith(data, expect.any(Function));
 
     // Verify gsap.set was called with custom transformed properties
     expect(gsap.set).toHaveBeenCalledWith(mockElement, {
@@ -107,27 +115,13 @@ describe('useMotionSubscriber', () => {
     expect(gsap.set).not.toHaveBeenCalled();
   });
 
-  it('should use transform overrides from motionEngine if registered', () => {
-    const mockElement = document.createElement('div');
-    const mockRef = { current: mockElement };
-    const baseTransformFn = vi.fn(() => ({ x: 0 }));
-    
-    // Register override on mock motionEngine
-    const overrideTransformFn = vi.fn((data) => ({ x: data.x * 2, y: data.y * 2 }));
-    motionEngine._transformOverrides.set('rocket-id', overrideTransformFn);
+  it('should not write to motionEngine._domRefs (legacy code removed)', () => {
+    const mockRef = { current: document.createElement('div') };
+    const engineBefore = { ...motionEngine };
 
-    renderHook(() => useMotionSubscriber('rocket-id', mockRef, baseTransformFn));
+    renderHook(() => useMotionSubscriber('rocket-id', mockRef));
 
-    // Broadcast coordinate
-    const data = { x: 50, y: 80, rotation: 0, progress: 0.5 };
-    mockSubscribeCallback(data);
-
-    // Verify override was called instead of the base function
-    expect(overrideTransformFn).toHaveBeenCalledWith(data);
-    expect(baseTransformFn).not.toHaveBeenCalled();
-    expect(gsap.set).toHaveBeenCalledWith(mockElement, { x: 100, y: 160 });
-
-    // Cleanup override
-    motionEngine._transformOverrides.clear();
+    // _domRefs should not be added to motionEngine by the hook
+    expect(motionEngine._domRefs).toBeUndefined();
   });
 });
