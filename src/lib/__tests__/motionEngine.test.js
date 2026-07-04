@@ -155,7 +155,7 @@ describe('GsapPubSub - Scene Cleanup', () => {
           id: 'el-1',
           keyframes: {
             path: {
-              points: [{ x: 0, y: 0 }, { x: 10, y: 10 }],
+              points: [{ x: 0, y: 0 }, { x: 3, y: 3 }, { x: 7, y: 7 }, { x: 10, y: 10 }],
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
             }
           }
@@ -178,7 +178,7 @@ describe('GsapPubSub - Scene Cleanup', () => {
           id: 'cached-el-1',
           keyframes: {
             path: {
-              points: [{ x: 0, y: 0 }, { x: 10, y: 10 }],
+              points: [{ x: 0, y: 0 }, { x: 3, y: 3 }, { x: 7, y: 7 }, { x: 10, y: 10 }],
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
             }
           }
@@ -211,7 +211,7 @@ describe('GsapPubSub - Scene Cleanup', () => {
           id: 'fd-el',
           keyframes: {
             path: {
-              points: [{ x: 0, y: 0 }, { x: 10, y: 10 }],
+              points: [{ x: 0, y: 0 }, { x: 3, y: 3 }, { x: 7, y: 7 }, { x: 10, y: 10 }],
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
             }
           }
@@ -545,7 +545,7 @@ describe('GsapPubSub - Proxy Initialization and Static Config Separation', () =>
         transformOrigin: 'top left',
         keyframes: {
           opacity: { stops: [{ p: 0, v: 0.5 }, { p: 1, v: 1 }] },
-          path: { points: [{ x: 0, y: 0 }, { x: 100, y: 100 }], stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] }
+          path: { points: [{ x: 0, y: 0 }, { x: 30, y: 30 }, { x: 70, y: 70 }, { x: 100, y: 100 }], stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] }
         }
       }]
     };
@@ -584,7 +584,7 @@ describe('GsapPubSub - Proxy Initialization and Static Config Separation', () =>
         {
           id: 'align-el-2', // no explicit origin (defaults to 50% 50%)
           keyframes: {
-            path: { points: [{ x: 0, y: 0 }, { x: 100, y: 100 }], stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] }
+            path: { points: [{ x: 0, y: 0 }, { x: 30, y: 30 }, { x: 70, y: 70 }, { x: 100, y: 100 }], stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] }
           }
         },
         {
@@ -626,7 +626,7 @@ describe('GsapPubSub - Proxy Initialization and Static Config Separation', () =>
           id: 'path-el-default', // defaults to autoRotate: false
           keyframes: {
             path: {
-              points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+              points: [{ x: 0, y: 0 }, { x: 30, y: 30 }, { x: 70, y: 70 }, { x: 100, y: 100 }],
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
             }
           }
@@ -635,7 +635,7 @@ describe('GsapPubSub - Proxy Initialization and Static Config Separation', () =>
           id: 'path-el-enabled', // explicitly autoRotate: true
           keyframes: {
             path: {
-              points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+              points: [{ x: 0, y: 0 }, { x: 30, y: 30 }, { x: 70, y: 70 }, { x: 100, y: 100 }],
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
               autoRotate: true
             }
