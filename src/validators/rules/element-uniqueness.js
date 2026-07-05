@@ -10,7 +10,7 @@
  * @param {unknown[]} scenarios
  * @returns {ValidationError[]}
  */
-export function elementUniquenessRule(scenarios) {
+export function elementUniquenessRule(scenarios, context) {
   const errors = [];
 
   if (!Array.isArray(scenarios)) {

@@ -58,6 +58,11 @@ export function createEngineCore(buildResult) {
       subscribers.get(elementId).add(callback);
       if (totalSubscriberCount() === 1) startTicker();
 
+      // Replay current state immediately so a new subscriber never waits on the
+      // next tick, which may be arbitrarily delayed (paused editor timeline,
+      // backgrounded tab, fake timers in tests). `proxy` is already always current.
+      callback({ ...buildResult.elements.get(elementId).proxy });
+
       return () => {
         const cbs = subscribers.get(elementId);
         if (cbs) {

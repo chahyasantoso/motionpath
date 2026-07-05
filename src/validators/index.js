@@ -65,11 +65,12 @@ export function validateProject(schema) {
     return errors; // cannot iterate scenarios safely; return early
   }
 
+  const context = { schema };
+
   // Iterate scenarios
   for (const [i, scenario] of schema.scenarios.entries()) {
     const scenarioPath = `scenarios[${i}]`;
 
-    const context = { schema };
     // Run scenario rules (ScenarioRule signature: (scenario, context, path) => errors)
     for (const rule of scenarioRules) {
       errors.push(...runSafely(rule, scenario, context, scenarioPath));
@@ -80,15 +81,15 @@ export function validateProject(schema) {
       for (const [j, element] of scenario.elements.entries()) {
         const elementPath = `${scenarioPath}.elements[${j}]`;
         for (const rule of elementRules) {
-          errors.push(...runSafely(rule, element, scenario, elementPath));
+          errors.push(...runSafely(rule, element, scenario, context, elementPath));
         }
       }
     }
   }
 
-  // Run cross-scenario rules (CrossScenarioRule signature: (scenarios) => errors)
+  // Run cross-scenario rules (CrossScenarioRule signature: (scenarios, context) => errors)
   for (const rule of crossScenarioRules) {
-    errors.push(...runSafely(rule, schema.scenarios));
+    errors.push(...runSafely(rule, schema.scenarios, context));
   }
 
   return errors;

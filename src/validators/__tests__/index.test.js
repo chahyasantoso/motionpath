@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { validateProject } from '../index.js';
+import { directionAmbiguityRule } from '../rules/direction-ambiguity.js';
+import { pathXYExclusivityRule } from '../rules/path-xy-exclusivity.js';
+import { pathShapeRule } from '../rules/path-shape.js';
+import { timelineGroupRule } from '../rules/timeline-group.js';
+import { elementUniquenessRule } from '../rules/element-uniqueness.js';
+import { triggerShapeRule } from '../rules/trigger-shape.js';
+import { easeCollisionRule } from '../rules/ease-collision.js';
+import { staggerShapeRule } from '../rules/stagger-shape.js';
+import { perspectiveUsageRule } from '../rules/perspective-usage.js';
 
 describe('validateProject integration tests', () => {
   it('should return empty array for a fully valid minimal project', () => {
@@ -97,5 +106,15 @@ describe('validateProject integration tests', () => {
     expect(missingScenariosErrors[0].ruleId).toBe('invalid-shape');
     expect(missingScenariosErrors[0].severity).toBe('error');
     expect(missingScenariosErrors[0].path).toBe('$.scenarios');
+  });
+
+  it('every rule function has the correct arity for its type', () => {
+    const scenarioRules = [triggerShapeRule, easeCollisionRule, staggerShapeRule, perspectiveUsageRule];
+    const elementRules = [directionAmbiguityRule, pathXYExclusivityRule, pathShapeRule];
+    const crossScenarioRules = [timelineGroupRule, elementUniquenessRule];
+
+    scenarioRules.forEach(rule => expect(rule.length).toBe(3));   // (scenario, context, path)
+    elementRules.forEach(rule => expect(rule.length).toBe(4));    // (element, scenario, context, path)
+    crossScenarioRules.forEach(rule => expect(rule.length).toBe(2)); // (scenarios, context)
   });
 });

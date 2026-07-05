@@ -196,4 +196,34 @@ describe('ProductionEngine', () => {
 
     expect(() => engine.pauseTimer('unknown')).toThrow(/no group or scenario found/);
   });
+
+  it('kills all timelines built so far if trigger-wiring throws partway through', async () => {
+    const scenarioA = { scenarioIndex: 0, sceneId: 'a', triggerType: 'scroll-scrub',
+      triggerConfig: { trigger: '#a', scrub: true }, timeline: { kill: vi.fn(), progress: vi.fn() } };
+    const scenarioB = { scenarioIndex: 1, sceneId: 'b', triggerType: 'scroll-scrub',
+      triggerConfig: { trigger: '#b', scrub: true }, timeline: { kill: vi.fn(), progress: vi.fn() } };
+
+    const buildResult = {
+      scenarios: [scenarioA, scenarioB],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map(),
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockResolvedValue(buildResult);
+
+    // First ScrollTrigger.create succeeds, second throws
+    ScrollTrigger.create
+      .mockImplementationOnce(() => ({ kill: vi.fn() }))
+      .mockImplementationOnce(() => { throw new Error('boom'); });
+
+    const engine = createProductionEngine(mockDeps);
+
+    await expect(engine.loadProject({})).rejects.toThrow('boom');
+
+    // Both timelines — including scenario A's, which was already wired before B failed — must be killed.
+    expect(scenarioA.timeline.kill).toHaveBeenCalled();
+    expect(scenarioB.timeline.kill).toHaveBeenCalled();
+  });
 });

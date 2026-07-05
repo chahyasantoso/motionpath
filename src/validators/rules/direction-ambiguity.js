@@ -14,7 +14,8 @@
  * @param {string} path - JSON path to element
  * @returns {ValidationError[]}
  */
-export function directionAmbiguityRule(element, scenario, path) {
+export function directionAmbiguityRule(element, scenario, context, path) {
+  const actualPath = (typeof context === 'string') ? context : path;
   const errors = [];
 
   if (!element || typeof element !== 'object') {
@@ -48,7 +49,7 @@ export function directionAmbiguityRule(element, scenario, path) {
           ruleId: "direction-ambiguity",
           severity: "error",
           message: `Element direction 'fromTo' requires at least 2 stops, but property '${propKey}' has only 1 stop.`,
-          path: `${path}.keyframes.${propKey}`
+          path: `${actualPath}.keyframes.${propKey}`
         });
       } else if (direction === undefined || direction === null) {
         if (!near0 && !near1) {
@@ -56,7 +57,7 @@ export function directionAmbiguityRule(element, scenario, path) {
             ruleId: "direction-ambiguity",
             severity: "error",
             message: `Property '${propKey}' has a single stop at p=${p} (not near 0 or 1), so element direction is required.`,
-            path: `${path}.keyframes.${propKey}`
+            path: `${actualPath}.keyframes.${propKey}`
           });
         }
       }

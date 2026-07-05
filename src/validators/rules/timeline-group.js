@@ -11,7 +11,7 @@
  * @param {unknown[]} scenarios
  * @returns {ValidationError[]}
  */
-export function timelineGroupRule(scenarios) {
+export function timelineGroupRule(scenarios, context) {
   const errors = [];
 
   if (!Array.isArray(scenarios)) {

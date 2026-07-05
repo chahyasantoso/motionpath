@@ -12,7 +12,8 @@
  * @param {string} path - JSON path to element
  * @returns {ValidationError[]}
  */
-export function pathShapeRule(element, scenario, path) {
+export function pathShapeRule(element, scenario, context, path) {
+  const actualPath = (typeof context === 'string') ? context : path;
   const errors = [];
 
   if (!element || typeof element !== 'object') {
@@ -29,7 +30,7 @@ export function pathShapeRule(element, scenario, path) {
     return errors;
   }
 
-  const pathPath = `${path}.keyframes.path`;
+  const pathPath = `${actualPath}.keyframes.path`;
 
   if (typeof pathVal !== 'object') {
     errors.push({

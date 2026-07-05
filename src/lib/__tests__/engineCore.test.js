@@ -77,6 +77,15 @@ describe('EngineCore', () => {
       unsubscribe2();
     });
 
+    it('replays current proxy state synchronously on subscribe, before any tick', () => {
+      const core = createEngineCore(buildResult);
+      const callback = vi.fn();
+      core.subscribe('el-1', callback);
+      // No gsap.ticker advance here — zero ticks have occurred.
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(expect.objectContaining({ x: 10, __blur: 5 }));
+    });
+
     it('clears ticker callback on destroy()', () => {
       const addSpy = vi.spyOn(gsap.ticker, 'add');
       const removeSpy = vi.spyOn(gsap.ticker, 'remove');
