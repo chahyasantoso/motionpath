@@ -191,12 +191,9 @@ export async function buildProject(schema, deps) {
 
     // A1: stagger is always a plain number post-validation (Brief 1 §Task 1
     // rejects object-form stagger). No object.each branch needed.
-    const getStaggerOffset = (stagger, idx) =>
-      typeof stagger === 'number' ? stagger * idx : 0;
-
     elements.forEach((element, idx) => {
       const tween = elementTweens[idx];
-      const offset = getStaggerOffset(scenario.stagger, idx);
+      const offset = typeof scenario.stagger === 'number' ? scenario.stagger * idx : 0;
       scenarioTimeline.add(tween, offset);
     });
 

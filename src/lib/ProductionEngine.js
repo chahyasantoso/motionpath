@@ -163,15 +163,11 @@ export function createProductionEngine(deps) {
     },
 
     enableScroll() {
-      for (const st of _createdScrollTriggers) {
-        try { st.enable(); } catch (e) { /* ignore */ }
-      }
+      ScrollTrigger.getAll().forEach(st => st.enable());
     },
 
     disableScroll() {
-      for (const st of _createdScrollTriggers) {
-        try { st.disable(); } catch (e) { /* ignore */ }
-      }
+      ScrollTrigger.getAll().forEach(st => st.disable());
     },
   };
 }
