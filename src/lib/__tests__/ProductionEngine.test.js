@@ -1,14 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as validatorModule from '../../validators/index.js';
 import { createProductionEngine } from '../ProductionEngine.js';
 import * as builderModule from '../builder.js';
-import * as validatorModule from '../../validators/index.js';
 
 vi.mock('gsap/ScrollTrigger', () => {
   return {
     ScrollTrigger: {
       create: vi.fn(),
-      getAll: vi.fn(() => [])
+      getAll: vi.fn(() => []),
+      refresh: vi.fn()
     }
   };
 });
@@ -86,7 +87,7 @@ describe('ProductionEngine', () => {
     await engine.loadProject({});
 
     expect(ScrollTrigger.create).toHaveBeenCalledWith({
-      trigger: '#el',
+      trigger: { id: '#el' },
       scrub: true,
       animation: mockTimeline
     });
@@ -136,7 +137,7 @@ describe('ProductionEngine', () => {
 
     expect(ScrollTrigger.create).toHaveBeenCalledTimes(1);
     expect(ScrollTrigger.create).toHaveBeenCalledWith({
-      trigger: '#primary',
+      trigger: { id: '#primary' },
       scrub: true,
       animation: mockMasterTimeline
     });
@@ -225,5 +226,84 @@ describe('ProductionEngine', () => {
     // Both timelines — including scenario A's, which was already wired before B failed — must be killed.
     expect(scenarioA.timeline.kill).toHaveBeenCalled();
     expect(scenarioB.timeline.kill).toHaveBeenCalled();
+  });
+
+  it('correctly resolves trigger-element references using resolveTriggerRef logic', async () => {
+    const customResult = {
+      scenarios: [
+        {
+          scenarioIndex: 0,
+          sceneId: 'my-scene-id',
+          triggerType: 'scroll-scrub',
+          triggerConfig: {
+            trigger: 'my-trigger-id',
+            pin: true,
+            endTrigger: 'my-end-trigger-id',
+            start: 'top top',
+            end: 'bottom bottom'
+          },
+          timeline: mockTimeline
+        }
+      ],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map()
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockResolvedValue(customResult);
+
+    const engine = createProductionEngine(mockDeps);
+    await engine.loadProject({});
+
+    // resolveElement should have been called for trigger and endTrigger, but NOT for pin (boolean true)
+    expect(mockDeps.resolveElement).toHaveBeenCalledWith('my-trigger-id');
+    expect(mockDeps.resolveElement).toHaveBeenCalledWith('my-end-trigger-id');
+    expect(mockDeps.resolveElement).not.toHaveBeenCalledWith(true);
+
+    // resolveElement should never be called with start/end values
+    expect(mockDeps.resolveElement).not.toHaveBeenCalledWith('top top');
+    expect(mockDeps.resolveElement).not.toHaveBeenCalledWith('bottom bottom');
+
+    expect(ScrollTrigger.create).toHaveBeenCalledWith(expect.objectContaining({
+      trigger: { id: 'my-trigger-id' },
+      pin: true,
+      endTrigger: { id: 'my-end-trigger-id' },
+      start: 'top top',
+      end: 'bottom bottom'
+    }));
+  });
+
+  it('falls back to sceneId when trigger and startTrigger are missing', async () => {
+    const customResult = {
+      scenarios: [
+        {
+          scenarioIndex: 0,
+          sceneId: 'fallback-scene-id',
+          triggerType: 'scroll-scrub',
+          triggerConfig: {
+            pin: 'pin-id'
+          },
+          timeline: mockTimeline
+        }
+      ],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map()
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockResolvedValue(customResult);
+
+    const engine = createProductionEngine(mockDeps);
+    await engine.loadProject({});
+
+    expect(mockDeps.resolveElement).toHaveBeenCalledWith('fallback-scene-id');
+    expect(mockDeps.resolveElement).toHaveBeenCalledWith('pin-id');
+
+    expect(ScrollTrigger.create).toHaveBeenCalledWith(expect.objectContaining({
+      trigger: { id: 'fallback-scene-id' },
+      pin: { id: 'pin-id' }
+    }));
   });
 });

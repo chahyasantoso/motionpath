@@ -120,6 +120,45 @@ describe('EditorEngine', () => {
     expect(() => engine.setProgress('unknown-id', 0.5)).toThrow(/no group or scenario found/);
   });
 
+  it('allows subscribing before project is loaded, queueing and wiring them on load', async () => {
+    const customResult = {
+      scenarios: [
+        {
+          scenarioIndex: 0,
+          sceneId: 'my-scene-id',
+          triggerType: 'scroll-scrub',
+          triggerConfig: {},
+          timeline: mockTimeline
+        }
+      ],
+      timelineGroups: new Map(),
+      elements: new Map([
+        ['rocket-track', { proxy: { x: 100 } }]
+      ]),
+      elementPlugins: new Map()
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockResolvedValue(customResult);
+
+    const engine = createEditorEngine(mockDeps);
+
+    const callback = vi.fn();
+    const unsubscribe = engine.subscribe('rocket-track', callback);
+
+    expect(callback).not.toHaveBeenCalled();
+
+    // Now load project
+    await engine.loadProject({});
+
+    // Upon load, it should wire and trigger callback synchronously with the proxy snapshot
+    expect(callback).toHaveBeenCalled();
+    expect(callback).toHaveBeenCalledWith({ x: 100 });
+
+    // Verify unsubscribe works
+    unsubscribe();
+  });
+
   it('EditorEngine.js does not contain ScrollTrigger', () => {
     const sourcePath = path.resolve(__dirname, '../EditorEngine.js');
     const source = fs.readFileSync(sourcePath, 'utf8');

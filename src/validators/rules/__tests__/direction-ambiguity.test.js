@@ -9,7 +9,7 @@ describe('direction-ambiguity rule', () => {
         x: { stops: [{ p: 0, v: 0 }] }
       }
     };
-    const errors = directionAmbiguityRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = directionAmbiguityRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -20,7 +20,7 @@ describe('direction-ambiguity rule', () => {
         x: { stops: [{ p: 0.0005, v: 0 }] }
       }
     };
-    const errors = directionAmbiguityRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = directionAmbiguityRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -31,7 +31,7 @@ describe('direction-ambiguity rule', () => {
         x: { stops: [{ p: 0.5, v: 10 }] }
       }
     };
-    const errors = directionAmbiguityRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = directionAmbiguityRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('direction-ambiguity');
     expect(errors[0].severity).toBe('error');
@@ -46,7 +46,7 @@ describe('direction-ambiguity rule', () => {
         x: { stops: [{ p: 0, v: 0 }] }
       }
     };
-    const errors = directionAmbiguityRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = directionAmbiguityRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('direction-ambiguity');
   });
@@ -59,7 +59,7 @@ describe('direction-ambiguity rule', () => {
         x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 10 }] }
       }
     };
-    const errors = directionAmbiguityRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = directionAmbiguityRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(0);
   });
 });

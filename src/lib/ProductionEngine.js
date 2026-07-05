@@ -3,9 +3,24 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { validateProject } from '../validators/index.js';
 import { buildProject } from './builder.js';
 import { createEngineCore } from './engineCore.js';
+import { createDeferredSubscribe } from './deferredSubscribe.js';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
+}
+
+/**
+ * Resolves a trigger-related field that may reference an element.
+ * - undefined/null -> falls back to resolving `fallbackId` (typically sceneId).
+ * - boolean -> passed through unchanged (GSAP's `pin: true` means "pin the
+ *   trigger element itself"; there's nothing to resolve).
+ * - string -> resolved via deps.resolveElement (the data-motion-id lookup) —
+ *   never treated as a raw CSS selector, for the same reason element.id isn't.
+ */
+function resolveTriggerRef(value, deps, fallbackId) {
+  if (value === undefined || value === null) return deps.resolveElement(fallbackId);
+  if (typeof value === 'boolean') return value;
+  return deps.resolveElement(value);
 }
 
 /**
@@ -18,12 +33,14 @@ export function createProductionEngine(deps) {
   let _buildResult = null;
   // Track only the ScrollTrigger instances THIS engine created.
   const _createdScrollTriggers = [];
+  const _subRegistry = createDeferredSubscribe();
 
   function _cleanup() {
     for (const st of _createdScrollTriggers) {
       try { st.kill(); } catch (e) { /* ignore */ }
     }
     _createdScrollTriggers.length = 0;
+    _subRegistry.clearCore();
     if (_core) {
       _core.destroy();
       _core = null;
@@ -70,7 +87,17 @@ export function createProductionEngine(deps) {
             const config = primaryScenario?.triggerConfig || {};
 
             if (group.triggerType === 'scroll-scrub') {
-              const st = ScrollTrigger.create({ ...config, animation: group.masterTimeline });
+              const resolvedConfig = {
+                ...config,
+                trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, primaryScenario.sceneId),
+              };
+              if (config.pin !== undefined) {
+                resolvedConfig.pin = resolveTriggerRef(config.pin, deps, primaryScenario.sceneId);
+              }
+              if (config.endTrigger !== undefined) {
+                resolvedConfig.endTrigger = resolveTriggerRef(config.endTrigger, deps, primaryScenario.sceneId);
+              }
+              const st = ScrollTrigger.create({ ...resolvedConfig, animation: group.masterTimeline });
               createdSTs.push(st);
             } else if (group.triggerType === 'time') {
               group.masterTimeline
@@ -83,12 +110,21 @@ export function createProductionEngine(deps) {
             const config = triggerConfig || {};
 
             if (triggerType === 'scroll-scrub') {
-              const st = ScrollTrigger.create({ ...config, animation: scenario.timeline });
+              const resolvedConfig = {
+                ...config,
+                trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, sceneId),
+              };
+              if (config.pin !== undefined) {
+                resolvedConfig.pin = resolveTriggerRef(config.pin, deps, sceneId);
+              }
+              if (config.endTrigger !== undefined) {
+                resolvedConfig.endTrigger = resolveTriggerRef(config.endTrigger, deps, sceneId);
+              }
+              const st = ScrollTrigger.create({ ...resolvedConfig, animation: scenario.timeline });
               createdSTs.push(st);
             } else if (triggerType === 'scroll-observer') {
-              const triggerEl = deps.resolveElement(config.startTrigger ?? sceneId);
               const st = ScrollTrigger.create({
-                trigger: triggerEl,
+                trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, sceneId),
                 start: config.start,
                 toggleActions: config.toggleActions,
                 animation: scenario.timeline,
@@ -123,11 +159,20 @@ export function createProductionEngine(deps) {
       _core = core;
       _buildResult = buildResult;
       _createdScrollTriggers.push(...createdSTs);
+      _subRegistry.setCore(core);
+
+      // Recalculate all scroll trigger positions after the full layout is committed.
+      // When multiple pinned sections exist, each pin inserts a spacer element that
+      // shifts the page layout for all subsequent sections. Without this refresh,
+      // GSAP uses stale pre-pin offsets which causes earlier sections to appear
+      // stuck (animation runs but the scrub range is miscalculated).
+      if (createdSTs.length > 0) {
+        ScrollTrigger.refresh();
+      }
     },
 
     subscribe(elementId, callback) {
-      if (!_core) throw new Error('ProductionEngine: loadProject() must be called before subscribe().');
-      return _core.subscribe(elementId, callback);
+      return _subRegistry.subscribe(elementId, callback);
     },
 
     compose(elementId, rawData) {

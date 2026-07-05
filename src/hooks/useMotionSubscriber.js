@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
-import motionEngine from '../lib/motionEngine';
+import { productionEngine } from '../lib/ProductionEngine';
 
 /**
- * Smart Subscriber Hook — Listens to coordinate broadcasts from motionEngine
+ * Smart Subscriber Hook — Listens to coordinate broadcasts from productionEngine
  * and applies them directly to a DOM element via gsap.set(), bypassing
  * React's Virtual DOM entirely (Zero Re-render).
  *
@@ -12,7 +12,7 @@ import motionEngine from '../lib/motionEngine';
  * @param {Function} [transformFn] - Optional transform function. Receives data (rawData)
  *   and compose function (rawData => patch) and must return an object of CSS properties for gsap.set().
  *   Should be wrapped in useCallback by the consumer.
- *   When absent, defaults to applying motionEngine.compose(elementId, rawData).
+ *   When absent, defaults to applying productionEngine.compose(elementId, rawData).
  */
 export default function useMotionSubscriber(elementId, ref, transformFn) {
   const transformFnRef = useRef(transformFn);
@@ -24,16 +24,16 @@ export default function useMotionSubscriber(elementId, ref, transformFn) {
     }
 
     // Subscribe to coordinate broadcasts for this element.
-    const unsubscribe = motionEngine.subscribe(elementId, (rawData) => {
+    const unsubscribe = productionEngine.subscribe(elementId, (rawData) => {
       if (!ref.current) return;
 
       const activeTransformFn = transformFnRef.current;
 
       if (typeof activeTransformFn === 'function') {
-        gsap.set(ref.current, activeTransformFn(rawData, (data) => motionEngine.compose(elementId, data)));
+        gsap.set(ref.current, activeTransformFn(rawData, (data) => productionEngine.compose(elementId, data)));
       } else {
         // Default: compose raw data to target DOM-ready values and apply
-        gsap.set(ref.current, motionEngine.compose(elementId, rawData));
+        gsap.set(ref.current, productionEngine.compose(elementId, rawData));
       }
     });
 

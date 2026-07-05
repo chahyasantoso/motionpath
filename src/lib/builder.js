@@ -172,8 +172,7 @@ export async function buildProject(schema, deps) {
       const tween = gsap.to(proxy, {
         keyframes: sharedKeyframes,
         ...sharedTweenVars,
-        duration: tweenDuration,
-        paused: true
+        duration: tweenDuration
       });
       elementTweens.push(tween);
     }

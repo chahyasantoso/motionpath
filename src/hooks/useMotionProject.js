@@ -1,49 +1,28 @@
-import { useEffect } from 'react';
-import motionEngine from '../lib/motionEngine';
+import { useEffect, useRef } from 'react';
+import { productionEngine } from '../lib/ProductionEngine';
 
 /**
- * Initializes multiple scenarios from a project data object.
- * Each scenario is initialized independently via motionEngine.initScene().
+ * React Hook to load a complete MotionPath project once.
+ * Replaces the entire previous state of the productionEngine upon mount.
+ * Destroys and cleans up engine resources on unmount.
  *
- * @param {Object[]|Object} scenarios - Array of scenario objects, or a full project
- *   object with a `scenarios` array field.
- * @param {{ [sceneId]: React.RefObject }} containerRefMap - Map of sceneId → React ref
- *   to the DOM container for that scenario. Scenarios without a matching ref get null.
- * @param {{ paused?: boolean }} [options]
+ * @param {Object} project - The complete project schema object
  */
-export default function useMotionProject(scenarios, containerRefMap = {}, options = {}) {
-  const { paused = false } = options;
-
-  // Normalize: accept full project object or bare array
-  const scenarioList = Array.isArray(scenarios)
-    ? scenarios
-    : Array.isArray(scenarios?.scenarios)
-      ? scenarios.scenarios
-      : [];
+export default function useMotionProject(project) {
+  const projectRef = useRef(project);
+  projectRef.current = project;
 
   useEffect(() => {
-    if (scenarioList.length === 0) return;
+    if (!projectRef.current) return;
+    let cancelled = false;
 
-    scenarioList.forEach(scenario => {
-      if (!scenario?.sceneId) return;
-      const ref = containerRefMap[scenario.sceneId];
-      const containerEl = ref?.current ?? null;
-      motionEngine.initScene(scenario, containerEl);
+    productionEngine.loadProject(projectRef.current).catch(err => {
+      if (!cancelled) console.error('[useMotionProject] loadProject failed:', err);
     });
 
     return () => {
-      scenarioList.forEach(scenario => {
-        if (scenario?.sceneId) motionEngine.destroyScene(scenario.sceneId);
-      });
+      cancelled = true;
+      productionEngine.destroy();
     };
-  }, [scenarioList]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Unified play/pause for all scenarios
-  useEffect(() => {
-    scenarioList.forEach(scenario => {
-      if (!scenario?.sceneId) return;
-      if (paused) motionEngine.pause(scenario.sceneId);
-      else motionEngine.play(scenario.sceneId);
-    });
-  }, [scenarioList, paused]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [project]);
 }

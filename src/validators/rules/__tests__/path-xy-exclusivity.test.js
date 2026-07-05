@@ -10,7 +10,7 @@ describe('path-xy-exclusivity rule', () => {
         x: {}
       }
     };
-    const errors = pathXYExclusivityRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = pathXYExclusivityRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('path-xy-exclusivity');
     expect(errors[0].severity).toBe('error');
@@ -25,7 +25,7 @@ describe('path-xy-exclusivity rule', () => {
         y: {}
       }
     };
-    const errors = pathXYExclusivityRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = pathXYExclusivityRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(1);
   });
 
@@ -36,7 +36,7 @@ describe('path-xy-exclusivity rule', () => {
         path: {}
       }
     };
-    const errors = pathXYExclusivityRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = pathXYExclusivityRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -48,7 +48,7 @@ describe('path-xy-exclusivity rule', () => {
         y: {}
       }
     };
-    const errors = pathXYExclusivityRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = pathXYExclusivityRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(0);
   });
 });

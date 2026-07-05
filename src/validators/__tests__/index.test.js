@@ -117,4 +117,27 @@ describe('validateProject integration tests', () => {
     elementRules.forEach(rule => expect(rule.length).toBe(4));    // (element, scenario, context, path)
     crossScenarioRules.forEach(rule => expect(rule.length).toBe(2)); // (scenarios, context)
   });
+
+  it('element rules use the 3rd argument positionally as context, never sniffing its type', () => {
+    const scenario = {};
+    const realPath = 'scenarios[0].elements[0]';
+
+    // 1. directionAmbiguityRule
+    const elementDA = { keyframes: { opacity: { stops: [{ p: 0.5 }] } } };
+    const errorsDA = directionAmbiguityRule(elementDA, scenario, 'not-a-context-object', realPath);
+    expect(errorsDA.length).toBeGreaterThan(0);
+    errorsDA.forEach(e => expect(e.path.startsWith(realPath)).toBe(true));
+
+    // 2. pathXYExclusivityRule
+    const elementXY = { keyframes: { path: {}, x: {} } };
+    const errorsXY = pathXYExclusivityRule(elementXY, scenario, 'not-a-context-object', realPath);
+    expect(errorsXY.length).toBeGreaterThan(0);
+    errorsXY.forEach(e => expect(e.path.startsWith(realPath)).toBe(true));
+
+    // 3. pathShapeRule
+    const elementPS = { keyframes: { path: { points: [{}, {}, {}] } } };
+    const errorsPS = pathShapeRule(elementPS, scenario, 'not-a-context-object', realPath);
+    expect(errorsPS.length).toBeGreaterThan(0);
+    errorsPS.forEach(e => expect(e.path.startsWith(realPath)).toBe(true));
+  });
 });

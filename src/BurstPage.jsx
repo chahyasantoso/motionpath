@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import './BurstPage.css';
-import useMotionPlayer from './hooks/useMotionPlayer';
+import useMotionProject from './hooks/useMotionProject';
 import useMotionSubscriber from './hooks/useMotionSubscriber';
-import { buildMotionPath } from './lib/pathUtils';
+import { buildMotionPath, convertToCubicPath } from './lib/pathUtils';
 import { projectPathNodes3DTo2D } from './lib/projection3d';
 
 // ─── Strawberry Burst Demo Configs ──────────────────────────────
@@ -13,7 +13,7 @@ const strawberryScene = {
   trigger: {
     type: 'scroll',
     scrub: 0.5,
-    pin: '.burst-stage',
+    pin: 'burst-stage',
     start: 'top top',
     end: 'bottom bottom'
   },
@@ -274,7 +274,7 @@ const iceCreamCardScene = {
   trigger: {
     type: 'scroll',
     scrub: false,
-    startTrigger: '#strawberry-burst-scroll',
+    startTrigger: 'strawberry-burst-scroll',
     start: 'top 30%',
     toggleActions: 'play none none none'
   },
@@ -342,7 +342,7 @@ function Strawberry({ elementId, emoji }) {
   useMotionSubscriber(elementId, ref, transform);
 
   return (
-    <div ref={ref} className="strawberry-element">
+    <div ref={ref} data-motion-id={elementId} className="strawberry-element">
       {emoji}
     </div>
   );
@@ -358,7 +358,7 @@ function IceCreamCard() {
   useMotionSubscriber('strawberry-card', ref, transform);
 
   return (
-    <div ref={ref} className="burst-card">
+    <div ref={ref} data-motion-id="strawberry-card" className="burst-card">
       <div className="badge">Limited Flavor</div>
       <h3>Strawberry Sundae</h3>
       <p>A double scoop of fresh strawberry and creamy vanilla ice cream, topped with rich syrup and juicy strawberry bursts.</p>
@@ -379,7 +379,7 @@ function IceCreamCenterpiece() {
   useMotionSubscriber('ice-cream-center', ref, transform);
 
   return (
-    <div ref={ref} className="ice-cream-wrapper">
+    <div ref={ref} data-motion-id="ice-cream-center" className="ice-cream-wrapper">
       <div className="ice-cream-center-el">🍦</div>
     </div>
   );
@@ -408,8 +408,29 @@ export default function BurstPage() {
     };
   }, []);
 
-  useMotionPlayer(strawberryScene, containerRef);
-  useMotionPlayer(iceCreamCardScene, containerRef);
+  const project = useMemo(() => {
+    // Deep clone scenarios to avoid mutating static objects
+    const clonedStrawberry = JSON.parse(JSON.stringify(strawberryScene));
+    const clonedIceCream = JSON.parse(JSON.stringify(iceCreamCardScene));
+
+    // Convert all element paths to cubic paths programmatically
+    for (const scenario of [clonedStrawberry, clonedIceCream]) {
+      for (const element of scenario.elements || []) {
+        if (element.keyframes?.path?.points) {
+          element.keyframes.path.points = convertToCubicPath(element.keyframes.path.points);
+        }
+      }
+    }
+
+    return {
+      schemaVersion: 1,
+      projectId: 'burst-page',
+      perspective: STRAW_PERSPECTIVE,
+      scenarios: [clonedStrawberry, clonedIceCream],
+    };
+  }, []);
+
+  useMotionProject(project);
 
   const strawCx = dimensions.width * 0.25;
   const strawCy = dimensions.height * 0.5;
@@ -441,8 +462,8 @@ export default function BurstPage() {
         <p className="subtitle">Staggered Timeframes • Native 3D Z-Depth Projection</p>
       </header>
 
-      <section ref={containerRef} id={strawberryScene.sceneId} className="burst-scene">
-        <div ref={stageRef} className="burst-stage">
+      <section ref={containerRef} data-motion-id={strawberryScene.sceneId} className="burst-scene">
+        <div ref={stageRef} data-motion-id="burst-stage" className="burst-stage">
           <div className="scene-label">
             <h2>Multi-Scene Orchestration (Scroll Scrub + Scroll Observer)</h2>
             <p>Ten scroll-triggered strawberries burst sequentially using staggered timeframes, while a scroll-observer triggered card slides in autonomously when the stage enters viewport.</p>

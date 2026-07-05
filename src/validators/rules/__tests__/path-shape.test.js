@@ -12,7 +12,7 @@ describe('path-shape rule', () => {
         }
       }
     };
-    const errors = pathShapeRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -25,7 +25,7 @@ describe('path-shape rule', () => {
         }
       }
     };
-    const errors = pathShapeRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -38,7 +38,7 @@ describe('path-shape rule', () => {
         }
       }
     };
-    const errors = pathShapeRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('path-shape');
     expect(errors[0].severity).toBe('error');
@@ -55,7 +55,7 @@ describe('path-shape rule', () => {
         }
       }
     };
-    const errors = pathShapeRule(element, {}, 'scenarios[0].elements[0]');
+    const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(2);
     expect(errors[0].ruleId).toBe('path-shape');
     expect(errors[0].severity).toBe('error');

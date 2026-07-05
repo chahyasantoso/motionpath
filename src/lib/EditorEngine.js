@@ -1,6 +1,7 @@
 import { validateProject } from '../validators/index.js';
 import { buildProject } from './builder.js';
 import { createEngineCore } from './engineCore.js';
+import { createDeferredSubscribe } from './deferredSubscribe.js';
 
 /**
  * Factory function per Brief 5.
@@ -12,6 +13,7 @@ import { createEngineCore } from './engineCore.js';
 export function createEditorEngine(deps) {
   let _core = null;
   let _buildResult = null;
+  const _subRegistry = createDeferredSubscribe();
 
   return {
     async loadProject(schema) {
@@ -36,11 +38,11 @@ export function createEditorEngine(deps) {
       if (_core) _core.destroy();
       _core = core;
       _buildResult = buildResult;
+      _subRegistry.setCore(core);
     },
 
     subscribe(elementId, callback) {
-      if (!_core) throw new Error('EditorEngine: loadProject() must be called before subscribe().');
-      return _core.subscribe(elementId, callback);
+      return _subRegistry.subscribe(elementId, callback);
     },
 
     compose(elementId, rawData) {
@@ -54,6 +56,7 @@ export function createEditorEngine(deps) {
     },
 
     destroy() {
+      _subRegistry.clearCore();
       if (_core) { _core.destroy(); _core = null; }
       _buildResult = null;
     },

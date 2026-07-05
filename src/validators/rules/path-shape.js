@@ -13,7 +13,6 @@
  * @returns {ValidationError[]}
  */
 export function pathShapeRule(element, scenario, context, path) {
-  const actualPath = (typeof context === 'string') ? context : path;
   const errors = [];
 
   if (!element || typeof element !== 'object') {
@@ -30,7 +29,7 @@ export function pathShapeRule(element, scenario, context, path) {
     return errors;
   }
 
-  const pathPath = `${actualPath}.keyframes.path`;
+  const pathPath = `${path}.keyframes.path`;
 
   if (typeof pathVal !== 'object') {
     errors.push({

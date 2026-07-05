@@ -20,6 +20,28 @@ export function buildMotionPath(pathNodes) {
   return path;
 }
 
+
+/**
+ * Converts an already-cubic Bezier path (3n+1 format from convertToCubicPath)
+ * to an SVG path string using cubic `C` commands.
+ * Input format: [anchor, cp1, cp2, anchor, cp1, cp2, anchor, ...]
+ * @param {Array} cubicPath Array of { x, y, z? }
+ * @returns {string} SVG Path string with C commands
+ */
+export function buildCubicMotionPath(cubicPath) {
+  if (!cubicPath || cubicPath.length < 4) return '';
+  // First point is always an anchor
+  let path = `M ${cubicPath[0].x} ${cubicPath[0].y}`;
+  // Every subsequent segment is: cp1, cp2, anchor (groups of 3)
+  for (let i = 1; i + 2 < cubicPath.length; i += 3) {
+    const cp1 = cubicPath[i];
+    const cp2 = cubicPath[i + 1];
+    const anchor = cubicPath[i + 2];
+    path += ` C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${anchor.x} ${anchor.y}`;
+  }
+  return path;
+}
+
 /**
  * Converts path nodes to a GSAP cubic Bezier array for MotionPathPlugin.
  * Each node's `z` defaults to 0. Quadratic control points (ctrlX/ctrlY) are

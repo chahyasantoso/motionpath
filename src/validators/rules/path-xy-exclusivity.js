@@ -11,7 +11,6 @@
  * @returns {ValidationError[]}
  */
 export function pathXYExclusivityRule(element, scenario, context, path) {
-  const actualPath = (typeof context === 'string') ? context : path;
   const errors = [];
 
   if (!element || typeof element !== 'object') {
@@ -33,7 +32,7 @@ export function pathXYExclusivityRule(element, scenario, context, path) {
       ruleId: "path-xy-exclusivity",
       severity: "error",
       message: `Element has both a 'path' property and explicit '${offendingProps}' keyframes. They are mutually exclusive.`,
-      path: `${actualPath}.keyframes`
+      path: `${path}.keyframes`
     });
   }
 

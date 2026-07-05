@@ -17,10 +17,12 @@ describe('pathPlugin', () => {
       { p: 0.8, v: 0.8, ease: 'power1.out' }
     ];
 
+    // autoRotate lives inside keyframes.path (not on the element root).
+    // points are expected to be already in cubic Bezier format (pre-converted by the caller).
     const mockElement = {
-      autoRotate: true,
       keyframes: {
         path: {
+          autoRotate: true,
           points: [
             { x: 0, y: 0 },
             { x: 5, y: 5 },
@@ -42,7 +44,37 @@ describe('pathPlugin', () => {
     expect(zeroFrame).toBeDefined();
     expect(zeroFrame.__autoRotate).toBe(true);
     expect(zeroFrame.__cubicPath).toBeInstanceOf(Array);
-    expect(zeroFrame.__cubicPath.length).toBe(10);
-    expect(zeroFrame.__cubicPath[0]).toEqual({ x: 0, y: 0, z: 0 }); // coordinates translated to cubic path representation
+    // Points are stored directly; length is 4
+    expect(zeroFrame.__cubicPath.length).toBe(4);
+    // First point matches original coordinates
+    expect(zeroFrame.__cubicPath[0]).toEqual({ x: 0, y: 0 });
+  });
+
+  describe('compose', () => {
+    it('returns empty object if rawData has no path progress or cubicPath', () => {
+      expect(pathPlugin.compose({})).toEqual({});
+      expect(pathPlugin.compose({ __pathProgress: 0.5 })).toEqual({});
+    });
+
+    it('interpolates coordinate along cubic path and injects automatic centering', () => {
+      const rawData = {
+        __pathProgress: 0.5,
+        __cubicPath: [
+          { x: 0, y: 0 },
+          { x: 5, y: 5 },
+          { x: 10, y: 10 },
+          { x: 15, y: 15 }
+        ],
+        __autoRotate: true
+      };
+
+      const result = pathPlugin.compose(rawData);
+      expect(result.x).toBeCloseTo(7.5);
+      expect(result.y).toBeCloseTo(7.5);
+      expect(result.z).toBe(0);
+      expect(result.xPercent).toBe(-50);
+      expect(result.yPercent).toBe(-50);
+      expect(result.rotation).toBeDefined();
+    });
   });
 });

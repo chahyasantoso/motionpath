@@ -1,69 +1,96 @@
 // @vitest-environment jsdom
-import { renderHook } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
+import { render, renderHook } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useMotionProject from '../useMotionProject';
-import motionEngine from '../../lib/motionEngine';
+import { productionEngine } from '../../lib/ProductionEngine';
+import BurstPage from '../../BurstPage';
 
-// Mock motionEngine
-vi.mock('../../lib/motionEngine', () => ({
-  default: {
-    initScene: vi.fn(),
-    destroyScene: vi.fn(),
-    play: vi.fn(),
-    pause: vi.fn(),
+vi.mock('../../lib/ProductionEngine', () => ({
+  productionEngine: {
+    loadProject: vi.fn(),
+    destroy: vi.fn(),
+    subscribe: vi.fn(() => vi.fn()),
+    compose: vi.fn(() => ({})),
   }
 }));
 
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}));
+
 describe('useMotionProject', () => {
+  let consoleErrorSpy;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  it('should initialize multiple scenarios when mounted and destroy them on unmount', () => {
-    const project = {
-      scenarios: [
-        { sceneId: 'scene-1', trigger: { type: 'time' } },
-        { sceneId: 'scene-2', trigger: { type: 'time' } }
-      ]
-    };
-    
-    const containerRefMap = {
-      'scene-1': { current: document.createElement('div') },
-      'scene-2': { current: document.createElement('div') }
-    };
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
 
-    const { unmount } = renderHook(() => useMotionProject(project, containerRefMap));
+  it('calls loadProject exactly once with the project schema on mount and destroy on unmount', async () => {
+    productionEngine.loadProject.mockResolvedValue();
+    const project = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
 
-    expect(motionEngine.initScene).toHaveBeenCalledTimes(2);
-    expect(motionEngine.initScene).toHaveBeenNthCalledWith(1, project.scenarios[0], containerRefMap['scene-1'].current);
-    expect(motionEngine.initScene).toHaveBeenNthCalledWith(2, project.scenarios[1], containerRefMap['scene-2'].current);
+    const { unmount } = renderHook(() => useMotionProject(project));
+
+    expect(productionEngine.loadProject).toHaveBeenCalledTimes(1);
+    expect(productionEngine.loadProject).toHaveBeenCalledWith(project);
 
     unmount();
-
-    expect(motionEngine.destroyScene).toHaveBeenCalledTimes(2);
-    expect(motionEngine.destroyScene).toHaveBeenCalledWith('scene-1');
-    expect(motionEngine.destroyScene).toHaveBeenCalledWith('scene-2');
+    expect(productionEngine.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it('should handle play/pause correctly across all scenarios', () => {
-    const project = {
-      scenarios: [
-        { sceneId: 'scene-1', trigger: { type: 'time' } },
-        { sceneId: 'scene-2', trigger: { type: 'time' } }
-      ]
-    };
+  it('destroys old engine state and loads new project when project reference changes', async () => {
+    productionEngine.loadProject.mockResolvedValue();
+    const project1 = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
+    const project2 = { schemaVersion: 1, projectId: 'p2', scenarios: [] };
 
-    const { rerender } = renderHook(
-      ({ paused }) => useMotionProject(project, {}, { paused }),
-      { initialProps: { paused: true } }
-    );
+    const { rerender } = renderHook(({ project }) => useMotionProject(project), {
+      initialProps: { project: project1 }
+    });
 
-    expect(motionEngine.pause).toHaveBeenCalledWith('scene-1');
-    expect(motionEngine.pause).toHaveBeenCalledWith('scene-2');
+    expect(productionEngine.loadProject).toHaveBeenCalledTimes(1);
+    expect(productionEngine.loadProject).toHaveBeenLastCalledWith(project1);
 
-    rerender({ paused: false });
+    // Rerender with new project
+    rerender({ project: project2 });
 
-    expect(motionEngine.play).toHaveBeenCalledWith('scene-1');
-    expect(motionEngine.play).toHaveBeenCalledWith('scene-2');
+    // Should call destroy to clear project1, then load project2
+    expect(productionEngine.destroy).toHaveBeenCalledTimes(1);
+    expect(productionEngine.loadProject).toHaveBeenCalledTimes(2);
+    expect(productionEngine.loadProject).toHaveBeenLastCalledWith(project2);
+  });
+
+  it('logs loadProject failure without throwing synchronously', async () => {
+    const error = new Error('load failed');
+    productionEngine.loadProject.mockRejectedValue(error);
+    const project = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
+
+    // Should not throw synchronously
+    expect(() => {
+      renderHook(() => useMotionProject(project));
+    }).not.toThrow();
+
+    // Wait for the promise rejection microtask to flush
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('[useMotionProject] loadProject failed:', error);
+  });
+
+  it('integration: rendering BurstPage loads both scenarios in a single project exactly once', async () => {
+    productionEngine.loadProject.mockResolvedValue();
+    render(React.createElement(BurstPage));
+
+    expect(productionEngine.loadProject).toHaveBeenCalledTimes(1);
+    const loadedSchema = productionEngine.loadProject.mock.calls[0][0];
+    expect(loadedSchema.scenarios).toHaveLength(2);
+    expect(loadedSchema.scenarios.map(s => s.sceneId)).toContain('strawberry-burst-scroll');
+    expect(loadedSchema.scenarios.map(s => s.sceneId)).toContain('ice-cream-card-slide');
   });
 });

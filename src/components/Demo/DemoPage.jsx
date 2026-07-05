@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useRef } from 'react';
-import useMotionPlayer from '../../hooks/useMotionPlayer';
+import React, { useCallback, useMemo, useRef } from 'react';
+import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
-import { buildMotionPath, convertToCubicPath } from '../../lib/pathUtils';
+import { buildMotionPath, buildCubicMotionPath, convertToCubicPath } from '../../lib/pathUtils';
 import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../lib/projection3d';
 import './DemoPage.css';
 
@@ -11,7 +11,7 @@ const scrollScene = {
   trigger: {
     type: 'scroll',
     scrub: 1,
-    pin: '.stage',
+    pin: 'stage',
     start: 'top top',
     end: 'bottom bottom'
   },
@@ -20,11 +20,11 @@ const scrollScene = {
       id: 'rocket-track',
       keyframes: {
         path: {
-          points: [
+          points: convertToCubicPath([
             { x: 50, y: 300 },
             { x: 400, y: 100, ctrlX: 200, ctrlY: -50 },
             { x: 900, y: 350, ctrlX: 700, ctrlY: 500 },
-          ],
+          ]),
           stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
           autoRotate: true
         }
@@ -34,10 +34,10 @@ const scrollScene = {
       id: 'cloud',
       keyframes: {
         path: {
-          points: [
+          points: convertToCubicPath([
             { x: -100, y: 80 },
             { x: 1100, y: 80 },
-          ],
+          ]),
           stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
         }
       }
@@ -62,7 +62,6 @@ const helixPathNodes = shapeGenerators.helix({
 });
 
 const helixCubicPath = convertToCubicPath(helixPathNodes);
-
 const MOCK_CARDS = [
   { id: 1, badge: '01 / IMAGINATION', title: 'Fluid Motion Engine', desc: 'Harnessing the power of GSAP Pub/Sub for sub-millisecond DOM updates.' },
   { id: 2, badge: '02 / ARCHITECTURE', title: 'Zero Re-renders', desc: 'No React component updates during animation cycles for maximum 60FPS performance.' },
@@ -74,6 +73,74 @@ const MOCK_CARDS = [
   { id: 8, badge: '08 / ANTIGRAVITY', title: 'Endless Horizons', desc: 'Scaling up to unlimited items on custom paths without duplicating nodes.' },
 ];
 
+const dynamicCarouselScene = {
+  sceneId: 'carousel-storytelling',
+  trigger: {
+    type: 'scroll',
+    scrub: 1.2,
+    pin: 'carousel-stage',
+    start: 'top top',
+    end: 'bottom bottom'
+  },
+  stagger: 0.14,
+  elements: MOCK_CARDS.map((card, i) => ({
+    id: `carousel-card-${i}`,
+    keyframes: {
+      path: {
+        points: convertToCubicPath([
+          { x: -350, y: 400 },
+          { x: 300, y: 150, ctrlX: -20, ctrlY: 100 },
+          { x: 950, y: 500, ctrlX: 620, ctrlY: 200 },
+          { x: 1600, y: 200, ctrlX: 1280, ctrlY: 800 },
+          { x: 2200, y: 400, ctrlX: 1920, ctrlY: -400 },
+        ]),
+        stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
+        autoRotate: true
+      },
+      opacity: {
+        stops: [
+          { p: 0.0, v: 0 },
+          { p: 0.15, v: 1 },
+          { p: 0.85, v: 1 },
+          { p: 1.0, v: 0 }
+        ]
+      }
+    }
+  }))
+};
+
+const dynamicHelixScene = {
+  sceneId: 'helix-storytelling',
+  trigger: {
+    type: 'scroll',
+    scrub: 1.2,
+    pin: 'helix-stage',
+    start: 'top top',
+    end: 'bottom bottom'
+  },
+  stagger: 0.16,
+  elements: MOCK_CARDS.slice(0, 6).map((card, i) => ({
+    id: `helix-card-${i}`,
+    keyframes: {
+      path: {
+        points: helixCubicPath,
+        stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
+      }
+    }
+  }))
+};
+
+const project = {
+  schemaVersion: 1,
+  projectId: 'demo-page',
+  perspective: 1200,
+  scenarios: [
+    scrollScene,
+    dynamicCarouselScene,
+    dynamicHelixScene
+  ]
+};
+
 // ─── Animated Elements ─────────────────────────────────────────
 
 function Rocket({ offset = 0 }) {
@@ -82,7 +149,8 @@ function Rocket({ offset = 0 }) {
   // transformFn receives rawData and composeFn
   const transform = useCallback((rawData, composeFn) => {
     const progress = Math.max(0, Math.min(1, (rawData.__pathProgress ?? 0) + offset));
-    const composed = composeFn({ __pathProgress: progress });
+    // Spread rawData to preserve __cubicPath and __autoRotate — only override progress
+    const composed = composeFn({ ...rawData, __pathProgress: progress });
 
     return {
       ...composed,
@@ -93,7 +161,7 @@ function Rocket({ offset = 0 }) {
 
   useMotionSubscriber('rocket-track', ref, transform);
 
-  return <div ref={ref} className="element rocket">🚀</div>;
+  return <div ref={ref} data-motion-id="rocket-track" className="element rocket">🚀</div>;
 }
 
 function Cloud() {
@@ -105,7 +173,7 @@ function Cloud() {
   }, []);
 
   useMotionSubscriber('cloud', ref, transform);
-  return <div ref={ref} className="element cloud">☁️</div>;
+  return <div ref={ref} data-motion-id="cloud" className="element cloud">☁️</div>;
 }
 
 function CarouselCard({ elementId, cardData }) {
@@ -143,7 +211,7 @@ function CarouselCard({ elementId, cardData }) {
   useMotionSubscriber(elementId, ref, transform);
 
   return (
-    <div ref={ref} className="element carousel-card">
+    <div ref={ref} data-motion-id={elementId} className="element carousel-card">
       <div className="card-badge">{cardData.badge}</div>
       <h3>{cardData.title}</h3>
       <p>{cardData.desc}</p>
@@ -209,7 +277,7 @@ function HelixCard({ elementId, cardData }) {
   useMotionSubscriber(elementId, ref, transform);
 
   return (
-    <div ref={ref} className="element helix-card">
+    <div ref={ref} data-motion-id={elementId} className="element helix-card">
       <div className="card-badge">{cardData.badge}</div>
       <h3>{cardData.title}</h3>
       <p>{cardData.desc}</p>
@@ -221,23 +289,22 @@ function HelixCard({ elementId, cardData }) {
 
 function ScrollDemo() {
   const containerRef = useRef(null);
-  useMotionPlayer(scrollScene, containerRef);
 
   return (
-    <section ref={containerRef} className="scene">
+    <section ref={containerRef} data-motion-id={scrollScene.sceneId} className="scroll-scene">
       <div className="scene-label">
         <h2>Continuous Path Animation (Scroll-Scrub)</h2>
         <p>A rocket following a 2D bezier path curve. The clouds move linearly on their own independent track.</p>
       </div>
 
-      <div className="stage">
+      <div data-motion-id="stage" className="stage">
         {/* Render paths using the exact coordinate config to overlay guide lines */}
         <svg className="path-guide" width="100%" height="100%">
           {scrollScene.elements.map(el => (
             <path
               key={el.id}
               id={`path-guide-${el.id}`}
-              d={buildMotionPath(el.keyframes.path.points)}
+              d={buildCubicMotionPath(el.keyframes.path.points)}
               fill="none"
               stroke="rgba(255,255,255,0.1)"
               strokeWidth="2"
@@ -256,56 +323,13 @@ function ScrollDemo() {
 function CarouselDemo() {
   const containerRef = useRef(null);
 
-  // Generate dynamic scenario utilizing engine-level stagger
-  const dynamicCarouselScene = useMemo(() => {
-    return {
-      sceneId: 'carousel-storytelling',
-      trigger: {
-        type: 'scroll',
-        scrub: 1.2,
-        pin: '.carousel-stage',
-        start: 'top top',
-        end: 'bottom bottom'
-      },
-      stagger: {
-        each: 0.14
-      },
-      elements: MOCK_CARDS.map((card, i) => ({
-        id: `carousel-card-${i}`,
-        keyframes: {
-          path: {
-            points: [
-              { x: -350, y: 400 },
-              { x: 300, y: 150, ctrlX: -20, ctrlY: 100 },
-              { x: 950, y: 500, ctrlX: 620, ctrlY: 200 },
-              { x: 1600, y: 200, ctrlX: 1280, ctrlY: 800 },
-              { x: 2200, y: 400, ctrlX: 1920, ctrlY: -400 },
-            ],
-            stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
-            autoRotate: true
-          },
-          opacity: {
-            stops: [
-              { p: 0.0, v: 0 },
-              { p: 0.15, v: 1 },
-              { p: 0.85, v: 1 },
-              { p: 1.0, v: 0 }
-            ]
-          }
-        }
-      }))
-    };
-  }, []);
-
-  useMotionPlayer(dynamicCarouselScene, containerRef);
-
   return (
-    <section ref={containerRef} className="carousel-scene">
+    <section ref={containerRef} data-motion-id={dynamicCarouselScene.sceneId} className="carousel-scene">
       <div className="scene-label">
         <h2>Unlimited Carousel Scene (Scroll Stagger)</h2>
         <p>Dynamic mock cards flowing smoothly on a single Bezier S-curve track with engine-level stagger</p>
       </div>
-      <div className="carousel-stage">
+      <div data-motion-id="carousel-stage" className="carousel-stage">
         {MOCK_CARDS.map((card, i) => (
           <CarouselCard
             key={card.id}
@@ -316,7 +340,7 @@ function CarouselDemo() {
         {/* Path guides generated from scene data */}
         <svg className="path-guide" width="100%" height="100%">
           <path
-            d={buildMotionPath(dynamicCarouselScene.elements[0].keyframes.path.points)}
+            d={buildCubicMotionPath(dynamicCarouselScene.elements[0].keyframes.path.points)}
             fill="none"
             stroke="rgba(255,255,255,0.1)"
             strokeWidth="2"
@@ -331,34 +355,6 @@ function CarouselDemo() {
 function HelixDemo() {
   const containerRef = useRef(null);
 
-  // Generate dynamic scenario utilizing engine-level stagger
-  const dynamicHelixScene = useMemo(() => {
-    return {
-      sceneId: 'helix-storytelling',
-      trigger: {
-        type: 'scroll',
-        scrub: 1.2,
-        pin: '.helix-stage',
-        start: 'top top',
-        end: 'bottom bottom'
-      },
-      stagger: {
-        each: 0.16
-      },
-      elements: MOCK_CARDS.slice(0, 6).map((card, i) => ({
-        id: `helix-card-${i}`,
-        keyframes: {
-          path: {
-            points: helixPathNodes,
-            stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
-          }
-        }
-      }))
-    };
-  }, []);
-
-  useMotionPlayer(dynamicHelixScene, containerRef);
-
   const { cx, cy, radius, height, tiltDeg } = HELIX_CONFIG;
   const tiltRad = (tiltDeg * Math.PI) / 180;
   const cylinderHeight2D = height * Math.cos(tiltRad);
@@ -370,13 +366,13 @@ function HelixDemo() {
   );
 
   return (
-    <section ref={containerRef} className="helix-scene">
+    <section ref={containerRef} data-motion-id={dynamicHelixScene.sceneId} className="helix-scene">
       <div className="scene-label">
         <h2>3D Helix Card Flow (Scroll Stagger)</h2>
         <p>Content cards flowing down a vertical spring, rotating 3D tangent to the cylinder surface</p>
       </div>
 
-      <div className="helix-stage">
+      <div data-motion-id="helix-stage" className="helix-stage">
         {/* SVG guides for the cylinder outlines */}
         <svg className="path-guide" width="100%" height="100%">
           <defs>
@@ -441,6 +437,8 @@ function HelixDemo() {
 }
 
 export default function DemoPage() {
+  useMotionProject(project);
+
   return (
     <div className="app">
       <header className="header">

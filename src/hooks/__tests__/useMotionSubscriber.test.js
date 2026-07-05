@@ -2,18 +2,18 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useMotionSubscriber from '../useMotionSubscriber';
-import motionEngine from '../../lib/motionEngine';
+import { productionEngine } from '../../lib/ProductionEngine';
 import { gsap } from 'gsap';
 
-// Mock GSAP and motionEngine
+// Mock GSAP and productionEngine
 vi.mock('gsap', () => ({
   gsap: {
     set: vi.fn(),
   }
 }));
 
-vi.mock('../../lib/motionEngine', () => ({
-  default: {
+vi.mock('../../lib/ProductionEngine', () => ({
+  productionEngine: {
     subscribe: vi.fn(),
     compose: vi.fn((elementId, rawData) => ({
       x: rawData.x,
@@ -30,20 +30,20 @@ describe('useMotionSubscriber', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Simulate motionEngine.subscribe returning an unsubscribe cleanup function
-    motionEngine.subscribe.mockImplementation((id, cb) => {
+    // Simulate productionEngine.subscribe returning an unsubscribe cleanup function
+    productionEngine.subscribe.mockImplementation((id, cb) => {
       mockSubscribeCallback = cb;
       return mockUnsubscribe;
     });
   });
 
-  it('should subscribe to motionEngine with the correct elementId on mount and unsubscribe on unmount', () => {
+  it('should subscribe to productionEngine with the correct elementId on mount and unsubscribe on unmount', () => {
     const mockRef = { current: document.createElement('div') };
 
     const { unmount } = renderHook(() => useMotionSubscriber('rocket-id', mockRef));
 
     // Assert subscribe was called
-    expect(motionEngine.subscribe).toHaveBeenCalledWith('rocket-id', expect.any(Function));
+    expect(productionEngine.subscribe).toHaveBeenCalledWith('rocket-id', expect.any(Function));
 
     // Unmount and verify unsubscribe is triggered
     unmount();
@@ -61,7 +61,7 @@ describe('useMotionSubscriber', () => {
     mockSubscribeCallback(data);
 
     // Verify compose was called
-    expect(motionEngine.compose).toHaveBeenCalledWith('rocket-id', data);
+    expect(productionEngine.compose).toHaveBeenCalledWith('rocket-id', data);
 
     // Verify gsap.set was called with composed properties
     expect(gsap.set).toHaveBeenCalledWith(mockElement, {
@@ -115,13 +115,13 @@ describe('useMotionSubscriber', () => {
     expect(gsap.set).not.toHaveBeenCalled();
   });
 
-  it('should not write to motionEngine._domRefs (legacy code removed)', () => {
+  it('should not write to productionEngine._domRefs (legacy code removed)', () => {
     const mockRef = { current: document.createElement('div') };
-    const engineBefore = { ...motionEngine };
+    const engineBefore = { ...productionEngine };
 
     renderHook(() => useMotionSubscriber('rocket-id', mockRef));
 
-    // _domRefs should not be added to motionEngine by the hook
-    expect(motionEngine._domRefs).toBeUndefined();
+    // _domRefs should not be added to productionEngine by the hook
+    expect(productionEngine._domRefs).toBeUndefined();
   });
 });
