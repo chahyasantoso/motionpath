@@ -79,14 +79,23 @@ describe('validateProject integration tests', () => {
 
     // empty object
     expect(() => validateProject({})).not.toThrow();
-    expect(validateProject({}).length).toBe(1);
+    expect(validateProject({}).length).toBe(2);
 
-    // scenarios is not an array
     const badScenarios = { schemaVersion: 1, scenarios: 'not-an-array' };
     expect(() => validateProject(badScenarios)).not.toThrow();
-    expect(validateProject(badScenarios).length).toBe(0); // since schemaVersion is valid, but isValidShape is false so returns only version errors (which are 0)
-    // Wait! If schemaVersion is valid, but scenarios is 'not-an-array', should isValidShape return false?
-    // Yes. And since isValidShape returns false, validateProject returns errors which contains only version check errors (which is empty in this case).
-    // Let's verify that this behaves correctly.
+    const badScenariosErrors = validateProject(badScenarios);
+    expect(badScenariosErrors).toHaveLength(1);
+    expect(badScenariosErrors[0].ruleId).toBe('invalid-shape');
+    expect(badScenariosErrors[0].severity).toBe('error');
+    expect(badScenariosErrors[0].path).toBe('$.scenarios');
+
+    // scenarios is entirely absent
+    const missingScenarios = { schemaVersion: 1 };
+    expect(() => validateProject(missingScenarios)).not.toThrow();
+    const missingScenariosErrors = validateProject(missingScenarios);
+    expect(missingScenariosErrors).toHaveLength(1);
+    expect(missingScenariosErrors[0].ruleId).toBe('invalid-shape');
+    expect(missingScenariosErrors[0].severity).toBe('error');
+    expect(missingScenariosErrors[0].path).toBe('$.scenarios');
   });
 });

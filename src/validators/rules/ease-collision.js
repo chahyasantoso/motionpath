@@ -7,10 +7,15 @@
  *   if two stops entries share the same literal p value but different ease values -> error.
  *
  * @param {unknown} scenario
+ * @param {{ schema: unknown }} context - Rule validation context
  * @param {string} path - JSON path to scenario
  * @returns {ValidationError[]}
  */
-export function easeCollisionRule(scenario, path) {
+export function easeCollisionRule(scenario, context, path) {
+  if (typeof context === 'string') {
+    path = context;
+    context = undefined;
+  }
   const errors = [];
 
   if (!scenario || typeof scenario !== 'object') {

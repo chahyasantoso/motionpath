@@ -6,21 +6,19 @@
  * - If any element in the scenario uses z, rotationX, or rotationY,
  *   and top-level schema.perspective is absent -> warning.
  *
- * NOTE: As per spec, this rule deviates slightly from ScenarioRule signature by
- * accepting schemaPerspective as its second argument (passed from orchestrator).
- *
  * @param {unknown} scenario
- * @param {unknown} schemaPerspective - The top-level schema.perspective value
+ * @param {{ schema: unknown }} context - Rule validation context
  * @param {string} path - JSON path to scenario
  * @returns {ValidationError[]}
  */
-export function perspectiveUsageRule(scenario, schemaPerspective, path) {
+export function perspectiveUsageRule(scenario, context, path) {
   const errors = [];
 
   if (!scenario || typeof scenario !== 'object') {
     return errors;
   }
 
+  const schemaPerspective = context?.schema?.perspective;
   // Perspective is present if it's not null/undefined
   const isPerspectivePresent = schemaPerspective !== undefined && schemaPerspective !== null;
   if (isPerspectivePresent) {

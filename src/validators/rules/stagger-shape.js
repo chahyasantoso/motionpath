@@ -7,10 +7,15 @@
  * - scenario.stagger present, non-zero, and elements.length < 2 -> warning.
  *
  * @param {unknown} scenario
+ * @param {{ schema: unknown }} context - Rule validation context
  * @param {string} path - JSON path to scenario
  * @returns {ValidationError[]}
  */
-export function staggerShapeRule(scenario, path) {
+export function staggerShapeRule(scenario, context, path) {
+  if (typeof context === 'string') {
+    path = context;
+    context = undefined;
+  }
   const errors = [];
 
   if (!scenario || typeof scenario !== 'object') {
@@ -25,19 +30,18 @@ export function staggerShapeRule(scenario, path) {
   const elements = scenario.elements || [];
   const staggerPath = `${path}.stagger`;
 
-  let val = 0;
-  let isNegative = false;
-
-  if (typeof stagger === 'number') {
-    val = stagger;
-    isNegative = stagger < 0;
-  } else if (stagger && typeof stagger === 'object') {
-    const each = stagger.each;
-    if (each !== undefined && each !== null && typeof each === 'number') {
-      val = each;
-      isNegative = each < 0;
-    }
+  if (typeof stagger !== 'number') {
+    errors.push({
+      ruleId: "stagger-shape",
+      severity: "error",
+      message: "scenario.stagger must be a plain number. Object-form stagger (e.g. { each, amount, from }) is not supported.",
+      path: staggerPath
+    });
+    return errors;
   }
+
+  const val = stagger;
+  const isNegative = stagger < 0;
 
   if (isNegative) {
     errors.push({

@@ -13,7 +13,7 @@ describe('perspective-usage rule', () => {
         }
       ]
     };
-    const errors = perspectiveUsageRule(scenario, undefined, 'scenarios[0]');
+    const errors = perspectiveUsageRule(scenario, { schema: {} }, 'scenarios[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('perspective-usage');
     expect(errors[0].severity).toBe('warning');
@@ -31,7 +31,7 @@ describe('perspective-usage rule', () => {
         }
       ]
     };
-    const errors = perspectiveUsageRule(scenario, 800, 'scenarios[0]');
+    const errors = perspectiveUsageRule(scenario, { schema: { perspective: 800 } }, 'scenarios[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -47,7 +47,7 @@ describe('perspective-usage rule', () => {
         }
       ]
     };
-    const errors = perspectiveUsageRule(scenario, undefined, 'scenarios[0]');
+    const errors = perspectiveUsageRule(scenario, { schema: {} }, 'scenarios[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -64,7 +64,7 @@ describe('perspective-usage rule', () => {
         }
       ]
     };
-    const errors = perspectiveUsageRule(scenario, undefined, 'scenarios[0]');
+    const errors = perspectiveUsageRule(scenario, { schema: {} }, 'scenarios[0]');
     expect(errors).toHaveLength(1);
   });
 });

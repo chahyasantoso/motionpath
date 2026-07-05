@@ -1,9 +1,11 @@
+export const CURRENT_SCHEMA_VERSION = 1;
+
 /**
  * Rule: schema-version
  * Top-level guard.
  *
  * Requirements:
- * - schema.schemaVersion must be present and a positive integer.
+ * - schema.schemaVersion must be present and exactly CURRENT_SCHEMA_VERSION.
  *
  * @param {unknown} schema
  * @param {string} path - Always "$"
@@ -31,11 +33,11 @@ export function schemaVersionRule(schema, path = "$") {
       message: "schemaVersion is missing.",
       path
     });
-  } else if (typeof schemaVersion !== 'number' || !Number.isInteger(schemaVersion) || schemaVersion <= 0) {
+  } else if (schemaVersion !== CURRENT_SCHEMA_VERSION) {
     errors.push({
       ruleId: "schema-version",
       severity: "error",
-      message: `schemaVersion must be a positive integer, got ${JSON.stringify(schemaVersion)}.`,
+      message: `schemaVersion must be exactly ${CURRENT_SCHEMA_VERSION}. Got: ${JSON.stringify(schemaVersion)}.`,
       path
     });
   }

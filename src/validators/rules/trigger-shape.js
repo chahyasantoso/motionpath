@@ -10,10 +10,15 @@
  * - delay present + (type === "scroll" && scrub === true) -> error.
  *
  * @param {unknown} scenario
+ * @param {{ schema: unknown }} context - Rule validation context
  * @param {string} path - JSON path to the scenario, e.g. "scenarios[0]"
  * @returns {ValidationError[]}
  */
-export function triggerShapeRule(scenario, path) {
+export function triggerShapeRule(scenario, context, path) {
+  if (typeof context === 'string') {
+    path = context;
+    context = undefined;
+  }
   const errors = [];
 
   if (!scenario || typeof scenario !== 'object') {

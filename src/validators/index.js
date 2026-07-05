@@ -54,6 +54,14 @@ export function validateProject(schema) {
   // Run top-level schema-version check first
   errors.push(...runSafely(schemaVersionRule, schema, "$"));
   if (!isValidShape(schema)) {
+    if (schema && typeof schema === 'object') {
+      errors.push({
+        ruleId: "invalid-shape",
+        severity: "error",
+        message: "schema.scenarios must be an array.",
+        path: "$.scenarios"
+      });
+    }
     return errors; // cannot iterate scenarios safely; return early
   }
 
@@ -61,14 +69,10 @@ export function validateProject(schema) {
   for (const [i, scenario] of schema.scenarios.entries()) {
     const scenarioPath = `scenarios[${i}]`;
 
-    // Run scenario rules
+    const context = { schema };
+    // Run scenario rules (ScenarioRule signature: (scenario, context, path) => errors)
     for (const rule of scenarioRules) {
-      if (rule === perspectiveUsageRule) {
-        // Special case: perspectiveUsageRule needs schema.perspective as the 2nd argument
-        errors.push(...runSafely(rule, scenario, schema.perspective, scenarioPath));
-      } else {
-        errors.push(...runSafely(rule, scenario, scenarioPath));
-      }
+      errors.push(...runSafely(rule, scenario, context, scenarioPath));
     }
 
     // Run element rules, checking defensively if scenario is an object and has elements array
@@ -82,9 +86,9 @@ export function validateProject(schema) {
     }
   }
 
-  // Run cross-scenario rules
+  // Run cross-scenario rules (CrossScenarioRule signature: (scenarios) => errors)
   for (const rule of crossScenarioRules) {
-    errors.push(...runSafely(rule, schema.scenarios, "scenarios"));
+    errors.push(...runSafely(rule, schema.scenarios));
   }
 
   return errors;
