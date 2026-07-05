@@ -25,7 +25,12 @@ export function resolveDirection(stops, direction, naturalValue) {
 
 // Module-level Map persists across buildProject calls — concurrent calls for
 // the same plugin share the same in-flight Promise, preventing double-load.
+// This persistence is intentional to deduplicate plugin loading across subsequent
+// builds, but can be cleared for test isolation via _resetLoadPromises.
 const loadPromises = new Map();
+export function _resetLoadPromises() {
+  loadPromises.clear();
+}
 export function ensureLoaded(plugin) {
   if (!plugin.lazy) return Promise.resolve();
   if (!loadPromises.has(plugin)) {
@@ -104,12 +109,7 @@ export async function buildProject(schema, deps) {
         const percentPatch = contribution?.percentPatch || {};
         const tweenVars = contribution?.tweenVars || {};
 
-        // Seed the proxy from whatever contribute() produced at "0%" — same source
-        // of truth as sharedKeyframes, no second contribute() call needed.
-        const zeroFrame = percentPatch['0%'] ?? {};
-        for (const [pKey, pVal] of Object.entries(zeroFrame)) {
-          if (pKey !== 'ease' && !(pKey in proxy)) proxy[pKey] = pVal;
-        }
+
 
         // Deep-merge percentPatch per spec §5.5 — real per-key merge, not a
         // shallow overwrite, so two properties contributing to the same percent
@@ -152,8 +152,14 @@ export async function buildProject(schema, deps) {
         }
       }
 
+      // After the full propKeys loop, seed proxy from the fully merged 0% frame
+      const mergedZero = sharedKeyframes['0%'] ?? {};
+      for (const [k, v] of Object.entries(mergedZero)) {
+        if (k !== 'ease') proxy[k] = v;
+      }
+
       elementPlugins.set(element.id, resolvedPlugins);
-      elementsMap.set(element.id, { proxy, domNode });
+      elementsMap.set(element.id, { proxy, domNode, elementConfig: element });
 
       // Duration fallback chain — authorized addendum to §5.8:
       // Without an explicit duration, GSAP defaults to 0.5s which silently

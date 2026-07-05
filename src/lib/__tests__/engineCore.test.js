@@ -61,7 +61,7 @@ describe('EngineCore', () => {
 
       const unsubscribe = core.subscribe('el-1', cb);
 
-      expect(addSpy).toHaveBeenCalled();
+      expect(addSpy).toHaveBeenCalledTimes(1);
       const tickerFn = addSpy.mock.calls[0][0];
 
       // Simulate ticker tick
@@ -70,6 +70,11 @@ describe('EngineCore', () => {
 
       unsubscribe();
       expect(removeSpy).toHaveBeenCalledWith(tickerFn);
+
+      // Re-subscribe should trigger startTicker() again
+      const unsubscribe2 = core.subscribe('el-1', cb);
+      expect(addSpy).toHaveBeenCalledTimes(2);
+      unsubscribe2();
     });
 
     it('clears ticker callback on destroy()', () => {

@@ -84,7 +84,7 @@ export function createEngineCore(buildResult) {
         if (typeof plugin.compose !== 'function') continue;
         let contribution;
         try {
-          contribution = plugin.compose(source, elementBuild);
+          contribution = plugin.compose(source, elementBuild.elementConfig ?? elementBuild);
         } catch {
           // Defensive: one broken plugin must not blank the whole patch
           continue;
@@ -114,6 +114,8 @@ export function createEngineCore(buildResult) {
       const matchingScenarios = buildResult.scenarios.filter(s => s.sceneId === sceneId);
       const elementsToClear = new Set();
 
+      const groupsToKill = new Set();
+
       for (const scenario of matchingScenarios) {
         if (scenario.timeline) {
           // Find all proxies targeted by tweens in this timeline
@@ -132,12 +134,23 @@ export function createEngineCore(buildResult) {
             }
           }
           scenario.timeline.kill();
-        }
-        if (scenario.timelineId) {
-          const group = buildResult.timelineGroups.get(scenario.timelineId);
-          if (group?.masterTimeline) {
-            group.masterTimeline.kill();
+          if (scenario.timelineId) {
+            groupsToKill.add(scenario.timelineId);
+            const group = buildResult.timelineGroups.get(scenario.timelineId);
+            if (group?.masterTimeline) {
+              group.masterTimeline.remove(scenario.timeline);
+            }
           }
+        }
+      }
+
+      for (const id of groupsToKill) {
+        // Only kill master if ALL child scenarios in the group are being destroyed
+        const allMatch = buildResult.scenarios
+          .filter(s => s.timelineId === id)
+          .every(s => matchingScenarios.includes(s));
+        if (allMatch) {
+          buildResult.timelineGroups.get(id)?.masterTimeline?.kill();
         }
       }
 

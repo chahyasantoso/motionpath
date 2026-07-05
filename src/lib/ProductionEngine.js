@@ -126,14 +126,17 @@ export function createProductionEngine(deps) {
     },
 
     subscribe(elementId, callback) {
+      if (!_core) throw new Error('ProductionEngine: loadProject() must be called before subscribe().');
       return _core.subscribe(elementId, callback);
     },
 
     compose(elementId, rawData) {
+      if (!_core) return {};
       return _core.compose(elementId, rawData);
     },
 
     destroyScene(sceneId) {
+      if (!_core) return;
       return _core.destroyScene(sceneId);
     },
 
@@ -160,11 +163,15 @@ export function createProductionEngine(deps) {
     },
 
     enableScroll() {
-      ScrollTrigger.getAll().forEach(st => st.enable());
+      for (const st of _createdScrollTriggers) {
+        try { st.enable(); } catch (e) { /* ignore */ }
+      }
     },
 
     disableScroll() {
-      ScrollTrigger.getAll().forEach(st => st.disable());
+      for (const st of _createdScrollTriggers) {
+        try { st.disable(); } catch (e) { /* ignore */ }
+      }
     },
   };
 }

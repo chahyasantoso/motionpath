@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { buildProject, resolveDirection, ensureLoaded } from '../builder.js';
+import { buildProject, resolveDirection, ensureLoaded, _resetLoadPromises } from '../builder.js';
 
 let mockResolvePlugin = () => null;
 
@@ -21,6 +21,7 @@ describe('builder unit and integration tests', () => {
     deps = {
       resolveElement: vi.fn(() => mockDom)
     };
+    _resetLoadPromises();
   });
 
   describe('resolveDirection', () => {
@@ -529,6 +530,9 @@ describe('builder unit and integration tests', () => {
 
       // Expect proxy.opacity to be seeded with natural value of 1 immediately
       expect(proxy.opacity).toBe(1);
+
+      const tween = result.scenarios[0].timeline.getChildren()[0];
+      expect(tween.vars.keyframes['0%']?.opacity).toBe(1); // proves it's in the merged keyframes
     });
   });
 });

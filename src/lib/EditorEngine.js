@@ -39,14 +39,17 @@ export function createEditorEngine(deps) {
     },
 
     subscribe(elementId, callback) {
+      if (!_core) throw new Error('EditorEngine: loadProject() must be called before subscribe().');
       return _core.subscribe(elementId, callback);
     },
 
     compose(elementId, rawData) {
+      if (!_core) return {};
       return _core.compose(elementId, rawData);
     },
 
     destroyScene(sceneId) {
+      if (!_core) return;
       return _core.destroyScene(sceneId);
     },
 
