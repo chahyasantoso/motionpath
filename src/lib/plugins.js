@@ -1,92 +1,31 @@
-// Shared contribute() implementation for plugins that write their property key
-// directly into the percentPatch without any key transformation. Used by the
-// five plugins below; filterPlugin and pathPlugin have custom implementations.
-function contributeDirectAssign(propertyKey, stops) {
-  const percentPatch = {};
-  stops.forEach(stop => {
-    const pct = `${Math.round(stop.p * 100)}%`;
-    if (!percentPatch[pct]) percentPatch[pct] = {};
-    percentPatch[pct][propertyKey] = stop.v;
-    if (stop.ease) percentPatch[pct].ease = stop.ease;
-  });
-  return { percentPatch, tweenVars: {} };
-}
+import { createSimplePropertyPlugin } from './plugins/simpleProperty.js';
+import { createColorPropertyPlugin } from './plugins/colorProperty.js';
+import { createFilterPropertyPlugin } from './plugins/filterProperty.js';
+import { pathPlugin } from './plugins/pathPlugin.js';
+import { cssVarPlugin } from './plugins/cssVarProperty.js';
 
-export const positionPlugin = {
-  keys: ['x', 'y', 'z'],
-  getNaturalValue(propertyKey, domNode) {
-    return 0;
-  },
-  contribute: contributeDirectAssign
-};
+const simpleKeys = [
+  'x', 'y', 'z',
+  'rotation', 'rotationX', 'rotationY',
+  'scaleX', 'scaleY',
+  'skewX', 'skewY',
+  'opacity'
+];
 
-export const transformPlugin = {
-  keys: ['rotation', 'rotationX', 'rotationY', 'scaleX', 'scaleY', 'skewX', 'skewY'],
-  getNaturalValue(propertyKey, domNode) {
-    if (propertyKey.startsWith('scale')) return 1;
-    return 0;
-  },
-  contribute: contributeDirectAssign
-};
+const colorKeys = [
+  'backgroundColor', 'color', 'borderColor'
+];
 
-export const opacityPlugin = {
-  keys: ['opacity'],
-  getNaturalValue(propertyKey, domNode) {
-    return 1;
-  },
-  contribute: contributeDirectAssign
-};
+const filterKeys = [
+  'blur', 'brightness', 'contrast', 'saturate'
+];
 
-export const filterPlugin = {
-  keys: ['blur', 'brightness', 'contrast', 'saturate'],
-  getNaturalValue(propertyKey, domNode) {
-    if (propertyKey === 'blur') return 0;
-    return 1;
-  },
-  contribute(propertyKey, stops, elementCfg) {
-    const percentPatch = {};
-    stops.forEach(stop => {
-      const pct = `${Math.round(stop.p * 100)}%`;
-      percentPatch[pct] = percentPatch[pct] || {};
-      percentPatch[pct][`__${propertyKey}`] = stop.v;
-      if (stop.ease) percentPatch[pct].ease = stop.ease;
-    });
-    return { percentPatch, tweenVars: {} };
-  }
-};
+const simplePlugins = Object.fromEntries(simpleKeys.map(k => [k, createSimplePropertyPlugin(k)]));
+const colorPlugins = Object.fromEntries(colorKeys.map(k => [k, createColorPropertyPlugin(k)]));
+const filterPlugins = Object.fromEntries(filterKeys.map(k => [k, createFilterPropertyPlugin(k)]));
 
-export const colorPlugin = {
-  keys: ['backgroundColor', 'color', 'borderColor'],
-  getNaturalValue(propertyKey, domNode) {
-    return 'transparent';
-  },
-  contribute: contributeDirectAssign
-};
-
-export const cssVarPlugin = {
-  keys: [], // Matched via prefix '--'
-  getNaturalValue(propertyKey, domNode) {
-    return 0;
-  },
-  contribute: contributeDirectAssign
-};
-
-export const pathPlugin = {
-  keys: ['path'],
-  getNaturalValue(propertyKey, domNode) {
-    return 0;
-  },
-  contribute(propertyKey, stops, elementCfg) {
-    const percentPatch = {};
-    stops.forEach(stop => {
-      const pct = `${Math.round(stop.p * 100)}%`;
-      percentPatch[pct] = percentPatch[pct] || {};
-      percentPatch[pct].__pathProgress = Math.max(0, Math.min(1, Number(stop.v)));
-      if (stop.ease) percentPatch[pct].ease = stop.ease;
-    });
-    return { percentPatch, tweenVars: {} };
-  }
-};
+// Individual exports for legacy references (if any exist)
+export { pathPlugin, cssVarPlugin };
 
 // Lazy plugin stubs
 export const splitTextPlugin = { keys: ['splitText'], lazy: true, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
@@ -95,25 +34,43 @@ export const drawSvgPlugin = { keys: ['drawSVG'], lazy: true, load: () => Promis
 export const scrambleTextPlugin = { keys: ['scrambleText'], lazy: true, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
 
 export const ALL_PLUGINS = [
-  positionPlugin,
-  transformPlugin,
-  opacityPlugin,
-  filterPlugin,
-  colorPlugin,
-  cssVarPlugin,
+  ...Object.values(simplePlugins),
+  ...Object.values(colorPlugins),
+  ...Object.values(filterPlugins),
   pathPlugin,
+  cssVarPlugin,
   splitTextPlugin,
   morphSvgPlugin,
   drawSvgPlugin,
   scrambleTextPlugin
 ];
 
-const _keyToPlugin = new Map();
-ALL_PLUGINS.forEach(plugin => {
-  plugin.keys.forEach(key => _keyToPlugin.set(key, plugin));
-});
-
+/**
+ * Resolves a schema property key to its corresponding plugin instance.
+ * Supports exact key matching and CSS custom property fallback (--*).
+ *
+ * @param {string} key - The property key to resolve.
+ * @returns {Plugin|undefined} The resolved plugin, or undefined if not found.
+ */
 export function resolvePluginForKey(key) {
+  if (typeof key !== 'string') return undefined;
   if (key.startsWith('--')) return cssVarPlugin;
-  return _keyToPlugin.get(key);
+
+  const simple = simplePlugins[key];
+  if (simple) return simple;
+
+  const color = colorPlugins[key];
+  if (color) return color;
+
+  const filter = filterPlugins[key];
+  if (filter) return filter;
+
+  if (key === 'path') return pathPlugin;
+
+  if (key === 'splitText') return splitTextPlugin;
+  if (key === 'morphSVG') return morphSvgPlugin;
+  if (key === 'drawSVG') return drawSvgPlugin;
+  if (key === 'scrambleText') return scrambleTextPlugin;
+
+  return undefined;
 }

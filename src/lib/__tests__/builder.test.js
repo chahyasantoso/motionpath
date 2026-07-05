@@ -377,6 +377,37 @@ describe('builder unit and integration tests', () => {
       expect(children[0]).toBe(result.scenarios[0].timeline);
       expect(children[1]).toBe(result.scenarios[1].timeline);
     });
+
+    it('applies trigger.delay to scenario timeline total duration for time triggers', async () => {
+      const pluginA = {
+        keys: ['propA'],
+        getNaturalValue: () => 0,
+        contribute: () => ({ percentPatch: {}, tweenVars: {} })
+      };
+      mockResolvePlugin = () => pluginA;
+
+      const projectWithDelay = {
+        scenarios: [{
+          sceneId: 'scene-1',
+          trigger: { type: 'time', delay: 0.5, duration: 1 },
+          elements: [{ id: 'el-1', keyframes: { propA: { stops: [] } } }]
+        }]
+      };
+
+      const projectWithoutDelay = {
+        scenarios: [{
+          sceneId: 'scene-1',
+          trigger: { type: 'time', duration: 1 },
+          elements: [{ id: 'el-1', keyframes: { propA: { stops: [] } } }]
+        }]
+      };
+
+      const resWithDelay = await buildProject(projectWithDelay, deps);
+      const resWithoutDelay = await buildProject(projectWithoutDelay, deps);
+
+      expect(resWithDelay.scenarios[0].timeline.delay()).toBe(0.5);
+      expect(resWithoutDelay.scenarios[0].timeline.delay()).toBe(0);
+    });
   });
 
   describe('end-to-end compile with real plugins', () => {

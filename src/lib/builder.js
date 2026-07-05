@@ -174,6 +174,15 @@ export async function buildProject(schema, deps) {
 
     const scenarioTimeline = gsap.timeline({ paused: true });
 
+    // Addendum C: bake trigger.delay into the scenario timeline's total duration.
+    // Only applies to time and scroll-observer (non-scrub) triggers.
+    if (
+      (trigger.type === 'time' || (trigger.type === 'scroll' && !trigger.scrub)) &&
+      typeof trigger.delay === 'number'
+    ) {
+      scenarioTimeline.delay(trigger.delay);
+    }
+
     // A1: stagger is always a plain number post-validation (Brief 1 §Task 1
     // rejects object-form stagger). No object.each branch needed.
     const getStaggerOffset = (stagger, idx) =>
