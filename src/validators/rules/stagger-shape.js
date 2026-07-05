@@ -12,10 +12,6 @@
  * @returns {ValidationError[]}
  */
 export function staggerShapeRule(scenario, context, path) {
-  if (typeof context === 'string') {
-    path = context;
-    context = undefined;
-  }
   const errors = [];
 
   if (!scenario || typeof scenario !== 'object') {

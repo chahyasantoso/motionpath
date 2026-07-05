@@ -14,7 +14,7 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, 'scenarios[0]');
+    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('ease-collision');
     expect(errors[0].severity).toBe('error');
@@ -34,7 +34,7 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, 'scenarios[0]');
+    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -50,7 +50,7 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, 'scenarios[0]');
+    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -66,7 +66,7 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, 'scenarios[0]');
+    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -87,7 +87,7 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, 'scenarios[0]');
+    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(1);
   });
 });

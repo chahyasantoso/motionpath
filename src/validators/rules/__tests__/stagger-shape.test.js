@@ -7,7 +7,7 @@ describe('stagger-shape rule', () => {
       stagger: -0.1,
       elements: [{}, {}]
     };
-    const errors = staggerShapeRule(scenario, 'scenarios[0]');
+    const errors = staggerShapeRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('stagger-shape');
     expect(errors[0].severity).toBe('error');
@@ -19,7 +19,7 @@ describe('stagger-shape rule', () => {
       stagger: { each: 0.2 },
       elements: [{}, {}]
     };
-    const errors = staggerShapeRule(scenario, 'scenarios[0]');
+    const errors = staggerShapeRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('stagger-shape');
     expect(errors[0].severity).toBe('error');
@@ -31,7 +31,7 @@ describe('stagger-shape rule', () => {
       stagger: '0.2',
       elements: [{}, {}]
     };
-    const errors = staggerShapeRule(scenario, 'scenarios[0]');
+    const errors = staggerShapeRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('stagger-shape');
     expect(errors[0].severity).toBe('error');
@@ -43,7 +43,7 @@ describe('stagger-shape rule', () => {
       stagger: 0.2,
       elements: [{}]
     };
-    const errors = staggerShapeRule(scenario, 'scenarios[0]');
+    const errors = staggerShapeRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('stagger-shape');
     expect(errors[0].severity).toBe('warning');
@@ -55,7 +55,7 @@ describe('stagger-shape rule', () => {
       stagger: 0.2,
       elements: [{}, {}, {}]
     };
-    const errors = staggerShapeRule(scenario, 'scenarios[0]');
+    const errors = staggerShapeRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(0);
   });
 
@@ -63,7 +63,7 @@ describe('stagger-shape rule', () => {
     const scenario = {
       elements: [{}]
     };
-    const errors = staggerShapeRule(scenario, 'scenarios[0]');
+    const errors = staggerShapeRule(scenario, {}, 'scenarios[0]');
     expect(errors).toHaveLength(0);
   });
 });

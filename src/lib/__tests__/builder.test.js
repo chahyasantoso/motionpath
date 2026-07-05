@@ -425,4 +425,79 @@ describe('builder unit and integration tests', () => {
       expect(group.primaryScenarioIndex).toBe(1);
     });
   });
+
+  describe('proxy-not-DOM (critical §9)', () => {
+    it('tweens proxy object, never touches domNode style or attributes', async () => {
+      // Use real filterPlugin: it writes __blur to proxy, not blur to DOM.
+      const actualPlugins = await vi.importActual('../plugins.js');
+      mockResolvePlugin = actualPlugins.resolvePluginForKey;
+
+      // Spy on any style writes to the DOM node
+      const styleSetSpy = vi.fn();
+      Object.defineProperty(mockDom, 'style', {
+        get: () => new Proxy({}, { set: styleSetSpy }),
+        configurable: true
+      });
+      const setAttributeSpy = vi.spyOn(mockDom, 'setAttribute');
+
+      const project = {
+        scenarios: [{
+          sceneId: 'scene-1',
+          trigger: { type: 'time', duration: 1 },
+          elements: [{
+            id: 'el-blur',
+            keyframes: {
+              blur: { stops: [{ p: 0, v: 0 }, { p: 1, v: 20 }] }
+            }
+          }]
+        }]
+      };
+
+      const result = await buildProject(project, deps);
+
+      // Verify elements map is populated (requires Change 1)
+      const elementBuild = result.elements.get('el-blur');
+      expect(elementBuild).toBeDefined();
+      const { proxy, domNode } = elementBuild;
+
+      // Advance the tween to mid-point
+      const tween = result.scenarios[0].timeline.getChildren()[0];
+      tween.progress(0.5);
+
+      // (a) proxy must carry the synthetic key filterPlugin writes (__blur)
+      expect('__blur' in proxy).toBe(true);
+      expect(proxy.__blur).toBeGreaterThan(0);
+
+      // (b) domNode must not have been touched by the builder at all
+      expect(styleSetSpy).not.toHaveBeenCalled();
+      expect(setAttributeSpy).not.toHaveBeenCalled();
+      expect(domNode).toBe(mockDom);
+    });
+
+    it('seeds proxy with natural value at p=0 when stops start after p=0', async () => {
+      const actualPlugins = await vi.importActual('../plugins.js');
+      mockResolvePlugin = actualPlugins.resolvePluginForKey;
+
+      const project = {
+        scenarios: [{
+          sceneId: 'scene-1',
+          trigger: { type: 'time', duration: 1 },
+          elements: [{
+            id: 'el-opacity',
+            keyframes: {
+              opacity: { stops: [{ p: 0.5, v: 0.3 }] }
+            }
+          }]
+        }]
+      };
+
+      const result = await buildProject(project, deps);
+      const elementBuild = result.elements.get('el-opacity');
+      expect(elementBuild).toBeDefined();
+      const { proxy } = elementBuild;
+
+      // Expect proxy.opacity to be seeded with natural value of 1 immediately
+      expect(proxy.opacity).toBe(1);
+    });
+  });
 });

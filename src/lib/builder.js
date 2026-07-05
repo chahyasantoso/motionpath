@@ -36,6 +36,7 @@ export function ensureLoaded(plugin) {
 
 export async function buildProject(schema, deps) {
   const elementPlugins = new Map();
+  const elementsMap = new Map();
   const scenarios = [];
   const timelineGroups = new Map();
 
@@ -94,18 +95,19 @@ export async function buildProject(schema, deps) {
         const naturalValue = plugin.getNaturalValue(propKey, domNode);
         const effectiveStops = resolveDirection(rawStops, element.direction, naturalValue);
 
-        const contribution = plugin.contribute(propKey, effectiveStops, element);
+        const hasZeroStop = effectiveStops.some(s => Math.abs(s.p - 0) < 0.001);
+        const stopsForContribute = hasZeroStop
+          ? effectiveStops
+          : [{ p: 0, v: naturalValue }, ...effectiveStops];
+
+        const contribution = plugin.contribute(propKey, stopsForContribute, element);
         const percentPatch = contribution?.percentPatch || {};
         const tweenVars = contribution?.tweenVars || {};
 
-        // Proxy initialization: use a synthetic one-stop seed at p=0 with the
-        // natural value to discover which proxy key(s) this plugin writes to
-        // (e.g. filterPlugin writes `__blur`, not `blur`). This seeds the proxy
-        // with the correct starting value and key, even when there is no
-        // explicit p=0 keyframe in the user's schema.
-        const seed = plugin.contribute(propKey, [{ p: 0, v: naturalValue }], element);
-        const seedFrame = seed?.percentPatch?.['0%'] ?? {};
-        for (const [pKey, pVal] of Object.entries(seedFrame)) {
+        // Seed the proxy from whatever contribute() produced at "0%" — same source
+        // of truth as sharedKeyframes, no second contribute() call needed.
+        const zeroFrame = percentPatch['0%'] ?? {};
+        for (const [pKey, pVal] of Object.entries(zeroFrame)) {
           if (pKey !== 'ease' && !(pKey in proxy)) proxy[pKey] = pVal;
         }
 
@@ -151,6 +153,7 @@ export async function buildProject(schema, deps) {
       }
 
       elementPlugins.set(element.id, resolvedPlugins);
+      elementsMap.set(element.id, { proxy, domNode });
 
       // Duration fallback chain — authorized addendum to §5.8:
       // Without an explicit duration, GSAP defaults to 0.5s which silently
@@ -239,6 +242,7 @@ export async function buildProject(schema, deps) {
 
   return {
     elementPlugins,
+    elements: elementsMap,
     scenarios,
     timelineGroups
   };
