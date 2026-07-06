@@ -306,4 +306,66 @@ describe('ProductionEngine', () => {
       pin: { id: 'pin-id' }
     }));
   });
+
+  it('stale load is discarded when a second loadProject() supersedes it', async () => {
+    let resolveFirst;
+    const firstBuild = new Promise(res => { resolveFirst = res; });
+    const firstBuildResult = {
+      scenarios: [{ scenarioIndex: 0, sceneId: 'first', triggerType: 'time', triggerConfig: {}, timeline: { kill: vi.fn(), play: vi.fn(), repeat: vi.fn().mockReturnThis(), yoyo: vi.fn().mockReturnThis(), repeatDelay: vi.fn().mockReturnThis() } }],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map(),
+    };
+    const secondBuildResult = {
+      scenarios: [{ scenarioIndex: 0, sceneId: 'second', triggerType: 'time', triggerConfig: {}, timeline: { kill: vi.fn(), play: vi.fn(), repeat: vi.fn().mockReturnThis(), yoyo: vi.fn().mockReturnThis(), repeatDelay: vi.fn().mockReturnThis() } }],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map(),
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject
+      .mockReturnValueOnce(firstBuild)
+      .mockResolvedValueOnce(secondBuildResult);
+
+    const engine = createProductionEngine(mockDeps);
+    const first = engine.loadProject({});
+    const second = engine.loadProject({});
+
+    // Let the second load settle first
+    await second;
+
+    // Resolve the stale first build — it should be killed, never wired
+    resolveFirst(firstBuildResult);
+    await first;
+
+    expect(firstBuildResult.scenarios[0].timeline.kill).toHaveBeenCalled();
+  });
+
+  it('load is discarded when destroy() fires before buildProject resolves', async () => {
+    let resolveBuild;
+    const pendingBuild = new Promise(res => { resolveBuild = res; });
+    const staleBuildResult = {
+      scenarios: [{ scenarioIndex: 0, sceneId: 'stale', triggerType: 'time', triggerConfig: {}, timeline: { kill: vi.fn(), play: vi.fn(), repeat: vi.fn().mockReturnThis(), yoyo: vi.fn().mockReturnThis(), repeatDelay: vi.fn().mockReturnThis() } }],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map(),
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockReturnValue(pendingBuild);
+
+    const engine = createProductionEngine(mockDeps);
+    const load = engine.loadProject({});
+
+    // Destroy before the build resolves
+    engine.destroy();
+
+    // Stale build resolves after destroy — must be killed, never wired
+    resolveBuild(staleBuildResult);
+    await load;
+
+    expect(staleBuildResult.scenarios[0].timeline.kill).toHaveBeenCalled();
+  });
 });
+

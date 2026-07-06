@@ -31,16 +31,23 @@ function resolveTriggerRef(value, deps, fallbackId) {
 export function createProductionEngine(deps) {
   let _core = null;
   let _buildResult = null;
+  let _loadGeneration = 0;
   // Track only the ScrollTrigger instances THIS engine created.
   const _createdScrollTriggers = [];
   const _subRegistry = createDeferredSubscribe();
 
   function _cleanup() {
+    // Invalidate any in-flight loadProject() — if its buildProject resolves
+    // after this point it will see a mismatched generation and self-discard.
+    _loadGeneration++;
     for (const st of _createdScrollTriggers) {
       try { st.kill(); } catch (e) { /* ignore */ }
     }
     _createdScrollTriggers.length = 0;
-    _subRegistry.clearCore();
+    // NOTE: do NOT call _subRegistry.clearCore() here.
+    // _cleanup() is also called from the commit step inside loadProject(),
+    // where pending subscriptions must survive so setCore() can flush them.
+    // Only destroy() should clear the sub registry.
     if (_core) {
       _core.destroy();
       _core = null;
@@ -50,6 +57,8 @@ export function createProductionEngine(deps) {
 
   return {
     async loadProject(schema) {
+      const loadId = ++_loadGeneration;
+
       // Step 1: Validate
       const errors = validateProject(schema) || [];
       const hardErrors = errors.filter(e => e.severity === 'error');
@@ -64,6 +73,14 @@ export function createProductionEngine(deps) {
 
       // Step 2: Build
       const buildResult = await buildProject(schema, deps);
+
+      // Stale-load guard: a newer loadProject() call (or destroy()) started
+      // while buildProject was awaited — discard this result entirely.
+      if (loadId !== _loadGeneration) {
+        for (const scenario of buildResult.scenarios) scenario.timeline?.kill();
+        for (const group of buildResult.timelineGroups.values()) group.masterTimeline?.kill();
+        return;
+      }
 
       // Step 3: EngineCore
       const core = createEngineCore(buildResult);
@@ -186,6 +203,9 @@ export function createProductionEngine(deps) {
     },
 
     destroy() {
+      // Clear pending subscriptions before tearing down so they are not
+      // flushed into a new core after intentional teardown.
+      _subRegistry.clearCore();
       _cleanup();
     },
 

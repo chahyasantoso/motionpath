@@ -4,7 +4,7 @@ import { render, renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useMotionProject from '../useMotionProject';
 import { productionEngine } from '../../lib/ProductionEngine';
-import BurstPage from '../../BurstPage';
+import BurstPage from '../../components/Burst/BurstPage';
 
 vi.mock('../../lib/ProductionEngine', () => ({
   productionEngine: {

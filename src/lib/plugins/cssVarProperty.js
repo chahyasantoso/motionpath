@@ -4,6 +4,9 @@
 export const cssVarPlugin = {
   keys: [], // Matched dynamically
   lazy: false,
+  claimsKey(key) {
+    return key.startsWith('--');
+  },
   getNaturalValue(propKey, domNode) {
     return getComputedStyle(domNode).getPropertyValue(propKey) || '';
   },

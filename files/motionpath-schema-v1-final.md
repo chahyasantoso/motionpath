@@ -147,8 +147,9 @@ Natural/default value is plugin-supplied: computed CSS style for real properties
 ```json
 "path": {
   "points": [
-    { "x": 0, "y": 0 }, { "x": 50, "y": -80 },
-    { "x": 150, "y": -80 }, { "x": 200, "y": 0 }
+    { "x": 50, "y": 300 },
+    { "x": 400, "y": 100, "ctrlX": 200, "ctrlY": -50 },
+    { "x": 900, "y": 350, "ctrlX": 700, "ctrlY": 500 }
   ],
   "stops": [
     { "p": 0, "v": 0, "ease": "power1.in" },
@@ -157,8 +158,9 @@ Natural/default value is plugin-supplied: computed CSS style for real properties
 }
 ```
 
-- `points` — static cubic Bézier control points (`x`/`y`, optional `z`). **Not animated**, not subject to `direction` inference. Must satisfy `(points.length - 1) % 3 === 0` and `points.length >= 4`.
-- `stops` — structurally identical to every other property, **except** `v` is constrained to `[0, 1]`, representing fractional progress along `points`. Drives synthetic `__pathProgress` through the standard keyframes mechanism; `compose()` resolves `__pathProgress` + `points` into `{x, y, z, rotation}` via `getPointOnCubicPath()`.
+- `points` — **raw waypoints** (`{x, y, z?, ctrlX?, ctrlY?, ctrlZ?}`), minimum 2. **Not** a pre-converted cubic Bézier array — the path plugin's `contribute()` converts internally via `convertToCubicPath()` at build time (quadratic-style control-point elevation to cubic), once per element. Authors/AI agents never construct the cubic form directly; doing so and feeding it in as `points` would be silently double-converted and produce a wrong curve. `ctrlX`/`ctrlY` are optional per waypoint — omit both for a straight segment into that point; providing only one is a validation error. `ctrlX`/`ctrlY` on the first waypoint have no effect (no preceding segment to curve) and are flagged as a warning.
+- `stops` — structurally identical to every other property, **except** `v` is constrained to `[0, 1]`, representing fractional progress along the path. Drives synthetic `__pathProgress` through the standard keyframes mechanism; `compose()` resolves `__pathProgress` + the internally-converted cubic path into `{x, y, z, rotation}` via `getPointOnCubicPath()`.
+- `autoRotate` (boolean, optional, sibling of `points`/`stops` inside the `path` object) — when `true`, `compose()` also emits `rotation`, aligned to the path's tangent direction at the current progress. Omit or `false` for no automatic rotation.
 - `MotionPathPlugin` is explicitly **not used** — empirically measured 121px max positional drift against per-segment keyframe pacing (motionPath tracks its own internal tween time, not the custom property's value).
 
 ---

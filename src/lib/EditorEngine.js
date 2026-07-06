@@ -13,10 +13,13 @@ import { createDeferredSubscribe } from './deferredSubscribe.js';
 export function createEditorEngine(deps) {
   let _core = null;
   let _buildResult = null;
+  let _loadGeneration = 0;
   const _subRegistry = createDeferredSubscribe();
 
   return {
     async loadProject(schema) {
+      const loadId = ++_loadGeneration;
+
       // Step 1: Validate (same as ProductionEngine steps 1–3, no step 4)
       const errors = validateProject(schema) || [];
       const hardErrors = errors.filter(e => e.severity === 'error');
@@ -31,6 +34,14 @@ export function createEditorEngine(deps) {
 
       // Step 2: Build
       const buildResult = await buildProject(schema, deps);
+
+      // Stale-load guard: a newer loadProject() call (or destroy()) started
+      // while buildProject was awaited — discard this result entirely.
+      if (loadId !== _loadGeneration) {
+        for (const scenario of buildResult.scenarios) scenario.timeline?.kill();
+        for (const group of buildResult.timelineGroups.values()) group.masterTimeline?.kill();
+        return;
+      }
 
       // Step 3: EngineCore — NO trigger wiring
       const core = createEngineCore(buildResult);
@@ -56,6 +67,9 @@ export function createEditorEngine(deps) {
     },
 
     destroy() {
+      // Increment generation before teardown so any in-flight loadProject()
+      // that resolves afterward treats itself as stale and self-discards.
+      _loadGeneration++;
       _subRegistry.clearCore();
       if (_core) { _core.destroy(); _core = null; }
       _buildResult = null;

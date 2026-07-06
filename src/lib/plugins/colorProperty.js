@@ -8,6 +8,9 @@ export function createColorPropertyPlugin(propKey) {
   return {
     keys: [propKey],
     lazy: false,
+    claimsKey(key) {
+      return key === propKey;
+    },
     getNaturalValue(key, domNode) {
       return getComputedStyle(domNode)[key] || 'transparent';
     },

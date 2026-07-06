@@ -1,4 +1,4 @@
-import { getPointOnCubicPath } from '../pathUtils.js';
+import { getPointOnCubicPath, convertToCubicPath } from '../pathUtils.js';
 
 /**
  * Custom plugin for path keyframes.
@@ -7,6 +7,9 @@ import { getPointOnCubicPath } from '../pathUtils.js';
 export const pathPlugin = {
   keys: ['path'],
   lazy: false,
+  claimsKey(key) {
+    return key === 'path' || key === '__pathProgress' || key === '__cubicPath' || key === '__autoRotate';
+  },
   getNaturalValue() {
     return 0; // Natural start of path progress
   },
@@ -28,7 +31,7 @@ export const pathPlugin = {
       const pathConfig = element.keyframes.path;
       const points = pathConfig.points || [];
       percentPatch['0%'] = percentPatch['0%'] || {};
-      percentPatch['0%'].__cubicPath = points;
+      percentPatch['0%'].__cubicPath = convertToCubicPath(points);
       percentPatch['0%'].__autoRotate = pathConfig.autoRotate === true;
     }
 

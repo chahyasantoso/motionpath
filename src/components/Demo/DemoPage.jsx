@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
-import { buildMotionPath, buildCubicMotionPath, convertToCubicPath } from '../../lib/pathUtils';
+import { buildMotionPath } from '../../lib/pathUtils';
 import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../lib/projection3d';
 import './DemoPage.css';
 
@@ -20,11 +20,11 @@ const scrollScene = {
       id: 'rocket-track',
       keyframes: {
         path: {
-          points: convertToCubicPath([
+          points: [
             { x: 50, y: 300 },
             { x: 400, y: 100, ctrlX: 200, ctrlY: -50 },
             { x: 900, y: 350, ctrlX: 700, ctrlY: 500 },
-          ]),
+          ],
           stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
           autoRotate: true
         }
@@ -34,10 +34,10 @@ const scrollScene = {
       id: 'cloud',
       keyframes: {
         path: {
-          points: convertToCubicPath([
+          points: [
             { x: -100, y: 80 },
             { x: 1100, y: 80 },
-          ]),
+          ],
           stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
         }
       }
@@ -61,7 +61,7 @@ const helixPathNodes = shapeGenerators.helix({
   turns: HELIX_CONFIG.turns,
 });
 
-const helixCubicPath = convertToCubicPath(helixPathNodes);
+const helixPathPoints = helixPathNodes;
 const MOCK_CARDS = [
   { id: 1, badge: '01 / IMAGINATION', title: 'Fluid Motion Engine', desc: 'Harnessing the power of GSAP Pub/Sub for sub-millisecond DOM updates.' },
   { id: 2, badge: '02 / ARCHITECTURE', title: 'Zero Re-renders', desc: 'No React component updates during animation cycles for maximum 60FPS performance.' },
@@ -87,13 +87,13 @@ const dynamicCarouselScene = {
     id: `carousel-card-${i}`,
     keyframes: {
       path: {
-        points: convertToCubicPath([
+        points: [
           { x: -350, y: 400 },
           { x: 300, y: 150, ctrlX: -20, ctrlY: 100 },
           { x: 950, y: 500, ctrlX: 620, ctrlY: 200 },
           { x: 1600, y: 200, ctrlX: 1280, ctrlY: 800 },
           { x: 2200, y: 400, ctrlX: 1920, ctrlY: -400 },
-        ]),
+        ],
         stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
         autoRotate: true
       },
@@ -123,7 +123,7 @@ const dynamicHelixScene = {
     id: `helix-card-${i}`,
     keyframes: {
       path: {
-        points: helixCubicPath,
+        points: helixPathPoints,
         stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
       }
     }
@@ -304,7 +304,7 @@ function ScrollDemo() {
             <path
               key={el.id}
               id={`path-guide-${el.id}`}
-              d={buildCubicMotionPath(el.keyframes.path.points)}
+              d={buildMotionPath(el.keyframes.path.points)}
               fill="none"
               stroke="rgba(255,255,255,0.1)"
               strokeWidth="2"
@@ -340,7 +340,7 @@ function CarouselDemo() {
         {/* Path guides generated from scene data */}
         <svg className="path-guide" width="100%" height="100%">
           <path
-            d={buildCubicMotionPath(dynamicCarouselScene.elements[0].keyframes.path.points)}
+            d={buildMotionPath(dynamicCarouselScene.elements[0].keyframes.path.points)}
             fill="none"
             stroke="rgba(255,255,255,0.1)"
             strokeWidth="2"

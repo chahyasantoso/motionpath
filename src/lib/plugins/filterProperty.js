@@ -23,6 +23,9 @@ export function createFilterPropertyPlugin(propKey) {
   return {
     keys: [propKey],
     lazy: false,
+    claimsKey(key) {
+      return key === propKey || key === proxyKey;
+    },
     getNaturalValue(key) {
       // Returns identity value for synthetic fields (no DOM access)
       return naturalDefaults[key];

@@ -44,10 +44,10 @@ describe('pathPlugin', () => {
     expect(zeroFrame).toBeDefined();
     expect(zeroFrame.__autoRotate).toBe(true);
     expect(zeroFrame.__cubicPath).toBeInstanceOf(Array);
-    // Points are stored directly; length is 4
-    expect(zeroFrame.__cubicPath.length).toBe(4);
-    // First point matches original coordinates
-    expect(zeroFrame.__cubicPath[0]).toEqual({ x: 0, y: 0 });
+    // Plugin calls convertToCubicPath internally: 4 raw waypoints → 3*(4-1)+1 = 10 cubic points
+    expect(zeroFrame.__cubicPath.length).toBe(10);
+    // First cubic anchor matches the first waypoint's coordinates (z defaults to 0)
+    expect(zeroFrame.__cubicPath[0]).toEqual({ x: 0, y: 0, z: 0 });
   });
 
   describe('compose', () => {

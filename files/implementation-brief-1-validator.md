@@ -224,3 +224,92 @@ This validates **author-supplied JSON** — not attacker-controlled in the tradi
 - Every test case listed in §4 must exist as an actual test — they are not illustrative, they are the acceptance criteria.
 - One additional integration test file (`index.test.ts`) covering: (a) a fully valid minimal project → empty array, (b) a project with multiple simultaneous violations across different rules → all of them present in the returned array (proves collect-all works end-to-end), (c) a garbage/malformed top-level input (`null`, `{}`, `{ scenarios: "not an array" }`) → returns errors, does not throw.
 - No test should require constructing a full valid project to exercise a single unrelated rule — this is the entire point of the per-rule-function architecture in §3. If a test file needs a large fixture to test one small rule, that's a signal the rule function's scope is wrong.
+
+---
+
+## Addendum B — Correct `path-shape` to Validate Raw Waypoints, Not a Pre-Converted Cubic Array
+
+**Problem:** this rule was originally specified against the assumption that `path.points` arrives as a final cubic Bézier array (`(points.length - 1) % 3 === 0 && points.length >= 4`). That assumption is stale — `pathPlugin.js`'s `contribute()` correctly converts raw waypoints (`{x, y, z?, ctrlX?, ctrlY?, ctrlZ?}`) into the cubic form internally, at build time, via `convertToCubicPath()`. The validator was never updated to match, so it currently rejects the correct, intended authoring format and would only accept content that no longer matches what the plugin expects.
+
+**Corrected rule — validates the actual input shape:**
+
+```js
+export function pathShapeRule(element, scenario, context, path) {
+  const errors = [];
+  const points = element?.keyframes?.path?.points;
+  if (!Array.isArray(points)) return errors;
+
+  const pointsPath = `${path}.keyframes.path.points`;
+
+  if (points.length < 2) {
+    errors.push({ ruleId: "path-shape", severity: "error",
+      message: "path.points needs at least 2 waypoints to form a path.", path: pointsPath });
+    return errors;
+  }
+
+  points.forEach((pt, i) => {
+    const ptPath = `${pointsPath}[${i}]`;
+    if (typeof pt?.x !== 'number' || typeof pt?.y !== 'number') {
+      errors.push({ ruleId: "path-shape", severity: "error",
+        message: "each path point requires numeric x and y.", path: ptPath });
+    }
+    const hasCtrlX = pt?.ctrlX !== undefined;
+    const hasCtrlY = pt?.ctrlY !== undefined;
+    if (hasCtrlX !== hasCtrlY) {
+      errors.push({ ruleId: "path-shape", severity: "error",
+        message: "ctrlX and ctrlY must be provided together, or not at all.", path: ptPath });
+    }
+    if (i === 0 && (hasCtrlX || hasCtrlY)) {
+      errors.push({ ruleId: "path-shape", severity: "warning",
+        message: "ctrlX/ctrlY on the first path point have no effect (no preceding segment to curve).", path: ptPath });
+    }
+  });
+
+  return errors;
+}
+```
+
+**Why the `ctrlX`/`ctrlY` pairing check matters, not just extra strictness:** `convertToCubicPath` determines curvature via `isCurved = ctrlX !== undefined && ctrlY !== undefined`. A typo or omission of one half of the pair doesn't error inside the conversion — it silently produces a straight segment instead of the intended curve. That's exactly the "runs but wrong" failure class worth catching at validation time rather than leaving someone to debug a mysteriously flat curve later.
+
+**This supersedes the old `path.stops[].v` range check's neighbor logic only where it concerned `points`** — the `v ∈ [0,1]` check on `stops` is unaffected and stays exactly as originally specified; only the `points`-shape half of this rule changes.
+
+**Test cases (replacing the old cubic-chain test cases):**
+- `points: [{x:0,y:0}]` (length 1) → error.
+- `points: [{x:0,y:0},{x:10,y:10}]` → no error (minimum valid path).
+- `points: [{x:0,y:0},{x:10,y:10,ctrlX:5}]` (missing `ctrlY`) → error.
+- `points: [{x:0,y:0,ctrlX:1,ctrlY:1},{x:10,y:10}]` → warning (ctrl on first point is a no-op).
+- `points: [{x:"a",y:0},{x:1,y:1}]` → error (non-numeric `x`).
+
+
+---
+
+## Addendum A — Uniform Rule Signature (supersedes §3's rule type definitions)
+
+**Problem found in review:** `ease-collision.js`, `stagger-shape.js`, and `trigger-shape.js` each shipped with a runtime signature-sniffer:
+
+```js
+// WRONG — do not reintroduce this pattern anywhere in this module
+if (typeof context === 'string') {
+  path = context;
+  context = undefined;
+}
+```
+
+This lets a rule be called either the old two-arg way or a new three-arg way, so both the rule's own stale tests and the orchestrator's calls keep passing. It works, but every rule now silently supports two calling conventions forever — the exact inconsistency a uniform signature exists to prevent. `perspective-usage.js`/`perspective-usage.test.js` already do this correctly; every other rule and its test file must match that pattern exactly, not the other way around.
+
+**Corrected, final contract — no exceptions, no sniffing:**
+
+```ts
+type ScenarioRule = (scenario: unknown, context: RuleContext, path: string) => ValidationError[];
+type ElementRule = (element: unknown, scenario: unknown, context: RuleContext, path: string) => ValidationError[];
+type CrossScenarioRule = (scenarios: unknown[], context: RuleContext) => ValidationError[];
+
+interface RuleContext {
+  schema: unknown; // the full top-level project object, read-only
+}
+```
+
+- Every `ScenarioRule` and `ElementRule` now always receives `context`, whether or not that specific rule needs it. A rule that doesn't need `schema` simply ignores the parameter — this costs nothing and keeps every rule's call signature identical, which is what makes the orchestrator loop in §3 correct as written (one calling convention, no branching per rule).
+- **Required fix:** remove the signature-sniffing block from all three affected rule files.
+- **Required fix:** update `ease-collision.test.js`, `stagger-shape.test.js`, and `trigger-shape.test.js` to call the rule with the full three-argument signature — do not preserve the old two-arg calls "for compatibility." There is no compatibility concern here; nothing external depends on this internal function signature.
+- **Test to add:** one shared test asserting every exported rule function has arity matching its declared type (`ScenarioRule` → length 3, `ElementRule` → length 4, `CrossScenarioRule` → length 2). This is cheap and catches a regression to the sniffing pattern immediately, without needing to inspect each rule file by hand on every future change.

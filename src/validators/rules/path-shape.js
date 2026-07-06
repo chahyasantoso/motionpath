@@ -1,96 +1,87 @@
 /**
  * Rule: path-shape
- * Per-element Bézier path and stops range check.
+ * Validates the raw waypoint array authors provide for `path.points`.
+ * `points` is NOT a pre-converted cubic Bézier array — pathPlugin.js converts
+ * internally via convertToCubicPath() at build time. This rule validates the
+ * input to that conversion, not its output.
  *
- * Requirements:
- * - Only runs if keyframes.path is present.
- * - path.points.length >= 4 and (points.length - 1) % 3 === 0 -> else error (invalid Bézier chain).
- * - Every path.stops[].v must satisfy 0 <= v <= 1 -> else error.
+ * Also validates path.stops[].v range (0 <= v <= 1).
+ * This check lives here because no other rule owns path.stops validation.
  *
  * @param {unknown} element
- * @param {unknown} scenario - Parent scenario
+ * @param {unknown} scenario
+ * @param {{ schema: unknown }} context
  * @param {string} path - JSON path to element
  * @returns {ValidationError[]}
  */
 export function pathShapeRule(element, scenario, context, path) {
   const errors = [];
+  const points = element?.keyframes?.path?.points;
+  if (!Array.isArray(points)) return errors;
 
-  if (!element || typeof element !== 'object') {
-    return errors;
-  }
+  const pointsPath = `${path}.keyframes.path.points`;
 
-  const keyframes = element.keyframes;
-  if (!keyframes || typeof keyframes !== 'object') {
-    return errors;
-  }
-
-  const pathVal = keyframes.path;
-  if (pathVal === undefined || pathVal === null) {
-    return errors;
-  }
-
-  const pathPath = `${path}.keyframes.path`;
-
-  if (typeof pathVal !== 'object') {
+  if (points.length < 2) {
     errors.push({
       ruleId: "path-shape",
       severity: "error",
-      message: "keyframes.path must be an object.",
-      path: pathPath
+      message: "path.points needs at least 2 waypoints to form a path.",
+      path: pointsPath,
     });
     return errors;
   }
 
-  const { points, stops } = pathVal;
+  points.forEach((pt, i) => {
+    const ptPath = `${pointsPath}[${i}]`;
 
-  // Validate points array
-  if (points === undefined || points === null) {
-    errors.push({
-      ruleId: "path-shape",
-      severity: "error",
-      message: "path.points is required when using path keyframes.",
-      path: `${pathPath}.points`
-    });
-  } else if (!Array.isArray(points)) {
-    errors.push({
-      ruleId: "path-shape",
-      severity: "error",
-      message: "path.points must be an array.",
-      path: `${pathPath}.points`
-    });
-  } else if (points.length < 4 || (points.length - 1) % 3 !== 0) {
-    errors.push({
-      ruleId: "path-shape",
-      severity: "error",
-      message: `path.points.length must be >= 4 and satisfy (length - 1) % 3 === 0 for a cubic Bézier chain. Got: ${points.length}.`,
-      path: `${pathPath}.points`
-    });
-  }
-
-  // Validate stops array range for v
-  if (stops !== undefined && stops !== null) {
-    if (!Array.isArray(stops)) {
+    if (typeof pt?.x !== 'number' || typeof pt?.y !== 'number') {
       errors.push({
         ruleId: "path-shape",
         severity: "error",
-        message: "path.stops must be an array.",
-        path: `${pathPath}.stops`
-      });
-    } else {
-      stops.forEach((stop, idx) => {
-        if (!stop || typeof stop !== 'object') return;
-        const { v } = stop;
-        if (v === undefined || v === null) return;
-        if (typeof v !== 'number' || v < 0 || v > 1) {
-          errors.push({
-            ruleId: "path-shape",
-            severity: "error",
-            message: `path.stops[${idx}].v must satisfy 0 <= v <= 1. Got: ${JSON.stringify(v)}.`,
-            path: `${pathPath}.stops[${idx}].v`
-          });
-        }
+        message: "each path point requires numeric x and y.",
+        path: ptPath,
       });
     }
+
+    const hasCtrlX = pt?.ctrlX !== undefined;
+    const hasCtrlY = pt?.ctrlY !== undefined;
+    if (hasCtrlX !== hasCtrlY) {
+      errors.push({
+        ruleId: "path-shape",
+        severity: "error",
+        message: "ctrlX and ctrlY must be provided together, or not at all.",
+        path: ptPath,
+      });
+    }
+
+    if (i === 0 && (hasCtrlX || hasCtrlY)) {
+      errors.push({
+        ruleId: "path-shape",
+        severity: "warning",
+        message: "ctrlX/ctrlY on the first path point have no effect (no preceding segment to curve).",
+        path: ptPath,
+      });
+    }
+  });
+
+  // Validate stops[].v range (0 <= v <= 1).
+  // This is the only rule that owns path.stops validation.
+  const stops = element?.keyframes?.path?.stops;
+  if (Array.isArray(stops)) {
+    const stopsPath = `${path}.keyframes.path.stops`;
+    stops.forEach((stop, idx) => {
+      if (!stop || typeof stop !== 'object') return;
+      const { v } = stop;
+      if (v === undefined || v === null) return;
+      if (typeof v !== 'number' || v < 0 || v > 1) {
+        errors.push({
+          ruleId: "path-shape",
+          severity: "error",
+          message: `path.stops[${idx}].v must satisfy 0 <= v <= 1. Got: ${JSON.stringify(v)}.`,
+          path: `${stopsPath}[${idx}].v`,
+        });
+      }
+    });
   }
 
   return errors;

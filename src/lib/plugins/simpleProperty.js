@@ -10,6 +10,9 @@ export function createSimplePropertyPlugin(propKey) {
   return {
     keys: [propKey],
     lazy: false,
+    claimsKey(key) {
+      return key === propKey;
+    },
     getNaturalValue(key, domNode) {
       // Use gsap.getProperty to handle transform components correctly
       const val = gsap.getProperty(domNode, key);

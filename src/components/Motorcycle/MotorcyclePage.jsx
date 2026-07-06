@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
-import { convertToCubicPath, buildMotionPath } from '../../lib/pathUtils';
+import { buildMotionPath } from '../../lib/pathUtils';
 import './MotorcyclePage.css';
 
 // ─── Path Data ────────────────────────────────────────────────────
@@ -14,29 +14,24 @@ const roadNodes = [
   { x: 1380, y: 70,  ctrlX: 1120, ctrlY: 30  },
 ];
 
-const roadCubicPath = convertToCubicPath(roadNodes);
-
 // Shadow is offset 22px below the main path
 const shadowNodes = roadNodes.map(n => ({
   ...n,
   y: n.y + 22,
   ...(n.ctrlY !== undefined ? { ctrlY: n.ctrlY + 22 } : {}),
 }));
-const shadowCubicPath = convertToCubicPath(shadowNodes);
+
+
 
 // Cloud paths (independent, slower visual layers)
 const cloudANodes = [{ x: -240, y: 90 }, { x: 1400, y: 80 }];
-const cloudACubicPath = convertToCubicPath(cloudANodes);
 
 const cloudBNodes = [{ x: -240, y: 140 }, { x: 1400, y: 120 }];
-const cloudBCubicPath = convertToCubicPath(cloudBNodes);
 
 // Speed streak paths (horizontal, bottom half)
 const streakANodes = [{ x: -400, y: 510 }, { x: 1400, y: 510 }];
-const streakACubicPath = convertToCubicPath(streakANodes);
 
 const streakBNodes = [{ x: -400, y: 470 }, { x: 1400, y: 470 }];
-const streakBCubicPath = convertToCubicPath(streakBNodes);
 
 // ─── Project Schema ───────────────────────────────────────────────
 const RIDE_DURATION = 5; // seconds end-to-end
@@ -54,7 +49,7 @@ const project = {
           id: 'moto-bike',
           keyframes: {
             path: {
-              points: roadCubicPath,
+              points: roadNodes,
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
               autoRotate: true,
             },
@@ -79,7 +74,7 @@ const project = {
           id: 'moto-shadow',
           keyframes: {
             path: {
-              points: shadowCubicPath,
+              points: shadowNodes,
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
               autoRotate: true,
             },
@@ -104,7 +99,7 @@ const project = {
           id: 'moto-cloud-a',
           keyframes: {
             path: {
-              points: cloudACubicPath,
+              points: cloudANodes,
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
             },
           },
@@ -113,7 +108,7 @@ const project = {
           id: 'moto-cloud-b',
           keyframes: {
             path: {
-              points: cloudBCubicPath,
+              points: cloudBNodes,
               stops: [{ p: 0, v: 0.22 }, { p: 1, v: 1 }],
             },
             opacity: {
@@ -137,7 +132,7 @@ const project = {
           id: 'moto-streak-a',
           keyframes: {
             path: {
-              points: streakACubicPath,
+              points: streakANodes,
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
             },
             opacity: {
@@ -154,7 +149,7 @@ const project = {
           id: 'moto-streak-b',
           keyframes: {
             path: {
-              points: streakBCubicPath,
+              points: streakBNodes,
               stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
             },
             opacity: {

@@ -164,4 +164,162 @@ describe('EditorEngine', () => {
     const source = fs.readFileSync(sourcePath, 'utf8');
     expect(source).not.toContain('ScrollTrigger');
   });
+
+  it('stale load is discarded when a second loadProject() supersedes it', async () => {
+    // Simulate two overlapping loads — first resolves after second has already started.
+    let resolveFirst;
+    const firstBuild = new Promise(res => { resolveFirst = res; });
+    const secondBuildResult = {
+      scenarios: [{ scenarioIndex: 0, sceneId: 'second', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map(),
+    };
+    const firstBuildResult = {
+      scenarios: [{ scenarioIndex: 0, sceneId: 'first', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map(),
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject
+      .mockReturnValueOnce(firstBuild)
+      .mockResolvedValueOnce(secondBuildResult);
+
+    const engine = createEditorEngine(mockDeps);
+    const first = engine.loadProject({});
+    const second = engine.loadProject({});
+
+    // Let the second load settle first
+    await second;
+
+    // Now resolve the first (stale) build — it should be killed and not wired
+    resolveFirst(firstBuildResult);
+    await first;
+
+    expect(firstBuildResult.scenarios[0].timeline.kill).toHaveBeenCalled();
+  });
+
+  it('load is discarded when destroy() fires before buildProject resolves', async () => {
+    let resolveBuild;
+    const pendingBuild = new Promise(res => { resolveBuild = res; });
+    const staleBuildResult = {
+      scenarios: [{ scenarioIndex: 0, sceneId: 'stale', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map(),
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockReturnValue(pendingBuild);
+
+    const engine = createEditorEngine(mockDeps);
+    const load = engine.loadProject({});
+
+    // Destroy the engine before the build resolves
+    engine.destroy();
+
+    // Now let the stale build resolve — it must be discarded
+    resolveBuild(staleBuildResult);
+    await load;
+
+    expect(staleBuildResult.scenarios[0].timeline.kill).toHaveBeenCalled();
+  });
+
+  it('StrictMode regression: subscribe → destroy → subscribe → both loads resolve → only second subscriber is wired', async () => {
+    // Simulates the exact React StrictMode double-invoke:
+    //   1. Mount 1 — child subscribes (pending), parent starts loadProject #1
+    //   2. Cleanup  — child unsubscribes, parent destroy()s
+    //   3. Mount 2  — child subscribes again (pending), parent starts loadProject #2
+    //   4. Both builds resolve (first build resolves last, as in a real race)
+    // Expected: only the mount-2 subscriber is wired; the mount-1 subscriber is never called.
+
+    const elementId = 'el-strict';
+    const proxy = { x: 42 };
+    const makeResult = () => ({
+      scenarios: [{ scenarioIndex: 0, sceneId: 'scene', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      timelineGroups: new Map(),
+      elements: new Map([[elementId, { proxy }]]),
+      elementPlugins: new Map(),
+    });
+
+    let resolveFirst;
+    const firstBuild = new Promise(res => { resolveFirst = res; });
+    const secondBuildResult = makeResult();
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject
+      .mockReturnValueOnce(firstBuild)
+      .mockResolvedValueOnce(secondBuildResult);
+
+    const engine = createEditorEngine(mockDeps);
+
+    // --- Mount 1 ---
+    const cb1 = vi.fn();
+    const unsub1 = engine.subscribe(elementId, cb1); // goes to pending
+
+    const load1 = engine.loadProject({});
+
+    // --- StrictMode cleanup ---
+    unsub1();           // cancel mount-1 subscription
+    engine.destroy();   // clears pending, increments generation
+
+    // --- Mount 2 ---
+    const cb2 = vi.fn();
+    engine.subscribe(elementId, cb2); // goes to fresh pending
+
+    const load2 = engine.loadProject({});
+
+    // Second build resolves first (normal async order)
+    await load2;
+
+    // First (stale) build resolves later — must be discarded
+    resolveFirst(makeResult());
+    await load1;
+
+    // Only mount-2 subscriber wired
+    expect(cb2).toHaveBeenCalledWith({ x: 42 });
+    // Mount-1 subscriber must never have been called
+    expect(cb1).not.toHaveBeenCalled();
+  });
+
+  it('commit-path scoping regression: pending subscriptions survive a successful commit', async () => {
+    // Regression for the bug where _cleanup() called clearCore() during the
+    // successful commit step, wiping pending subscriptions before setCore() could
+    // flush them. Simulates child-before-parent mount order:
+    //   1. Child subscribes → goes to pending (no core yet)
+    //   2. Parent loadProject() starts → async build
+    //   3. Build resolves → commit → setCore() must flush the pending entry
+    // Expected: the subscriber's callback is invoked with the initial proxy state.
+
+    const elementId = 'el-commit';
+    const proxy = { opacity: 0.5 };
+    const buildResult = {
+      scenarios: [{ scenarioIndex: 0, sceneId: 'scene', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      timelineGroups: new Map(),
+      elements: new Map([[elementId, { proxy }]]),
+      elementPlugins: new Map(),
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockResolvedValue(buildResult);
+
+    const engine = createEditorEngine(mockDeps);
+
+    // Subscribe BEFORE loadProject — simulates child effect running before parent effect
+    const callback = vi.fn();
+    engine.subscribe(elementId, callback);
+
+    // Callback must not fire yet (no core)
+    expect(callback).not.toHaveBeenCalled();
+
+    // Normal successful load
+    await engine.loadProject({});
+
+    // After commit, the pending subscription must have been flushed by setCore()
+    // and the initial proxy state replayed synchronously
+    expect(callback).toHaveBeenCalledWith({ opacity: 0.5 });
+  });
 });
+

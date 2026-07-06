@@ -1,6 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import './App.css';
-import BurstPage from './BurstPage';
+import BurstPage from './components/Burst/BurstPage';
 import DemoPage from './components/Demo/DemoPage';
 import MotorcyclePage from './components/Motorcycle/MotorcyclePage';
 

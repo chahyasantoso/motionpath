@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import './BurstPage.css';
-import useMotionProject from './hooks/useMotionProject';
-import useMotionSubscriber from './hooks/useMotionSubscriber';
-import { buildMotionPath, convertToCubicPath } from './lib/pathUtils';
-import { projectPathNodes3DTo2D } from './lib/projection3d';
+import useMotionProject from '../../hooks/useMotionProject';
+import useMotionSubscriber from '../../hooks/useMotionSubscriber';
+import { buildMotionPath } from '../../lib/pathUtils';
+import { projectPathNodes3DTo2D } from '../../lib/projection3d';
 
 // ─── Strawberry Burst Demo Configs ──────────────────────────────
 const STRAW_PERSPECTIVE = 800;
@@ -408,27 +408,12 @@ export default function BurstPage() {
     };
   }, []);
 
-  const project = useMemo(() => {
-    // Deep clone scenarios to avoid mutating static objects
-    const clonedStrawberry = JSON.parse(JSON.stringify(strawberryScene));
-    const clonedIceCream = JSON.parse(JSON.stringify(iceCreamCardScene));
-
-    // Convert all element paths to cubic paths programmatically
-    for (const scenario of [clonedStrawberry, clonedIceCream]) {
-      for (const element of scenario.elements || []) {
-        if (element.keyframes?.path?.points) {
-          element.keyframes.path.points = convertToCubicPath(element.keyframes.path.points);
-        }
-      }
-    }
-
-    return {
-      schemaVersion: 1,
-      projectId: 'burst-page',
-      perspective: STRAW_PERSPECTIVE,
-      scenarios: [clonedStrawberry, clonedIceCream],
-    };
-  }, []);
+  const project = useMemo(() => ({
+    schemaVersion: 1,
+    projectId: 'burst-page',
+    perspective: STRAW_PERSPECTIVE,
+    scenarios: [strawberryScene, iceCreamCardScene],
+  }), []);
 
   useMotionProject(project);
 

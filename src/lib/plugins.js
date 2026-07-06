@@ -28,10 +28,10 @@ const filterPlugins = Object.fromEntries(filterKeys.map(k => [k, createFilterPro
 export { pathPlugin, cssVarPlugin };
 
 // Lazy plugin stubs
-export const splitTextPlugin = { keys: ['splitText'], lazy: true, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
-export const morphSvgPlugin = { keys: ['morphSVG'], lazy: true, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
-export const drawSvgPlugin = { keys: ['drawSVG'], lazy: true, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
-export const scrambleTextPlugin = { keys: ['scrambleText'], lazy: true, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
+export const splitTextPlugin    = { keys: ['splitText'],    lazy: true, claimsKey(k) { return k === 'splitText';    }, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
+export const morphSvgPlugin     = { keys: ['morphSVG'],     lazy: true, claimsKey(k) { return k === 'morphSVG';     }, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
+export const drawSvgPlugin      = { keys: ['drawSVG'],      lazy: true, claimsKey(k) { return k === 'drawSVG';      }, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
+export const scrambleTextPlugin = { keys: ['scrambleText'], lazy: true, claimsKey(k) { return k === 'scrambleText'; }, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
 
 export const ALL_PLUGINS = [
   ...Object.values(simplePlugins),
@@ -47,30 +47,12 @@ export const ALL_PLUGINS = [
 
 /**
  * Resolves a schema property key to its corresponding plugin instance.
- * Supports exact key matching and CSS custom property fallback (--*).
+ * Every plugin in ALL_PLUGINS is required to implement claimsKey(key).
  *
  * @param {string} key - The property key to resolve.
  * @returns {Plugin|undefined} The resolved plugin, or undefined if not found.
  */
 export function resolvePluginForKey(key) {
   if (typeof key !== 'string') return undefined;
-  if (key.startsWith('--')) return cssVarPlugin;
-
-  const simple = simplePlugins[key];
-  if (simple) return simple;
-
-  const color = colorPlugins[key];
-  if (color) return color;
-
-  const filter = filterPlugins[key];
-  if (filter) return filter;
-
-  if (key === 'path') return pathPlugin;
-
-  if (key === 'splitText') return splitTextPlugin;
-  if (key === 'morphSVG') return morphSvgPlugin;
-  if (key === 'drawSVG') return drawSvgPlugin;
-  if (key === 'scrambleText') return scrambleTextPlugin;
-
-  return undefined;
+  return ALL_PLUGINS.find(p => p.claimsKey(key));
 }

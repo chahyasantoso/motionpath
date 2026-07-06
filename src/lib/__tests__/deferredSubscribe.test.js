@@ -72,7 +72,12 @@ describe('deferredSubscribe', () => {
     expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
   });
 
-  it('clears core reference but preserves pending on clearCore', () => {
+  it('clearCore() clears pending — entry does NOT flush after clearCore() → setCore()', () => {
+    // Addendum B: clearCore() must clear pending. A pending subscription that
+    // existed before clearCore() is NOT forwarded to a subsequent setCore() call.
+    // This is the correct behaviour because clearCore() signals a full reset
+    // (stale load discarded or engine destroyed); any pending entries from that
+    // dead load must not bleed into the replacement core.
     const registry = createDeferredSubscribe();
     const cb = vi.fn();
     registry.subscribe('el-1', cb);
@@ -80,7 +85,8 @@ describe('deferredSubscribe', () => {
     registry.clearCore();
     registry.setCore(mockCore);
 
-    // Since clearCore preserves pending, setCore should flush it
-    expect(mockCore.subscribe).toHaveBeenCalledWith('el-1', cb);
+    // pending was cleared by clearCore(), so nothing should have flushed
+    expect(mockCore.subscribe).not.toHaveBeenCalled();
   });
 });
+

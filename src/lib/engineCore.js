@@ -1,4 +1,5 @@
 import { gsap } from 'gsap';
+import { ALL_PLUGINS } from './plugins.js';
 
 /**
  * Creates a shared EngineCore that both ProductionEngine and EditorEngine compose.
@@ -81,7 +82,29 @@ export function createEngineCore(buildResult) {
       const elementBuild = buildResult.elements.get(elementId);
       if (!elementBuild) return {};
       const source = rawData ?? { ...elementBuild.proxy };
-      const plugins = buildResult.elementPlugins.get(elementId) ?? [];
+      const resolved = buildResult.elementPlugins.get(elementId) ?? [];
+      
+      const resolvedKeys = new Set();
+      for (const p of resolved) {
+        if (p.keys) {
+          for (const k of p.keys) {
+            resolvedKeys.add(k);
+          }
+        }
+      }
+
+      const plugins = [...resolved];
+      for (const p of ALL_PLUGINS) {
+        if (resolved.includes(p)) continue;
+        if (p.keys && p.keys.some(k => resolvedKeys.has(k))) continue;
+
+        const hasMatchingKey = Object.keys(source).some(key => p.claimsKey(key));
+
+        if (hasMatchingKey) {
+          plugins.push(p);
+        }
+      }
+
       const patch = {};
       const filterParts = [];
 

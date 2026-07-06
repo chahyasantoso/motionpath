@@ -2,63 +2,56 @@ import { describe, it, expect } from 'vitest';
 import { pathShapeRule } from '../path-shape.js';
 
 describe('path-shape rule', () => {
-  it('should pass with points length 4 and stops in range', () => {
-    const element = {
-      id: 'test-el',
-      keyframes: {
-        path: {
-          points: [{}, {}, {}, {}],
-          stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
-        }
-      }
-    };
+  it('errors when fewer than 2 points are given', () => {
+    const element = { keyframes: { path: { points: [{ x: 0, y: 0 }] } } };
     const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
-    expect(errors).toHaveLength(0);
+    expect(errors.some(e => e.severity === 'error')).toBe(true);
   });
 
-  it('should pass with points length 7 (Bézier chain)', () => {
-    const element = {
-      id: 'test-el',
-      keyframes: {
-        path: {
-          points: [{}, {}, {}, {}, {}, {}, {}]
-        }
-      }
-    };
+  it('accepts the minimum valid path (2 plain waypoints)', () => {
+    const element = { keyframes: { path: { points: [{ x: 0, y: 0 }, { x: 10, y: 10 }] } } };
     const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
-    expect(errors).toHaveLength(0);
+    expect(errors.length).toBe(0);
   });
 
-  it('should error when points length is 5 (invalid Bézier chain)', () => {
-    const element = {
-      id: 'test-el',
-      keyframes: {
-        path: {
-          points: [{}, {}, {}, {}, {}]
-        }
-      }
-    };
+  it('errors when only one of ctrlX/ctrlY is provided', () => {
+    const element = { keyframes: { path: { points: [
+      { x: 0, y: 0 }, { x: 10, y: 10, ctrlX: 5 },
+    ] } } };
     const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
-    expect(errors).toHaveLength(1);
-    expect(errors[0].ruleId).toBe('path-shape');
-    expect(errors[0].severity).toBe('error');
-    expect(errors[0].path).toBe('scenarios[0].elements[0].keyframes.path.points');
+    expect(errors.some(e => e.severity === 'error')).toBe(true);
   });
 
-  it('should error when a stop has v out of range [0, 1]', () => {
-    const element = {
-      id: 'test-el',
-      keyframes: {
-        path: {
-          points: [{}, {}, {}, {}],
-          stops: [{ p: 0, v: -0.1 }, { p: 1, v: 1.5 }]
-        }
-      }
-    };
+  it('warns when ctrlX/ctrlY are given on the first point', () => {
+    const element = { keyframes: { path: { points: [
+      { x: 0, y: 0, ctrlX: 1, ctrlY: 1 }, { x: 10, y: 10 },
+    ] } } };
     const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
-    expect(errors).toHaveLength(2);
-    expect(errors[0].ruleId).toBe('path-shape');
-    expect(errors[0].severity).toBe('error');
+    expect(errors.some(e => e.severity === 'warning')).toBe(true);
+    expect(errors.some(e => e.severity === 'error')).toBe(false);
+  });
+
+  it('errors on non-numeric x/y', () => {
+    const element = { keyframes: { path: { points: [
+      { x: 'a', y: 0 }, { x: 1, y: 1 },
+    ] } } };
+    const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
+    expect(errors.some(e => e.severity === 'error')).toBe(true);
+  });
+
+  it('returns no errors when path is absent', () => {
+    const element = { keyframes: { x: { stops: [{ p: 0, v: 0 }] } } };
+    const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
+    expect(errors.length).toBe(0);
+  });
+
+  it('errors when a stop has v out of range [0, 1]', () => {
+    const element = { keyframes: { path: {
+      points: [{ x: 0, y: 0 }, { x: 10, y: 10 }],
+      stops: [{ p: 0, v: -0.1 }, { p: 1, v: 1.5 }],
+    } } };
+    const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
+    expect(errors.filter(e => e.severity === 'error').length).toBe(2);
     expect(errors[0].path).toBe('scenarios[0].elements[0].keyframes.path.stops[0].v');
     expect(errors[1].path).toBe('scenarios[0].elements[0].keyframes.path.stops[1].v');
   });
