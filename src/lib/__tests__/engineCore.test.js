@@ -38,7 +38,7 @@ describe('EngineCore', () => {
       ],
       timelineGroups: new Map(),
       elements: new Map([
-        ['el-1', { proxy: { x: 10, blur: 5 }, domNode: {} }]
+        ['el-1', { proxy: { x: 10, blur: 5 } }]
       ]),
       elementPlugins: new Map([
         ['el-1', [mockPlugin1, mockPlugin2]]

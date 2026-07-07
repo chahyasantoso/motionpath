@@ -81,6 +81,26 @@ export function timelineGroupRule(scenarios, context) {
         });
       });
     }
+
+    // 4. Non-primary scenario must not declare start, end, pin, pinSpacing, snap, repeat, yoyo, repeatDelay
+    const forbiddenFields = ['start', 'end', 'pin', 'pinSpacing', 'snap', 'repeat', 'yoyo', 'repeatDelay'];
+    list.forEach(({ scenario, index }) => {
+      if (scenario.primary !== true) {
+        const trigger = scenario.trigger;
+        if (trigger && typeof trigger === 'object') {
+          forbiddenFields.forEach(field => {
+            if (trigger[field] !== undefined && trigger[field] !== null) {
+              errors.push({
+                ruleId: "timeline-group",
+                severity: "error",
+                message: `Non-primary scenario in timeline group '${timelineId}' cannot declare trigger field '${field}'.`,
+                path: `scenarios[${index}].trigger.${field}`
+              });
+            }
+          });
+        }
+      }
+    });
   });
 
   return errors;

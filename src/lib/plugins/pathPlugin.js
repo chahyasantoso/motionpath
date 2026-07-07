@@ -2,7 +2,7 @@ import { getPointOnCubicPath, convertToCubicPath } from '../pathUtils.js';
 
 /**
  * Custom plugin for path keyframes.
- * Seeding metadata (__cubicPath, __autoRotate) is injected at p=0.
+ * Seeding metadata (cubicPath, autoRotate) is injected at p=0.
  */
 export const pathPlugin = {
   keys: ['path'],
@@ -34,7 +34,7 @@ export const pathPlugin = {
 
     return { percentPatch, tweenVars: {} };
   },
-  compose(rawData) {
+  compose(rawData, elementCfg) {
     if (rawData.pathProgress === undefined || !rawData.cubicPath) return {};
     const pt = getPointOnCubicPath(rawData.cubicPath, rawData.pathProgress);
     const patch = {

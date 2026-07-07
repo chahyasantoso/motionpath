@@ -23,7 +23,7 @@ export function createColorPropertyPlugin(propKey) {
       });
       return { percentPatch, tweenVars: {} };
     },
-    compose(rawData) {
+    compose(rawData, elementCfg) {
       const patch = {};
       if (rawData[propKey] !== undefined) patch[propKey] = rawData[propKey];
       return patch;

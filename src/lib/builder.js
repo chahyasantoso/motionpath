@@ -41,15 +41,6 @@ export async function buildProject(schema, deps) {
     const elementTweens = [];
 
     for (const element of elements) {
-      // Resolve DOM node once per element — used only for getNaturalValue().
-      // The tween targets a proxy object, not the DOM node directly, so the
-      // engine's onUpdate → compose() layer can apply filter/path properties
-      // correctly via plugin.compose(proxy) → real CSS.
-      const domNode = deps.resolveElement(element.id);
-      if (!domNode) {
-        throw new Error(`Failed to resolve DOM element for id "${element.id}"`);
-      }
-
       const keyframes = element.keyframes || {};
       const propKeys = Object.keys(keyframes);
 
@@ -59,8 +50,8 @@ export async function buildProject(schema, deps) {
 
       // Plain proxy object: GSAP animates this, not the DOM node.
       // The engine's onUpdate → plugin.compose(proxy) translates proxy state
-      // into real CSS. This is required so filterPlugin (__blur) and
-      // pathPlugin (__pathProgress) work correctly — those keys are not
+      // into real CSS. This is required so filterPlugin (blur) and
+      // pathPlugin (pathProgress) work correctly — those keys are not
       // valid CSS properties and cannot be set directly on a DOM node.
       const proxy = {};
 
@@ -132,7 +123,7 @@ export async function buildProject(schema, deps) {
       }
 
       elementPlugins.set(element.id, resolvedPlugins);
-      elementsMap.set(element.id, { proxy, domNode, elementConfig: element });
+      elementsMap.set(element.id, { proxy, elementConfig: element });
 
       // Duration fallback chain — authorized addendum to §5.8:
       // Without an explicit duration, GSAP defaults to 0.5s which silently

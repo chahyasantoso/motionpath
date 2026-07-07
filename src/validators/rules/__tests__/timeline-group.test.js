@@ -90,4 +90,48 @@ describe('timeline-group rule', () => {
     expect(errors).toHaveLength(2);
     expect(errors[0].message).toContain('Found 2 primary');
   });
+
+  it('should error if a non-primary scenario in a group declares forbidden trigger fields', () => {
+    const scenarios = [
+      {
+        timelineId: 'group-1',
+        primary: true,
+        trigger: { type: 'scroll', scrub: true, pin: true }
+      },
+      {
+        timelineId: 'group-1',
+        primary: false,
+        trigger: { type: 'scroll', scrub: true, pin: true, start: 'top top' }
+      }
+    ];
+    const errors = timelineGroupRule(scenarios);
+    expect(errors).toHaveLength(2); // pin and start are forbidden on non-primary
+
+    const errorPaths = errors.map(e => e.path);
+    expect(errorPaths).toContain('scenarios[1].trigger.pin');
+    expect(errorPaths).toContain('scenarios[1].trigger.start');
+
+    errors.forEach(e => {
+      expect(e.ruleId).toBe('timeline-group');
+      expect(e.severity).toBe('error');
+      expect(e.message).toContain('cannot declare trigger field');
+    });
+  });
+
+  it('should pass if primary scenario declares forbidden fields, and non-primary declares only type/scrub', () => {
+    const scenarios = [
+      {
+        timelineId: 'group-1',
+        primary: true,
+        trigger: { type: 'scroll', scrub: true, pin: true, start: 'top top', end: 'bottom bottom', pinSpacing: true, snap: 0.5 }
+      },
+      {
+        timelineId: 'group-1',
+        primary: false,
+        trigger: { type: 'scroll', scrub: true }
+      }
+    ];
+    const errors = timelineGroupRule(scenarios);
+    expect(errors).toHaveLength(0);
+  });
 });

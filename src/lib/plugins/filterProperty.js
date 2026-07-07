@@ -5,13 +5,6 @@ const filterKeyMap = {
   saturate: 'saturate'
 };
 
-const naturalDefaults = {
-  blur: 0,
-  brightness: 1,
-  contrast: 1,
-  saturate: 1
-};
-
 /**
  * Creates a plugin for CSS filter sub-properties that compiles to a synthetic proxy key.
  *
@@ -37,7 +30,7 @@ export function createFilterPropertyPlugin(propKey) {
       });
       return { percentPatch, tweenVars: {} };
     },
-    compose(rawData) {
+    compose(rawData, elementCfg) {
       if (rawData[proxyKey] === undefined) return {};
       const val = rawData[proxyKey];
       const filterFnMap = {

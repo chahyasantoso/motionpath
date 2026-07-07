@@ -63,4 +63,35 @@ describe('trigger-shape rule', () => {
     expect(invalidScrub).toHaveLength(1);
     expect(invalidScrub[0].path).toBe('scenarios[0].trigger.scrub');
   });
+
+  it('should error if an element inside a scroll-scrub scenario defines duration', () => {
+    const scenario = {
+      trigger: { type: 'scroll', scrub: true },
+      elements: [
+        { id: 'el-1', duration: 1.5, keyframes: {} },
+        { id: 'el-2', keyframes: {} }
+      ]
+    };
+    const errors = triggerShapeRule(scenario, {}, 'scenarios[0]');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].ruleId).toBe('trigger-shape');
+    expect(errors[0].severity).toBe('error');
+    expect(errors[0].message).toContain("duration is incompatible with scroll-scrub triggers");
+    expect(errors[0].message).toContain("el-1");
+    expect(errors[0].path).toBe('scenarios[0].elements[0].duration');
+  });
+
+  it('should pass if an element defines duration in a time or scroll-observer scenario', () => {
+    const timeScenario = {
+      trigger: { type: 'time', duration: 3 },
+      elements: [{ id: 'el-1', duration: 1.5, keyframes: {} }]
+    };
+    expect(triggerShapeRule(timeScenario, {}, 'scenarios[0]')).toHaveLength(0);
+
+    const observerScenario = {
+      trigger: { type: 'scroll', scrub: false },
+      elements: [{ id: 'el-1', duration: 1.5, keyframes: {} }]
+    };
+    expect(triggerShapeRule(observerScenario, {}, 'scenarios[0]')).toHaveLength(0);
+  });
 });

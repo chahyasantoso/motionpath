@@ -19,7 +19,7 @@ export const cssVarPlugin = {
     });
     return { percentPatch, tweenVars: {} };
   },
-  compose(rawData) {
+  compose(rawData, elementCfg) {
     const patch = {};
     for (const key of Object.keys(rawData)) {
       if (key.startsWith('--')) patch[key] = rawData[key];

@@ -28,7 +28,6 @@ describe('builder unit and integration tests', () => {
     it('two properties contributing to different percent keys', async () => {
       const pluginA = {
         keys: ['propA'],
-        getNaturalValue: () => 0,
         contribute: (prop, stops) => ({
           percentPatch: { '0%': { propA: 10 } },
           tweenVars: {}
@@ -36,7 +35,6 @@ describe('builder unit and integration tests', () => {
       };
       const pluginB = {
         keys: ['propB'],
-        getNaturalValue: () => 0,
         contribute: (prop, stops) => ({
           percentPatch: { '100%': { propB: 20 } },
           tweenVars: {}
@@ -447,10 +445,11 @@ describe('builder unit and integration tests', () => {
       expect('blur' in proxy).toBe(true);
       expect(proxy.blur).toBeGreaterThan(0);
 
-      // (b) domNode must not have been touched by the builder at all
+      // (b) domNode must not have been resolved by the builder at all (strictly no build-time DOM reads)
+      expect(deps.resolveElement).not.toHaveBeenCalled();
       expect(styleSetSpy).not.toHaveBeenCalled();
       expect(setAttributeSpy).not.toHaveBeenCalled();
-      expect(domNode).toBe(mockDom);
+      expect(domNode).toBeUndefined();
     });
   });
 });

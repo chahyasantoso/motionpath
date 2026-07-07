@@ -110,5 +110,19 @@ export function triggerShapeRule(scenario, context, path) {
     });
   }
 
+  // element duration present + (type === "scroll" && scrub === true) -> error.
+  if (isScrub && Array.isArray(scenario.elements)) {
+    scenario.elements.forEach((element, idx) => {
+      if (element && element.duration !== undefined && element.duration !== null) {
+        errors.push({
+          ruleId: "trigger-shape",
+          severity: "error",
+          message: `duration is incompatible with scroll-scrub triggers (found on element '${element.id || 'unknown'}').`,
+          path: `${path}.elements[${idx}].duration`
+        });
+      }
+    });
+  }
+
   return errors;
 }

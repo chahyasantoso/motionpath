@@ -1,8 +1,10 @@
-# MotionPath — Implementation Brief 2: Shared Builder
+# MotionPath — Implementation Brief 2: Shared Builder (Consolidated)
 
-**Status:** Design-complete. Standalone spec — implement against this document only.
+**Status:** Design-complete. Fix-note 2b (Explicit Two-Stop Keyframes — removal of direction inference) applied directly into this document.
 
-**Precondition (do not re-verify):** input schema has already passed `validateProject` (Brief 1) with zero errors. This module must **not** re-implement any schema-validation rule from Brief 1. If it receives invalid schema, undefined behavior is acceptable — that is not a bug in this module.
+**Editorial note on this merge:** the original Brief 2 implemented direction inference (`resolveDirection()`, `getNaturalValue()`, and Addendum A's natural-value seeding). All three are removed here per the locked "Explicit Two-Stop Keyframes" schema addendum: every property now arrives with ≥2 explicit stops, enforced upstream by Brief 1's validator, so there is nothing left to infer or seed. Every place this touches is marked **[REMOVED — see note]** inline so the diff against your original is traceable. No other content changed.
+
+**Precondition (do not re-verify):** input schema has already passed `validateProject` (Brief 1) with zero errors, including the ≥2-stops rule. This module must **not** re-implement any schema-validation rule from Brief 1. If it receives invalid schema, undefined behavior is acceptable — that is not a bug in this module.
 
 ---
 
@@ -17,6 +19,7 @@ Rules for this implementation, non-negotiable:
 - **If a §8 test case fails, the code is wrong — fix the code, do not adjust the test to match the code's actual behavior.**
 - **Do not touch anything under §7 (Non-Goals).** ScrollTrigger creation, `.play()`, `compose()`, `subscribe()` are explicitly other modules' jobs. Building them "since it seemed related" is a spec violation, not a bonus.
 - **GSAP must tween a plain object proxy, never the DOM node directly.** This is the single easiest shortcut to take by accident, because tweening the DOM node "just works" for simple properties and looks correct in a quick test. It silently breaks the moment `blur`/`brightness`/`path` (synthetic properties with no CSS equivalent, per architecture doc §3–§4) are used, and it breaks the broadcast/compose split (§2) that another module depends on. See §5 — read it before writing the element-build loop.
+- **Do not implement direction inference or natural-value lookups.** `resolveDirection()` and `getNaturalValue()` do not exist in this version of the plugin contract. Every property's `stops` array already contains ≥2 explicit entries by the time it reaches this module — treat that as a hard precondition, not something to check or work around.
 
 ---
 
@@ -63,9 +66,10 @@ interface TimelineGroupBuild {
 
 interface ElementBuild {
   proxy: Record<string, unknown>;   // GSAP's actual tween target. Engine's subscribe() reads from this every tick.
-  domNode: Element;                 // resolved via deps.resolveElement — used ONLY for getNaturalValue() during
-                                     // direction resolution (§4) and later handed to the engine for compose()'s
-                                     // eventual gsap.set() write-back. This module never writes to domNode itself.
+  domNode: Element;                 // resolved via deps.resolveElement — stored purely for the engine's later
+                                     // compose()/gsap.set() write-back. This module never reads from or writes
+                                     // to domNode at all now [REMOVED — see note: was also used for
+                                     // getNaturalValue() during direction resolution; that call site is gone].
 }
 
 interface BuildResult {
@@ -94,7 +98,6 @@ interface Plugin {
   keys: string[];                 // keyframe property names this plugin owns, e.g. ["x","y","z"]
   lazy?: boolean;                 // true only for splitText/morphSVG/drawSVG/scrambleText
   load?: () => Promise<void>;     // required if lazy is true; must be idempotent (see below)
-  getNaturalValue(propertyKey: string, domNode: Element): number | string;
   contribute(
     propertyKey: string,
     stops: Array<{ p: number; v: number | string; ease?: string }>,
@@ -105,6 +108,8 @@ interface Plugin {
   // that's a different module's responsibility.
 }
 ```
+
+**[REMOVED — see note]** `getNaturalValue(propertyKey: string, domNode: Element): number | string;` no longer exists on this interface. No plugin implements it; nothing calls it.
 
 **Lazy plugin loading rule — implement exactly this, it is a known correctness trap:**
 Two elements using the same lazy plugin (e.g. two elements both using `splitText`) in the same build pass must trigger only **one** dynamic import, not two. Cache the load with a **module-level promise**, not a boolean flag:
@@ -132,42 +137,22 @@ Resolve and cache each element's plugin list **once**, at build time, in `elemen
 
 ---
 
-## 4. Direction Resolution (pure function, run before `contribute()` for any property with a `stops` array)
+## 4. Direction Resolution
 
-```ts
-function resolveDirection(
-  stops: Array<{ p: number; v: number | string; ease?: string }>,
-  direction: string | undefined,
-  naturalValue: number | string
-): Array<{ p: number; v: number | string; ease?: string }>
-```
-
-By the time this runs, Brief 1 guarantees the input is already in one of exactly three valid shapes — **do not add handling for other shapes, do not add error-throwing here, that's Brief 1's job and re-implementing it here is duplicated logic that can drift out of sync:**
-
-| Input shape | Output |
-|---|---|
-| `stops.length >= 2` | Return `stops` unchanged. |
-| `stops.length === 1`, `p` within `0.001` of `0` | Return `[stops[0], { p: 1, v: naturalValue }]` |
-| `stops.length === 1`, `p` within `0.001` of `1` | Return `[{ p: 0, v: naturalValue }, stops[0]]` |
-
-**Test cases (must pass exactly):**
-- `resolveDirection([{p:0,v:10}], undefined, 0)` → `[{p:0,v:10},{p:1,v:0}]`
-- `resolveDirection([{p:1,v:10}], undefined, 0)` → `[{p:0,v:0},{p:1,v:10}]`
-- `resolveDirection([{p:0,v:10},{p:1,v:20}], "fromTo", 0)` → returns the two stops unchanged, untouched by `direction` at all
-- `resolveDirection([{p:0.0007,v:5}], undefined, 0)` → treated as `p≈0` (within epsilon), same as first case
+**[REMOVED — see note]** This section, its `resolveDirection()` function, its input/output table, and its test cases have been deleted in full. Direction inference does not exist in this schema version — every property's `stops` array already contains ≥2 explicit entries, enforced upstream by Brief 1. There is no pre-pass before `contribute()` anymore; stops from schema are used as-is.
 
 ---
 
 ## 5. Element Build — Merge Pipeline (implement in this exact order)
 
-**0. Before processing any property:** create `const proxy: Record<string, unknown> = {}` for this element. Resolve `const domNode = deps.resolveElement(element.id)`. `domNode` is used **only** for `getNaturalValue()` calls in step 3 below — it is never the tween target and this module never writes to it (no `.style` mutation, no `gsap.set()` on it). Both `proxy` and `domNode` get stored in the final `ElementBuild` (§2) for the engine layer to use later.
+**0. Before processing any property:** create `const proxy: Record<string, unknown> = {}` for this element. Resolve `const domNode = deps.resolveElement(element.id)`. `domNode` is stored in the final `ElementBuild` (§2) purely for the engine layer to use later — **[REMOVED — see note]** it is not read by this module at all now (previously used for `getNaturalValue()` calls; that call site is gone). It is never the tween target and this module never writes to it (no `.style` mutation, no `gsap.set()` on it). Both `proxy` and `domNode` get stored in the final `ElementBuild` (§2).
 
 For each element in a scenario, in `keyframes` key declaration order:
 
 1. Resolve owning plugin via `keys` lookup (build this lookup once, at module load, from the static plugin registry — not per element, not per property).
 2. `await ensureLoaded(plugin)`.
-3. Get `stops` for this property key. Run `resolveDirection` (§4) if the property carries a plain `stops` array (this includes `path.stops` — path's `points` is separate static data, untouched by direction resolution, passed through as-is inside `elementCfg`). `resolveDirection`'s `naturalValue` argument comes from `plugin.getNaturalValue(propertyKey, domNode)` — this is the one legitimate read of `domNode` in this whole module.
-4. Call `plugin.contribute(propertyKey, effectiveStops, elementCfg)` → `{ percentPatch, tweenVars }`.
+3. Get `stops` for this property key **directly from schema — use as-is.** **[REMOVED — see note]** No `resolveDirection` call, no natural-value lookup. Every property (including `path.stops`; `path.points` remains separate static data, passed through as-is inside `elementCfg`) already has ≥2 explicit stops by the time this module sees it — that is a precondition, not something built here.
+4. Call `plugin.contribute(propertyKey, stops, elementCfg)` → `{ percentPatch, tweenVars }`.
 5. **Deep-merge `percentPatch` into one shared object, per element, keyed by percent-string.** This must be a real per-key merge, not a shallow overwrite of the whole percent key:
 
 ```ts
@@ -246,11 +231,12 @@ Do not implement any of the following in this module. Each is either another mod
 
 - **No `ScrollTrigger` creation, no `.play()`, no `.scrollTrigger` config attachment.** This module only constructs paused GSAP timeline/tween objects. Wiring them to real scroll/time playback is `ProductionEngine`'s job.
 - **No `compose()` or `subscribe()` implementation.** Those are engine-layer, not builder-layer. This module's only obligation toward them is returning `elementPlugins` so the engine can call `plugin.compose()` itself, later, elsewhere.
-- **No re-validation of anything Brief 1 already checks** (trigger shape, ease collision at the schema level, timeline group rules, `stagger` non-negativity, etc.). Assume the input is valid. Re-checking it here is duplicated logic, not extra safety.
+- **No re-validation of anything Brief 1 already checks** (trigger shape, ease collision at the schema level, timeline group rules, `stagger` non-negativity, minimum-two-stops, etc.). Assume the input is valid. Re-checking it here is duplicated logic, not extra safety.
 - **No `offset`/overlap support for `timelineId` groups.** Not in this schema version. Sequential-by-declaration-order only (§6). Do not add a position argument to `master.add()` beyond the default.
 - **No `id` → DOM resolution logic.** `resolveElement` is injected (§2); this module calls it, never implements `querySelector` itself.
 - **No `schemaVersion` checking.** That's Brief 1's job, already run before this module is invoked.
 - **No caching/memoization beyond what's specified** (lazy plugin load promise, per-element plugin resolution). Do not add a generic "build cache" layer speculatively.
+- **[REMOVED — see note] No direction inference, no natural-value lookup, no proxy seeding.** These do not exist in this schema version. Do not reintroduce `resolveDirection()`, `getNaturalValue()`, or any pre-`contribute()` stop-augmentation step.
 
 ---
 
@@ -264,7 +250,7 @@ Do not implement any of the following in this module. Each is either another mod
 
 ## 9. Testing Requirements
 
-- `resolveDirection` — pure function, test every row of the §4 table directly, no GSAP or DOM needed.
+- **[REMOVED — see note]** `resolveDirection` test suite deleted — the function no longer exists.
 - Merge pipeline (§5) — test with a **mock plugin registry** (fake `contribute()` implementations returning controlled `percentPatch`/`tweenVars`), not real GSAP plugins. Required cases:
   - Two properties contributing to different percent keys → both present in final `sharedKeyframes`, independently.
   - Two properties contributing to the *same* percent key, different props (e.g. one contributes `x`, another `opacity`, both at `"50%"`) → both present in the merged object at that key (proves deep-merge, not overwrite).
@@ -274,33 +260,17 @@ Do not implement any of the following in this module. Each is either another mod
 - Scenario/group construction (§6) — assert stagger offsets are applied at the correct positions; assert grouped scenarios nest in declaration order under one master; assert `primaryScenarioIndex` is correctly recorded.
 - One end-to-end test: a small valid 2-scenario project (one grouped pair) → `buildProject` resolves without throwing, returns a `BuildResult` with the expected shape, and every returned timeline has `paused: true`.
 - **Proxy-not-DOM test (critical — this is the one shortcut most likely to slip through):** build an element using a synthetic property (e.g. `blur`), advance the returned tween's progress (`tween.progress(0.5)`), then assert (a) `proxy.blur` (or whichever proxy key the plugin uses) changed, and (b) the mock `domNode`'s style/attributes were **not** touched by this module at all. If this test fails, the builder is tweening the DOM node directly — a spec violation, not a passing edge case.
+- **New, replacing the removed direction tests:** feed `contribute()` a property with exactly 2 explicit stops (no natural-value involvement possible) and assert the builder never calls anything resembling a natural-value/direction step — i.e. assert no such function exists to call, and that `stops` reaching `contribute()` are byte-identical to the schema's declared stops (proves nothing was injected or mutated upstream).
 
 ---
 
-## Addendum A — Single-Call Proxy Seeding (supersedes §5 step 3's implicit seeding behavior)
+## Addendum A — Single-Call Proxy Seeding
 
-**Problem found in review:** the initial implementation seeds the proxy's starting value (e.g. `brightness`'s natural value is `1`, not `0`) by calling `plugin.contribute()` **twice** per property — once with a synthetic `{p:0, v:naturalValue}` stop purely to discover the seed, then again with the real stops. This is more complex than the problem requires, and it was shipped effectively untested: the one test exercising this path used a property whose real stops already included `p:0`, so the seeding branch never actually ran.
-
-**Corrected approach — one `contribute()` call, always:**
-
-After `resolveDirection` (§4) produces the effective stops for a property, before calling `contribute()`:
-
-```ts
-const hasZeroStop = effectiveStops.some(s => Math.abs(s.p - 0) < 0.001);
-const stopsForContribute = hasZeroStop
-  ? effectiveStops
-  : [{ p: 0, v: naturalValue }, ...effectiveStops];
-```
-
-Then call `plugin.contribute(propertyKey, stopsForContribute, elementCfg)` exactly once. The seed value flows through the normal merge path in §5 like any other stop — no second call, no side channel, no ordering-dependent "first plugin to run claims the proxy's initial key" behavior.
-
-**Why this is strictly better, not just shorter:** the double-call version has a real correctness gap — if two different plugins happened to seed the *same* underlying proxy key (not currently possible with the defined plugin set, but not structurally prevented either), whichever ran second would silently win with no collision check, since the seeding call bypassed the normal `percentPatch` merge entirely. The single-call version has no such gap: the seed stop goes through the exact same deep-merge and collision-detection logic as every other stop, so any future collision is caught by the existing rules in §5.5–§5.7 automatically, not by a separate mechanism that has to be reasoned about independently.
-
-**Test requirement, replacing the previous under-tested case:** add a test using a property whose real stops do **not** include a `p≈0` entry (e.g. `brightness` stops starting at `p:0.3`) and assert the resulting `sharedKeyframes["0%"]` contains the natural value — this is the actual case the seeding logic exists for, and it must be the one under test, not a case where the seed is a no-op.
+**[REMOVED — see note]** This addendum is fully superseded and deleted. It existed to fix a bug in the old natural-value seeding mechanism (`resolveDirection` + `getNaturalValue`), which no longer exists at all per the Explicit Two-Stop Keyframes schema addendum. There is nothing left to seed — every property already declares its own explicit start/end stops in schema, so `contribute()` is called once with exactly those stops, with no synthetic `p:0` entry ever injected by this module. If you are looking at older Gemini output that still contains a natural-value seeding branch, that is dead code from before this fix-note and must be deleted, not preserved.
 
 ---
 
-## Addendum C — `trigger.delay` Handling (new requirement, found while designing Brief 4/5)
+## Addendum C — `trigger.delay` Handling
 
 **Gap:** the current implementation has no handling for the schema's `trigger.delay` field at all. `delay` is only valid on `type:"time"` and `type:"scroll",scrub:false` (Brief 1 already enforces this). Per architecture §10, delay "becomes literal dead space at the front of an observer's scrubbable range" — GSAP bakes `delay` into a timeline's **total duration**. That means it must be applied here, in the builder, not in `ProductionEngine` or `EditorEngine` — both engines need to see the same total duration (one plays it, one scrubs through it), so this is shared timing data, not a playback concern either engine owns individually.
 
@@ -315,3 +285,14 @@ if ((scenario.trigger.type === "time" || (scenario.trigger.type === "scroll" && 
 
 - Only applies to the scenario's own timeline, not the group's master — if this scenario is later nested into a `timelineId` group, the delay is already part of its duration and carries through naturally via `master.add(scenarioTimeline)`'s default sequential positioning. Do not also apply `.delay()` to the master timeline; that would double the delay for grouped scenarios.
 - Test: a `type:"time"` scenario with `delay: 0.5` → assert the built `scenarioTimeline`'s total duration reflects the added delay (`scenarioTimeline.totalDuration()` increases by `0.5` versus an identical scenario with no `delay`).
+
+---
+
+## Verification Checklist (fix-note 2b specifics)
+
+1. Grep for `resolveDirection` across the builder source — zero results.
+2. Grep for `getNaturalValue` across the builder and every plugin file — zero results.
+3. Grep for `direction` as a schema/elementCfg field read anywhere in the builder — zero results.
+4. Confirm no build-time `domNode` read remains for the purpose of direction/natural-value inference — a targeted DOM-read spy test (same style as the existing proxy-not-DOM test) should show zero calls to `domNode` for this purpose.
+5. Behavioral test: a 2-stop property builds correctly with `contribute()` called exactly once, no pre-pass invoked.
+6. Existing proxy-not-DOM test, ease-collision test, and merge tests (§9, unaffected cases) still pass unmodified — confirms this fix-note didn't touch anything outside its stated scope.
