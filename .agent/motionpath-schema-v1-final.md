@@ -42,7 +42,7 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
 | `sceneId` | string | yes | Default trigger element; groups scenarios for the element-uniqueness rule. |
 | `trigger` | object | yes | **One trigger type per scenario, no exceptions.** See Trigger below. |
 | `timelineId` | string | no | Groups scenarios into one real GSAP master timeline. Only scenarios of **identical trigger type** may share a value (scrub-with-scrub, or time-with-time). Scroll **observer** scenarios can never carry this — build-time error if present. Children nest under the master **in schema-declaration order**, GSAP's default sequential positioning — no offset/overlap field exists in v1 (see Wishlist). |
-| `primary` | boolean | no | Exactly one `true` per `timelineId` group. Scrub groups: primary's trigger config (`start`/`end`/`pin`/etc.) is the one real ScrollTrigger; others only declare `type`/`scrub` compatibility. Time groups: primary's `repeat`/`yoyo`/`repeatDelay` apply to the whole nested group. Zero or 2+ per group is a build-time error. |
+| `primary` | boolean | no | Exactly one `true` per `timelineId` group. Scrub groups: primary's trigger config (`start`/`end`/`pin`/etc.) is the one real ScrollTrigger; others only declare `type`/`scrub` compatibility. Time groups: primary's `repeat`/`yoyo`/`repeatDelay` apply to the whole nested group. Non-primary scenarios are forbidden from declaring trigger fields (`start`, `end`, `pin`, `pinSpacing`, `snap`, `repeat`, `yoyo`, `repeatDelay`) — build-time error. Zero or 2+ primary per group is a build-time error. |
 | `stagger` | number (seconds) | no | Each element's start offset = `index * stagger`, index = declaration order in `elements[]`. Manual per-element positional offset in the build loop — **not** GSAP's native `stagger` vars option (rejected: requires uniform tween shapes across targets, incompatible with our per-element merged keyframe model). Non-negative; validator warns if set with <2 elements. |
 | `elements` | array | yes | See Element below. |
 
@@ -90,7 +90,7 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | string | yes | **Logical identifier, not a CSS selector.** Resolved via `document.querySelector('[data-motion-id="${id}"]')` at `initScene` time — decouples animation targeting from page styling/structure. Must be unique within a scenario's element list. Missing markup is a **runtime** error (separate validation phase from static schema checks — needs a live DOM). |
-| `duration` | number (seconds) | no | Overrides scenario duration; observer/time-scoped only. |
+| `duration` | number (seconds) | no | Overrides scenario duration; observer/time-scoped only. Forbidden on scrub scenarios — build-time error. |
 | `transformOrigin` | string | no | e.g. `"50% 50%"`. Direct CSS pass-through. |
 | `keyframes` | object | yes | Flat — each key is an animatable property. |
 
