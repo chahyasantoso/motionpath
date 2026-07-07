@@ -1,27 +1,7 @@
 import { gsap } from 'gsap';
 import { resolvePluginForKey } from './plugins.js';
 
-export function resolveDirection(stops, direction, naturalValue) {
-  if (!stops || stops.length >= 2) {
-    return stops || [];
-  }
-  if (stops.length === 1) {
-    const stop = stops[0];
-    if (Math.abs(stop.p - 0) < 0.001) {
-      return [
-        { ...stop },
-        { p: 1, v: naturalValue }
-      ];
-    }
-    if (Math.abs(stop.p - 1) < 0.001) {
-      return [
-        { p: 0, v: naturalValue },
-        { ...stop }
-      ];
-    }
-  }
-  return stops;
-}
+
 
 // Module-level Map persists across buildProject calls — concurrent calls for
 // the same plugin share the same in-flight Promise, preventing double-load.
@@ -97,15 +77,8 @@ export async function buildProject(schema, deps) {
 
         const propConfig = keyframes[propKey];
         const rawStops = propConfig?.stops || [];
-        const naturalValue = plugin.getNaturalValue(propKey, domNode);
-        const effectiveStops = resolveDirection(rawStops, element.direction, naturalValue);
 
-        const hasZeroStop = effectiveStops.some(s => Math.abs(s.p - 0) < 0.001);
-        const stopsForContribute = hasZeroStop
-          ? effectiveStops
-          : [{ p: 0, v: naturalValue }, ...effectiveStops];
-
-        const contribution = plugin.contribute(propKey, stopsForContribute, element);
+        const contribution = plugin.contribute(propKey, rawStops, element);
         const percentPatch = contribution?.percentPatch || {};
         const tweenVars = contribution?.tweenVars || {};
 

@@ -14,12 +14,7 @@ describe('cssVarPlugin & resolvePluginForKey', () => {
     });
   });
 
-  it('cssVarPlugin getNaturalValue reads CSS variable value from DOM', () => {
-    const val = cssVarPlugin.getNaturalValue('--custom-offset', mockDom);
-    const mockStyles = global.getComputedStyle(mockDom);
-    expect(mockStyles.getPropertyValue).toHaveBeenCalledWith('--custom-offset');
-    expect(val).toBe('15px');
-  });
+
 
   it('cssVarPlugin contribute passes CSS variable string values through unchanged', () => {
     const stops = [

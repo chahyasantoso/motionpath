@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateProject } from '../index.js';
-import { directionAmbiguityRule } from '../rules/direction-ambiguity.js';
+import { stopCountRule } from '../rules/stop-count.js';
 import { pathXYExclusivityRule } from '../rules/path-xy-exclusivity.js';
 import { pathShapeRule } from '../rules/path-shape.js';
 import { timelineGroupRule } from '../rules/timeline-group.js';
@@ -57,9 +57,10 @@ describe('validateProject integration tests', () => {
               id: 'el-1',
               keyframes: {
                 path: {
-                  points: [{}, {}, {}] // rule: path-shape (invalid points count)
+                  points: [{}, {}, {}], // rule: path-shape (invalid points count)
+                  stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
                 },
-                x: { stops: [{ p: 0, v: 0 }] } // rule: path-xy-exclusivity (path & x present)
+                x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 10 }] } // rule: path-xy-exclusivity (path & x present)
               }
             }
           ]
@@ -110,7 +111,7 @@ describe('validateProject integration tests', () => {
 
   it('every rule function has the correct arity for its type', () => {
     const scenarioRules = [triggerShapeRule, easeCollisionRule, staggerShapeRule, perspectiveUsageRule];
-    const elementRules = [directionAmbiguityRule, pathXYExclusivityRule, pathShapeRule];
+    const elementRules = [stopCountRule, pathXYExclusivityRule, pathShapeRule];
     const crossScenarioRules = [timelineGroupRule, elementUniquenessRule];
 
     scenarioRules.forEach(rule => expect(rule.length).toBe(3));   // (scenario, context, path)
@@ -122,9 +123,9 @@ describe('validateProject integration tests', () => {
     const scenario = {};
     const realPath = 'scenarios[0].elements[0]';
 
-    // 1. directionAmbiguityRule
+    // 1. stopCountRule
     const elementDA = { keyframes: { opacity: { stops: [{ p: 0.5 }] } } };
-    const errorsDA = directionAmbiguityRule(elementDA, scenario, 'not-a-context-object', realPath);
+    const errorsDA = stopCountRule(elementDA, scenario, 'not-a-context-object', realPath);
     expect(errorsDA.length).toBeGreaterThan(0);
     errorsDA.forEach(e => expect(e.path.startsWith(realPath)).toBe(true));
 

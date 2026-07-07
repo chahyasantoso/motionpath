@@ -1,8 +1,8 @@
 const filterKeyMap = {
-  blur: '__blur',
-  brightness: '__brightness',
-  contrast: '__contrast',
-  saturate: '__saturate'
+  blur: 'blur',
+  brightness: 'brightness',
+  contrast: 'contrast',
+  saturate: 'saturate'
 };
 
 const naturalDefaults = {
@@ -24,11 +24,7 @@ export function createFilterPropertyPlugin(propKey) {
     keys: [propKey],
     lazy: false,
     claimsKey(key) {
-      return key === propKey || key === proxyKey;
-    },
-    getNaturalValue(key) {
-      // Returns identity value for synthetic fields (no DOM access)
-      return naturalDefaults[key];
+      return key === propKey;
     },
     contribute(key, stops) {
       const percentPatch = {};
@@ -45,10 +41,10 @@ export function createFilterPropertyPlugin(propKey) {
       if (rawData[proxyKey] === undefined) return {};
       const val = rawData[proxyKey];
       const filterFnMap = {
-        __blur: `blur(${val}px)`,
-        __brightness: `brightness(${val})`,
-        __contrast: `contrast(${val})`,
-        __saturate: `saturate(${val})`,
+        blur: `blur(${val}px)`,
+        brightness: `brightness(${val})`,
+        contrast: `contrast(${val})`,
+        saturate: `saturate(${val})`,
       };
       return { [proxyKey + '_filter']: filterFnMap[proxyKey] };
     }

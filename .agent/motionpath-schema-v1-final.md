@@ -83,7 +83,6 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
   "id": "sprinkle1",
   "duration": 0.8,
   "transformOrigin": "50% 50%",
-  "direction": "from",
   "keyframes": { /* ... */ }
 }
 ```
@@ -93,24 +92,7 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
 | `id` | string | yes | **Logical identifier, not a CSS selector.** Resolved via `document.querySelector('[data-motion-id="${id}"]')` at `initScene` time — decouples animation targeting from page styling/structure. Must be unique within a scenario's element list. Missing markup is a **runtime** error (separate validation phase from static schema checks — needs a live DOM). |
 | `duration` | number (seconds) | no | Overrides scenario duration; observer/time-scoped only. |
 | `transformOrigin` | string | no | e.g. `"50% 50%"`. Direct CSS pass-through. |
-| `direction` | `"to"` \| `"from"` \| `"fromTo"` | no | See Direction Resolution below. |
 | `keyframes` | object | yes | Flat — each key is an animatable property. |
-
----
-
-## Direction Resolution
-
-Pre-pass, runs before any plugin's `contribute()`, **per property**:
-
-| Stops | `direction` | Result |
-|---|---|---|
-| 2+ | any | Ignored — fully explicit already. |
-| 1, `p`≈0 | omitted | Inferred `"from"` — natural/current value injected at `p:1`. |
-| 1, `p`≈1 | omitted | Inferred `"to"` — natural/current value injected at `p:0`. |
-| 1, `p` elsewhere | omitted | **Build-time error** — ambiguous, no positional precedent. |
-| 1 | `"fromTo"` | **Build-time error** — needs 2 stops. |
-
-Natural/default value is plugin-supplied: computed CSS style for real properties, identity value (e.g. `0` for blur, `1` for brightness) for synthetic proxy fields with no DOM representation.
 
 ---
 
@@ -123,7 +105,7 @@ Natural/default value is plugin-supplied: computed CSS style for real properties
 }
 ```
 
-**Stops format:** `p` = progress 0–1, `v` = value (number or string), `ease` = optional, set per-entry.
+**Stops format:** `p` = progress 0–1, `v` = value (number or string), `ease` = optional, set per-entry. **Each animated property must explicitly declare at least two stops (minimum length >= 2). Single-stop shorthand is not allowed.**
 
 | Property | Type | Unit |
 |---|---|---|
@@ -140,7 +122,7 @@ Natural/default value is plugin-supplied: computed CSS style for real properties
 
 `path` and `x`/`y` are **mutually exclusive** per element — build-time error if both present.
 
-**Filter consolidation:** `blur`/`brightness`/`contrast`/`saturate` never write to `filter` directly during tweening — each writes to its own internal proxy field (`__blur`, `__brightness`, etc.). Only `compose()` reads whichever are present and emits one combined `{ filter: "blur(4px) brightness(1.1)" }`.
+**Filter consolidation:** `blur`/`brightness`/`contrast`/`saturate` never write to `filter` directly during tweening — each writes to its own internal proxy field (`blur`, `brightness`, etc.). Only `compose()` reads whichever are present and emits one combined `{ filter: "blur(4px) brightness(1.1)" }`.
 
 ### Path
 
@@ -159,7 +141,7 @@ Natural/default value is plugin-supplied: computed CSS style for real properties
 ```
 
 - `points` — **raw waypoints** (`{x, y, z?, ctrlX?, ctrlY?, ctrlZ?}`), minimum 2. **Not** a pre-converted cubic Bézier array — the path plugin's `contribute()` converts internally via `convertToCubicPath()` at build time (quadratic-style control-point elevation to cubic), once per element. Authors/AI agents never construct the cubic form directly; doing so and feeding it in as `points` would be silently double-converted and produce a wrong curve. `ctrlX`/`ctrlY` are optional per waypoint — omit both for a straight segment into that point; providing only one is a validation error. `ctrlX`/`ctrlY` on the first waypoint have no effect (no preceding segment to curve) and are flagged as a warning.
-- `stops` — structurally identical to every other property, **except** `v` is constrained to `[0, 1]`, representing fractional progress along the path. Drives synthetic `__pathProgress` through the standard keyframes mechanism; `compose()` resolves `__pathProgress` + the internally-converted cubic path into `{x, y, z, rotation}` via `getPointOnCubicPath()`.
+- `stops` — structurally identical to every other property, **except** `v` is constrained to `[0, 1]`, representing fractional progress along the path (requires at least 2 entries). Drives synthetic `pathProgress` through the standard keyframes mechanism; `compose()` resolves `pathProgress` + the internally-converted cubic path into `{x, y, z, rotation}` via `getPointOnCubicPath()`.
 - `autoRotate` (boolean, optional, sibling of `points`/`stops` inside the `path` object) — when `true`, `compose()` also emits `rotation`, aligned to the path's tangent direction at the current progress. Omit or `false` for no automatic rotation.
 - `MotionPathPlugin` is explicitly **not used** — empirically measured 121px max positional drift against per-segment keyframe pacing (motionPath tracks its own internal tween time, not the custom property's value).
 
@@ -197,7 +179,7 @@ Two properties contributing different `ease` values at the same literal `p` perc
 
 ## Engine Notes (non-schema, for implementers)
 
-- GSAP tweens a **plain per-element proxy object**, never the DOM node directly — synthetic properties (`__blur`, `__pathProgress`) have no DOM equivalent, and the broadcast/compose split depends on a proxy target. `domNode` is used only for `getNaturalValue()` during direction resolution.
+- GSAP tweens a **plain per-element proxy object**, never the DOM node directly — synthetic properties (`blur`, `pathProgress`) have no DOM equivalent, and the broadcast/compose split depends on a proxy target.
 - `subscribe(elementId, callback)` broadcasts **raw** proxy values every tick. `compose(elementId, data)` — public method, not hook-internal — runs active plugins' `compose()` and merges into a DOM-ready patch.
 - Element `id` → DOM resolution (`data-motion-id`) is a distinct, runtime-only validation phase — separate from static schema validation, since it requires a live DOM.
 

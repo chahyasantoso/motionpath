@@ -29,7 +29,7 @@ Determines whether this plugin **owns** a given data key at **runtime**.
 This is the central method for plugin resolution and is the reason the engine stays decoupled from individual plugin details. `claimsKey` must return `true` for:
 
 1. **Public schema keys** — the same strings found in `keys[]`. e.g. `'blur'`, `'path'`.
-2. **Private synthetic proxy keys** — internal keys the plugin writes into the proxy object that the engine later reads back. e.g. `'__blur'`, `'__pathProgress'`, `'__cubicPath'`.
+2. **Synthetic proxy keys** — internal keys the plugin writes into the proxy object that the engine later reads back. e.g. `'pathProgress'`, `'cubicPath'`.
 3. **Pattern-based keys** — for open-ended namespaces like CSS custom properties where a finite `keys[]` array cannot be maintained.
 
 #### Why `keys.includes(key)` alone is not enough
@@ -37,8 +37,8 @@ This is the central method for plugin resolution and is the reason the engine st
 | Scenario | `keys.includes(key)` | `claimsKey(key)` |
 |---|---|---|
 | `cssVarPlugin` claiming `'--brand-color'` | ❌ (`keys: []`) | ✅ (`key.startsWith('--')`) |
-| `filterPlugin` claiming its proxy key `'__blur'` | ❌ (`keys: ['blur']`) | ✅ |
-| `pathPlugin` claiming `'__pathProgress'` | ❌ (`keys: ['path']`) | ✅ |
+| `filterPlugin` claiming its proxy key `'blur'` | ✅ | ✅ |
+| `pathPlugin` claiming `'pathProgress'` | ❌ (`keys: ['path']`) | ✅ |
 | `simplePlugin` claiming `'opacity'` | ✅ | ✅ (same result) |
 
 #### Implementations by plugin type
@@ -47,18 +47,14 @@ This is the central method for plugin resolution and is the reason the engine st
 |---|---|
 | `simpleProperty` | `key === propKey` |
 | `colorProperty` | `key === propKey` |
-| `filterProperty` | `key === propKey \|\| key === proxyKey` (e.g. `'blur' \|\| '__blur'`) |
-| `pathPlugin` | `key === 'path' \|\| key === '__pathProgress' \|\| key === '__cubicPath' \|\| key === '__autoRotate'` |
+| `filterProperty` | `key === propKey` (e.g. `'blur'`) |
+| `pathPlugin` | `key === 'path' \|\| key === 'pathProgress' \|\| key === 'cubicPath' \|\| key === 'autoRotate'` |
 | `cssVarPlugin` | `key.startsWith('--')` |
 | Lazy stubs | `key === 'splitText'` (etc.) |
 
-### `getNaturalValue(key, domNode): unknown`
+---
 
-Returns the **baseline value** for the property before any animation begins. The builder uses this as the implicit start/end value when an element only has one stop.
-
-- For GSAP transform properties: use `gsap.getProperty(domNode, key)`.
-- For color properties: use `getComputedStyle(domNode)[key]`.
-- For synthetic/filter properties (no DOM equivalent): return an identity value — `0` for blur, `1` for brightness/contrast/saturate.
+## Required Methods
 
 ### `contribute(key, stops, element?): ContributeResult`
 
@@ -77,16 +73,16 @@ Translates the **raw keyframe stops** from the schema into a `percentPatch` obje
 ```
 
 - The builder **deep-merges** patches from all plugins on an element, so multiple properties safely contribute to the same percent key.
-- The `path` plugin additionally seeds metadata at `0%` (`__cubicPath`, `__autoRotate`) that it needs in `compose()`.
+- The `path` plugin additionally seeds metadata at `0%` (`cubicPath`, `autoRotate`) that it needs in `compose()`.
 
-### `compose(rawData): object`
+### `compose(rawData, elementCfg): object`
 
 Translates the **current animated proxy state** into a CSS-ready style patch that is passed to `gsap.set(domNode, patch)`.
 
-- Read your property's current value from `rawData` (e.g. `rawData.__blur`).
+- Read your property's current value from `rawData` (e.g. `rawData.blur`).
 - Return a flat object of CSS properties (e.g. `{ filter: 'blur(2px)' }`).
 - Return `{}` when your property is absent from `rawData`.
-- Filter-family plugins return a key suffixed with `_filter` (e.g. `__blur_filter: 'blur(2px)'`). The engine collects all `*_filter` contributions and joins them into a single `filter` string to avoid collisions.
+- Filter-family plugins return a key suffixed with `_filter` (e.g. `blur_filter: 'blur(2px)'`). The engine collects all `*_filter` contributions and joins them into a single `filter` string to avoid collisions.
 
 ---
 
@@ -112,7 +108,7 @@ An async loader called once by the builder before the first `contribute()`. Only
 - [ ] Define `keys[]` with the public schema key(s).
 - [ ] Set `lazy: false` (or `true` + implement `load()`).
 - [ ] Implement `claimsKey(key)` — covers both public and private proxy keys.
-- [ ] Implement `getNaturalValue(key, domNode)` — returns the DOM baseline.
 - [ ] Implement `contribute(key, stops, element?)` — returns `{ percentPatch, tweenVars }`.
-- [ ] Implement `compose(rawData)` — returns a CSS-ready patch object.
+- [ ] Implement `compose(rawData, elementCfg)` — returns a CSS-ready patch object.
 - [ ] Register the plugin in `ALL_PLUGINS` in [`plugins.js`](file:///d:/dev/motionpath/src/lib/plugins.js).
+

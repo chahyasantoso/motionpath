@@ -174,7 +174,7 @@ function Bike() {
   // Scale up slightly as the bike accelerates across the screen
   const transform = useCallback((rawData, composeFn) => {
     const composed = composeFn(rawData);
-    const t = rawData.__pathProgress ?? 0;
+    const t = rawData.pathProgress ?? 0;
     const scale = 0.65 + t * 0.55;
     return { ...composed, scale };
   }, []);
@@ -190,7 +190,7 @@ function BikeShadow() {
   const ref = useRef(null);
   const transform = useCallback((rawData, composeFn) => {
     const composed = composeFn(rawData);
-    const t = rawData.__pathProgress ?? 0;
+    const t = rawData.pathProgress ?? 0;
     const scale = 0.5 + t * 0.4;
     return { ...composed, scale, scaleY: 0.28, skewX: -18, blur: 2 };
   }, []);

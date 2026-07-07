@@ -316,7 +316,7 @@ function Strawberry({ elementId, emoji }) {
 
   const transform = useCallback((rawData, composeFn) => {
     const point3D = composeFn(rawData);
-    const progress = rawData.__pathProgress ?? 0;
+    const progress = rawData.pathProgress ?? 0;
     const rotation = startRotation + (progress * 90);
 
     let blurVal = 0;
@@ -330,7 +330,7 @@ function Strawberry({ elementId, emoji }) {
 
     const composed = composeFn({
       ...rawData,
-      __blur: Math.round(blurVal * 10) / 10
+      blur: Math.round(blurVal * 10) / 10
     });
 
     return {

@@ -28,10 +28,10 @@ const filterPlugins = Object.fromEntries(filterKeys.map(k => [k, createFilterPro
 export { pathPlugin, cssVarPlugin };
 
 // Lazy plugin stubs
-export const splitTextPlugin    = { keys: ['splitText'],    lazy: true, claimsKey(k) { return k === 'splitText';    }, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
-export const morphSvgPlugin     = { keys: ['morphSVG'],     lazy: true, claimsKey(k) { return k === 'morphSVG';     }, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
-export const drawSvgPlugin      = { keys: ['drawSVG'],      lazy: true, claimsKey(k) { return k === 'drawSVG';      }, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
-export const scrambleTextPlugin = { keys: ['scrambleText'], lazy: true, claimsKey(k) { return k === 'scrambleText'; }, load: () => Promise.resolve(), contribute() {}, getNaturalValue() {} };
+export const splitTextPlugin    = { keys: ['splitText'],    lazy: true, claimsKey(k) { return k === 'splitText';    }, load: () => Promise.resolve(), contribute() {} };
+export const morphSvgPlugin     = { keys: ['morphSVG'],     lazy: true, claimsKey(k) { return k === 'morphSVG';     }, load: () => Promise.resolve(), contribute() {} };
+export const drawSvgPlugin      = { keys: ['drawSVG'],      lazy: true, claimsKey(k) { return k === 'drawSVG';      }, load: () => Promise.resolve(), contribute() {} };
+export const scrambleTextPlugin = { keys: ['scrambleText'], lazy: true, claimsKey(k) { return k === 'scrambleText'; }, load: () => Promise.resolve(), contribute() {} };
 
 export const ALL_PLUGINS = [
   ...Object.values(simplePlugins),

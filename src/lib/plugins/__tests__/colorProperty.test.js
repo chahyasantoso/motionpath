@@ -23,11 +23,7 @@ describe('colorProperty plugin factory', () => {
     expect(plugin.lazy).toBe(false);
   });
 
-  it('getNaturalValue reads CSS style value from DOM via computed styles', () => {
-    const val = plugin.getNaturalValue('backgroundColor', mockDom);
-    expect(global.getComputedStyle).toHaveBeenCalledWith(mockDom);
-    expect(val).toBe('rgb(255, 0, 0)');
-  });
+
 
   it('contribute passes color string values through unchanged', () => {
     const stops = [

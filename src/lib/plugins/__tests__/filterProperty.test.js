@@ -13,13 +13,6 @@ describe('filterProperty plugin factory', () => {
     expect(plugin.lazy).toBe(false);
   });
 
-  it('getNaturalValue returns preset numeric defaults (no DOM read)', () => {
-    expect(plugin.getNaturalValue('blur')).toBe(0);
-
-    const brightnessPlugin = createFilterPropertyPlugin('brightness');
-    expect(brightnessPlugin.getNaturalValue('brightness')).toBe(1);
-  });
-
   it('contribute maps stops to correct synthetic proxy keys, never to standard filter directly', () => {
     const stops = [
       { p: 0, v: 0 },
@@ -29,8 +22,8 @@ describe('filterProperty plugin factory', () => {
     const result = plugin.contribute('blur', stops);
 
     expect(result.percentPatch).toEqual({
-      '0%': { __blur: 0 },
-      '100%': { __blur: 15, ease: 'linear' }
+      '0%': { blur: 0 },
+      '100%': { blur: 15, ease: 'linear' }
     });
     expect(result.tweenVars).toEqual({});
 

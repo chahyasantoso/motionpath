@@ -11,9 +11,7 @@ export function createColorPropertyPlugin(propKey) {
     claimsKey(key) {
       return key === propKey;
     },
-    getNaturalValue(key, domNode) {
-      return getComputedStyle(domNode)[key] || 'transparent';
-    },
+
     contribute(key, stops) {
       const percentPatch = {};
       stops.forEach(stop => {

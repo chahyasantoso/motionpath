@@ -3,7 +3,7 @@ import { triggerShapeRule } from './rules/trigger-shape.js';
 import { easeCollisionRule } from './rules/ease-collision.js';
 import { staggerShapeRule } from './rules/stagger-shape.js';
 import { perspectiveUsageRule } from './rules/perspective-usage.js';
-import { directionAmbiguityRule } from './rules/direction-ambiguity.js';
+import { stopCountRule } from './rules/stop-count.js';
 import { pathXYExclusivityRule } from './rules/path-xy-exclusivity.js';
 import { pathShapeRule } from './rules/path-shape.js';
 import { timelineGroupRule } from './rules/timeline-group.js';
@@ -17,7 +17,7 @@ const scenarioRules = [
 ];
 
 const elementRules = [
-  directionAmbiguityRule,
+  stopCountRule,
   pathXYExclusivityRule,
   pathShapeRule,
 ];

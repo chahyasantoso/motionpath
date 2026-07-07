@@ -148,9 +148,9 @@ function Rocket({ offset = 0 }) {
 
   // transformFn receives rawData and composeFn
   const transform = useCallback((rawData, composeFn) => {
-    const progress = Math.max(0, Math.min(1, (rawData.__pathProgress ?? 0) + offset));
-    // Spread rawData to preserve __cubicPath and __autoRotate — only override progress
-    const composed = composeFn({ ...rawData, __pathProgress: progress });
+    const progress = Math.max(0, Math.min(1, (rawData.pathProgress ?? 0) + offset));
+    // Spread rawData to preserve cubicPath and autoRotate — only override progress
+    const composed = composeFn({ ...rawData, pathProgress: progress });
 
     return {
       ...composed,
@@ -180,7 +180,7 @@ function CarouselCard({ elementId, cardData }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
-    const cardProgress = rawData.__pathProgress ?? 0;
+    const cardProgress = rawData.pathProgress ?? 0;
 
     // Filter visibility (hide cards outside active path progress segment)
     if (cardProgress <= 0 || cardProgress >= 1) {
@@ -223,7 +223,7 @@ function HelixCard({ elementId, cardData }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
-    const cardProgress = rawData.__pathProgress ?? 0;
+    const cardProgress = rawData.pathProgress ?? 0;
 
     if (cardProgress <= 0 || cardProgress >= 1) {
       return {

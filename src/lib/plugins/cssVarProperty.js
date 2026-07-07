@@ -7,9 +7,7 @@ export const cssVarPlugin = {
   claimsKey(key) {
     return key.startsWith('--');
   },
-  getNaturalValue(propKey, domNode) {
-    return getComputedStyle(domNode).getPropertyValue(propKey) || '';
-  },
+
   contribute(propKey, stops) {
     const percentPatch = {};
     stops.forEach(stop => {

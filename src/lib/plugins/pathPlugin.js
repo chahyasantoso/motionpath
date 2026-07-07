@@ -8,16 +8,13 @@ export const pathPlugin = {
   keys: ['path'],
   lazy: false,
   claimsKey(key) {
-    return key === 'path' || key === '__pathProgress' || key === '__cubicPath' || key === '__autoRotate';
-  },
-  getNaturalValue() {
-    return 0; // Natural start of path progress
+    return key === 'path' || key === 'pathProgress' || key === 'cubicPath' || key === 'autoRotate';
   },
   contribute(propKey, stops, element) {
     const percentPatch = {};
     stops.forEach(stop => {
       const pctKey = `${stop.p * 100}%`;
-      percentPatch[pctKey] = { __pathProgress: Math.max(0, Math.min(1, Number(stop.v))) };
+      percentPatch[pctKey] = { pathProgress: Math.max(0, Math.min(1, Number(stop.v))) };
       if (stop.ease) {
         percentPatch[pctKey].ease = stop.ease;
       }
@@ -31,15 +28,15 @@ export const pathPlugin = {
       const pathConfig = element.keyframes.path;
       const points = pathConfig.points || [];
       percentPatch['0%'] = percentPatch['0%'] || {};
-      percentPatch['0%'].__cubicPath = convertToCubicPath(points);
-      percentPatch['0%'].__autoRotate = pathConfig.autoRotate === true;
+      percentPatch['0%'].cubicPath = convertToCubicPath(points);
+      percentPatch['0%'].autoRotate = pathConfig.autoRotate === true;
     }
 
     return { percentPatch, tweenVars: {} };
   },
   compose(rawData) {
-    if (rawData.__pathProgress === undefined || !rawData.__cubicPath) return {};
-    const pt = getPointOnCubicPath(rawData.__cubicPath, rawData.__pathProgress);
+    if (rawData.pathProgress === undefined || !rawData.cubicPath) return {};
+    const pt = getPointOnCubicPath(rawData.cubicPath, rawData.pathProgress);
     const patch = {
       x: pt.x,
       y: pt.y,
@@ -47,7 +44,7 @@ export const pathPlugin = {
       xPercent: -50,
       yPercent: -50
     };
-    if (rawData.__autoRotate) patch.rotation = pt.rotation;
+    if (rawData.autoRotate) patch.rotation = pt.rotation;
     return patch;
   }
 };

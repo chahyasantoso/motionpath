@@ -21,8 +21,8 @@ describe('EngineCore', () => {
     mockPlugin2 = {
       keys: ['blur'],
       compose: vi.fn((rawData) => {
-        if (rawData.__blur === undefined) return {};
-        return { __blur_filter: `blur(${rawData.__blur}px)` };
+        if (rawData.blur === undefined) return {};
+        return { blur_filter: `blur(${rawData.blur}px)` };
       })
     };
 
@@ -38,7 +38,7 @@ describe('EngineCore', () => {
       ],
       timelineGroups: new Map(),
       elements: new Map([
-        ['el-1', { proxy: { x: 10, __blur: 5 }, domNode: {} }]
+        ['el-1', { proxy: { x: 10, blur: 5 }, domNode: {} }]
       ]),
       elementPlugins: new Map([
         ['el-1', [mockPlugin1, mockPlugin2]]
@@ -66,7 +66,7 @@ describe('EngineCore', () => {
 
       // Simulate ticker tick
       tickerFn();
-      expect(cb).toHaveBeenCalledWith({ x: 10, __blur: 5 });
+      expect(cb).toHaveBeenCalledWith({ x: 10, blur: 5 });
 
       unsubscribe();
       expect(removeSpy).toHaveBeenCalledWith(tickerFn);
@@ -83,7 +83,7 @@ describe('EngineCore', () => {
       core.subscribe('el-1', callback);
       // No gsap.ticker advance here — zero ticks have occurred.
       expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(expect.objectContaining({ x: 10, __blur: 5 }));
+      expect(callback).toHaveBeenCalledWith(expect.objectContaining({ x: 10, blur: 5 }));
     });
 
     it('clears ticker callback on destroy()', () => {

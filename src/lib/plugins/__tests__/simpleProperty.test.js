@@ -23,25 +23,7 @@ describe('simpleProperty plugin factory', () => {
     expect(plugin.lazy).toBe(false);
   });
 
-  it('getNaturalValue queries GSAP property value', () => {
-    gsap.getProperty.mockReturnValue(0.7);
 
-    const mockDom = {};
-    const val = plugin.getNaturalValue('opacity', mockDom);
-
-    expect(gsap.getProperty).toHaveBeenCalledWith(mockDom, 'opacity');
-    expect(val).toBe(0.7);
-  });
-
-  it('getNaturalValue returns default fallback (1 for opacity, 0 for others) when query is empty', () => {
-    gsap.getProperty.mockReturnValue(null);
-
-    const mockDom = {};
-    expect(plugin.getNaturalValue('opacity', mockDom)).toBe(1);
-
-    const xPlugin = createSimplePropertyPlugin('x');
-    expect(xPlugin.getNaturalValue('x', mockDom)).toBe(0);
-  });
 
   it('contribute maps stops to correct percent keys and passes ease through', () => {
     const stops = [
