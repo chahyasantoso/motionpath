@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
+import { useEffect, useRef } from 'react';
 import { productionEngine } from '../lib/ProductionEngine';
 
 /**

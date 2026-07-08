@@ -1,0 +1,426 @@
+/* Pasar Malam Storytelling Hero Styles */
+
+:root {
+  --pm-bg: #03050d;
+  --pm-accent-gold: #ffd700;
+  --pm-accent-pink: #ff2e93;
+  --pm-accent-cyan: #00f0ff;
+  --pm-card-bg: rgba(10, 15, 30, 0.55);
+  --pm-card-border: rgba(255, 255, 255, 0.08);
+}
+
+.pm-container {
+  width: 100%;
+  background-color: var(--pm-bg);
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Hero Section (Scroll Scrollytelling Stage) */
+.pm-hero-section {
+  width: 100%;
+  height: 300vh; /* Control the scroll length of the scrub timeline */
+  position: relative;
+}
+
+.pm-stage {
+  width: 100%;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Image Sequence Background */
+.pm-bg-sequence {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  transform: scale(1.1); /* Provide buffer room for scale/zoom animations */
+  z-index: 1;
+}
+
+/* Overlay for Vignette and Lantern Glow */
+.pm-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, transparent 30%, rgba(2, 4, 10, 0.85) 90%),
+              radial-gradient(circle at 50% 10%, rgba(255, 215, 0, 0.05) 0%, transparent 60%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Decorative Floating Lanterns */
+.pm-lanterns-glow {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.pm-lantern {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--pm-accent-gold) 20%, rgba(255, 69, 0, 0.4) 60%, transparent 100%);
+  filter: blur(8px);
+  animation: pm-lantern-pulse 6s ease-in-out infinite alternate;
+}
+
+.pm-lantern-1 { width: 180px; height: 180px; top: 10%; left: 8%; opacity: 0.35; }
+.pm-lantern-2 { width: 220px; height: 220px; top: 15%; right: 5%; opacity: 0.4; animation-delay: 2s; }
+.pm-lantern-3 { width: 140px; height: 140px; bottom: 15%; left: 12%; opacity: 0.25; animation-delay: 4s; }
+
+@keyframes pm-lantern-pulse {
+  0% { transform: translateY(0) scale(0.95); opacity: 0.2; }
+  100% { transform: translateY(-15px) scale(1.05); opacity: 0.45; }
+}
+
+/* Content Elements Container */
+.pm-content-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* Interactive Elements inside content must enable pointer events */
+.pm-interactive {
+  pointer-events: auto;
+}
+
+/* Animated Title styling */
+.pm-title-element {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-weight: 800;
+  font-size: 8rem;
+  letter-spacing: -2px;
+  line-height: 0.9;
+  text-transform: uppercase;
+  margin: 0;
+  background: linear-gradient(135deg, #ffffff 30%, var(--pm-accent-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.3)) drop-shadow(0 0 30px rgba(255, 46, 147, 0.2));
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.pm-title-subtitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 6px;
+  color: var(--pm-accent-pink);
+  margin-top: 1.5rem;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(255, 46, 147, 0.4);
+}
+
+/* Glassmorphic Cards (flying from sides) */
+.pm-glass-card {
+  position: absolute;
+  width: 320px;
+  padding: 2.2rem 2rem;
+  background: var(--pm-card-bg);
+  border: 1px solid var(--pm-card-border);
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5),
+              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  z-index: 5;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease;
+}
+
+.pm-glass-card:hover {
+  box-shadow: 0 25px 60px rgba(0, 240, 255, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.pm-card-left {
+  left: 8%;
+  top: 50%;
+}
+
+.pm-card-right {
+  right: 8%;
+  top: 38%;
+}
+
+.pm-card-badge {
+  align-self: flex-start;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--pm-accent-cyan);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.pm-glass-card h3 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+  color: #ffffff;
+}
+
+.pm-glass-card p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #b0b5c9;
+  margin: 0;
+}
+
+/* Stats Showcase Card */
+.pm-stats-card {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 480px;
+  padding: 1.5rem 3rem;
+  background: rgba(10, 12, 22, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 6;
+}
+
+.pm-stat-item {
+  text-align: center;
+}
+
+.pm-stat-num {
+  font-size: 2.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  color: var(--pm-accent-gold);
+  text-shadow: 0 0 15px rgba(255, 215, 0, 0.45);
+}
+
+.pm-stat-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #8c92a6;
+  margin-top: 0.3rem;
+}
+
+/* Virtual open neon indicator */
+.pm-neon-tag {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--pm-accent-pink);
+  color: var(--pm-accent-pink);
+  box-shadow: 0 0 8px rgba(255, 46, 147, 0.3);
+  opacity: var(--neon-opacity, 1);
+}
+
+/* ── Ambient Lanterns ─────────────────────────────── */
+.pm-lanterns-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.pm-lantern-wrap {
+  position: absolute;
+  top: 0;
+  opacity: 0; /* GSAP drives opacity in on scroll */
+}
+
+.pm-lantern-inner {
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: top center;
+  transform-origin: top center;
+  filter: drop-shadow(0 0 14px rgba(255, 180, 80, 0.5));
+}
+
+.pm-lantern-1 {
+  left: 8%;
+  width: 72px;
+  height: 110px;
+}
+
+.pm-lantern-2 {
+  left: 50%;
+  transform: translateX(-50%);
+  width: 58px;
+  height: 130px;
+}
+
+.pm-lantern-3 {
+  right: 10%;
+  width: 55px;
+  height: 95px;
+}
+/* Bottom Spacer Section for scrolling past */
+.pm-scroll-indicator-section {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(to bottom, var(--pm-bg) 0%, #060810 100%);
+  position: relative;
+  z-index: 5;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.pm-footer-content {
+  text-align: center;
+  max-width: 600px;
+  padding: 0 2rem;
+}
+
+.pm-footer-content h2 {
+  font-size: 2.4rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.pm-footer-content p {
+  color: #8c92a6;
+  line-height: 1.8;
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+}
+
+.pm-scroll-badge {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--pm-accent-gold);
+  border: 1px solid var(--pm-accent-gold);
+  padding: 8px 16px;
+  border-radius: 30px;
+  text-transform: uppercase;
+  animation: pm-badge-bounce 2s infinite;
+}
+
+@keyframes pm-badge-bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-8px); }
+  60% { transform: translateY(-4px); }
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 768px) {
+  .pm-title-element {
+    font-size: 3.2rem;
+    letter-spacing: -1px;
+    top: 24%;
+    width: 90%;
+    white-space: normal;
+  }
+
+  .pm-title-subtitle {
+    font-size: 0.95rem;
+    letter-spacing: 3px;
+    margin-top: 0.8rem;
+  }
+
+  .pm-glass-card {
+    width: 88%;
+    left: 6% !important;
+    right: 6% !important;
+    padding: 1.2rem 1.5rem;
+    gap: 0.5rem;
+  }
+
+  .pm-glass-card h3 {
+    font-size: 1.3rem;
+  }
+
+  .pm-glass-card p {
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  .pm-card-left {
+    top: 42%;
+  }
+
+  .pm-card-right {
+    top: 66%;
+  }
+
+  .pm-stats-card {
+    width: 88% !important;
+    left: 6% !important;
+    transform: none !important;
+    bottom: 5%;
+    padding: 0.8rem 1rem;
+    border-radius: 16px;
+  }
+
+  .pm-stat-num {
+    font-size: 2rem;
+  }
+
+  .pm-stat-label {
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+  }
+
+  .pm-neon-tag {
+    top: 8px;
+    right: 8px;
+    font-size: 0.55rem;
+    padding: 1px 4px;
+  }
+
+  .pm-footer-content h2 {
+    font-size: 1.8rem;
+  }
+
+  .pm-footer-content p {
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+}

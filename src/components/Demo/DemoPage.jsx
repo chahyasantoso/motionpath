@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
+import useSmoothScroll from '../../hooks/useSmoothScroll';
 import { buildMotionPath } from '../../lib/pathUtils';
 import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../lib/projection3d';
 import './DemoPage.css';
@@ -438,6 +439,7 @@ function HelixDemo() {
 
 export default function DemoPage() {
   useMotionProject(project);
+  useSmoothScroll();
 
   return (
     <div className="app">

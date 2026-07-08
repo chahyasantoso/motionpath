@@ -3,6 +3,7 @@ import { createColorPropertyPlugin } from './plugins/colorProperty.js';
 import { createFilterPropertyPlugin } from './plugins/filterProperty.js';
 import { pathPlugin } from './plugins/pathPlugin.js';
 import { cssVarPlugin } from './plugins/cssVarProperty.js';
+import { imageSequencePlugin } from './plugins/imageSequenceProperty.js';
 
 const simpleKeys = [
   'x', 'y', 'z',
@@ -25,7 +26,7 @@ const colorPlugins = Object.fromEntries(colorKeys.map(k => [k, createColorProper
 const filterPlugins = Object.fromEntries(filterKeys.map(k => [k, createFilterPropertyPlugin(k)]));
 
 // Individual exports for legacy references (if any exist)
-export { pathPlugin, cssVarPlugin };
+export { pathPlugin, cssVarPlugin, imageSequencePlugin };
 
 // Lazy plugin stubs
 export const splitTextPlugin    = { keys: ['splitText'],    lazy: true, claimsKey(k) { return k === 'splitText';    }, load: () => Promise.resolve(), contribute() {} };
@@ -39,6 +40,7 @@ export const ALL_PLUGINS = [
   ...Object.values(filterPlugins),
   pathPlugin,
   cssVarPlugin,
+  imageSequencePlugin,
   splitTextPlugin,
   morphSvgPlugin,
   drawSvgPlugin,

@@ -8,6 +8,7 @@ import { pathXYExclusivityRule } from './rules/path-xy-exclusivity.js';
 import { pathShapeRule } from './rules/path-shape.js';
 import { timelineGroupRule } from './rules/timeline-group.js';
 import { elementUniquenessRule } from './rules/element-uniqueness.js';
+import { imageSequenceRule } from './rules/image-sequence.js';
 
 const scenarioRules = [
   triggerShapeRule,
@@ -20,6 +21,7 @@ const elementRules = [
   stopCountRule,
   pathXYExclusivityRule,
   pathShapeRule,
+  imageSequenceRule,
 ];
 
 const crossScenarioRules = [

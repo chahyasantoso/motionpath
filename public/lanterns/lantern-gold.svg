@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 140" fill="none">
+  <!-- String -->
+  <line x1="35" y1="0" x2="35" y2="12" stroke="#c8a96e" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Top cap -->
+  <ellipse cx="35" cy="14" rx="10" ry="3.5" fill="#b8860b"/>
+  <rect x="25" y="12" width="20" height="5" rx="2" fill="#d4a017"/>
+  <!-- Body - elongated -->
+  <ellipse cx="35" cy="62" rx="22" ry="52" fill="url(#rg2)"/>
+  <!-- Diamond pattern -->
+  <path d="M35 22 L50 52 L35 82 L20 52 Z" fill="none" stroke="#c8a96e" stroke-width="1" opacity="0.5"/>
+  <path d="M35 32 L46 52 L35 72 L24 52 Z" fill="none" stroke="#f5c842" stroke-width="0.8" opacity="0.4"/>
+  <!-- Ribs -->
+  <ellipse cx="35" cy="42" rx="19" ry="2.5" fill="none" stroke="#b8860b" stroke-width="1" opacity="0.5"/>
+  <ellipse cx="35" cy="62" rx="22" ry="2.5" fill="none" stroke="#b8860b" stroke-width="1" opacity="0.5"/>
+  <ellipse cx="35" cy="82" rx="19" ry="2.5" fill="none" stroke="#b8860b" stroke-width="1" opacity="0.5"/>
+  <!-- Bottom cap -->
+  <rect x="25" y="111" width="20" height="5" rx="2" fill="#d4a017"/>
+  <ellipse cx="35" cy="118" rx="10" ry="3.5" fill="#b8860b"/>
+  <!-- Tassels -->
+  <line x1="31" y1="121" x2="29" y2="138" stroke="#ff8a65" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="35" y1="121" x2="35" y2="140" stroke="#ff8a65" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="39" y1="121" x2="41" y2="138" stroke="#ff8a65" stroke-width="1.5" stroke-linecap="round"/>
+  <defs>
+    <radialGradient id="rg2" cx="40%" cy="45%" r="60%" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="50%" stop-color="#d4a017"/>
+      <stop offset="100%" stop-color="#7a5c00"/>
+    </radialGradient>
+  </defs>
+</svg>

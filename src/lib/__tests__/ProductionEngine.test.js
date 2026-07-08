@@ -367,5 +367,76 @@ describe('ProductionEngine', () => {
 
     expect(staleBuildResult.scenarios[0].timeline.kill).toHaveBeenCalled();
   });
-});
 
+  it('time scenario auto-plays on load by default', async () => {
+    const timeBuildResult = {
+      scenarios: [{
+        scenarioIndex: 0,
+        sceneId: 'timed',
+        triggerType: 'time',
+        triggerConfig: { repeat: -1, yoyo: true },
+        timeline: mockTimeline
+      }],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map()
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockResolvedValue(timeBuildResult);
+
+    const engine = createProductionEngine(mockDeps);
+    await engine.loadProject({});
+
+    expect(mockTimeline.play).toHaveBeenCalled();
+  });
+
+  it('time scenario starts paused when playStates maps its timelineId to false', async () => {
+    const timeBuildResult = {
+      scenarios: [{
+        scenarioIndex: 0,
+        sceneId: 'timed',
+        timelineId: 'my-tl',
+        triggerType: 'time',
+        triggerConfig: { repeat: -1, yoyo: true },
+        timeline: mockTimeline
+      }],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map()
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockResolvedValue(timeBuildResult);
+
+    const engine = createProductionEngine(mockDeps);
+    await engine.loadProject({}, { playStates: { 'my-tl': false } });
+
+    expect(mockTimeline.play).not.toHaveBeenCalled();
+  });
+
+  it('scroll-observer scenario timeline configures repeat, yoyo, and repeatDelay parameters', async () => {
+    const observerBuildResult = {
+      scenarios: [{
+        scenarioIndex: 0,
+        sceneId: 'observed',
+        triggerType: 'scroll-observer',
+        triggerConfig: { trigger: 'my-trigger', start: 'top top', toggleActions: 'play none none none', repeat: -1, yoyo: true, repeatDelay: 1.5 },
+        timeline: mockTimeline
+      }],
+      timelineGroups: new Map(),
+      elements: new Map(),
+      elementPlugins: new Map()
+    };
+
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockResolvedValue(observerBuildResult);
+
+    const engine = createProductionEngine(mockDeps);
+    await engine.loadProject({});
+
+    expect(mockTimeline.repeat).toHaveBeenCalledWith(-1);
+    expect(mockTimeline.yoyo).toHaveBeenCalledWith(true);
+    expect(mockTimeline.repeatDelay).toHaveBeenCalledWith(1.5);
+  });
+});

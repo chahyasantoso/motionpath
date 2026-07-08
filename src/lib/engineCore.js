@@ -20,7 +20,11 @@ export function createEngineCore(buildResult) {
         if (cbs.size === 0) continue;
         const elementBuild = buildResult.elements.get(elementId);
         if (!elementBuild) continue;
-        const snapshot = { ...elementBuild.proxy };
+        const progress = elementBuild.tween ? elementBuild.tween.progress() : 0;
+        const snapshot = {
+          ...elementBuild.proxy,
+          progress
+        };
         for (const cb of cbs) {
           cb(snapshot);
         }

@@ -56,7 +56,7 @@ export function createProductionEngine(deps) {
   }
 
   return {
-    async loadProject(schema) {
+    async loadProject(schema, options = {}) {
       const loadId = ++_loadGeneration;
 
       // Step 1: Validate
@@ -117,11 +117,15 @@ export function createProductionEngine(deps) {
               const st = ScrollTrigger.create({ ...resolvedConfig, animation: group.masterTimeline });
               createdSTs.push(st);
             } else if (group.triggerType === 'time') {
+              // Unpause all nested child timelines so they inherit parent playhead motion
+              group.masterTimeline.getChildren().forEach(child => child.paused(false));
+
               group.masterTimeline
                 .repeat(config.repeat ?? 0)
                 .yoyo(!!config.yoyo)
                 .repeatDelay(config.repeatDelay ?? 0);
-              group.masterTimeline.play();
+              const shouldPlay = options.playStates?.[timelineId] ?? true;
+              if (shouldPlay) group.masterTimeline.play();
             }
           } else {
             const config = triggerConfig || {};
@@ -140,6 +144,11 @@ export function createProductionEngine(deps) {
               const st = ScrollTrigger.create({ ...resolvedConfig, animation: scenario.timeline });
               createdSTs.push(st);
             } else if (triggerType === 'scroll-observer') {
+              scenario.timeline
+                .repeat(config.repeat ?? 0)
+                .yoyo(!!config.yoyo)
+                .repeatDelay(config.repeatDelay ?? 0);
+
               const st = ScrollTrigger.create({
                 trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, sceneId),
                 start: config.start,
@@ -152,7 +161,10 @@ export function createProductionEngine(deps) {
                 .repeat(config.repeat ?? 0)
                 .yoyo(!!config.yoyo)
                 .repeatDelay(config.repeatDelay ?? 0);
-              scenario.timeline.play();
+              // playStates keyed by timelineId or scenarioIndex (string)
+              const stateKey = timelineId ?? String(scenario.scenarioIndex);
+              const shouldPlay = options.playStates?.[stateKey] ?? true;
+              if (shouldPlay) scenario.timeline.play();
             }
           }
         }

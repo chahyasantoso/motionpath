@@ -452,4 +452,53 @@ describe('builder unit and integration tests', () => {
       expect(domNode).toBeUndefined();
     });
   });
+
+  describe('imageSequence plugin integration', () => {
+    it('compiles imageSequence keyframes and drives imageSequenceIndex in tweening', async () => {
+      const actualPlugins = await vi.importActual('../plugins.js');
+      mockResolvePlugin = actualPlugins.resolvePluginForKey;
+
+      const project = {
+        scenarios: [{
+          sceneId: 'scene-1',
+          trigger: { type: 'time', duration: 1 },
+          elements: [{
+            id: 'el-seq',
+            keyframes: {
+              imageSequence: {
+                frames: ['001.jpg', '002.jpg', '003.jpg'],
+                stops: [
+                  { p: 0, v: 0 },
+                  { p: 1, v: 2 }
+                ]
+              }
+            }
+          }]
+        }]
+      };
+
+      const result = await buildProject(project, deps);
+      const elementBuild = result.elements.get('el-seq');
+      expect(elementBuild).toBeDefined();
+
+      const { proxy } = elementBuild;
+      expect(proxy.imageSequenceIndex).toBe(0);
+
+      const tween = result.scenarios[0].timeline.getChildren()[0];
+      
+      // Mid-point progress
+      tween.progress(0.5);
+      expect(proxy.imageSequenceIndex).toBeCloseTo(1);
+
+      // Verify composition
+      const composedMid = result.elementPlugins.get('el-seq')[0].compose(proxy, elementBuild.elementConfig);
+      expect(composedMid).toEqual({ backgroundImage: 'url(002.jpg)' });
+
+      // End progress
+      tween.progress(1);
+      expect(proxy.imageSequenceIndex).toBeCloseTo(2);
+      const composedEnd = result.elementPlugins.get('el-seq')[0].compose(proxy, elementBuild.elementConfig);
+      expect(composedEnd).toEqual({ backgroundImage: 'url(003.jpg)' });
+    });
+  });
 });

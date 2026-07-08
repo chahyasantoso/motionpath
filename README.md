@@ -59,7 +59,33 @@ graph TD
 
 ---
 
-## 3. Core Modules & Utilities
+## 3. AI & Developer Cheat Sheet: Capability Bounds
+
+This section contains strict operational bounds and execution patterns. **Read this to instantly evaluate if a requested scenario is possible and how to structure it.**
+
+### A. Engine Capabilities Matrix
+
+| What the Engine CAN Do | What the Engine CANNOT Do |
+|---|---|
+| **Multiple Scenarios**: Load scroll-scrub triggers and time-based triggers inside the same project. | **Duplicate Target IDs**: You cannot target the same element ID across two different scenarios (e.g. scroll and time). The last scenario loaded will clobber the elements map entry. |
+| **Declarative Loops in Observers**: Configure infinite loops (`repeat: -1, yoyo: true`) on scroll-observer scenarios. | **Scrub Loops**: You cannot loop a scroll-scrub animation (`repeat` is illegal on scrub triggers). Scrub progress is strictly a function of scroll position. |
+| **Component-Level Play Control**: Pause individual time-based scenarios on load, and play/pause them later via React state. | **React Render Control**: You cannot use React state to drive style changes at 60fps. React should only be used to toggle high-level states (like play/pause). |
+| **Compose Transforms**: Animate multiple axes on a single visual entity by using nested DOM wrappers (Parent/Child). | **Native Speed-to-Scroll Velocity Mapping**: The engine cannot natively scale animation speed matching scroll velocity yet (must be handled manually or wait for Option 4). |
+
+### B. Hook & Subscription Execution Contract
+
+1. **The Active Ref Requirement**:
+   `useMotionSubscriber(elementId, ref, callback)` will **bail out immediately** and ignore the callback if `ref.current` is null. 
+   - *Consequence*: You cannot register a "ghost" subscriber on an empty ref to listen to scroll progress. To monitor progress, register the subscriber callback on an active visual component that has a real DOM element rendered.
+2. **Infinite React Render Loop Prevention**:
+   Subscriber callbacks execute on the GSAP update loop (up to 60+ times per second).
+   - *Rule*: Never call a state setter (e.g., `setState`) inside a subscriber callback without a threshold gate (using a React `useRef` to verify the state has actually changed). If you call `setState` every tick, React will crash with a maximum update depth error.
+3. **Timeline Grouping Constraints**:
+   Only scenarios of the **identical trigger type** (scrub-with-scrub or time-with-time) may share a `timelineId` group. Scroll observer scenarios cannot be grouped.
+
+---
+
+## 4. Core Modules & Utilities
 
 ### A. Engines & Core Orchestration
 
@@ -99,21 +125,24 @@ Handles trigonometric projection of coordinates from a 3D coordinate space onto 
 
 ---
 
-## 4. React Hooks API
+## 5. React Hooks API
 
 ### A. `useMotionProject` (`src/hooks/useMotionProject.js`)
 
-A headless initializer that registers a scene to the engine:
+A headless React hook that loads a schema project and manages its playback states:
 
 ```javascript
 import useMotionProject from './hooks/useMotionProject';
 
-useMotionProject(projectSchema);
+// load project, start 'timeline-id' paused, auto-play other time scenarios
+useMotionProject(projectSchema, {
+  'timeline-id': false // true = playing, false = paused
+});
 ```
 
 *   **Behavior**:
-    *   Automatically triggers scene validation and initialization when the project changes.
-    *   Returns a cleanup function on unmount that runs `productionEngine.destroy()`.
+    *   **Independent Lifecycles**: Split into two distinct effects. Changing the schema re-loads the project completely. Changing `playStates` only toggles GSAP play/pause timers, avoiding expensive engine re-builds.
+    *   **Auto-Cleanup**: Automatically cleans up and calls `productionEngine.destroy()` on unmount.
 
 ### B. `useMotionSubscriber` (`src/hooks/useMotionSubscriber.js`)
 
@@ -140,12 +169,12 @@ useMotionSubscriber('element-id', ref, transformFn);
 
 *   **Behavior**:
     *   Subscribes directly to coordinate broadcasts.
-    *   If `transformFn` is provided, applies the returned custom styles. Otherwise, applies the default spatial and style values.
+    *   If `transformFn` is provided, applies the returned custom styles. Otherwise, applies the default composed values.
     *   Automatically unsubscribes on unmount.
 
 ---
 
-## 5. JSON Scene Schema & Structures
+## 6. JSON Scene Schema & Structures
 
 All animation data must follow the TypeScript definitions structured below (extended for 3D/Z support):
 
@@ -188,10 +217,22 @@ interface SceneElement {
 interface TriggerScrollScrub {
   type: "scroll";
   scrub: boolean | number;
+  trigger?: string; // Selector or data-motion-id reference
   start?: string;
   end?: string;
   pin?: boolean | string;
   pinSpacing?: boolean;
+}
+
+interface TriggerScrollObserver {
+  type: "scroll";
+  scrub: false;
+  trigger: string;
+  start: string;
+  toggleActions: string; // E.g., "play pause resume pause"
+  repeat?: number;
+  yoyo?: boolean;
+  repeatDelay?: number;
 }
 
 interface TriggerTime {
@@ -204,7 +245,9 @@ interface TriggerTime {
 
 interface Scenario {
   sceneId: string;
-  trigger: TriggerScrollScrub | TriggerTime;
+  timelineId?: string; // Addressable timeline key for playStates
+  primary?: boolean;
+  trigger: TriggerScrollScrub | TriggerScrollObserver | TriggerTime;
   stagger?: number;
   elements: SceneElement[];
 }
@@ -219,19 +262,51 @@ interface MotionProject {
 
 ---
 
-## 6. Practical Showcase Examples (In `src/App.jsx`)
+## 7. Core Capabilities & Design Patterns
 
-1.  **ScrollDemo**: Low-friction timeline scrubbing showing rockets trailing along a dashed SVG track with distinct offset multipliers.
-2.  **CarouselDemo**: Multi-card horizontal glassmorphic showcase moving on a complex cubic Bezier S-curve track. Cards tilt dynamically depending on the local path tangent.
-3.  **HelixDemo**: Scroll-controlled 3D vertical spring simulation where cards scale, blur, change opacity, and rotate around the Y-axis according to cylinder depth.
-4.  **GrowthDemo**: True 3D Z-depth scaling demo. A single card translates diagonally along a tilted 3D Bezier curve from $Z = -300$ to $Z = 300$ and back. The browser's native CSS perspective engine handles visual enlargement and depth, aligned with a perspective-projected SVG guide line.
-5.  **TimerDemo**: Simple auto-playing orbiting satellite showcasing timer play/pause features.
+### A. Play State Control (`options.playStates`)
+Time scenarios do not have to auto-play immediately on load. The engine accepts runtime play/pause state directives (via hooks or raw loads).
+- **GSAP Nesting Resolution**: Timelines built with `{ paused: true }` are automatically unpaused when appended to a master timeline, allowing parent playback controls to drive child nodes.
+
+### B. Scroll Observer Loops
+The engine natively supports non-scrub scroll observers containing looping options (`repeat`, `yoyo`, `repeatDelay`).
+- **Use Case**: Starting an infinite animation sequence (e.g., hovering bounce) only when a specific scroll container enters the viewport.
+
+### C. Wrapper/Inner Animation Composition
+To prevent different timelines from clobbering coordinates (e.g. two separate scenarios moving the same item along the `y` axis):
+- Map the scroll-scrub translation to a parent container element (`lantern-1-wrap`).
+- Map the time-based loop translation to the inner visual element (`lantern-1`).
+- CSS naturally stacks these transforms without property clobbering.
 
 ---
 
-## 7. Testing & Verification
+## 8. Practical Showcase Examples (In `src/App.jsx`)
 
-The suite runs **161 unit tests** using **Vitest** covering edge cases, curve configurations, pub/sub event distributions, caching, and 3D projection formulas.
+1.  **ScrollDemo**: Low-friction timeline scrubbing showing rockets trailing along a dashed SVG track.
+2.  **CarouselDemo**: Horizontal glassmorphic cards moving on an S-curve track, tilting based on local path tangents.
+3.  **HelixDemo**: Scroll-controlled 3D vertical spring scaling and rotating cards around a cylinder axis.
+4.  **GrowthDemo**: 3D Z-depth scaling diagonally along a tilted 3D Bezier curve from $Z = -300$ to $Z = 300$.
+5.  **Pasar Malam (`/pasarmalam`)**: Pinned scrollytelling page with frame-by-frame preloaded WebP sequence playback, live stats counter updates outside React render loops, and stateful React-gated lantern bounce.
+6.  **Pasar Malam Observer (`/pasarmalam-observer`)**: Stateless version of the Pasar Malam page driving the scroll entry and infinite hover bounce entirely in the JSON schema triggers via `scroll-observer` scroll-threshold crossings.
+
+---
+
+## 9. Future Wishlist (Unimplemented Capabilities)
+
+*   **Native Velocity-Based Speed Scaling (`timeScale` mapping)**:
+    Provide a declarative trigger setting (`velocityScale: { sensitivity, damping, mode }`) allowing the engine to automatically speed up, slow down, or freeze time-based timelines based on the scroll velocity (`ScrollTrigger.getVelocity()`) without writing custom event listeners or stateful React hooks.
+*   **Engine vs. Player Architectural Split**:
+    Decouple the current hybrid `ProductionEngine` into a pure **`MotionEngine`** (encapsulating compilation, validation, and subscriber rendering) and a pluggable **`MotionPlayer`** (handling viewport scroll listeners, ScrollTriggers, and playhead states). This allows identical compiled projects to be run in different modes (e.g. `ScrollPlayer`, `TimePlayer`, `EditorPlayer`) without modifying the core rendering system.
+*   **Sequential Stagger Overlaps**:
+    Support declarative delay offsets within staggered group timelines (`staggerOffset` or overlap offsets) instead of purely strict sequential spacing.
+*   **TypeScript Migration (Public Schema & Hooks API)**:
+    Migrate hook declarations and JSON schema interfaces to TypeScript. While runtime JS validators remain necessary for dynamic JSON, TS interfaces will provide compile-time schema correctness checks and IDE autocompletion for `useMotionSubscriber` callbacks.
+
+---
+
+## 10. Testing & Verification
+
+The suite runs **189 unit tests** using **Vitest** covering edge cases, curve configurations, play-state overrides, pub/sub event distributions, caching, and 3D projection formulas.
 
 To execute tests:
 ```bash

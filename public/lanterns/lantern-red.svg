@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 120" fill="none">
+  <!-- String -->
+  <line x1="40" y1="0" x2="40" y2="12" stroke="#c8a96e" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Top cap -->
+  <ellipse cx="40" cy="14" rx="12" ry="4" fill="#c8341a"/>
+  <rect x="28" y="12" width="24" height="5" rx="2" fill="#e03d20"/>
+  <!-- Body -->
+  <ellipse cx="40" cy="52" rx="28" ry="42" fill="url(#rg1)"/>
+  <!-- Ribs -->
+  <ellipse cx="40" cy="37" rx="22" ry="3" fill="none" stroke="#c8341a" stroke-width="1" opacity="0.6"/>
+  <ellipse cx="40" cy="52" rx="28" ry="3" fill="none" stroke="#c8341a" stroke-width="1" opacity="0.6"/>
+  <ellipse cx="40" cy="67" rx="22" ry="3" fill="none" stroke="#c8341a" stroke-width="1" opacity="0.6"/>
+  <!-- Bottom cap -->
+  <rect x="28" y="91" width="24" height="5" rx="2" fill="#e03d20"/>
+  <ellipse cx="40" cy="98" rx="12" ry="4" fill="#c8341a"/>
+  <!-- Tassels -->
+  <line x1="36" y1="102" x2="33" y2="118" stroke="#f5c842" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="40" y1="102" x2="40" y2="120" stroke="#f5c842" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="44" y1="102" x2="47" y2="118" stroke="#f5c842" stroke-width="1.5" stroke-linecap="round"/>
+  <defs>
+    <radialGradient id="rg1" cx="40%" cy="45%" r="60%" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ff8a65"/>
+      <stop offset="60%" stop-color="#e03d20"/>
+      <stop offset="100%" stop-color="#8b1a0a"/>
+    </radialGradient>
+  </defs>
+</svg>

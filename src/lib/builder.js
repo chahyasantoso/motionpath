@@ -123,7 +123,6 @@ export async function buildProject(schema, deps) {
       }
 
       elementPlugins.set(element.id, resolvedPlugins);
-      elementsMap.set(element.id, { proxy, elementConfig: element });
 
       // Duration fallback chain — authorized addendum to §5.8:
       // Without an explicit duration, GSAP defaults to 0.5s which silently
@@ -139,6 +138,7 @@ export async function buildProject(schema, deps) {
         duration: tweenDuration
       });
       elementTweens.push(tween);
+      elementsMap.set(element.id, { proxy, elementConfig: element, tween });
     }
 
     const scenarioTimeline = gsap.timeline({ paused: true });
