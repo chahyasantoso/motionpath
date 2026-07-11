@@ -89,7 +89,7 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `id` | string | yes | **Logical identifier, not a CSS selector.** Resolved via `document.querySelector('[data-motion-id="${id}"]')` at `initScene` time — decouples animation targeting from page styling/structure. Must be unique within a scenario's element list. Missing markup is a **runtime** error (separate validation phase from static schema checks — needs a live DOM). |
+| `id` | string | yes | **Logical identifier, not a CSS selector.** Resolved via push-based DOM subscription (`useMotionSubscriber(elementId, ref)`) — decouples animation targeting from page styling/structure. Must be unique within a scenario's element list. Missing markup does not cause build-time errors since subscriptions occur dynamically at runtime. |
 | `duration` | number (seconds) | no | Overrides scenario duration; observer/time-scoped only. Forbidden on scrub scenarios — build-time error. |
 | `transformOrigin` | string | no | e.g. `"50% 50%"`. Direct CSS pass-through. |
 | `keyframes` | object | yes | Flat — each key is an animatable property. |
@@ -181,7 +181,7 @@ Two properties contributing different `ease` values at the same literal `p` perc
 
 - GSAP tweens a **plain per-element proxy object**, never the DOM node directly — synthetic properties (`blur`, `pathProgress`) have no DOM equivalent, and the broadcast/compose split depends on a proxy target.
 - `subscribe(elementId, callback)` broadcasts **raw** proxy values every tick. `compose(elementId, data)` — public method, not hook-internal — runs active plugins' `compose()` and merges into a DOM-ready patch.
-- Element `id` → DOM resolution (`data-motion-id`) is a distinct, runtime-only validation phase — separate from static schema validation, since it requires a live DOM.
+- Element/trigger ID resolution is fully decoupled from DOM querying (no `querySelector` or `data-motion-id` checks). Nodes are registered to the engine via push-based hook calls (`useMotionSubscriber` for elements, `useMotionTrigger` for trigger/pin anchors). Trigger elements must be registered before scenario wiring, throwing a runtime error on missing refs.
 
 ---
 
