@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import './BurstPage.css';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
+import useMotionTrigger from '../../hooks/useMotionTrigger';
 import { buildMotionPath } from '../../lib/pathUtils';
 import { projectPathNodes3DTo2D } from '../../lib/projection3d';
 
@@ -342,7 +343,7 @@ function Strawberry({ elementId, emoji }) {
   useMotionSubscriber(elementId, ref, transform);
 
   return (
-    <div ref={ref} data-motion-id={elementId} className="strawberry-element">
+    <div ref={ref} className="strawberry-element">
       {emoji}
     </div>
   );
@@ -358,7 +359,7 @@ function IceCreamCard() {
   useMotionSubscriber('strawberry-card', ref, transform);
 
   return (
-    <div ref={ref} data-motion-id="strawberry-card" className="burst-card">
+    <div ref={ref} className="burst-card">
       <div className="badge">Limited Flavor</div>
       <h3>Strawberry Sundae</h3>
       <p>A double scoop of fresh strawberry and creamy vanilla ice cream, topped with rich syrup and juicy strawberry bursts.</p>
@@ -379,7 +380,7 @@ function IceCreamCenterpiece() {
   useMotionSubscriber('ice-cream-center', ref, transform);
 
   return (
-    <div ref={ref} data-motion-id="ice-cream-center" className="ice-cream-wrapper">
+    <div ref={ref} className="ice-cream-wrapper">
       <div className="ice-cream-center-el">🍦</div>
     </div>
   );
@@ -417,6 +418,9 @@ export default function BurstPage() {
 
   useMotionProject(project);
 
+  useMotionTrigger('strawberry-burst-scroll', containerRef);
+  useMotionTrigger('burst-stage', stageRef);
+
   const strawCx = dimensions.width * 0.25;
   const strawCy = dimensions.height * 0.5;
 
@@ -447,8 +451,8 @@ export default function BurstPage() {
         <p className="subtitle">Staggered Timeframes • Native 3D Z-Depth Projection</p>
       </header>
 
-      <section ref={containerRef} data-motion-id={strawberryScene.sceneId} className="burst-scene">
-        <div ref={stageRef} data-motion-id="burst-stage" className="burst-stage">
+      <section ref={containerRef} className="burst-scene">
+        <div ref={stageRef} className="burst-stage">
           <div className="scene-label">
             <h2>Multi-Scene Orchestration (Scroll Scrub + Scroll Observer)</h2>
             <p>Ten scroll-triggered strawberries burst sequentially using staggered timeframes, while a scroll-observer triggered card slides in autonomously when the stage enters viewport.</p>

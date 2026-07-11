@@ -12,6 +12,8 @@ vi.mock('../../lib/ProductionEngine', () => ({
     destroy: vi.fn(),
     subscribe: vi.fn(() => vi.fn()),
     compose: vi.fn(() => ({})),
+    registerTriggerRef: vi.fn(),
+    unregisterTriggerRef: vi.fn(),
   }
 }));
 
@@ -94,65 +96,15 @@ describe('useMotionProject', () => {
     expect(loadedSchema.scenarios.map(s => s.sceneId)).toContain('ice-cream-card-slide');
   });
 
-  it('forwards initial playStates to loadProject so paused-on-load works', async () => {
+  it('forwards initialPlayStates option to loadProject so paused-on-load works', async () => {
     productionEngine.loadProject.mockResolvedValue();
     const project = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
-    const playStates = { 'my-tl': false };
 
-    renderHook(() => useMotionProject(project, playStates));
+    renderHook(() => useMotionProject(project, { initialPlayStates: { 'my-tl': false } }));
 
     expect(productionEngine.loadProject).toHaveBeenCalledWith(
       project,
       { playStates: { 'my-tl': false } }
     );
-  });
-
-  it('calls playTimer when playStates entry changes from false to true', async () => {
-    productionEngine.loadProject.mockResolvedValue();
-    productionEngine.playTimer = vi.fn();
-    productionEngine.pauseTimer = vi.fn();
-    const project = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
-
-    const { rerender } = renderHook(
-      ({ ps }) => useMotionProject(project, ps),
-      { initialProps: { ps: { 'my-tl': false } } }
-    );
-
-    rerender({ ps: { 'my-tl': true } });
-    expect(productionEngine.playTimer).toHaveBeenCalledWith('my-tl');
-  });
-
-  it('calls pauseTimer when playStates entry changes from true to false', async () => {
-    productionEngine.loadProject.mockResolvedValue();
-    productionEngine.playTimer = vi.fn();
-    productionEngine.pauseTimer = vi.fn();
-    const project = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
-
-    const { rerender } = renderHook(
-      ({ ps }) => useMotionProject(project, ps),
-      { initialProps: { ps: { 'my-tl': true } } }
-    );
-
-    rerender({ ps: { 'my-tl': false } });
-    expect(productionEngine.pauseTimer).toHaveBeenCalledWith('my-tl');
-  });
-
-  it('does not call playTimer/pauseTimer when project changes but playStates stays same', async () => {
-    productionEngine.loadProject.mockResolvedValue();
-    productionEngine.playTimer = vi.fn();
-    productionEngine.pauseTimer = vi.fn();
-    const project1 = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
-    const project2 = { schemaVersion: 1, projectId: 'p2', scenarios: [] };
-    const playStates = { 'my-tl': true };
-
-    const { rerender } = renderHook(
-      ({ p }) => useMotionProject(p, playStates),
-      { initialProps: { p: project1 } }
-    );
-    vi.clearAllMocks();
-
-    rerender({ p: project2 });
-    expect(productionEngine.playTimer).not.toHaveBeenCalled();
-    expect(productionEngine.pauseTimer).not.toHaveBeenCalled();
   });
 });

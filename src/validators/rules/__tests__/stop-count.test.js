@@ -69,4 +69,34 @@ describe('stop-count rule', () => {
     const errors = stopCountRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(0);
   });
+
+  it('should error on imageSequence.stops with fewer than 2 entries', () => {
+    const element = {
+      id: 'test-el3',
+      keyframes: {
+        imageSequence: {
+          frames: ['/a.jpg'],
+          stops: [{ p: 0, v: 0 }]
+        }
+      }
+    };
+    const errors = stopCountRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].ruleId).toBe('stop-count');
+    expect(errors[0].path).toBe('scenarios[0].elements[0].keyframes.imageSequence');
+  });
+
+  it('should pass on imageSequence.stops with 2 entries', () => {
+    const element = {
+      id: 'test-el3',
+      keyframes: {
+        imageSequence: {
+          frames: ['/a.jpg', '/b.jpg'],
+          stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
+        }
+      }
+    };
+    const errors = stopCountRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
+    expect(errors).toHaveLength(0);
+  });
 });

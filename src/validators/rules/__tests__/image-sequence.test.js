@@ -88,31 +88,19 @@ describe('image-sequence rule', () => {
     expect(errors[1].path).toBe('scenarios[0].elements[0].keyframes.imageSequence.frames[2]');
   });
 
-  it('should error if stops is missing, not an array, or has fewer than 2 stops', () => {
-    const elementNoStops = {
-      id: 'test-el',
-      keyframes: {
-        imageSequence: {
-          frames: ['/a.jpg']
-        }
-      }
-    };
-    let errors = imageSequenceRule(elementNoStops, {}, {}, 'scenarios[0].elements[0]');
-    expect(errors).toHaveLength(1);
-    expect(errors[0].message).toContain('stops is required');
-
-    const elementFewerStops = {
+  it('should error if stops is not an array', () => {
+    const element = {
       id: 'test-el',
       keyframes: {
         imageSequence: {
           frames: ['/a.jpg'],
-          stops: [{ p: 0, v: 0 }]
+          stops: 'not-an-array'
         }
       }
     };
-    errors = imageSequenceRule(elementFewerStops, {}, {}, 'scenarios[0].elements[0]');
+    const errors = imageSequenceRule(element, {}, {}, 'scenarios[0].elements[0]');
     expect(errors).toHaveLength(1);
-    expect(errors[0].message).toContain('must have at least 2 stops');
+    expect(errors[0].message).toContain('stops must be an array');
   });
 
   it('should error if stops have non-numeric p or v', () => {
@@ -132,5 +120,75 @@ describe('image-sequence rule', () => {
     expect(errors).toHaveLength(2);
     expect(errors[0].path).toBe('scenarios[0].elements[0].keyframes.imageSequence.stops[0].p');
     expect(errors[1].path).toBe('scenarios[0].elements[0].keyframes.imageSequence.stops[1].v');
+  });
+
+  it('should error if a stop index v is out of range', () => {
+    const elementTooHigh = {
+      id: 'test-el',
+      keyframes: {
+        imageSequence: {
+          frames: ['/0.jpg', '/1.jpg', '/2.jpg'],
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: 3 }
+          ]
+        }
+      }
+    };
+    let errors = imageSequenceRule(elementTooHigh, {}, {}, 'scenarios[0].elements[0]');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('must satisfy 0 <= v <= 2 (frames.length - 1). Got: 3');
+
+    const elementNegative = {
+      id: 'test-el',
+      keyframes: {
+        imageSequence: {
+          frames: ['/0.jpg', '/1.jpg', '/2.jpg'],
+          stops: [
+            { p: 0, v: -1 },
+            { p: 1, v: 1 }
+          ]
+        }
+      }
+    };
+    errors = imageSequenceRule(elementNegative, {}, {}, 'scenarios[0].elements[0]');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('must satisfy 0 <= v <= 2 (frames.length - 1). Got: -1');
+  });
+
+  it('should pass if stop index v is at range boundary or is fractional', () => {
+    const element = {
+      id: 'test-el',
+      keyframes: {
+        imageSequence: {
+          frames: ['/0.jpg', '/1.jpg', '/2.jpg'],
+          stops: [
+            { p: 0, v: 2 },
+            { p: 0.5, v: 1.5 },
+            { p: 1, v: 0 }
+          ]
+        }
+      }
+    };
+    const errors = imageSequenceRule(element, {}, {}, 'scenarios[0].elements[0]');
+    expect(errors).toHaveLength(0);
+  });
+
+  it('should not error on range of v if frames itself is invalid', () => {
+    const element = {
+      id: 'test-el',
+      keyframes: {
+        imageSequence: {
+          frames: 'invalid-frames',
+          stops: [
+            { p: 0, v: 40 },
+            { p: 1, v: 1 }
+          ]
+        }
+      }
+    };
+    const errors = imageSequenceRule(element, {}, {}, 'scenarios[0].elements[0]');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('frames must be an array');
   });
 });

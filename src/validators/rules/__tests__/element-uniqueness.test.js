@@ -37,7 +37,7 @@ describe('element-uniqueness rule', () => {
     expect(errors[0].message).toContain("Duplicate element ID 'el-1'");
   });
 
-  it('should pass when the same element ID is used across different sceneId values', () => {
+  it('should error when the same element ID is used across different sceneId values', () => {
     const scenarios = [
       {
         sceneId: 'scene-1',
@@ -49,6 +49,11 @@ describe('element-uniqueness rule', () => {
       }
     ];
     const errors = elementUniquenessRule(scenarios);
-    expect(errors).toHaveLength(0);
+    expect(errors).toHaveLength(2);
+    expect(errors[0].ruleId).toBe('element-uniqueness');
+    expect(errors[0].severity).toBe('error');
+    expect(errors[0].path).toBe('scenarios[0].elements[0].id');
+    expect(errors[1].path).toBe('scenarios[1].elements[0].id');
+    expect(errors[0].message).toContain("Duplicate element ID 'el-1' found across multiple scenarios");
   });
 });

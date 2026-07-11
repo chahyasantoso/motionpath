@@ -74,49 +74,49 @@ export function imageSequenceRule(element, scenario, context, path) {
   }
 
   // 2. Validate stops
-  if (stops === undefined || stops === null) {
-    errors.push({
-      ruleId: 'image-sequence',
-      severity: 'error',
-      message: 'imageSequence.stops is required.',
-      path: `${propPath}.stops`
-    });
-  } else if (!Array.isArray(stops)) {
-    errors.push({
-      ruleId: 'image-sequence',
-      severity: 'error',
-      message: 'imageSequence.stops must be an array.',
-      path: `${propPath}.stops`
-    });
-  } else if (stops.length < 2) {
-    errors.push({
-      ruleId: 'image-sequence',
-      severity: 'error',
-      message: 'imageSequence.stops must have at least 2 stops.',
-      path: `${propPath}.stops`
-    });
-  } else {
-    stops.forEach((stop, idx) => {
-      if (!stop || typeof stop !== 'object') {
-        return;
-      }
-      if (typeof stop.p !== 'number') {
-        errors.push({
-          ruleId: 'image-sequence',
-          severity: 'error',
-          message: `imageSequence.stops[${idx}].p must be a number.`,
-          path: `${propPath}.stops[${idx}].p`
-        });
-      }
-      if (typeof stop.v !== 'number') {
-        errors.push({
-          ruleId: 'image-sequence',
-          severity: 'error',
-          message: `imageSequence.stops[${idx}].v must be a number (frame index).`,
-          path: `${propPath}.stops[${idx}].v`
-        });
-      }
-    });
+  // stops.length >= 2 is validated by stop-count.js — not re-checked here.
+  if (stops !== undefined && stops !== null) {
+    if (!Array.isArray(stops)) {
+      errors.push({
+        ruleId: 'image-sequence',
+        severity: 'error',
+        message: 'imageSequence.stops must be an array.',
+        path: `${propPath}.stops`
+      });
+    } else {
+      const isFramesValid = Array.isArray(frames) && frames.length > 0 && frames.every(f => typeof f === 'string');
+
+      stops.forEach((stop, idx) => {
+        if (!stop || typeof stop !== 'object') {
+          return;
+        }
+        if (typeof stop.p !== 'number') {
+          errors.push({
+            ruleId: 'image-sequence',
+            severity: 'error',
+            message: `imageSequence.stops[${idx}].p must be a number.`,
+            path: `${propPath}.stops[${idx}].p`
+          });
+        }
+        if (typeof stop.v !== 'number') {
+          errors.push({
+            ruleId: 'image-sequence',
+            severity: 'error',
+            message: `imageSequence.stops[${idx}].v must be a number (frame index).`,
+            path: `${propPath}.stops[${idx}].v`
+          });
+        } else if (isFramesValid) {
+          if (stop.v < 0 || stop.v > frames.length - 1) {
+            errors.push({
+              ruleId: 'image-sequence',
+              severity: 'error',
+              message: `imageSequence.stops[${idx}].v must satisfy 0 <= v <= ${frames.length - 1} (frames.length - 1). Got: ${JSON.stringify(stop.v)}.`,
+              path: `${propPath}.stops[${idx}].v`
+            });
+          }
+        }
+      });
+    }
   }
 
   return errors;

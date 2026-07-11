@@ -1,9 +1,7 @@
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { validateProject } from '../validators/index.js';
-import { buildProject } from './builder.js';
-import { createEngineCore } from './engineCore.js';
-import { createDeferredSubscribe } from './deferredSubscribe.js';
+import { compileProject } from './compileProject.js';
+import { createDeferredCall } from './deferredCall.js';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -34,7 +32,7 @@ export function createProductionEngine(deps) {
   let _loadGeneration = 0;
   // Track only the ScrollTrigger instances THIS engine created.
   const _createdScrollTriggers = [];
-  const _subRegistry = createDeferredSubscribe();
+  const _deferredCall = createDeferredCall();
 
   function _cleanup() {
     // Invalidate any in-flight loadProject() — if its buildProject resolves
@@ -59,20 +57,7 @@ export function createProductionEngine(deps) {
     async loadProject(schema, options = {}) {
       const loadId = ++_loadGeneration;
 
-      // Step 1: Validate
-      const errors = validateProject(schema) || [];
-      const hardErrors = errors.filter(e => e.severity === 'error');
-      const warnings = errors.filter(e => e.severity !== 'error');
-      warnings.forEach(w => console.warn('[ProductionEngine]', w.message));
-      if (hardErrors.length > 0) {
-        throw new Error(
-          '[ProductionEngine] Schema validation failed:\n' +
-          hardErrors.map(e => `  - ${e.message}`).join('\n')
-        );
-      }
-
-      // Step 2: Build
-      const buildResult = await buildProject(schema, deps);
+      const { core, buildResult } = await compileProject(schema, deps, 'ProductionEngine');
 
       // Stale-load guard: a newer loadProject() call (or destroy()) started
       // while buildProject was awaited — discard this result entirely.
@@ -81,9 +66,6 @@ export function createProductionEngine(deps) {
         for (const group of buildResult.timelineGroups.values()) group.masterTimeline?.kill();
         return;
       }
-
-      // Step 3: EngineCore
-      const core = createEngineCore(buildResult);
 
       // Step 4: Wire triggers — with rollback on failure
       const createdSTs = [];
@@ -188,7 +170,7 @@ export function createProductionEngine(deps) {
       _core = core;
       _buildResult = buildResult;
       _createdScrollTriggers.push(...createdSTs);
-      _subRegistry.setCore(core);
+      _deferredCall.setCore(core);
 
       // Recalculate all scroll trigger positions after the full layout is committed.
       // When multiple pinned sections exist, each pin inserts a spacer element that
@@ -201,7 +183,7 @@ export function createProductionEngine(deps) {
     },
 
     subscribe(elementId, callback) {
-      return _subRegistry.subscribe(elementId, callback);
+      return _deferredCall.call((core) => core.subscribe(elementId, callback));
     },
 
     compose(elementId, rawData) {
@@ -214,29 +196,39 @@ export function createProductionEngine(deps) {
       return _core.destroyScene(sceneId);
     },
 
+    registerTriggerRef(id, ref) {
+      _triggerRefs.set(id, ref);
+    },
+
+    unregisterTriggerRef(id) {
+      _triggerRefs.delete(id);
+    },
+
     destroy() {
       // Clear pending subscriptions before tearing down so they are not
       // flushed into a new core after intentional teardown.
-      _subRegistry.clearCore();
+      _deferredCall.clearCore();
       _cleanup();
     },
 
     pauseTimer(id) {
-      if (!_buildResult) throw new Error(`pauseTimer: no project loaded.`);
-      const group = _buildResult.timelineGroups.get(id);
-      if (group) { group.masterTimeline.pause(); return; }
-      const scenario = _buildResult.scenarios.find(s => String(s.scenarioIndex) === id);
-      if (scenario) { scenario.timeline.pause(); return; }
-      throw new Error(`pauseTimer: no group or scenario found for id "${id}".`);
+      return _deferredCall.call(() => {
+        const group = _buildResult?.timelineGroups.get(id);
+        if (group) { group.masterTimeline.pause(); return; }
+        const scenario = _buildResult?.scenarios.find(s => String(s.scenarioIndex) === id);
+        if (scenario) { scenario.timeline.pause(); return; }
+        throw new Error(`pauseTimer: no group or scenario found for id "${id}".`);
+      });
     },
 
     playTimer(id) {
-      if (!_buildResult) throw new Error(`playTimer: no project loaded.`);
-      const group = _buildResult.timelineGroups.get(id);
-      if (group) { group.masterTimeline.play(); return; }
-      const scenario = _buildResult.scenarios.find(s => String(s.scenarioIndex) === id);
-      if (scenario) { scenario.timeline.play(); return; }
-      throw new Error(`playTimer: no group or scenario found for id "${id}".`);
+      return _deferredCall.call(() => {
+        const group = _buildResult?.timelineGroups.get(id);
+        if (group) { group.masterTimeline.play(); return; }
+        const scenario = _buildResult?.scenarios.find(s => String(s.scenarioIndex) === id);
+        if (scenario) { scenario.timeline.play(); return; }
+        throw new Error(`playTimer: no group or scenario found for id "${id}".`);
+      });
     },
 
     enableScroll() {
@@ -249,11 +241,23 @@ export function createProductionEngine(deps) {
   };
 }
 
+const _triggerRefs = new Map(); // id -> React.RefObject
+
 // Singleton — drop-in replacement for motionEngine default export.
 // The import path in useMotionSubscriber.js changes from '../lib/motionEngine'
 // to '../lib/ProductionEngine'; nothing else changes at the call sites.
 export const productionEngine = createProductionEngine({
-  resolveElement: (id) => document.querySelector(`[data-motion-id="${id}"]`),
+  resolveElement: (id) => {
+    const ref = _triggerRefs.get(id);
+    if (!ref || !ref.current) {
+      throw new Error(
+        `MotionPath: trigger ref '${id}' is not registered. ` +
+        `Ensure useMotionTrigger('${id}', ref) is mounted (and its ref attached) ` +
+        `before this project's scenarios are wired.`
+      );
+    }
+    return ref.current;
+  },
 });
 
 export default productionEngine;

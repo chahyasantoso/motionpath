@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
+import useMotionTrigger from '../../hooks/useMotionTrigger';
 import useSmoothScroll from '../../hooks/useSmoothScroll';
 import { buildMotionPath } from '../../lib/pathUtils';
 import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../lib/projection3d';
@@ -162,7 +163,7 @@ function Rocket({ offset = 0 }) {
 
   useMotionSubscriber('rocket-track', ref, transform);
 
-  return <div ref={ref} data-motion-id="rocket-track" className="element rocket">🚀</div>;
+  return <div ref={ref} className="element rocket">🚀</div>;
 }
 
 function Cloud() {
@@ -174,7 +175,7 @@ function Cloud() {
   }, []);
 
   useMotionSubscriber('cloud', ref, transform);
-  return <div ref={ref} data-motion-id="cloud" className="element cloud">☁️</div>;
+  return <div ref={ref} className="element cloud">☁️</div>;
 }
 
 function CarouselCard({ elementId, cardData }) {
@@ -212,7 +213,7 @@ function CarouselCard({ elementId, cardData }) {
   useMotionSubscriber(elementId, ref, transform);
 
   return (
-    <div ref={ref} data-motion-id={elementId} className="element carousel-card">
+    <div ref={ref} className="element carousel-card">
       <div className="card-badge">{cardData.badge}</div>
       <h3>{cardData.title}</h3>
       <p>{cardData.desc}</p>
@@ -278,7 +279,7 @@ function HelixCard({ elementId, cardData }) {
   useMotionSubscriber(elementId, ref, transform);
 
   return (
-    <div ref={ref} data-motion-id={elementId} className="element helix-card">
+    <div ref={ref} className="element helix-card">
       <div className="card-badge">{cardData.badge}</div>
       <h3>{cardData.title}</h3>
       <p>{cardData.desc}</p>
@@ -290,15 +291,19 @@ function HelixCard({ elementId, cardData }) {
 
 function ScrollDemo() {
   const containerRef = useRef(null);
+  const stageRef = useRef(null);
+
+  useMotionTrigger('hero-scrollytelling', containerRef);
+  useMotionTrigger('stage', stageRef);
 
   return (
-    <section ref={containerRef} data-motion-id={scrollScene.sceneId} className="scroll-scene">
+    <section ref={containerRef} className="scroll-scene">
       <div className="scene-label">
         <h2>Continuous Path Animation (Scroll-Scrub)</h2>
         <p>A rocket following a 2D bezier path curve. The clouds move linearly on their own independent track.</p>
       </div>
 
-      <div data-motion-id="stage" className="stage">
+      <div ref={stageRef} className="stage">
         {/* Render paths using the exact coordinate config to overlay guide lines */}
         <svg className="path-guide" width="100%" height="100%">
           {scrollScene.elements.map(el => (
@@ -323,14 +328,18 @@ function ScrollDemo() {
 
 function CarouselDemo() {
   const containerRef = useRef(null);
+  const stageRef = useRef(null);
+
+  useMotionTrigger('carousel-storytelling', containerRef);
+  useMotionTrigger('carousel-stage', stageRef);
 
   return (
-    <section ref={containerRef} data-motion-id={dynamicCarouselScene.sceneId} className="carousel-scene">
+    <section ref={containerRef} className="carousel-scene">
       <div className="scene-label">
         <h2>Unlimited Carousel Scene (Scroll Stagger)</h2>
         <p>Dynamic mock cards flowing smoothly on a single Bezier S-curve track with engine-level stagger</p>
       </div>
-      <div data-motion-id="carousel-stage" className="carousel-stage">
+      <div ref={stageRef} className="carousel-stage">
         {MOCK_CARDS.map((card, i) => (
           <CarouselCard
             key={card.id}
@@ -355,6 +364,10 @@ function CarouselDemo() {
 
 function HelixDemo() {
   const containerRef = useRef(null);
+  const stageRef = useRef(null);
+
+  useMotionTrigger('helix-storytelling', containerRef);
+  useMotionTrigger('helix-stage', stageRef);
 
   const { cx, cy, radius, height, tiltDeg } = HELIX_CONFIG;
   const tiltRad = (tiltDeg * Math.PI) / 180;
@@ -367,13 +380,13 @@ function HelixDemo() {
   );
 
   return (
-    <section ref={containerRef} data-motion-id={dynamicHelixScene.sceneId} className="helix-scene">
+    <section ref={containerRef} className="helix-scene">
       <div className="scene-label">
         <h2>3D Helix Card Flow (Scroll Stagger)</h2>
         <p>Content cards flowing down a vertical spring, rotating 3D tangent to the cylinder surface</p>
       </div>
 
-      <div data-motion-id="helix-stage" className="helix-stage">
+      <div ref={stageRef} className="helix-stage">
         {/* SVG guides for the cylinder outlines */}
         <svg className="path-guide" width="100%" height="100%">
           <defs>

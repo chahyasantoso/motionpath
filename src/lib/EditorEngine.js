@@ -1,7 +1,5 @@
-import { validateProject } from '../validators/index.js';
-import { buildProject } from './builder.js';
-import { createEngineCore } from './engineCore.js';
-import { createDeferredSubscribe } from './deferredSubscribe.js';
+import { compileProject } from './compileProject.js';
+import { createDeferredCall } from './deferredCall.js';
 
 /**
  * Factory function per Brief 5.
@@ -14,26 +12,13 @@ export function createEditorEngine(deps) {
   let _core = null;
   let _buildResult = null;
   let _loadGeneration = 0;
-  const _subRegistry = createDeferredSubscribe();
+  const _deferredCall = createDeferredCall();
 
   return {
     async loadProject(schema) {
       const loadId = ++_loadGeneration;
 
-      // Step 1: Validate (same as ProductionEngine steps 1–3, no step 4)
-      const errors = validateProject(schema) || [];
-      const hardErrors = errors.filter(e => e.severity === 'error');
-      const warnings = errors.filter(e => e.severity !== 'error');
-      warnings.forEach(w => console.warn('[EditorEngine]', w.message));
-      if (hardErrors.length > 0) {
-        throw new Error(
-          '[EditorEngine] Schema validation failed:\n' +
-          hardErrors.map(e => `  - ${e.message}`).join('\n')
-        );
-      }
-
-      // Step 2: Build
-      const buildResult = await buildProject(schema, deps);
+      const { core, buildResult } = await compileProject(schema, deps, 'EditorEngine');
 
       // Stale-load guard: a newer loadProject() call (or destroy()) started
       // while buildProject was awaited — discard this result entirely.
@@ -43,17 +28,14 @@ export function createEditorEngine(deps) {
         return;
       }
 
-      // Step 3: EngineCore — NO trigger wiring
-      const core = createEngineCore(buildResult);
-
       if (_core) _core.destroy();
       _core = core;
       _buildResult = buildResult;
-      _subRegistry.setCore(core);
+      _deferredCall.setCore(core);
     },
 
     subscribe(elementId, callback) {
-      return _subRegistry.subscribe(elementId, callback);
+      return _deferredCall.call((core) => core.subscribe(elementId, callback));
     },
 
     compose(elementId, rawData) {
@@ -70,7 +52,7 @@ export function createEditorEngine(deps) {
       // Increment generation before teardown so any in-flight loadProject()
       // that resolves afterward treats itself as stale and self-discards.
       _loadGeneration++;
-      _subRegistry.clearCore();
+      _deferredCall.clearCore();
       if (_core) { _core.destroy(); _core = null; }
       _buildResult = null;
     },

@@ -7,45 +7,33 @@ import { productionEngine } from '../lib/ProductionEngine';
  * Destroys and cleans up engine resources on unmount.
  *
  * @param {Object} project - The complete project schema object
- * @param {Object} [playStates] - Map of timelineId → boolean.
- *   false = start paused, true = start playing (default for unspecified ids).
- *   Changes to this object trigger play/pause without reloading the project.
+ * @param {Object} [options]
+ * @param {Object} [options.initialPlayStates] - Map of timelineId → boolean,
+ *   applied once at load time only (prevents a one-frame flash of motion
+ *   before a separate useMotionTimelinePlayback pause can land). Changing
+ *   this after mount has no effect — use useMotionTimelinePlayback for
+ *   ongoing control.
  */
-export default function useMotionProject(project, playStates = {}) {
+export default function useMotionProject(project, { initialPlayStates = {} } = {}) {
   const projectRef = useRef(project);
   projectRef.current = project;
+  const initialPlayStatesRef = useRef(initialPlayStates);
+  initialPlayStatesRef.current = initialPlayStates;
 
-  // Stable string key for play state — avoids object reference churn as dep
-  const playStatesKey = Object.entries(playStates)
-    .map(([k, v]) => `${k}:${v}`)
-    .sort()
-    .join(',');
-
-  // Effect 1: Load — reruns only when the project schema changes
   useEffect(() => {
     if (!projectRef.current) return;
     let cancelled = false;
 
-    productionEngine.loadProject(projectRef.current, { playStates }).catch(err => {
-      if (!cancelled) console.error('[useMotionProject] loadProject failed:', err);
-    });
+    productionEngine
+      .loadProject(projectRef.current, { playStates: initialPlayStatesRef.current })
+      .catch(err => {
+        if (!cancelled) console.error('[useMotionProject] loadProject failed:', err);
+      });
 
     return () => {
       cancelled = true;
       productionEngine.destroy();
     };
   }, [project]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Effect 2: Play state — reruns only when playStates values change
-  // Independent of the load effect; never triggers a project reload.
-  useEffect(() => {
-    for (const [id, playing] of Object.entries(playStates)) {
-      try {
-        if (playing) productionEngine.playTimer(id);
-        else         productionEngine.pauseTimer(id);
-      } catch {
-        // Engine not yet ready — initial state is handled by loadProject options above
-      }
-    }
-  }, [playStatesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 }
+

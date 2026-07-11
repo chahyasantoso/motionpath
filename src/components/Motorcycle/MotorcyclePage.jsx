@@ -180,7 +180,7 @@ function Bike() {
   }, []);
   useMotionSubscriber('moto-bike', ref, transform);
   return (
-    <div data-motion-id="moto-bike" ref={ref} className="moto-element moto-bike">
+    <div ref={ref} className="moto-element moto-bike">
       🏍️
     </div>
   );
@@ -196,7 +196,7 @@ function BikeShadow() {
   }, []);
   useMotionSubscriber('moto-shadow', ref, transform);
   return (
-    <div data-motion-id="moto-shadow" ref={ref} className="moto-element moto-shadow">
+    <div ref={ref} className="moto-element moto-shadow">
       🏍️
     </div>
   );
@@ -207,7 +207,7 @@ function MotoCloud({ elementId, label }) {
   const transform = useCallback((rawData, composeFn) => composeFn(rawData), []);
   useMotionSubscriber(elementId, ref, transform);
   return (
-    <div data-motion-id={elementId} ref={ref} className="moto-element moto-cloud">
+    <div ref={ref} className="moto-element moto-cloud">
       {label}
     </div>
   );
@@ -219,7 +219,6 @@ function Streak({ elementId, className }) {
   useMotionSubscriber(elementId, ref, transform);
   return (
     <div
-      data-motion-id={elementId}
       ref={ref}
       className={`moto-element moto-streak ${className}`}
     />
@@ -261,7 +260,7 @@ export default function MotorcyclePage() {
           <path d={roadSvgD}     className="road-dashes" strokeDasharray="28 18" />
         </svg>
 
-        {/* Animated elements — all with data-motion-id in JSX */}
+        {/* Animated elements */}
         <Streak elementId="moto-streak-a" className="streak-a" />
         <Streak elementId="moto-streak-b" className="streak-b" />
         <MotoCloud elementId="moto-cloud-a" label="☁️" />

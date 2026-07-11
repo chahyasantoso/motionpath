@@ -2,6 +2,7 @@ import { gsap } from 'gsap';
 import { useCallback, useRef } from 'react';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
+import useMotionTrigger from '../../hooks/useMotionTrigger';
 import useSmoothScroll from '../../hooks/useSmoothScroll';
 import './PasarMalamPage.css';
 
@@ -248,7 +249,7 @@ const pmObserverProject = {
 function BackgroundSequence() {
   const ref = useRef(null);
   useMotionSubscriber('pasar-malam-bg', ref);
-  return <div ref={ref} data-motion-id="pasar-malam-bg" className="pm-bg-sequence" />;
+  return <div ref={ref} className="pm-bg-sequence" />;
 }
 
 function Lantern({ wrapId, innerId, assetUrl, className }) {
@@ -264,12 +265,10 @@ function Lantern({ wrapId, innerId, assetUrl, className }) {
   return (
     <div
       ref={wrapRef}
-      data-motion-id={wrapId}
       className={`pm-lantern-wrap ${className}`}
     >
       <div
         ref={innerRef}
-        data-motion-id={innerId}
         className="pm-lantern-inner"
         style={{ backgroundImage: `url('${assetUrl}')` }}
       />
@@ -294,7 +293,7 @@ function HeroTitle() {
   useMotionSubscriber('hero-title', ref, transform);
 
   return (
-    <div ref={ref} data-motion-id="hero-title" className="pm-title-element">
+    <div ref={ref} className="pm-title-element">
       Pasar Malam
       <div className="pm-title-subtitle">The Night Awakens</div>
     </div>
@@ -306,7 +305,7 @@ function LeftCard() {
   useMotionSubscriber('card-left', ref);
 
   return (
-    <div ref={ref} data-motion-id="card-left" className="pm-glass-card pm-card-left pm-interactive">
+    <div ref={ref} className="pm-glass-card pm-card-left pm-interactive">
       <div className="pm-card-badge">Street Flavors</div>
       <h3>Nostalgic Tastes</h3>
       <p>Follow the aroma of fresh Apam Balik, grilled Satay, and spun sugar floating under colorful string lights.</p>
@@ -319,7 +318,7 @@ function RightCard() {
   useMotionSubscriber('card-right', ref);
 
   return (
-    <div ref={ref} data-motion-id="card-right" className="pm-glass-card pm-card-right pm-interactive">
+    <div ref={ref} className="pm-glass-card pm-card-right pm-interactive">
       <div className="pm-card-badge">Night Vibes</div>
       <h3>Carnival Thrills</h3>
       <p>Hear the laughter and music from the Ferris Wheel while glowing neon games light up the tropical midnight sky.</p>
@@ -352,7 +351,7 @@ function StatsCard() {
   useMotionSubscriber('stats-card', ref, transform);
 
   return (
-    <div ref={ref} data-motion-id="stats-card" className="pm-stats-card pm-interactive">
+    <div ref={ref} className="pm-stats-card pm-interactive">
       <div className="pm-neon-tag">Open</div>
       <div className="pm-stat-item">
         <p className="pm-stat-num stalls-num">0+</p>
@@ -369,6 +368,12 @@ function StatsCard() {
 // ─── Main Page Export ───────────────────────────────────────────
 
 export default function PasarMalamObserverPage() {
+  const storytellingRef = useRef(null);
+  const stageRef = useRef(null);
+
+  useMotionTrigger('pasar-malam-storytelling', storytellingRef);
+  useMotionTrigger('pm-stage', stageRef);
+
   // Pure observer-driven approach. No local React state and no hook wiring required.
   useMotionProject(pmObserverProject);
   useSmoothScroll();
@@ -376,8 +381,8 @@ export default function PasarMalamObserverPage() {
   return (
     <div className="pm-container">
       {/* Scroll storytelling stage */}
-      <section data-motion-id="pasar-malam-storytelling" className="pm-hero-section">
-        <div data-motion-id="pm-stage" className="pm-stage">
+      <section ref={storytellingRef} className="pm-hero-section">
+        <div ref={stageRef} className="pm-stage">
           <BackgroundSequence />
           <div className="pm-overlay" />
           

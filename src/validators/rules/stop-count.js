@@ -27,7 +27,7 @@ export function stopCountRule(element, scenario, context, path) {
       errors.push({
         ruleId: "stop-count",
         severity: "error",
-        message: `Property '${propKey}' on element '${element.id || 'unknown'}' must have at least 2 stops, but got ${stops ? stops.length : 0}.`,
+        message: `Property '${propKey}' on element '${element.id || 'unknown'}' must have at least 2 stops, but got ${Array.isArray(stops) ? stops.length : 0}.`,
         path: `${path}.keyframes.${propKey}`
       });
     }
