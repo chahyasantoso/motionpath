@@ -21,21 +21,26 @@ d:/dev/motionpath/
 │   ├── hooks/
 │   │   ├── useMotionProject.js    # React Hook: Headless project initializer
 │   │   ├── useMotionSubscriber.js # React Hook: Low-overhead direct DOM update subscriber
+│   │   ├── useMotionTrigger.js    # React Hook: Registers trigger element target DOM refs
+│   │   ├── useMotionTimelinePlayback.js # React Hook: Ongoing play/pause timeline control
 │   │   └── __tests__/             # Unit tests for Hooks
 │   │       ├── useMotionProject.test.js
-│   │       └── useMotionSubscriber.test.js
+│   │       ├── useMotionSubscriber.test.js
+│   │       └── useMotionTimelinePlayback.test.js
 │   └── lib/
 │       ├── ProductionEngine.js    # Production-facing engine singleton
 │       ├── EditorEngine.js        # Editor-facing engine with Manual Playback controls
+│       ├── compileProject.js      # Shared preamble compiler (validate -> build -> EngineCore)
 │       ├── engineCore.js          # Shared subscription & compose core
 │       ├── builder.js             # Compiles schema keyframes and merges plugin patches
-│       ├── deferredSubscribe.js   # Buffer/queue subscriber hook registrations
+│       ├── deferredCall.js        # Generalized buffer/queue for subscribers and timers
 │       ├── pathMath.js            # Quadratic/Cubic Bezier curve calculations
 │       ├── pathUtils.js           # Math curve interpolation and SVG DOM helpers
 │       ├── plugins.js             # Engine plugin registry
 │       ├── plugins/               # Custom animation plugins directory (opacity, path, filter, etc.)
 │       ├── projection3d.js        # 3D-to-2D perspective projection math and generators
 │       └── __tests__/             # Unit tests for core library functions
+│           └── ...
 ```
 
 ---
@@ -129,22 +134,58 @@ Handles trigonometric projection of coordinates from a 3D coordinate space onto 
 
 ### A. `useMotionProject` (`src/hooks/useMotionProject.js`)
 
-A headless React hook that loads a schema project and manages its playback states:
+A headless React hook that loads a schema project:
 
 ```javascript
 import useMotionProject from './hooks/useMotionProject';
 
-// load project, start 'timeline-id' paused, auto-play other time scenarios
+// load project with initial paused states (prevents one-frame flash of motion)
 useMotionProject(projectSchema, {
-  'timeline-id': false // true = playing, false = paused
+  initialPlayStates: {
+    'timeline-id': false // true = playing, false = paused (default for unspecified ids is true)
+  }
 });
 ```
 
 *   **Behavior**:
-    *   **Independent Lifecycles**: Split into two distinct effects. Changing the schema re-loads the project completely. Changing `playStates` only toggles GSAP play/pause timers, avoiding expensive engine re-builds.
     *   **Auto-Cleanup**: Automatically cleans up and calls `productionEngine.destroy()` on unmount.
+    *   **Static Playback Configuration**: Changing `initialPlayStates` after mount has no effect; use `useMotionTimelinePlayback` for dynamic reactive control.
 
-### B. `useMotionSubscriber` (`src/hooks/useMotionSubscriber.js`)
+### B. `useMotionTimelinePlayback` (`src/hooks/useMotionTimelinePlayback.js`)
+
+A React hook providing dynamic play/pause timeline control from any component at any level of nesting:
+
+```javascript
+import useMotionTimelinePlayback from './hooks/useMotionTimelinePlayback';
+
+// dynamically control play/pause of a time-based scenario
+useMotionTimelinePlayback('timeline-id', isPlaying);
+```
+
+*   **Behavior**:
+    *   Allows individual components to trigger timeline playback state changes based on viewport visibility, hover, or click interactions.
+    *   Buffered through the generalized `deferredCall` utility so commands are safely queued if the engine has not yet finished loading.
+
+### C. `useMotionTrigger` (`src/hooks/useMotionTrigger.js`)
+
+A React hook registering a DOM element reference as a trigger or pin target:
+
+```javascript
+import { useRef } from 'react';
+import useMotionTrigger from './hooks/useMotionTrigger';
+
+const sectionRef = useRef(null);
+const stageRef = useRef(null);
+
+useMotionTrigger('pricing-section', sectionRef);
+useMotionTrigger('pricing-stage', stageRef);
+```
+
+*   **Behavior**:
+    *   Decouples the engine from browser DOM querying APIs (removes need for global class selectors or `data-motion-id` attributes).
+    *   Registers target nodes in the trigger ref map on mount, and automatically unregisters them on unmount.
+
+### D. `useMotionSubscriber` (`src/hooks/useMotionSubscriber.js`)
 
 Subscribes direct DOM references to coordinate updates:
 
@@ -306,7 +347,7 @@ To prevent different timelines from clobbering coordinates (e.g. two separate sc
 
 ## 10. Testing & Verification
 
-The suite runs **189 unit tests** using **Vitest** covering edge cases, curve configurations, play-state overrides, pub/sub event distributions, caching, and 3D projection formulas.
+The suite runs **198 unit tests** using **Vitest** covering edge cases, curve configurations, play-state overrides, pub/sub event distributions, caching, and 3D projection formulas.
 
 To execute tests:
 ```bash
