@@ -2,8 +2,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { compileProject } from './compileProject.js';
 import { createDeferredCall } from './deferredCall.js';
-import { resolveTrack } from './templateResolver.js';
-import { buildTrackTweenSync } from './builder.js';
+import { createMotionResolver } from './resolveMotion.js';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -36,6 +35,7 @@ export function createProductionEngine(deps) {
   // Track only the ScrollTrigger instances THIS engine created.
   const _createdScrollTriggers = [];
   const _deferredCall = createDeferredCall();
+  const _motionResolver = createMotionResolver();
 
   function _cleanup() {
     // Invalidate any in-flight loadProject() — if its buildProject resolves
@@ -55,6 +55,7 @@ export function createProductionEngine(deps) {
     }
     _buildResult = null;
     _schema = null;
+    _motionResolver.clearCache();
   }
 
   return {
@@ -264,74 +265,7 @@ export function createProductionEngine(deps) {
       if (!_schema || !_buildResult) {
         throw new Error('resolveMotion: project not loaded.');
       }
-      const originalMotion = _schema.motions?.find(
-        m => m && (m.motionId === motionId || (m.motionId === undefined && String(_schema.motions.indexOf(m)) === motionId))
-      );
-      if (!originalMotion) {
-        throw new Error(`resolveMotion: motion with id "${motionId}" not found.`);
-      }
-      if (originalMotion.driver?.type !== 'delegate') {
-        throw new Error(`resolveMotion: motion with id "${motionId}" is not a delegate motion.`);
-      }
-
-      const result = {};
-      const templates = _schema.templates || [];
-
-      for (const track of originalMotion.tracks || []) {
-        const resolvedTrack = resolveTrack(track, templates);
-        
-        const trackOverride = overrides?.[track.id];
-        let finalKeyframes = resolvedTrack.keyframes;
-        let finalDuration = resolvedTrack.duration;
-        let finalTransformOrigin = resolvedTrack.transformOrigin;
-
-        if (trackOverride) {
-          if (trackOverride.duration !== undefined) finalDuration = trackOverride.duration;
-          if (trackOverride.transformOrigin !== undefined) finalTransformOrigin = trackOverride.transformOrigin;
-          if (trackOverride.keyframes) {
-            finalKeyframes = { ...finalKeyframes };
-            for (const key of Object.keys(trackOverride.keyframes)) {
-              finalKeyframes[key] = trackOverride.keyframes[key];
-            }
-          }
-        }
-
-        const tweenDuration = finalDuration ?? 1;
-        
-        const { proxy, tween, resolvedPlugins } = buildTrackTweenSync(
-          track.id,
-          finalKeyframes,
-          tweenDuration,
-          { ...resolvedTrack, duration: finalDuration, transformOrigin: finalTransformOrigin, keyframes: finalKeyframes }
-        );
-
-        tween.progress(progress);
-
-        const patch = {};
-        for (const plugin of resolvedPlugins) {
-          try {
-            const rawData = {};
-            for (const key of plugin.keys) {
-              if (key in proxy) rawData[key] = proxy[key];
-            }
-            const contribution = plugin.compose(rawData, { ...resolvedTrack, duration: finalDuration, transformOrigin: finalTransformOrigin, keyframes: finalKeyframes });
-            for (const [k, v] of Object.entries(contribution || {})) {
-              if (k === 'filter' && typeof v === 'object') {
-                patch.filter = { ...(patch.filter || {}), ...v };
-              } else {
-                patch[k] = v;
-              }
-            }
-          } catch (e) {
-            // Defensively ignore plugin compose errors
-          }
-        }
-
-        tween.kill();
-        result[track.id] = patch;
-      }
-
-      return result;
+      return _motionResolver.resolve(_schema, motionId, progress, overrides);
     }
   };
 }

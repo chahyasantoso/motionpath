@@ -119,4 +119,58 @@ describe('resolveMotion and mountTimeline API tests', () => {
     // tr2 opacity overrides should yield 0.4 at p=0.5
     expect(result.tr2.opacity).toBeCloseTo(0.4);
   });
+
+  it('resolveMotion reuses a cached tween across calls with no override (no rebuild per call)', async () => {
+    const { gsap } = await import('gsap');
+    const engine = createProductionEngine(mockDeps);
+    await engine.loadProject(validProject);
+
+    const toSpy = vi.spyOn(gsap, 'to');
+
+    engine.resolveMotion('delegateMotion', 0.1);
+    engine.resolveMotion('delegateMotion', 0.5);
+    engine.resolveMotion('delegateMotion', 0.9);
+
+    // Two tracks (tr2, tr3), each called 3x with no override -> exactly
+    // one gsap.to() per track across all three calls, not three.
+    expect(toSpy).toHaveBeenCalledTimes(2);
+
+    toSpy.mockRestore();
+  });
+
+  it('resolveMotion does not cache a track resolved with an override (rebuilds every call)', async () => {
+    const { gsap } = await import('gsap');
+    const engine = createProductionEngine(mockDeps);
+    await engine.loadProject(validProject);
+
+    const toSpy = vi.spyOn(gsap, 'to');
+    const override = {
+      tr2: { keyframes: { opacity: { stops: [{ p: 0, v: 0.2 }, { p: 1, v: 0.6 }] } } }
+    };
+
+    engine.resolveMotion('delegateMotion', 0.1, override);
+    engine.resolveMotion('delegateMotion', 0.5, override);
+
+    // tr2 rebuilt on every call (2x, one per resolveMotion call) since it
+    // carries an override; tr3 has no override so it's cached (1x total).
+    expect(toSpy).toHaveBeenCalledTimes(3);
+
+    toSpy.mockRestore();
+  });
+
+  it('resolveMotion throws with context when a plugin compose() call fails, instead of silently swallowing it', async () => {
+    const engine = createProductionEngine(mockDeps);
+    await engine.loadProject(validProject);
+
+    const { resolvePluginForKey } = await import('../plugins.js');
+    const opacityPlugin = resolvePluginForKey('opacity');
+    const originalCompose = opacityPlugin.compose;
+    opacityPlugin.compose = () => { throw new Error('boom'); };
+
+    try {
+      expect(() => engine.resolveMotion('delegateMotion', 0.5)).toThrow(/plugin compose failed.*delegateMotion.*tr2.*boom/s);
+    } finally {
+      opacityPlugin.compose = originalCompose;
+    }
+  });
 });
