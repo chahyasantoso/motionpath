@@ -47,9 +47,13 @@ describe('builder unit and integration tests', () => {
       };
 
       const project = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          elements: [{
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1'
+          },
+          tracks: [{
             id: 'el-1',
             keyframes: {
               propA: { stops: [{ p: 0, v: 10 }, { p: 1, v: 20 }] },
@@ -60,10 +64,10 @@ describe('builder unit and integration tests', () => {
       };
 
       const result = await buildProject(project, deps);
-      expect(result.elementPlugins.get('el-1')).toContain(pluginA);
-      expect(result.elementPlugins.get('el-1')).toContain(pluginB);
+      expect(result.trackPlugins.get('el-1')).toContain(pluginA);
+      expect(result.trackPlugins.get('el-1')).toContain(pluginB);
 
-      const timeline = result.scenarios[0].timeline;
+      const timeline = result.motions[0].timeline;
       const tweens = timeline.getChildren();
       expect(tweens).toHaveLength(1);
       const tween = tweens[0];
@@ -93,9 +97,13 @@ describe('builder unit and integration tests', () => {
       };
 
       const project = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          elements: [{
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1'
+          },
+          tracks: [{
             id: 'el-1',
             keyframes: {
               propA: { stops: [{ p: 0, v: 0 }, { p: 0.5, v: 10 }] },
@@ -106,7 +114,7 @@ describe('builder unit and integration tests', () => {
       };
 
       const result = await buildProject(project, deps);
-      const tween = result.scenarios[0].timeline.getChildren()[0];
+      const tween = result.motions[0].timeline.getChildren()[0];
       expect(tween.vars.keyframes).toEqual({
         '50%': { propA: 10, propB: 20 }
       });
@@ -134,9 +142,13 @@ describe('builder unit and integration tests', () => {
       };
 
       const project = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          elements: [{
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1'
+          },
+          tracks: [{
             id: 'el-1',
             keyframes: {
               propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
@@ -171,9 +183,13 @@ describe('builder unit and integration tests', () => {
       };
 
       const project = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          elements: [{
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1'
+          },
+          tracks: [{
             id: 'el-1',
             keyframes: {
               propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
@@ -184,7 +200,7 @@ describe('builder unit and integration tests', () => {
       };
 
       const result = await buildProject(project, deps);
-      const tween = result.scenarios[0].timeline.getChildren()[0];
+      const tween = result.motions[0].timeline.getChildren()[0];
       expect(tween.vars.transformOrigin).toBe('center center');
     });
 
@@ -208,9 +224,13 @@ describe('builder unit and integration tests', () => {
       };
 
       const project = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          elements: [{
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1'
+          },
+          tracks: [{
             id: 'el-1',
             keyframes: {
               propA: { stops: [{ p: 0, v: 0 }, { p: 0.5, v: 10 }] },
@@ -226,22 +246,15 @@ describe('builder unit and integration tests', () => {
 
   describe('lazy plugin loading', () => {
     it('concurrent ensureLoaded calls for the same plugin fire load() exactly once', async () => {
-      // This tests the actual race the spec warned about: two callers firing
-      // ensureLoaded without awaiting between them. The module-level Map ensures
-      // only one Promise is ever created. A boolean-flag implementation would
-      // fail this test because both calls would pass the `if (!loaded)` check
-      // before either resolves.
       const lazyPlugin = {
         lazy: true,
         load: vi.fn(() => new Promise(resolve => setTimeout(resolve, 20)))
       };
-      // Both calls fire before either resolves — real concurrency
       await Promise.all([ensureLoaded(lazyPlugin), ensureLoaded(lazyPlugin)]);
       expect(lazyPlugin.load).toHaveBeenCalledTimes(1);
     });
 
     it('sequential buildProject calls do not re-invoke load() for the same plugin', async () => {
-      // Module-level Map persists across buildProject calls.
       const lazyPlugin = {
         keys: ['splitText'],
         lazy: true,
@@ -251,9 +264,13 @@ describe('builder unit and integration tests', () => {
       mockResolvePlugin = () => lazyPlugin;
 
       const project = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          elements: [{ id: 'el-1', keyframes: { splitText: { stops: [{ p: 0, v: '' }, { p: 1, v: '' }] } } }]
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1'
+          },
+          tracks: [{ id: 'el-1', keyframes: { splitText: { stops: [{ p: 0, v: '' }, { p: 1, v: '' }] } } }]
         }]
       };
 
@@ -263,7 +280,7 @@ describe('builder unit and integration tests', () => {
     });
   });
 
-  describe('scenario and group timeline construction', () => {
+  describe('motion and group timeline construction', () => {
     it('applies stagger offsets correctly', async () => {
       const pluginA = {
         keys: ['propA'],
@@ -272,10 +289,14 @@ describe('builder unit and integration tests', () => {
       mockResolvePlugin = () => pluginA;
 
       const project = {
-        scenarios: [{
-          sceneId: 'scene-1',
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1'
+          },
           stagger: 0.5,
-          elements: [
+          tracks: [
             { id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } },
             { id: 'el-2', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }
           ]
@@ -283,14 +304,14 @@ describe('builder unit and integration tests', () => {
       };
 
       const result = await buildProject(project, deps);
-      const timeline = result.scenarios[0].timeline;
+      const timeline = result.motions[0].timeline;
       const children = timeline.getChildren();
       expect(children).toHaveLength(2);
       expect(children[0].startTime()).toBe(0);
       expect(children[1].startTime()).toBe(0.5);
     });
 
-    it('grouped scenarios nest sequentially and record primaryScenarioIndex', async () => {
+    it('grouped motions nest sequentially and record primaryMotionIndex', async () => {
       const pluginA = {
         keys: ['propA'],
         contribute: () => ({ percentPatch: {}, tweenVars: {} })
@@ -298,17 +319,24 @@ describe('builder unit and integration tests', () => {
       mockResolvePlugin = () => pluginA;
 
       const project = {
-        scenarios: [
+        schemaVersion: 2,
+        motions: [
           {
-            sceneId: 'scene-1',
-            timelineId: 'group-1',
-            elements: [{ id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
+            driver: {
+              type: 'timeline',
+              sectionId: 'scene-1',
+              timelineId: 'group-1'
+            },
+            tracks: [{ id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
           },
           {
-            sceneId: 'scene-2',
-            timelineId: 'group-1',
-            primary: true,
-            elements: [{ id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
+            driver: {
+              type: 'timeline',
+              sectionId: 'scene-2',
+              timelineId: 'group-1',
+              primary: true
+            },
+            tracks: [{ id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
           }
         ]
       };
@@ -316,16 +344,16 @@ describe('builder unit and integration tests', () => {
       const result = await buildProject(project, deps);
       const groupBuild = result.timelineGroups.get('group-1');
       expect(groupBuild).toBeDefined();
-      expect(groupBuild.primaryScenarioIndex).toBe(1);
+      expect(groupBuild.primaryMotionIndex).toBe(1);
 
       const master = groupBuild.masterTimeline;
       const children = master.getChildren(false, false, true);
       expect(children).toHaveLength(2);
-      expect(children[0]).toBe(result.scenarios[0].timeline);
-      expect(children[1]).toBe(result.scenarios[1].timeline);
+      expect(children[0]).toBe(result.motions[0].timeline);
+      expect(children[1]).toBe(result.motions[1].timeline);
     });
 
-    it('applies trigger.delay to scenario timeline total duration for time triggers', async () => {
+    it('applies trigger.delay to motion timeline total duration for time triggers', async () => {
       const pluginA = {
         keys: ['propA'],
         contribute: () => ({ percentPatch: {}, tweenVars: {} })
@@ -333,26 +361,34 @@ describe('builder unit and integration tests', () => {
       mockResolvePlugin = () => pluginA;
 
       const projectWithDelay = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          trigger: { type: 'time', delay: 0.5, duration: 1 },
-          elements: [{ id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1',
+            trigger: { type: 'time', delay: 0.5, duration: 1 }
+          },
+          tracks: [{ id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
         }]
       };
 
       const projectWithoutDelay = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          trigger: { type: 'time', duration: 1 },
-          elements: [{ id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1',
+            trigger: { type: 'time', duration: 1 }
+          },
+          tracks: [{ id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
         }]
       };
 
       const resWithDelay = await buildProject(projectWithDelay, deps);
       const resWithoutDelay = await buildProject(projectWithoutDelay, deps);
 
-      expect(resWithDelay.scenarios[0].timeline.delay()).toBe(0.5);
-      expect(resWithoutDelay.scenarios[0].timeline.delay()).toBe(0);
+      expect(resWithDelay.motions[0].timeline.delay()).toBe(0.5);
+      expect(resWithoutDelay.motions[0].timeline.delay()).toBe(0);
     });
   });
 
@@ -362,12 +398,16 @@ describe('builder unit and integration tests', () => {
       mockResolvePlugin = actualPlugins.resolvePluginForKey;
 
       const project = {
-        scenarios: [
+        schemaVersion: 2,
+        motions: [
           {
-            sceneId: 'scene-1',
-            timelineId: 'group-1',
-            trigger: { type: 'time', duration: 3 },
-            elements: [{
+            driver: {
+              type: 'timeline',
+              sectionId: 'scene-1',
+              timelineId: 'group-1',
+              trigger: { type: 'time', duration: 3 }
+            },
+            tracks: [{
               id: 'el-1',
               keyframes: {
                 x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 100 }] },
@@ -376,11 +416,14 @@ describe('builder unit and integration tests', () => {
             }]
           },
           {
-            sceneId: 'scene-2',
-            timelineId: 'group-1',
-            primary: true,
-            trigger: { type: 'scroll', scrub: true },
-            elements: [{
+            driver: {
+              type: 'timeline',
+              sectionId: 'scene-2',
+              timelineId: 'group-1',
+              primary: true,
+              trigger: { type: 'scroll', scrub: true }
+            },
+            tracks: [{
               id: 'el-1',
               keyframes: {
                 y: { stops: [{ p: 0, v: 0 }, { p: 1, v: 200 }] }
@@ -391,25 +434,23 @@ describe('builder unit and integration tests', () => {
       };
 
       const result = await buildProject(project, deps);
-      expect(result.elementPlugins.get('el-1')).toBeDefined();
-      expect(result.scenarios).toHaveLength(2);
-      expect(result.scenarios[0].timeline.paused()).toBe(true);
-      expect(result.scenarios[1].timeline.paused()).toBe(true);
+      expect(result.trackPlugins.get('el-1')).toBeDefined();
+      expect(result.motions).toHaveLength(2);
+      expect(result.motions[0].timeline.paused()).toBe(true);
+      expect(result.motions[1].timeline.paused()).toBe(true);
 
       const group = result.timelineGroups.get('group-1');
       expect(group).toBeDefined();
       expect(group.masterTimeline.paused()).toBe(true);
-      expect(group.primaryScenarioIndex).toBe(1);
+      expect(group.primaryMotionIndex).toBe(1);
     });
   });
 
   describe('proxy-not-DOM (critical §9)', () => {
     it('tweens proxy object, never touches domNode style or attributes', async () => {
-      // Use real filterPlugin: it writes blur to proxy, not blur to DOM.
       const actualPlugins = await vi.importActual('../plugins.js');
       mockResolvePlugin = actualPlugins.resolvePluginForKey;
 
-      // Spy on any style writes to the DOM node
       const styleSetSpy = vi.fn();
       Object.defineProperty(mockDom, 'style', {
         get: () => new Proxy({}, { set: styleSetSpy }),
@@ -418,10 +459,14 @@ describe('builder unit and integration tests', () => {
       const setAttributeSpy = vi.spyOn(mockDom, 'setAttribute');
 
       const project = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          trigger: { type: 'time', duration: 1 },
-          elements: [{
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1',
+            trigger: { type: 'time', duration: 1 }
+          },
+          tracks: [{
             id: 'el-blur',
             keyframes: {
               blur: { stops: [{ p: 0, v: 0 }, { p: 1, v: 20 }] }
@@ -432,20 +477,16 @@ describe('builder unit and integration tests', () => {
 
       const result = await buildProject(project, deps);
 
-      // Verify elements map is populated (requires Change 1)
-      const elementBuild = result.elements.get('el-blur');
-      expect(elementBuild).toBeDefined();
-      const { proxy, domNode } = elementBuild;
+      const trackBuild = result.tracks.get('el-blur');
+      expect(trackBuild).toBeDefined();
+      const { proxy, domNode } = trackBuild;
 
-      // Advance the tween to mid-point
-      const tween = result.scenarios[0].timeline.getChildren()[0];
+      const tween = result.motions[0].timeline.getChildren()[0];
       tween.progress(0.5);
 
-      // (a) proxy must carry the synthetic key filterPlugin writes (blur)
       expect('blur' in proxy).toBe(true);
       expect(proxy.blur).toBeGreaterThan(0);
 
-      // (b) domNode must not have been resolved by the builder at all (strictly no build-time DOM reads)
       expect(deps.resolveElement).not.toHaveBeenCalled();
       expect(styleSetSpy).not.toHaveBeenCalled();
       expect(setAttributeSpy).not.toHaveBeenCalled();
@@ -459,10 +500,14 @@ describe('builder unit and integration tests', () => {
       mockResolvePlugin = actualPlugins.resolvePluginForKey;
 
       const project = {
-        scenarios: [{
-          sceneId: 'scene-1',
-          trigger: { type: 'time', duration: 1 },
-          elements: [{
+        schemaVersion: 2,
+        motions: [{
+          driver: {
+            type: 'timeline',
+            sectionId: 'scene-1',
+            trigger: { type: 'time', duration: 1 }
+          },
+          tracks: [{
             id: 'el-seq',
             keyframes: {
               imageSequence: {
@@ -478,26 +523,23 @@ describe('builder unit and integration tests', () => {
       };
 
       const result = await buildProject(project, deps);
-      const elementBuild = result.elements.get('el-seq');
-      expect(elementBuild).toBeDefined();
+      const trackBuild = result.tracks.get('el-seq');
+      expect(trackBuild).toBeDefined();
 
-      const { proxy } = elementBuild;
+      const { proxy } = trackBuild;
       expect(proxy.imageSequenceIndex).toBe(0);
 
-      const tween = result.scenarios[0].timeline.getChildren()[0];
-      
-      // Mid-point progress
+      const tween = result.motions[0].timeline.getChildren()[0];
+
       tween.progress(0.5);
       expect(proxy.imageSequenceIndex).toBeCloseTo(1);
 
-      // Verify composition
-      const composedMid = result.elementPlugins.get('el-seq')[0].compose(proxy, elementBuild.elementConfig);
+      const composedMid = result.trackPlugins.get('el-seq')[0].compose(proxy, trackBuild.trackConfig);
       expect(composedMid).toEqual({ backgroundImage: 'url(002.jpg)' });
 
-      // End progress
       tween.progress(1);
       expect(proxy.imageSequenceIndex).toBeCloseTo(2);
-      const composedEnd = result.elementPlugins.get('el-seq')[0].compose(proxy, elementBuild.elementConfig);
+      const composedEnd = result.trackPlugins.get('el-seq')[0].compose(proxy, trackBuild.trackConfig);
       expect(composedEnd).toEqual({ backgroundImage: 'url(003.jpg)' });
     });
   });

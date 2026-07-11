@@ -9,20 +9,20 @@ import { ALL_PLUGINS } from './plugins.js';
  * @returns {EngineCore}
  */
 export function createEngineCore(buildResult) {
-  // subscribers: Map<elementId, Set<callback>>
+  // subscribers: Map<trackId, Set<callback>>
   const subscribers = new Map();
   let tickerCallback = null;
 
   function startTicker() {
     if (tickerCallback) return;
     tickerCallback = () => {
-      for (const [elementId, cbs] of subscribers.entries()) {
+      for (const [trackId, cbs] of subscribers.entries()) {
         if (cbs.size === 0) continue;
-        const elementBuild = buildResult.elements.get(elementId);
-        if (!elementBuild) continue;
-        const progress = elementBuild.tween ? elementBuild.tween.progress() : 0;
+        const trackBuild = buildResult.tracks.get(trackId);
+        if (!trackBuild) continue;
+        const progress = trackBuild.tween ? trackBuild.tween.progress() : 0;
         const snapshot = {
-          ...elementBuild.proxy,
+          ...trackBuild.proxy,
           progress
         };
         for (const cb of cbs) {
@@ -49,27 +49,27 @@ export function createEngineCore(buildResult) {
 
   return {
     /**
-     * Subscribes to raw proxy value broadcasts for an element.
-     * Throws if elementId is not in buildResult.
+     * Subscribes to raw proxy value broadcasts for a track.
+     * Throws if trackId is not in buildResult.
      * @returns {Function} unsubscribe
      */
-    subscribe(elementId, callback) {
-      if (!buildResult.elements.has(elementId)) {
-        throw new Error(`subscribe: element "${elementId}" not found in buildResult.`);
+    subscribe(trackId, callback) {
+      if (!buildResult.tracks.has(trackId)) {
+        throw new Error(`subscribe: track "${trackId}" not found in buildResult.`);
       }
-      if (!subscribers.has(elementId)) {
-        subscribers.set(elementId, new Set());
+      if (!subscribers.has(trackId)) {
+        subscribers.set(trackId, new Set());
       }
-      subscribers.get(elementId).add(callback);
+      subscribers.get(trackId).add(callback);
       if (totalSubscriberCount() === 1) startTicker();
 
       // Replay current state immediately so a new subscriber never waits on the
       // next tick, which may be arbitrarily delayed (paused editor timeline,
       // backgrounded tab, fake timers in tests). `proxy` is already always current.
-      callback({ ...buildResult.elements.get(elementId).proxy });
+      callback({ ...buildResult.tracks.get(trackId).proxy });
 
       return () => {
-        const cbs = subscribers.get(elementId);
+        const cbs = subscribers.get(trackId);
         if (cbs) {
           cbs.delete(callback);
           if (totalSubscriberCount() === 0) stopTicker();
@@ -78,15 +78,16 @@ export function createEngineCore(buildResult) {
     },
 
     /**
-     * Calls plugin.compose() for every resolved plugin on the element,
-     * merges the results, assembles the CSS filter string from *_filter keys,
-     * and returns the final patch object. Does NOT write to the DOM.
+     * Calls plugin.compose() for every resolved plugin on the track,
+     * merges the results into a patch object, and returns it.
+     * Does NOT write to the DOM or perform any platform-specific serialization
+     * (e.g. CSS filter string assembly) — that's owned by the renderer layer.
      */
-    compose(elementId, rawData) {
-      const elementBuild = buildResult.elements.get(elementId);
-      if (!elementBuild) return {};
-      const source = rawData ?? { ...elementBuild.proxy };
-      const resolved = buildResult.elementPlugins.get(elementId) ?? [];
+    compose(trackId, rawData) {
+      const trackBuild = buildResult.tracks.get(trackId);
+      if (!trackBuild) return {};
+      const source = rawData ?? { ...trackBuild.proxy };
+      const resolved = buildResult.trackPlugins.get(trackId) ?? [];
       
       const resolvedKeys = new Set();
       for (const p of resolved) {
@@ -115,7 +116,7 @@ export function createEngineCore(buildResult) {
         if (typeof plugin.compose !== 'function') continue;
         let contribution;
         try {
-          contribution = plugin.compose(source, elementBuild.elementConfig ?? elementBuild);
+          contribution = plugin.compose(source, trackBuild.trackConfig ?? trackBuild);
         } catch {
           // Defensive: one broken plugin must not blank the whole patch
           continue;
@@ -130,58 +131,58 @@ export function createEngineCore(buildResult) {
     },
 
     /**
-     * Kills all timelines whose sceneId matches, and removes their element subscribers.
+     * Kills all timelines whose sectionId matches, and removes their track subscribers.
      */
-    destroyScene(sceneId) {
-      const matchingScenarios = buildResult.scenarios.filter(s => s.sceneId === sceneId);
-      const elementsToClear = new Set();
+    destroySection(sectionId) {
+      const matchingMotions = buildResult.motions.filter(m => m.sectionId === sectionId);
+      const tracksToClear = new Set();
 
       const groupsToKill = new Set();
 
-      for (const scenario of matchingScenarios) {
-        if (scenario.timeline) {
+      for (const motion of matchingMotions) {
+        if (motion.timeline) {
           // Find all proxies targeted by tweens in this timeline
-          const tweens = scenario.timeline.getChildren(true, true, false);
+          const tweens = motion.timeline.getChildren(true, true, false);
           for (const tween of tweens) {
             const targets = tween.targets();
             const targetProxy = Array.isArray(targets) ? targets[0] : targets;
             if (targetProxy) {
-              // Find elementId for this proxy
-              for (const [elementId, elBuild] of buildResult.elements.entries()) {
+              // Find trackId for this proxy
+              for (const [trackId, elBuild] of buildResult.tracks.entries()) {
                 if (elBuild.proxy === targetProxy) {
-                  elementsToClear.add(elementId);
+                  tracksToClear.add(trackId);
                   break;
                 }
               }
             }
           }
-          scenario.timeline.kill();
-          if (scenario.timelineId) {
-            groupsToKill.add(scenario.timelineId);
-            const group = buildResult.timelineGroups.get(scenario.timelineId);
+          motion.timeline.kill();
+          if (motion.timelineId) {
+            groupsToKill.add(motion.timelineId);
+            const group = buildResult.timelineGroups.get(motion.timelineId);
             if (group?.masterTimeline) {
-              group.masterTimeline.remove(scenario.timeline);
+              group.masterTimeline.remove(motion.timeline);
             }
           }
         }
       }
 
       for (const id of groupsToKill) {
-        // Only kill master if ALL child scenarios in the group are being destroyed
-        const allMatch = buildResult.scenarios
-          .filter(s => s.timelineId === id)
-          .every(s => matchingScenarios.includes(s));
+        // Only kill master if ALL child motions in the group are being destroyed
+        const allMatch = buildResult.motions
+          .filter(m => m.timelineId === id)
+          .every(m => matchingMotions.includes(m));
         if (allMatch) {
           buildResult.timelineGroups.get(id)?.masterTimeline?.kill();
         }
       }
 
-      // Clear subscribers for elements belonging to the destroyed scene
-      for (const elementId of elementsToClear) {
-        const cbs = subscribers.get(elementId);
+      // Clear subscribers for tracks belonging to the destroyed section
+      for (const trackId of tracksToClear) {
+        const cbs = subscribers.get(trackId);
         if (cbs) {
           cbs.clear();
-          subscribers.delete(elementId);
+          subscribers.delete(trackId);
         }
       }
 
@@ -194,8 +195,8 @@ export function createEngineCore(buildResult) {
      * Kills everything: all timelines, all subscribers, removes ticker.
      */
     destroy() {
-      for (const scenario of buildResult.scenarios) {
-        if (scenario.timeline) scenario.timeline.kill();
+      for (const motion of buildResult.motions) {
+        if (motion.timeline) motion.timeline.kill();
       }
       for (const group of buildResult.timelineGroups.values()) {
         if (group.masterTimeline) group.masterTimeline.kill();

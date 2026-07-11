@@ -3,8 +3,8 @@ import { easeCollisionRule } from '../ease-collision.js';
 
 describe('ease-collision rule', () => {
   it('should error on ease collision at same p with different ease values', () => {
-    const scenario = {
-      elements: [
+    const motion = {
+      tracks: [
         {
           id: 'test-el',
           keyframes: {
@@ -14,17 +14,17 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
+    const errors = easeCollisionRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('ease-collision');
     expect(errors[0].severity).toBe('error');
-    expect(errors[0].path).toBe('scenarios[0].elements[0].keyframes');
+    expect(errors[0].path).toBe('motions[0].tracks[0].keyframes');
     expect(errors[0].message).toContain("conflicting eases at p=0.5");
   });
 
   it('should pass if ease at same p is identical', () => {
-    const scenario = {
-      elements: [
+    const motion = {
+      tracks: [
         {
           id: 'test-el',
           keyframes: {
@@ -34,13 +34,13 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
+    const errors = easeCollisionRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(0);
   });
 
   it('should pass if one of the properties omits ease', () => {
-    const scenario = {
-      elements: [
+    const motion = {
+      tracks: [
         {
           id: 'test-el',
           keyframes: {
@@ -50,13 +50,13 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
+    const errors = easeCollisionRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(0);
   });
 
   it('should pass if stops are at different p values entirely', () => {
-    const scenario = {
-      elements: [
+    const motion = {
+      tracks: [
         {
           id: 'test-el',
           keyframes: {
@@ -66,13 +66,13 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
+    const errors = easeCollisionRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(0);
   });
 
   it('should work with path stops as well', () => {
-    const scenario = {
-      elements: [
+    const motion = {
+      tracks: [
         {
           id: 'test-el',
           keyframes: {
@@ -87,7 +87,7 @@ describe('ease-collision rule', () => {
         }
       ]
     };
-    const errors = easeCollisionRule(scenario, {}, 'scenarios[0]');
+    const errors = easeCollisionRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(1);
   });
 });

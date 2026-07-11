@@ -1,20 +1,20 @@
 /**
  * Rule: perspective-usage
- * Per-scenario warning check for perspective.
+ * Per-motion warning check for perspective.
  *
  * Requirements:
- * - If any element in the scenario uses z, rotationX, or rotationY,
+ * - If any track in the motion uses z, rotationX, or rotationY,
  *   and top-level schema.perspective is absent -> warning.
  *
- * @param {unknown} scenario
+ * @param {unknown} motion
  * @param {{ schema: unknown }} context - Rule validation context
- * @param {string} path - JSON path to scenario
+ * @param {string} path - JSON path to motion
  * @returns {ValidationError[]}
  */
-export function perspectiveUsageRule(scenario, context, path) {
+export function perspectiveUsageRule(motion, context, path) {
   const errors = [];
 
-  if (!scenario || typeof scenario !== 'object') {
+  if (!motion || typeof motion !== 'object') {
     return errors;
   }
 
@@ -25,16 +25,16 @@ export function perspectiveUsageRule(scenario, context, path) {
     return errors; // perspective is set, no warnings needed
   }
 
-  const elements = scenario.elements;
-  if (!Array.isArray(elements)) {
+  const tracks = motion.tracks;
+  if (!Array.isArray(tracks)) {
     return errors;
   }
 
   let uses3D = false;
 
-  for (const element of elements) {
-    if (!element || typeof element !== 'object') continue;
-    const keyframes = element.keyframes;
+  for (const track of tracks) {
+    if (!track || typeof track !== 'object') continue;
+    const keyframes = track.keyframes;
     if (!keyframes || typeof keyframes !== 'object') continue;
 
     const hasZ = keyframes.z !== undefined && keyframes.z !== null;
@@ -56,7 +56,7 @@ export function perspectiveUsageRule(scenario, context, path) {
     errors.push({
       ruleId: "perspective-usage",
       severity: "warning",
-      message: `Scenario contains 3D keyframe properties (z, rotationX, or rotationY), but top-level 'perspective' is missing.`,
+      message: `Motion contains 3D keyframe properties (z, rotationX, or rotationY), but top-level 'perspective' is missing.`,
       path
     });
   }

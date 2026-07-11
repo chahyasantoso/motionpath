@@ -3,7 +3,7 @@ import { productionEngine } from '../lib/ProductionEngine';
 
 /**
  * Registers a DOM ref as the resolution target for a trigger-anchor id
- * (used by `trigger` / `startTrigger` / `pin` / `endTrigger` in scenario
+ * (used by `trigger` / `startTrigger` / `pin` / `endTrigger` in motion
  * schemas). Replaces the old `data-motion-id` attribute + querySelector
  * lookup — this is a push registration instead of a DOM query.
  *

@@ -1,36 +1,40 @@
 /**
  * Rule: stagger-shape
- * Per-scenario stagger validation.
+ * Per-motion stagger validation.
  *
  * Requirements:
- * - scenario.stagger present and negative -> error.
- * - scenario.stagger present, non-zero, and elements.length < 2 -> warning.
+ * - motion.stagger present and negative -> error.
+ * - motion.stagger present, non-zero, and tracks.length < 2 -> warning.
  *
- * @param {unknown} scenario
+ * @param {unknown} motion
  * @param {{ schema: unknown }} context - Rule validation context
- * @param {string} path - JSON path to scenario
+ * @param {string} path - JSON path to motion
  * @returns {ValidationError[]}
  */
-export function staggerShapeRule(scenario, context, path) {
+export function staggerShapeRule(motion, context, path) {
   const errors = [];
 
-  if (!scenario || typeof scenario !== 'object') {
+  if (!motion || typeof motion !== 'object') {
     return errors;
   }
 
-  const stagger = scenario.stagger;
+  if (motion.driver?.type === 'delegate') {
+    return errors;
+  }
+
+  const stagger = motion.stagger;
   if (stagger === undefined || stagger === null) {
     return errors;
   }
 
-  const elements = scenario.elements || [];
+  const tracks = motion.tracks || [];
   const staggerPath = `${path}.stagger`;
 
   if (typeof stagger !== 'number') {
     errors.push({
       ruleId: "stagger-shape",
       severity: "error",
-      message: "scenario.stagger must be a plain number. Object-form stagger (e.g. { each, amount, from }) is not supported.",
+      message: "motion.stagger must be a plain number. Object-form stagger (e.g. { each, amount, from }) is not supported.",
       path: staggerPath
     });
     return errors;
@@ -43,14 +47,14 @@ export function staggerShapeRule(scenario, context, path) {
     errors.push({
       ruleId: "stagger-shape",
       severity: "error",
-      message: `scenario.stagger must not be negative. Got: ${JSON.stringify(stagger)}.`,
+      message: `motion.stagger must not be negative. Got: ${JSON.stringify(stagger)}.`,
       path: staggerPath
     });
-  } else if (val !== 0 && elements.length < 2) {
+  } else if (val !== 0 && tracks.length < 2) {
     errors.push({
       ruleId: "stagger-shape",
       severity: "warning",
-      message: `scenario.stagger has no effect when scenario has fewer than 2 elements.`,
+      message: `motion.stagger has no effect when motion has fewer than 2 tracks.`,
       path: staggerPath
     });
   }

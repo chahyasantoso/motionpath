@@ -1,23 +1,23 @@
 /**
  * Rule: path-xy-exclusivity
- * Per-element keyframes mutual exclusivity checking between path and x/y.
+ * Per-track keyframes mutual exclusivity checking between path and x/y.
  *
  * Requirements:
- * - keyframes.path and (keyframes.x or keyframes.y) both present on the same element -> error.
+ * - keyframes.path and (keyframes.x or keyframes.y) both present on the same track -> error.
  *
- * @param {unknown} element
- * @param {unknown} scenario - Parent scenario
- * @param {string} path - JSON path to element
+ * @param {unknown} track
+ * @param {unknown} motion - Parent motion
+ * @param {string} path - JSON path to track
  * @returns {ValidationError[]}
  */
-export function pathXYExclusivityRule(element, scenario, context, path) {
+export function pathXYExclusivityRule(track, motion, context, path) {
   const errors = [];
 
-  if (!element || typeof element !== 'object') {
+  if (!track || typeof track !== 'object') {
     return errors;
   }
 
-  const keyframes = element.keyframes;
+  const keyframes = track.keyframes;
   if (!keyframes || typeof keyframes !== 'object') {
     return errors;
   }
@@ -31,7 +31,7 @@ export function pathXYExclusivityRule(element, scenario, context, path) {
     errors.push({
       ruleId: "path-xy-exclusivity",
       severity: "error",
-      message: `Element has both a 'path' property and explicit '${offendingProps}' keyframes. They are mutually exclusive.`,
+      message: `Track has both a 'path' property and explicit '${offendingProps}' keyframes. They are mutually exclusive.`,
       path: `${path}.keyframes`
     });
   }

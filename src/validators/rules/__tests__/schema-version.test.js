@@ -40,13 +40,13 @@ describe('schema-version rule', () => {
     expect(errorsNeg).toHaveLength(1);
   });
 
-  it('should return no errors if schemaVersion is exactly 1', () => {
-    const errors = schemaVersionRule({ schemaVersion: 1 });
+  it('should return no errors if schemaVersion is exactly 2', () => {
+    const errors = schemaVersionRule({ schemaVersion: 2 });
     expect(errors).toHaveLength(0);
   });
 
-  it('should return error if schemaVersion is 2', () => {
-    const errors = schemaVersionRule({ schemaVersion: 2 });
+  it('should return error if schemaVersion is 1', () => {
+    const errors = schemaVersionRule({ schemaVersion: 1 });
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('schema-version');
     expect(errors[0].severity).toBe('error');

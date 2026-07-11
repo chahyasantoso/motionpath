@@ -33,16 +33,16 @@ describe('EditorEngine', () => {
     };
 
     buildResult = {
-      scenarios: [
+      motions: [
         {
-          scenarioIndex: 0,
-          sceneId: 'scenario-0',
+          motionIndex: 0,
+          sectionId: 'scenario-0',
           timeline: mockTimeline
         },
         {
-          scenarioIndex: 1,
+          motionIndex: 1,
           timelineId: 'grouped-id',
-          sceneId: 'scenario-1',
+          sectionId: 'scenario-1',
           timeline: { progress: vi.fn(), kill: vi.fn() }
         }
       ],
@@ -54,8 +54,8 @@ describe('EditorEngine', () => {
           }
         ]
       ]),
-      elements: new Map(),
-      elementPlugins: new Map()
+      tracks: new Map(),
+      trackPlugins: new Map()
     };
 
     mockDeps = {
@@ -68,7 +68,7 @@ describe('EditorEngine', () => {
     builderModule.buildProject.mockResolvedValue(buildResult);
 
     const engine = createEditorEngine(mockDeps);
-    await engine.loadProject({ scenarios: [] });
+    await engine.loadProject({ motions: [] });
 
     expect(validatorModule.validateProject).toHaveBeenCalled();
     expect(builderModule.buildProject).toHaveBeenCalled();
@@ -79,18 +79,18 @@ describe('EditorEngine', () => {
     builderModule.buildProject.mockResolvedValue(buildResult);
 
     const engine = createEditorEngine(mockDeps);
-    await engine.loadProject({ scenarios: [] });
+    await engine.loadProject({ motions: [] });
 
     engine.setProgress('grouped-id', 0.5);
     expect(mockMasterTimeline.progress).toHaveBeenCalledWith(0.5);
   });
 
-  it('setProgress calls timeline.progress for ungrouped scenario index', async () => {
+  it('setProgress calls timeline.progress for ungrouped motion index', async () => {
     validatorModule.validateProject.mockReturnValue([]);
     builderModule.buildProject.mockResolvedValue(buildResult);
 
     const engine = createEditorEngine(mockDeps);
-    await engine.loadProject({ scenarios: [] });
+    await engine.loadProject({ motions: [] });
 
     engine.setProgress('0', 0.8);
     expect(mockTimeline.progress).toHaveBeenCalledWith(0.8);
@@ -101,7 +101,7 @@ describe('EditorEngine', () => {
     builderModule.buildProject.mockResolvedValue(buildResult);
 
     const engine = createEditorEngine(mockDeps);
-    await engine.loadProject({ scenarios: [] });
+    await engine.loadProject({ motions: [] });
 
     engine.setProgress('0', 1.5);
     expect(mockTimeline.progress).toHaveBeenCalledWith(1.0);
@@ -115,27 +115,27 @@ describe('EditorEngine', () => {
     builderModule.buildProject.mockResolvedValue(buildResult);
 
     const engine = createEditorEngine(mockDeps);
-    await engine.loadProject({ scenarios: [] });
+    await engine.loadProject({ motions: [] });
 
-    expect(() => engine.setProgress('unknown-id', 0.5)).toThrow(/no group or scenario found/);
+    expect(() => engine.setProgress('unknown-id', 0.5)).toThrow(/no group or motion found/);
   });
 
   it('allows subscribing before project is loaded, queueing and wiring them on load', async () => {
     const customResult = {
-      scenarios: [
+      motions: [
         {
-          scenarioIndex: 0,
-          sceneId: 'my-scene-id',
+          motionIndex: 0,
+          sectionId: 'my-scene-id',
           triggerType: 'scroll-scrub',
           triggerConfig: {},
           timeline: mockTimeline
         }
       ],
       timelineGroups: new Map(),
-      elements: new Map([
+      tracks: new Map([
         ['rocket-track', { proxy: { x: 100 } }]
       ]),
-      elementPlugins: new Map()
+      trackPlugins: new Map()
     };
 
     validatorModule.validateProject.mockReturnValue([]);
@@ -170,16 +170,16 @@ describe('EditorEngine', () => {
     let resolveFirst;
     const firstBuild = new Promise(res => { resolveFirst = res; });
     const secondBuildResult = {
-      scenarios: [{ scenarioIndex: 0, sceneId: 'second', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      motions: [{ motionIndex: 0, sectionId: 'second', timeline: { kill: vi.fn(), progress: vi.fn() } }],
       timelineGroups: new Map(),
-      elements: new Map(),
-      elementPlugins: new Map(),
+      tracks: new Map(),
+      trackPlugins: new Map(),
     };
     const firstBuildResult = {
-      scenarios: [{ scenarioIndex: 0, sceneId: 'first', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      motions: [{ motionIndex: 0, sectionId: 'first', timeline: { kill: vi.fn(), progress: vi.fn() } }],
       timelineGroups: new Map(),
-      elements: new Map(),
-      elementPlugins: new Map(),
+      tracks: new Map(),
+      trackPlugins: new Map(),
     };
 
     validatorModule.validateProject.mockReturnValue([]);
@@ -198,17 +198,17 @@ describe('EditorEngine', () => {
     resolveFirst(firstBuildResult);
     await first;
 
-    expect(firstBuildResult.scenarios[0].timeline.kill).toHaveBeenCalled();
+    expect(firstBuildResult.motions[0].timeline.kill).toHaveBeenCalled();
   });
 
   it('load is discarded when destroy() fires before buildProject resolves', async () => {
     let resolveBuild;
     const pendingBuild = new Promise(res => { resolveBuild = res; });
     const staleBuildResult = {
-      scenarios: [{ scenarioIndex: 0, sceneId: 'stale', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      motions: [{ motionIndex: 0, sectionId: 'stale', timeline: { kill: vi.fn(), progress: vi.fn() } }],
       timelineGroups: new Map(),
-      elements: new Map(),
-      elementPlugins: new Map(),
+      tracks: new Map(),
+      trackPlugins: new Map(),
     };
 
     validatorModule.validateProject.mockReturnValue([]);
@@ -224,7 +224,7 @@ describe('EditorEngine', () => {
     resolveBuild(staleBuildResult);
     await load;
 
-    expect(staleBuildResult.scenarios[0].timeline.kill).toHaveBeenCalled();
+    expect(staleBuildResult.motions[0].timeline.kill).toHaveBeenCalled();
   });
 
   it('StrictMode regression: subscribe → destroy → subscribe → both loads resolve → only second subscriber is wired', async () => {
@@ -235,13 +235,13 @@ describe('EditorEngine', () => {
     //   4. Both builds resolve (first build resolves last, as in a real race)
     // Expected: only the mount-2 subscriber is wired; the mount-1 subscriber is never called.
 
-    const elementId = 'el-strict';
+    const trackId = 'el-strict';
     const proxy = { x: 42 };
     const makeResult = () => ({
-      scenarios: [{ scenarioIndex: 0, sceneId: 'scene', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      motions: [{ motionIndex: 0, sectionId: 'scene', timeline: { kill: vi.fn(), progress: vi.fn() } }],
       timelineGroups: new Map(),
-      elements: new Map([[elementId, { proxy }]]),
-      elementPlugins: new Map(),
+      tracks: new Map([[trackId, { proxy }]]),
+      trackPlugins: new Map(),
     });
 
     let resolveFirst;
@@ -257,7 +257,7 @@ describe('EditorEngine', () => {
 
     // --- Mount 1 ---
     const cb1 = vi.fn();
-    const unsub1 = engine.subscribe(elementId, cb1); // goes to pending
+    const unsub1 = engine.subscribe(trackId, cb1); // goes to pending
 
     const load1 = engine.loadProject({});
 
@@ -267,7 +267,7 @@ describe('EditorEngine', () => {
 
     // --- Mount 2 ---
     const cb2 = vi.fn();
-    engine.subscribe(elementId, cb2); // goes to fresh pending
+    engine.subscribe(trackId, cb2); // goes to fresh pending
 
     const load2 = engine.loadProject({});
 
@@ -293,13 +293,13 @@ describe('EditorEngine', () => {
     //   3. Build resolves → commit → setCore() must flush the pending entry
     // Expected: the subscriber's callback is invoked with the initial proxy state.
 
-    const elementId = 'el-commit';
+    const trackId = 'el-commit';
     const proxy = { opacity: 0.5 };
     const buildResult = {
-      scenarios: [{ scenarioIndex: 0, sceneId: 'scene', timeline: { kill: vi.fn(), progress: vi.fn() } }],
+      motions: [{ motionIndex: 0, sectionId: 'scene', timeline: { kill: vi.fn(), progress: vi.fn() } }],
       timelineGroups: new Map(),
-      elements: new Map([[elementId, { proxy }]]),
-      elementPlugins: new Map(),
+      tracks: new Map([[trackId, { proxy }]]),
+      trackPlugins: new Map(),
     };
 
     validatorModule.validateProject.mockReturnValue([]);
@@ -309,7 +309,7 @@ describe('EditorEngine', () => {
 
     // Subscribe BEFORE loadProject — simulates child effect running before parent effect
     const callback = vi.fn();
-    engine.subscribe(elementId, callback);
+    engine.subscribe(trackId, callback);
 
     // Callback must not fire yet (no core)
     expect(callback).not.toHaveBeenCalled();
@@ -322,4 +322,3 @@ describe('EditorEngine', () => {
     expect(callback).toHaveBeenCalledWith({ opacity: 0.5 });
   });
 });
-

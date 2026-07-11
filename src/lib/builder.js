@@ -1,7 +1,6 @@
 import { gsap } from 'gsap';
 import { resolvePluginForKey } from './plugins.js';
-
-
+import { resolveTrack } from './templateResolver.js';
 
 // Module-level Map persists across buildProject calls — concurrent calls for
 // the same plugin share the same in-flight Promise, preventing double-load.
@@ -19,190 +18,195 @@ export function ensureLoaded(plugin) {
   return loadPromises.get(plugin);
 }
 
+/**
+ * Builds the GSAP tween and proxy object synchronously.
+ * Assumes all plugins used by the keyframes are already loaded.
+ */
+export function buildTrackTweenSync(trackId, keyframes, duration, trackConfig) {
+  const propKeys = Object.keys(keyframes || {});
+  const sharedKeyframes = {};
+  const sharedTweenVars = {};
+  const resolvedPlugins = [];
+  const proxy = {};
+
+  for (const propKey of propKeys) {
+    const plugin = resolvePluginForKey(propKey);
+    if (!plugin) {
+      throw new Error(`No plugin found for key "${propKey}" on track "${trackId}".`);
+    }
+    if (!resolvedPlugins.includes(plugin)) {
+      resolvedPlugins.push(plugin);
+    }
+
+    const propConfig = keyframes[propKey];
+    const rawStops = propConfig?.stops || [];
+    const contribution = plugin.contribute(propKey, rawStops, trackConfig);
+    const percentPatch = contribution?.percentPatch || {};
+    const tweenVars = contribution?.tweenVars || {};
+
+    for (const percentKey of Object.keys(percentPatch)) {
+      const existing = sharedKeyframes[percentKey];
+      const incoming = percentPatch[percentKey];
+
+      // Ease-collision check
+      if (
+        existing?.ease !== undefined &&
+        incoming?.ease !== undefined &&
+        existing.ease !== incoming.ease
+      ) {
+        throw new Error(
+          `Ease collision on track "${trackId}" at percent "${percentKey}" ` +
+          `(contributed by property "${propKey}"): ` +
+          `different eases found ("${existing.ease}" vs "${incoming.ease}").`
+        );
+      }
+
+      sharedKeyframes[percentKey] = {
+        ...(existing ?? {}),
+        ...incoming,
+      };
+    }
+
+    // tweenVars merge with collision detection
+    for (const key of Object.keys(tweenVars)) {
+      if (key in sharedTweenVars && sharedTweenVars[key] !== tweenVars[key]) {
+        throw new Error(
+          `tweenVars collision on track "${trackId}": key "${key}" ` +
+          `contributed twice with different values.`
+        );
+      }
+      sharedTweenVars[key] = tweenVars[key];
+    }
+  }
+
+  // After the full propKeys loop, seed proxy from the fully merged 0% frame
+  const mergedZero = sharedKeyframes['0%'] ?? {};
+  for (const [k, v] of Object.entries(mergedZero)) {
+    if (k !== 'ease') proxy[k] = v;
+  }
+
+  const tween = gsap.to(proxy, {
+    keyframes: sharedKeyframes,
+    ...sharedTweenVars,
+    duration: duration,
+    paused: true
+  });
+
+  return { proxy, tween, resolvedPlugins };
+}
+
 export async function buildProject(schema, deps) {
-  const elementPlugins = new Map();
-  const elementsMap = new Map();
-  const scenarios = [];
+  const trackPlugins = new Map();
+  const tracksMap = new Map();
+  const motions = [];
   const timelineGroups = new Map();
 
-  const scenariosArray = schema.scenarios || [];
+  const motionsArray = schema.motions || [];
 
-  for (let i = 0; i < scenariosArray.length; i++) {
-    const scenario = scenariosArray[i];
-    const sceneId = scenario.sceneId;
+  for (let i = 0; i < motionsArray.length; i++) {
+    const motion = motionsArray[i];
+    const sectionId = motion.driver?.sectionId;
 
     let triggerType = 'time';
-    const trigger = scenario.trigger || {};
+    const trigger = motion.driver?.trigger || {};
     if (trigger.type === 'scroll') {
       triggerType = trigger.scrub ? 'scroll-scrub' : 'scroll-observer';
     }
 
-    const elements = scenario.elements || [];
-    const elementTweens = [];
+    // Resolve tracks with templates
+    const rawTracks = motion.tracks || [];
+    const tracks = rawTracks.map(t => resolveTrack(t, schema.templates));
+    const trackTweens = [];
 
-    for (const element of elements) {
-      const keyframes = element.keyframes || {};
+    for (const track of tracks) {
+      const keyframes = track.keyframes || {};
       const propKeys = Object.keys(keyframes);
 
-      const sharedKeyframes = {};
-      const sharedTweenVars = {};
-      const resolvedPlugins = [];
-
-      // Plain proxy object: GSAP animates this, not the DOM node.
-      // The engine's onUpdate → plugin.compose(proxy) translates proxy state
-      // into real CSS. This is required so filterPlugin (blur) and
-      // pathPlugin (pathProgress) work correctly — those keys are not
-      // valid CSS properties and cannot be set directly on a DOM node.
-      const proxy = {};
-
+      // Pre-load plugins asynchronously before building tween synchronously
       for (const propKey of propKeys) {
         const plugin = resolvePluginForKey(propKey);
-        if (!plugin) {
-          throw new Error(`No plugin found for key "${propKey}" on element "${element.id}".`);
-        }
-        if (!resolvedPlugins.includes(plugin)) {
-          resolvedPlugins.push(plugin);
-        }
-
-        await ensureLoaded(plugin);
-
-        const propConfig = keyframes[propKey];
-        const rawStops = propConfig?.stops || [];
-
-        const contribution = plugin.contribute(propKey, rawStops, element);
-        const percentPatch = contribution?.percentPatch || {};
-        const tweenVars = contribution?.tweenVars || {};
-
-
-
-        // Deep-merge percentPatch per spec §5.5 — real per-key merge, not a
-        // shallow overwrite, so two properties contributing to the same percent
-        // don't erase each other's keys.
-        for (const percentKey of Object.keys(percentPatch)) {
-          const existing = sharedKeyframes[percentKey];
-          const incoming = percentPatch[percentKey];
-
-          // Ease-collision check — defense-in-depth (§5.7): Brief 1 rejects
-          // conflicting eases at the schema level, but we throw here too so a
-          // bug in validation cannot silently corrupt animation data.
-          if (
-            existing?.ease !== undefined &&
-            incoming?.ease !== undefined &&
-            existing.ease !== incoming.ease
-          ) {
-            throw new Error(
-              `Ease collision on element "${element.id}" at percent "${percentKey}" ` +
-              `(contributed by property "${propKey}"): ` +
-              `different eases found ("${existing.ease}" vs "${incoming.ease}").`
-            );
-          }
-
-          sharedKeyframes[percentKey] = {
-            ...(existing ?? {}),
-            ...incoming,
-          };
-        }
-
-        // tweenVars merge with collision detection (§5.6): same key, different
-        // value = plugin authoring bug (not a schema error).
-        for (const key of Object.keys(tweenVars)) {
-          if (key in sharedTweenVars && sharedTweenVars[key] !== tweenVars[key]) {
-            throw new Error(
-              `tweenVars collision on element "${element.id}": key "${key}" ` +
-              `contributed twice with different values (plugin authoring bug, not a schema error).`
-            );
-          }
-          sharedTweenVars[key] = tweenVars[key];
+        if (plugin) {
+          await ensureLoaded(plugin);
         }
       }
 
-      // After the full propKeys loop, seed proxy from the fully merged 0% frame
-      const mergedZero = sharedKeyframes['0%'] ?? {};
-      for (const [k, v] of Object.entries(mergedZero)) {
-        if (k !== 'ease') proxy[k] = v;
-      }
+      const tweenDuration = track.duration ?? motion.driver?.trigger?.duration ?? 1;
 
-      elementPlugins.set(element.id, resolvedPlugins);
+      const { proxy, tween, resolvedPlugins } = buildTrackTweenSync(
+        track.id,
+        keyframes,
+        tweenDuration,
+        track
+      );
 
-      // Duration fallback chain — authorized addendum to §5.8:
-      // Without an explicit duration, GSAP defaults to 0.5s which silently
-      // breaks all percent-keyframe animations. Chain:
-      //   element.duration  → per-element override (highest priority)
-      //   trigger.duration  → scenario-level (e.g. TriggerTime.duration)
-      //   1                 → final fallback (safe default)
-      const tweenDuration = element.duration ?? scenario.trigger?.duration ?? 1;
-
-      const tween = gsap.to(proxy, {
-        keyframes: sharedKeyframes,
-        ...sharedTweenVars,
-        duration: tweenDuration
-      });
-      elementTweens.push(tween);
-      elementsMap.set(element.id, { proxy, elementConfig: element, tween });
+      trackPlugins.set(track.id, resolvedPlugins);
+      trackTweens.push(tween);
+      tracksMap.set(track.id, { proxy, trackConfig: track, tween });
     }
 
-    const scenarioTimeline = gsap.timeline({ paused: true });
+    const motionTimeline = gsap.timeline({ paused: true });
 
-    // Addendum C: bake trigger.delay into the scenario timeline's total duration.
+    // Addendum C: bake trigger.delay into the motion timeline's total duration.
     // Only applies to time and scroll-observer (non-scrub) triggers.
     if (
       (trigger.type === 'time' || (trigger.type === 'scroll' && !trigger.scrub)) &&
       typeof trigger.delay === 'number'
     ) {
-      scenarioTimeline.delay(trigger.delay);
+      motionTimeline.delay(trigger.delay);
     }
 
-    // A1: stagger is always a plain number post-validation (Brief 1 §Task 1
-    // rejects object-form stagger). No object.each branch needed.
-    elements.forEach((element, idx) => {
-      const tween = elementTweens[idx];
-      const offset = typeof scenario.stagger === 'number' ? scenario.stagger * idx : 0;
-      scenarioTimeline.add(tween, offset);
+    // A1: stagger is always a plain number post-validation.
+    tracks.forEach((track, idx) => {
+      const tween = trackTweens[idx];
+      const offset = typeof motion.stagger === 'number' ? motion.stagger * idx : 0;
+      motionTimeline.add(tween, offset);
     });
 
-    const isPrimary = scenario.timelineId ? !!scenario.primary : false;
+    const isPrimary = motion.driver?.timelineId ? !!motion.driver.primary : false;
 
-    const scenarioBuild = {
-      scenarioIndex: i,
-      sceneId: sceneId,
+    const motionBuild = {
+      motionIndex: i,
+      motionId: motion.motionId,
+      sectionId: sectionId,
       triggerType: triggerType,
       triggerConfig: trigger,
-      timeline: scenarioTimeline,
-      isPrimary: isPrimary
+      timeline: motionTimeline,
+      isPrimary: isPrimary,
+      driverType: motion.driver?.type || 'timeline'
     };
 
-    if (scenario.timelineId) {
-      scenarioBuild.timelineId = scenario.timelineId;
+    if (motion.driver?.timelineId) {
+      motionBuild.timelineId = motion.driver.timelineId;
     }
 
-    scenarios.push(scenarioBuild);
+    motions.push(motionBuild);
   }
 
   const groupsMap = new Map();
-  scenarios.forEach(sb => {
-    if (sb.timelineId) {
-      if (!groupsMap.has(sb.timelineId)) {
-        groupsMap.set(sb.timelineId, []);
+  motions.forEach(mb => {
+    if (mb.timelineId) {
+      if (!groupsMap.has(mb.timelineId)) {
+        groupsMap.set(mb.timelineId, []);
       }
-      groupsMap.get(sb.timelineId).push({
-        timeline: sb.timeline,
-        index: sb.scenarioIndex,
-        isPrimary: sb.isPrimary
+      groupsMap.get(mb.timelineId).push({
+        timeline: mb.timeline,
+        index: mb.motionIndex,
+        isPrimary: mb.isPrimary
       });
     }
   });
 
   for (const [timelineId, groupItems] of groupsMap.entries()) {
     const masterTimeline = gsap.timeline({ paused: true });
-    let primaryScenarioIndex = -1;
+    let primaryMotionIndex = -1;
     let triggerType = 'time';
 
     groupItems.forEach(item => {
       masterTimeline.add(item.timeline);
       if (item.isPrimary) {
-        primaryScenarioIndex = item.index;
-        const originalScenario = scenariosArray[item.index];
-        const t = originalScenario.trigger || {};
+        primaryMotionIndex = item.index;
+        const originalMotion = motionsArray[item.index];
+        const t = originalMotion.driver?.trigger || {};
         triggerType = t.type === 'scroll' && t.scrub ? 'scroll-scrub' : 'time';
       }
     });
@@ -211,14 +215,14 @@ export async function buildProject(schema, deps) {
       timelineId,
       triggerType,
       masterTimeline,
-      primaryScenarioIndex
+      primaryMotionIndex
     });
   }
 
   return {
-    elementPlugins,
-    elements: elementsMap,
-    scenarios,
+    trackPlugins,
+    tracks: tracksMap,
+    motions,
     timelineGroups
   };
 }

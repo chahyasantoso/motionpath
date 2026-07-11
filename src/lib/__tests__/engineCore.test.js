@@ -27,9 +27,9 @@ describe('EngineCore', () => {
     };
 
     buildResult = {
-      scenarios: [
+      motions: [
         {
-          sceneId: 'scene-1',
+          sectionId: 'scene-1',
           timeline: {
             kill: vi.fn(),
             getChildren: vi.fn(() => [])
@@ -37,17 +37,17 @@ describe('EngineCore', () => {
         }
       ],
       timelineGroups: new Map(),
-      elements: new Map([
+      tracks: new Map([
         ['el-1', { proxy: { x: 10, blur: 5 } }]
       ]),
-      elementPlugins: new Map([
+      trackPlugins: new Map([
         ['el-1', [mockPlugin1, mockPlugin2]]
       ])
     };
   });
 
   describe('subscribe()', () => {
-    it('throws when subscribing to non-existent element', () => {
+    it('throws when subscribing to non-existent track', () => {
       const core = createEngineCore(buildResult);
       expect(() => core.subscribe('non-existent', () => {})).toThrow();
     });
@@ -129,11 +129,11 @@ describe('EngineCore', () => {
     });
   });
 
-  describe('destroyScene()', () => {
-    it('kills timeline of scene', () => {
+  describe('destroySection()', () => {
+    it('kills timeline of section', () => {
       const core = createEngineCore(buildResult);
-      core.destroyScene('scene-1');
-      expect(buildResult.scenarios[0].timeline.kill).toHaveBeenCalled();
+      core.destroySection('scene-1');
+      expect(buildResult.motions[0].timeline.kill).toHaveBeenCalled();
     });
   });
 });

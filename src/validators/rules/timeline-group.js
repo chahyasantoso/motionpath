@@ -1,35 +1,36 @@
 /**
  * Rule: timeline-group
- * Cross-scenario timeline grouping validation.
+ * Cross-motion timeline grouping validation.
  *
  * Requirements:
- * - Group scenarios by timelineId.
- * - All scenarios in a group must have the identical trigger.type (and identical trigger.scrub if type is scroll) -> else error.
- * - No scenario in a group may have trigger.type === "scroll" && trigger.scrub === false (no observers) -> else error.
- * - Exactly one scenario per group must have primary === true -> else error.
+ * - Group motions by driver.timelineId.
+ * - All motions in a group must have the identical driver.trigger.type (and identical driver.trigger.scrub if type is scroll) -> else error.
+ * - No motion in a group may have driver.trigger.type === "scroll" && driver.trigger.scrub === false (no observers) -> else error.
+ * - Exactly one motion per group must have driver.primary === true -> else error.
  *
- * @param {unknown[]} scenarios
+ * @param {unknown[]} motions
  * @returns {ValidationError[]}
  */
-export function timelineGroupRule(scenarios, context) {
+export function timelineGroupRule(motions, context) {
   const errors = [];
 
-  if (!Array.isArray(scenarios)) {
+  if (!Array.isArray(motions)) {
     return errors;
   }
 
-  // Group scenarios by timelineId (ignoring empty timelineId)
-  const groups = new Map(); // timelineId -> Array of { scenario, index }
+  // Group motions by timelineId (ignoring empty timelineId)
+  const groups = new Map(); // timelineId -> Array of { motion, index }
 
-  scenarios.forEach((scenario, index) => {
-    if (!scenario || typeof scenario !== 'object') return;
-    const { timelineId } = scenario;
+  motions.forEach((motion, index) => {
+    if (!motion || typeof motion !== 'object') return;
+    const { driver } = motion;
+    const timelineId = driver?.timelineId;
     if (timelineId !== undefined && timelineId !== null && timelineId !== '') {
       const tid = String(timelineId);
       if (!groups.has(tid)) {
         groups.set(tid, []);
       }
-      groups.get(tid).push({ scenario, index });
+      groups.get(tid).push({ motion, index });
     }
   });
 
@@ -38,11 +39,11 @@ export function timelineGroupRule(scenarios, context) {
 
     // 1. Check identical trigger type and scrub
     const firstItem = list[0];
-    const firstType = firstItem.scenario.trigger?.type;
-    const firstScrub = firstItem.scenario.trigger?.scrub;
+    const firstType = firstItem.motion.driver?.trigger?.type;
+    const firstScrub = firstItem.motion.driver?.trigger?.scrub;
 
-    list.forEach(({ scenario, index }) => {
-      const trigger = scenario.trigger;
+    list.forEach(({ motion, index }) => {
+      const trigger = motion.driver?.trigger;
       const type = trigger?.type;
       const scrub = trigger?.scrub;
 
@@ -50,51 +51,51 @@ export function timelineGroupRule(scenarios, context) {
         errors.push({
           ruleId: "timeline-group",
           severity: "error",
-          message: `Scenario in timeline group '${timelineId}' has mismatching trigger. Expected type '${firstType}' and scrub '${firstScrub}', got type '${type}' and scrub '${scrub}'.`,
-          path: `scenarios[${index}].trigger`
+          message: `Motion in timeline group '${timelineId}' has mismatching trigger. Expected type '${firstType}' and scrub '${firstScrub}', got type '${type}' and scrub '${scrub}'.`,
+          path: `motions[${index}].driver.trigger`
         });
       }
     });
 
     // 2. Check no observer (scroll and scrub: false)
-    list.forEach(({ scenario, index }) => {
-      const trigger = scenario.trigger;
+    list.forEach(({ motion, index }) => {
+      const trigger = motion.driver?.trigger;
       if (trigger?.type === 'scroll' && trigger?.scrub === false) {
         errors.push({
           ruleId: "timeline-group",
           severity: "error",
-          message: `Scenario in timeline group '${timelineId}' has an observer trigger (type: 'scroll', scrub: false), which cannot be grouped.`,
-          path: `scenarios[${index}].trigger`
+          message: `Motion in timeline group '${timelineId}' has an observer trigger (type: 'scroll', scrub: false), which cannot be grouped.`,
+          path: `motions[${index}].driver.trigger`
         });
       }
     });
 
     // 3. Exactly one primary === true
-    const primaries = list.filter(({ scenario }) => scenario.primary === true);
+    const primaries = list.filter(({ motion }) => motion.driver?.primary === true);
     if (primaries.length !== 1) {
       list.forEach(({ index }) => {
         errors.push({
           ruleId: "timeline-group",
           severity: "error",
-          message: `Timeline group '${timelineId}' must have exactly one primary scenario. Found ${primaries.length} primary scenario(s).`,
-          path: `scenarios[${index}]`
+          message: `Timeline group '${timelineId}' must have exactly one primary motion. Found ${primaries.length} primary motion(s).`,
+          path: `motions[${index}]`
         });
       });
     }
 
-    // 4. Non-primary scenario must not declare start, end, pin, pinSpacing, snap, repeat, yoyo, repeatDelay
+    // 4. Non-primary motion must not declare start, end, pin, pinSpacing, snap, repeat, yoyo, repeatDelay
     const forbiddenFields = ['start', 'end', 'pin', 'pinSpacing', 'snap', 'repeat', 'yoyo', 'repeatDelay'];
-    list.forEach(({ scenario, index }) => {
-      if (scenario.primary !== true) {
-        const trigger = scenario.trigger;
+    list.forEach(({ motion, index }) => {
+      if (motion.driver?.primary !== true) {
+        const trigger = motion.driver?.trigger;
         if (trigger && typeof trigger === 'object') {
           forbiddenFields.forEach(field => {
             if (trigger[field] !== undefined && trigger[field] !== null) {
               errors.push({
                 ruleId: "timeline-group",
                 severity: "error",
-                message: `Non-primary scenario in timeline group '${timelineId}' cannot declare trigger field '${field}'.`,
-                path: `scenarios[${index}].trigger.${field}`
+                message: `Non-primary motion in timeline group '${timelineId}' cannot declare trigger field '${field}'.`,
+                path: `motions[${index}].driver.trigger.${field}`
               });
             }
           });

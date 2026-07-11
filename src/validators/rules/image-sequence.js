@@ -2,19 +2,19 @@
  * Rule: image-sequence
  * Validates the schema config for keyframes.imageSequence.
  *
- * @param {unknown} element
- * @param {unknown} scenario
+ * @param {unknown} track
+ * @param {unknown} motion
  * @param {unknown} context
- * @param {string} path - JSON path to element
+ * @param {string} path - JSON path to track
  * @returns {ValidationError[]}
  */
-export function imageSequenceRule(element, scenario, context, path) {
+export function imageSequenceRule(track, motion, context, path) {
   const errors = [];
-  if (!element || typeof element !== 'object') {
+  if (!track || typeof track !== 'object') {
     return errors;
   }
 
-  const keyframes = element.keyframes;
+  const keyframes = track.keyframes;
   if (!keyframes || typeof keyframes !== 'object') {
     return errors;
   }

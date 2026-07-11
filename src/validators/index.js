@@ -9,28 +9,30 @@ import { pathShapeRule } from './rules/path-shape.js';
 import { timelineGroupRule } from './rules/timeline-group.js';
 import { elementUniquenessRule } from './rules/element-uniqueness.js';
 import { imageSequenceRule } from './rules/image-sequence.js';
+import { motionStructureRule } from './rules/motion-structure.js';
+import { resolveTrack } from '../lib/templateResolver.js';
 
-const scenarioRules = [
+const motionRules = [
   triggerShapeRule,
   easeCollisionRule,
   staggerShapeRule,
   perspectiveUsageRule,
 ];
 
-const elementRules = [
+const trackRules = [
   stopCountRule,
   pathXYExclusivityRule,
   pathShapeRule,
   imageSequenceRule,
 ];
 
-const crossScenarioRules = [
+const crossMotionRules = [
   timelineGroupRule,
   elementUniquenessRule,
 ];
 
 /**
- * Validates whether the project schema is structurally valid enough to iterate scenarios.
+ * Validates whether the project schema is structurally valid enough to iterate motions.
  *
  * @param {unknown} schema
  * @returns {boolean}
@@ -39,7 +41,7 @@ function isValidShape(schema) {
   return (
     schema !== null &&
     typeof schema === 'object' &&
-    Array.isArray(schema.scenarios)
+    Array.isArray(schema.motions)
   );
 }
 
@@ -60,38 +62,55 @@ export function validateProject(schema) {
       errors.push({
         ruleId: "invalid-shape",
         severity: "error",
-        message: "schema.scenarios must be an array.",
-        path: "$.scenarios"
+        message: "schema.motions must be an array.",
+        path: "$.motions"
       });
     }
-    return errors; // cannot iterate scenarios safely; return early
+    return errors; // cannot iterate motions safely; return early
   }
+
+  // Run structural check for templates and motions
+  errors.push(...runSafely(motionStructureRule, schema));
 
   const context = { schema };
 
-  // Iterate scenarios
-  for (const [i, scenario] of schema.scenarios.entries()) {
-    const scenarioPath = `scenarios[${i}]`;
+  // Iterate motions
+  for (const [i, motion] of schema.motions.entries()) {
+    const motionPath = `motions[${i}]`;
 
-    // Run scenario rules (ScenarioRule signature: (scenario, context, path) => errors)
-    for (const rule of scenarioRules) {
-      errors.push(...runSafely(rule, scenario, context, scenarioPath));
+    // Resolve tracks of this motion first (if valid object structure)
+    const resolvedTracks = [];
+    if (motion && typeof motion === 'object' && Array.isArray(motion.tracks)) {
+      for (const track of motion.tracks) {
+        resolvedTracks.push(resolveTrack(track, schema.templates));
+      }
     }
 
-    // Run element rules, checking defensively if scenario is an object and has elements array
-    if (scenario && typeof scenario === 'object' && Array.isArray(scenario.elements)) {
-      for (const [j, element] of scenario.elements.entries()) {
-        const elementPath = `${scenarioPath}.elements[${j}]`;
-        for (const rule of elementRules) {
-          errors.push(...runSafely(rule, element, scenario, context, elementPath));
+    // Create a resolved motion object to pass to motion rules so they see resolved tracks
+    const resolvedMotion = motion && typeof motion === 'object'
+      ? { ...motion, tracks: resolvedTracks }
+      : motion;
+
+    // Run motion rules (MotionRule signature: (motion, context, path) => errors)
+    for (const rule of motionRules) {
+      errors.push(...runSafely(rule, resolvedMotion, context, motionPath));
+    }
+
+    // Run track rules
+    if (motion && typeof motion === 'object' && Array.isArray(motion.tracks)) {
+      for (const [j, track] of motion.tracks.entries()) {
+        const trackPath = `${motionPath}.tracks[${j}]`;
+        const resolvedTrack = resolvedTracks[j];
+        for (const rule of trackRules) {
+          errors.push(...runSafely(rule, resolvedTrack, resolvedMotion, context, trackPath));
         }
       }
     }
   }
 
-  // Run cross-scenario rules (CrossScenarioRule signature: (scenarios, context) => errors)
-  for (const rule of crossScenarioRules) {
-    errors.push(...runSafely(rule, schema.scenarios, context));
+  // Run cross-motion rules (CrossMotionRule signature: (motions, context) => errors)
+  for (const rule of crossMotionRules) {
+    errors.push(...runSafely(rule, schema.motions, context));
   }
 
   return errors;

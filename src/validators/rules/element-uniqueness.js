@@ -1,56 +1,52 @@
 /**
  * Rule: element-uniqueness
- * * Project-wide element ID uniqueness check across ALL scenarios.
+ * * Project-wide track ID uniqueness check across ALL motions.
  * 
  * * Requirements:
- * - Collect every element ID across the entire project's scenarios.
- * - Any ID appearing in more than one scenario -> error (regardless of
- *   sceneId — the builder's elements map is flat and global, so any
- *   cross-scenario collision silently discards one tween. See the Pasar
- *   Malam lantern bug in .agent/lantern-animation-composition.md for the
- *   original real-world case this closes).
+ * - Collect every track ID across the entire project's motions.
+ * - Any ID appearing in more than one motion -> error.
  * 
- * @param {unknown[]} scenarios
+ * @param {unknown[]} motions
  * @returns {ValidationError[]}
  */
-export function elementUniquenessRule(scenarios, context) {
+export function elementUniquenessRule(motions, context) {
   const errors = [];
 
-  if (!Array.isArray(scenarios)) {
+  if (!Array.isArray(motions)) {
     return errors;
   }
 
-  // Track locations of each element ID globally across all scenarios
-  // elementId -> Array of { scenarioIndex, elementIndex }
+  // Track locations of each track ID globally across all motions
+  // trackId -> Array of { motionIndex, trackIndex }
   const idLocations = new Map();
 
-  scenarios.forEach((scenario, scenarioIndex) => {
-    if (!scenario || typeof scenario !== 'object') return;
-    const elements = scenario.elements;
-    if (!Array.isArray(elements)) return;
+  motions.forEach((motion, motionIndex) => {
+    if (!motion || typeof motion !== 'object') return;
+    const tracks = motion.tracks;
+    if (!Array.isArray(tracks)) return;
 
-    elements.forEach((element, elementIndex) => {
-      if (!element || typeof element !== 'object') return;
-      const { id } = element;
+    tracks.forEach((track, trackIndex) => {
+      if (!track || typeof track !== 'object') return;
+      const { id } = track;
       if (id !== undefined && id !== null && id !== '') {
-        const eid = String(id);
-        if (!idLocations.has(eid)) {
-          idLocations.set(eid, []);
+        const tid = String(id);
+        if (!idLocations.has(tid)) {
+          idLocations.set(tid, []);
         }
-        idLocations.get(eid).push({ scenarioIndex, elementIndex });
+        idLocations.get(tid).push({ motionIndex, trackIndex });
       }
     });
   });
 
   // Check for duplicates across the entire project
-  idLocations.forEach((locations, eid) => {
+  idLocations.forEach((locations, tid) => {
     if (locations.length > 1) {
-      locations.forEach(({ scenarioIndex, elementIndex }) => {
+      locations.forEach(({ motionIndex, trackIndex }) => {
         errors.push({
           ruleId: "element-uniqueness",
           severity: "error",
-          message: `Duplicate element ID '${eid}' found across multiple scenarios (scenario indices: ${locations.map(l => l.scenarioIndex).join(', ')}).`,
-          path: `scenarios[${scenarioIndex}].elements[${elementIndex}].id`
+          message: `Duplicate track ID '${tid}' found across multiple motions (motion indices: ${locations.map(l => l.motionIndex).join(', ')}).`,
+          path: `motions[${motionIndex}].tracks[${trackIndex}].id`
         });
       });
     }

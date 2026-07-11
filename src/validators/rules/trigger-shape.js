@@ -1,34 +1,39 @@
 /**
  * Rule: trigger-shape
- * Per-scenario trigger validation.
+ * Per-motion trigger validation.
  *
  * Requirements:
- * - scenario.trigger.type must be exactly one of "scroll", "time".
- * - If type === "scroll": scrub must be boolean, present.
+ * - motion.driver.trigger.type must be exactly one of "scroll", "time".
+ * - If type === "scroll": scrub must be boolean or number, present.
  * - endTrigger present + NOT (type === "scroll" && scrub === true) -> error.
  * - repeat, yoyo, or repeatDelay present + (type === "scroll" && scrub === true) -> error.
  * - delay present + (type === "scroll" && scrub === true) -> error.
  *
- * @param {unknown} scenario
+ * @param {unknown} motion
  * @param {{ schema: unknown }} context - Rule validation context
- * @param {string} path - JSON path to the scenario, e.g. "scenarios[0]"
+ * @param {string} path - JSON path to the motion, e.g. "motions[0]"
  * @returns {ValidationError[]}
  */
-export function triggerShapeRule(scenario, context, path) {
+export function triggerShapeRule(motion, context, path) {
   const errors = [];
 
-  if (!scenario || typeof scenario !== 'object') {
+  if (!motion || typeof motion !== 'object') {
     return errors; // handled by top-level or orchestrator checks, don't crash
   }
 
-  const trigger = scenario.trigger;
-  const triggerPath = `${path}.trigger`;
+  // Skip validation for delegate motions (delegate forbids trigger entirely, handled by driver rule)
+  if (motion.driver?.type === 'delegate') {
+    return errors;
+  }
+
+  const trigger = motion.driver?.trigger;
+  const triggerPath = `${path}.driver.trigger`;
 
   if (trigger === undefined || trigger === null) {
     errors.push({
       ruleId: "trigger-shape",
       severity: "error",
-      message: "scenario.trigger is required.",
+      message: "motion.driver.trigger is required.",
       path: triggerPath
     });
     return errors;
@@ -38,7 +43,7 @@ export function triggerShapeRule(scenario, context, path) {
     errors.push({
       ruleId: "trigger-shape",
       severity: "error",
-      message: "scenario.trigger must be an object.",
+      message: "motion.driver.trigger must be an object.",
       path: triggerPath
     });
     return errors;
@@ -110,15 +115,15 @@ export function triggerShapeRule(scenario, context, path) {
     });
   }
 
-  // element duration present + (type === "scroll" && scrub === true) -> error.
-  if (isScrub && Array.isArray(scenario.elements)) {
-    scenario.elements.forEach((element, idx) => {
-      if (element && element.duration !== undefined && element.duration !== null) {
+  // track duration present + (type === "scroll" && scrub === true) -> error.
+  if (isScrub && Array.isArray(motion.tracks)) {
+    motion.tracks.forEach((track, idx) => {
+      if (track && track.duration !== undefined && track.duration !== null) {
         errors.push({
           ruleId: "trigger-shape",
           severity: "error",
-          message: `duration is incompatible with scroll-scrub triggers (found on element '${element.id || 'unknown'}').`,
-          path: `${path}.elements[${idx}].duration`
+          message: `duration is incompatible with scroll-scrub triggers (found on track '${track.id || 'unknown'}').`,
+          path: `${path}.tracks[${idx}].duration`
         });
       }
     });

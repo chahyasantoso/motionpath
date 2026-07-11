@@ -8,15 +8,15 @@
  * Also validates path.stops[].v range (0 <= v <= 1).
  * This check lives here because no other rule owns path.stops validation.
  *
- * @param {unknown} element
- * @param {unknown} scenario
+ * @param {unknown} track
+ * @param {unknown} motion
  * @param {{ schema: unknown }} context
- * @param {string} path - JSON path to element
+ * @param {string} path - JSON path to track
  * @returns {ValidationError[]}
  */
-export function pathShapeRule(element, scenario, context, path) {
+export function pathShapeRule(track, motion, context, path) {
   const errors = [];
-  const points = element?.keyframes?.path?.points;
+  const points = track?.keyframes?.path?.points;
   if (!Array.isArray(points)) return errors;
 
   const pointsPath = `${path}.keyframes.path.points`;
@@ -66,7 +66,7 @@ export function pathShapeRule(element, scenario, context, path) {
 
   // Validate stops[].v range (0 <= v <= 1).
   // This is the only rule that owns path.stops validation.
-  const stops = element?.keyframes?.path?.stops;
+  const stops = track?.keyframes?.path?.stops;
   if (Array.isArray(stops)) {
     const stopsPath = `${path}.keyframes.path.stops`;
     stops.forEach((stop, idx) => {

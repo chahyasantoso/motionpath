@@ -2,6 +2,8 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { compileProject } from './compileProject.js';
 import { createDeferredCall } from './deferredCall.js';
+import { resolveTrack } from './templateResolver.js';
+import { buildTrackTweenSync } from './builder.js';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -9,7 +11,7 @@ if (typeof window !== 'undefined') {
 
 /**
  * Resolves a trigger-related field that may reference an element.
- * - undefined/null -> falls back to resolving `fallbackId` (typically sceneId).
+ * - undefined/null -> falls back to resolving `fallbackId` (typically sectionId).
  * - boolean -> passed through unchanged (GSAP's `pin: true` means "pin the
  *   trigger element itself"; there's nothing to resolve).
  * - string -> resolved via deps.resolveElement (the data-motion-id lookup) —
@@ -29,6 +31,7 @@ function resolveTriggerRef(value, deps, fallbackId) {
 export function createProductionEngine(deps) {
   let _core = null;
   let _buildResult = null;
+  let _schema = null;
   let _loadGeneration = 0;
   // Track only the ScrollTrigger instances THIS engine created.
   const _createdScrollTriggers = [];
@@ -51,6 +54,7 @@ export function createProductionEngine(deps) {
       _core = null;
     }
     _buildResult = null;
+    _schema = null;
   }
 
   return {
@@ -62,7 +66,7 @@ export function createProductionEngine(deps) {
       // Stale-load guard: a newer loadProject() call (or destroy()) started
       // while buildProject was awaited — discard this result entirely.
       if (loadId !== _loadGeneration) {
-        for (const scenario of buildResult.scenarios) scenario.timeline?.kill();
+        for (const motion of buildResult.motions) motion.timeline?.kill();
         for (const group of buildResult.timelineGroups.values()) group.masterTimeline?.kill();
         return;
       }
@@ -70,11 +74,16 @@ export function createProductionEngine(deps) {
       // Step 4: Wire triggers — with rollback on failure
       const createdSTs = [];
       try {
-        const { scenarios, timelineGroups } = buildResult;
+        const { motions, timelineGroups } = buildResult;
         const processedGroups = new Set();
 
-        for (const scenario of scenarios) {
-          const { timelineId, sceneId, triggerType, triggerConfig } = scenario;
+        for (const motion of motions) {
+          // If motion is delegate, it doesn't have trigger-wiring (no timelineId/sectionId/triggerType)
+          if (motion.driverType === 'delegate') {
+            continue;
+          }
+
+          const { timelineId, sectionId, triggerType, triggerConfig } = motion;
 
           if (timelineId) {
             if (processedGroups.has(timelineId)) continue;
@@ -82,19 +91,19 @@ export function createProductionEngine(deps) {
 
             const group = timelineGroups.get(timelineId);
             if (!group) continue;
-            const primaryScenario = scenarios[group.primaryScenarioIndex];
-            const config = primaryScenario?.triggerConfig || {};
+            const primaryMotion = motions[group.primaryMotionIndex];
+            const config = primaryMotion?.triggerConfig || {};
 
             if (group.triggerType === 'scroll-scrub') {
               const resolvedConfig = {
                 ...config,
-                trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, primaryScenario.sceneId),
+                trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, primaryMotion.sectionId),
               };
               if (config.pin !== undefined) {
-                resolvedConfig.pin = resolveTriggerRef(config.pin, deps, primaryScenario.sceneId);
+                resolvedConfig.pin = resolveTriggerRef(config.pin, deps, primaryMotion.sectionId);
               }
               if (config.endTrigger !== undefined) {
-                resolvedConfig.endTrigger = resolveTriggerRef(config.endTrigger, deps, primaryScenario.sceneId);
+                resolvedConfig.endTrigger = resolveTriggerRef(config.endTrigger, deps, primaryMotion.sectionId);
               }
               const st = ScrollTrigger.create({ ...resolvedConfig, animation: group.masterTimeline });
               createdSTs.push(st);
@@ -115,38 +124,38 @@ export function createProductionEngine(deps) {
             if (triggerType === 'scroll-scrub') {
               const resolvedConfig = {
                 ...config,
-                trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, sceneId),
+                trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, sectionId),
               };
               if (config.pin !== undefined) {
-                resolvedConfig.pin = resolveTriggerRef(config.pin, deps, sceneId);
+                resolvedConfig.pin = resolveTriggerRef(config.pin, deps, sectionId);
               }
               if (config.endTrigger !== undefined) {
-                resolvedConfig.endTrigger = resolveTriggerRef(config.endTrigger, deps, sceneId);
+                resolvedConfig.endTrigger = resolveTriggerRef(config.endTrigger, deps, sectionId);
               }
-              const st = ScrollTrigger.create({ ...resolvedConfig, animation: scenario.timeline });
+              const st = ScrollTrigger.create({ ...resolvedConfig, animation: motion.timeline });
               createdSTs.push(st);
             } else if (triggerType === 'scroll-observer') {
-              scenario.timeline
+              motion.timeline
                 .repeat(config.repeat ?? 0)
                 .yoyo(!!config.yoyo)
                 .repeatDelay(config.repeatDelay ?? 0);
 
               const st = ScrollTrigger.create({
-                trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, sceneId),
+                trigger: resolveTriggerRef(config.trigger ?? config.startTrigger, deps, sectionId),
                 start: config.start,
                 toggleActions: config.toggleActions,
-                animation: scenario.timeline,
+                animation: motion.timeline,
               });
               createdSTs.push(st);
             } else if (triggerType === 'time') {
-              scenario.timeline
+              motion.timeline
                 .repeat(config.repeat ?? 0)
                 .yoyo(!!config.yoyo)
                 .repeatDelay(config.repeatDelay ?? 0);
-              // playStates keyed by timelineId or scenarioIndex (string)
-              const stateKey = timelineId ?? String(scenario.scenarioIndex);
+              // playStates keyed by timelineId or motionIndex (string)
+              const stateKey = timelineId ?? String(motion.motionIndex);
               const shouldPlay = options.playStates?.[stateKey] ?? true;
-              if (shouldPlay) scenario.timeline.play();
+              if (shouldPlay) motion.timeline.play();
             }
           }
         }
@@ -156,8 +165,8 @@ export function createProductionEngine(deps) {
           try { st.kill(); } catch (e) { /* ignore */ }
         }
         // Kill all timelines built so far
-        for (const scenario of buildResult.scenarios) {
-          if (scenario.timeline) scenario.timeline.kill();
+        for (const motion of buildResult.motions) {
+          if (motion.timeline) motion.timeline.kill();
         }
         for (const group of buildResult.timelineGroups.values()) {
           if (group.masterTimeline) group.masterTimeline.kill();
@@ -169,31 +178,28 @@ export function createProductionEngine(deps) {
       _cleanup();
       _core = core;
       _buildResult = buildResult;
+      _schema = schema;
       _createdScrollTriggers.push(...createdSTs);
       _deferredCall.setCore(core);
 
       // Recalculate all scroll trigger positions after the full layout is committed.
-      // When multiple pinned sections exist, each pin inserts a spacer element that
-      // shifts the page layout for all subsequent sections. Without this refresh,
-      // GSAP uses stale pre-pin offsets which causes earlier sections to appear
-      // stuck (animation runs but the scrub range is miscalculated).
       if (createdSTs.length > 0) {
         ScrollTrigger.refresh();
       }
     },
 
-    subscribe(elementId, callback) {
-      return _deferredCall.call((core) => core.subscribe(elementId, callback));
+    subscribe(trackId, callback) {
+      return _deferredCall.call((core) => core.subscribe(trackId, callback));
     },
 
-    compose(elementId, rawData) {
+    compose(trackId, rawData) {
       if (!_core) return {};
-      return _core.compose(elementId, rawData);
+      return _core.compose(trackId, rawData);
     },
 
-    destroyScene(sceneId) {
+    destroySection(sectionId) {
       if (!_core) return;
-      return _core.destroyScene(sceneId);
+      return _core.destroySection(sectionId);
     },
 
     registerTriggerRef(id, ref) {
@@ -215,9 +221,9 @@ export function createProductionEngine(deps) {
       return _deferredCall.call(() => {
         const group = _buildResult?.timelineGroups.get(id);
         if (group) { group.masterTimeline.pause(); return; }
-        const scenario = _buildResult?.scenarios.find(s => String(s.scenarioIndex) === id);
-        if (scenario) { scenario.timeline.pause(); return; }
-        throw new Error(`pauseTimer: no group or scenario found for id "${id}".`);
+        const motion = _buildResult?.motions.find(m => String(m.motionIndex) === id || m.motionId === id);
+        if (motion) { motion.timeline.pause(); return; }
+        throw new Error(`pauseTimer: no group or motion found for id "${id}".`);
       });
     },
 
@@ -225,9 +231,9 @@ export function createProductionEngine(deps) {
       return _deferredCall.call(() => {
         const group = _buildResult?.timelineGroups.get(id);
         if (group) { group.masterTimeline.play(); return; }
-        const scenario = _buildResult?.scenarios.find(s => String(s.scenarioIndex) === id);
-        if (scenario) { scenario.timeline.play(); return; }
-        throw new Error(`playTimer: no group or scenario found for id "${id}".`);
+        const motion = _buildResult?.motions.find(m => String(m.motionIndex) === id || m.motionId === id);
+        if (motion) { motion.timeline.play(); return; }
+        throw new Error(`playTimer: no group or motion found for id "${id}".`);
       });
     },
 
@@ -238,14 +244,101 @@ export function createProductionEngine(deps) {
     disableScroll() {
       ScrollTrigger.getAll().forEach(st => st.disable());
     },
+
+    mountTimeline(motionId) {
+      if (!_schema) {
+        throw new Error('mountTimeline: project not loaded.');
+      }
+      const originalMotion = _schema.motions?.find(
+        m => m && (m.motionId === motionId || (m.motionId === undefined && String(_schema.motions.indexOf(m)) === motionId))
+      );
+      if (!originalMotion) {
+        throw new Error(`mountTimeline: motion with id "${motionId}" not found.`);
+      }
+      if (originalMotion.driver?.type === 'delegate') {
+        throw new Error(`mountTimeline: cannot mount delegate motion "${motionId}".`);
+      }
+    },
+
+    resolveMotion(motionId, progress, overrides = {}) {
+      if (!_schema || !_buildResult) {
+        throw new Error('resolveMotion: project not loaded.');
+      }
+      const originalMotion = _schema.motions?.find(
+        m => m && (m.motionId === motionId || (m.motionId === undefined && String(_schema.motions.indexOf(m)) === motionId))
+      );
+      if (!originalMotion) {
+        throw new Error(`resolveMotion: motion with id "${motionId}" not found.`);
+      }
+      if (originalMotion.driver?.type !== 'delegate') {
+        throw new Error(`resolveMotion: motion with id "${motionId}" is not a delegate motion.`);
+      }
+
+      const result = {};
+      const templates = _schema.templates || [];
+
+      for (const track of originalMotion.tracks || []) {
+        const resolvedTrack = resolveTrack(track, templates);
+        
+        const trackOverride = overrides?.[track.id];
+        let finalKeyframes = resolvedTrack.keyframes;
+        let finalDuration = resolvedTrack.duration;
+        let finalTransformOrigin = resolvedTrack.transformOrigin;
+
+        if (trackOverride) {
+          if (trackOverride.duration !== undefined) finalDuration = trackOverride.duration;
+          if (trackOverride.transformOrigin !== undefined) finalTransformOrigin = trackOverride.transformOrigin;
+          if (trackOverride.keyframes) {
+            finalKeyframes = { ...finalKeyframes };
+            for (const key of Object.keys(trackOverride.keyframes)) {
+              finalKeyframes[key] = trackOverride.keyframes[key];
+            }
+          }
+        }
+
+        const tweenDuration = finalDuration ?? 1;
+        
+        const { proxy, tween, resolvedPlugins } = buildTrackTweenSync(
+          track.id,
+          finalKeyframes,
+          tweenDuration,
+          { ...resolvedTrack, duration: finalDuration, transformOrigin: finalTransformOrigin, keyframes: finalKeyframes }
+        );
+
+        tween.progress(progress);
+
+        const patch = {};
+        for (const plugin of resolvedPlugins) {
+          try {
+            const rawData = {};
+            for (const key of plugin.keys) {
+              if (key in proxy) rawData[key] = proxy[key];
+            }
+            const contribution = plugin.compose(rawData, { ...resolvedTrack, duration: finalDuration, transformOrigin: finalTransformOrigin, keyframes: finalKeyframes });
+            for (const [k, v] of Object.entries(contribution || {})) {
+              if (k === 'filter' && typeof v === 'object') {
+                patch.filter = { ...(patch.filter || {}), ...v };
+              } else {
+                patch[k] = v;
+              }
+            }
+          } catch (e) {
+            // Defensively ignore plugin compose errors
+          }
+        }
+
+        tween.kill();
+        result[track.id] = patch;
+      }
+
+      return result;
+    }
   };
 }
 
 const _triggerRefs = new Map(); // id -> React.RefObject
 
 // Singleton — drop-in replacement for motionEngine default export.
-// The import path in useMotionSubscriber.js changes from '../lib/motionEngine'
-// to '../lib/ProductionEngine'; nothing else changes at the call sites.
 export const productionEngine = createProductionEngine({
   resolveElement: (id) => {
     const ref = _triggerRefs.get(id);
