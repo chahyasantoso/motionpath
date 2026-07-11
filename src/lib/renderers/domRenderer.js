@@ -1,13 +1,19 @@
 import { gsap } from 'gsap';
 
+const filterSuffixes = {
+  blur: 'px',
+  brightness: '',
+  contrast: '',
+  saturate: ''
+};
+
 function serializeFilter(filterValues) {
-  const parts = [];
-  if (filterValues.blur !== undefined) parts.push(`blur(${filterValues.blur}px)`);
-  if (filterValues.brightness !== undefined) parts.push(`brightness(${filterValues.brightness})`);
-  if (filterValues.contrast !== undefined) parts.push(`contrast(${filterValues.contrast})`);
-  if (filterValues.saturate !== undefined) parts.push(`saturate(${filterValues.saturate})`);
-  return parts.join(' ');
+  return Object.entries(filterSuffixes)
+    .filter(([key]) => filterValues[key] !== undefined)
+    .map(([key, suffix]) => `${key}(${filterValues[key]}${suffix})`)
+    .join(' ');
 }
+
 
 export function domRenderer(target, patch) {
   if (!target || !patch) return;

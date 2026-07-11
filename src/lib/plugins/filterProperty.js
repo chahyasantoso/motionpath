@@ -19,10 +19,11 @@ export const filterGroupPlugin = {
   },
   compose(rawData, elementCfg) {
     const filterValues = {};
-    if (rawData.blur !== undefined) filterValues.blur = rawData.blur;
-    if (rawData.brightness !== undefined) filterValues.brightness = rawData.brightness;
-    if (rawData.contrast !== undefined) filterValues.contrast = rawData.contrast;
-    if (rawData.saturate !== undefined) filterValues.saturate = rawData.saturate;
+    for (const key of filterKeys) {
+      if (rawData[key] !== undefined) {
+        filterValues[key] = rawData[key];
+      }
+    }
     return Object.keys(filterValues).length ? { filter: filterValues } : {};
   }
 };
