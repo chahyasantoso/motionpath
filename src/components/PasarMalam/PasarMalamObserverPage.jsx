@@ -285,8 +285,7 @@ function HeroTitle() {
     const rotateX = scrollY * 0.15;
     return {
       ...composed,
-      rotateX,
-      transformPerspective: 1000
+      rotateX
     };
   }, []);
 
