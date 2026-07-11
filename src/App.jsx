@@ -7,6 +7,7 @@ import MotorcyclePage from './components/Motorcycle/MotorcyclePage';
 import PasarMalamPage from './components/PasarMalam/PasarMalamPage';
 import PasarMalamObserverPage from './components/PasarMalam/PasarMalamObserverPage';
 import RefreshSpikePage from './components/Spikes/RefreshSpikePage';
+import TowerDefensePage from './components/TowerDefense/TowerDefensePage';
 import GlobalNav from './components/Navigation/GlobalNav';
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/pasarmalam" element={<PasarMalamPage />} />
         <Route path="/pasarmalam-observer" element={<PasarMalamObserverPage />} />
         <Route path="/spike-refresh" element={<RefreshSpikePage />} />
+        <Route path="/tower-defense" element={<TowerDefensePage />} />
       </Routes>
     </>
   );

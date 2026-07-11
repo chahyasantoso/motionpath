@@ -1,0 +1,306 @@
+/* Tower Defense Page Styles - Premium Sci-Fi Arcade */
+
+:root {
+  --neon-blue: #00f2fe;
+  --neon-pink: #ff6bcb;
+  --neon-amber: #f5a623;
+  --neon-green: #34c759;
+  --bg-dark: #07070c;
+  --bg-terminal: #0b0b16;
+  --border-neon: rgba(0, 242, 254, 0.2);
+}
+
+.td-page {
+  min-height: 100vh;
+  background-color: var(--bg-dark);
+  color: #ffffff;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  padding: 100px 24px 40px 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.td-container {
+  width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Top HUD bar */
+.td-hud {
+  display: flex;
+  justify-content: space-around;
+  background: var(--bg-terminal);
+  border: 1px solid var(--border-neon);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.05);
+}
+
+.hud-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.hud-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.hud-val {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--neon-blue);
+  text-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
+}
+
+.lives-val {
+  color: var(--neon-pink);
+  text-shadow: 0 0 10px rgba(255, 107, 203, 0.4);
+}
+
+/* Game canvas playfield */
+.td-playfield {
+  position: relative;
+  width: 900px;
+  height: 500px;
+  background: #090912;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+  /* Tech grid background */
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.td-path-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Modals overlays */
+.td-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(7, 7, 12, 0.9);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  animation: fade-in 0.3s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.td-overlay h2 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.td-overlay p {
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 420px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.td-btn {
+  background: var(--neon-blue);
+  color: #000000;
+  border: none;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 12px 32px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
+  transition: all 0.2s ease;
+}
+
+.td-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(0, 242, 254, 0.6);
+}
+
+.btn-red {
+  background: var(--neon-pink);
+  box-shadow: 0 0 20px rgba(255, 107, 203, 0.4);
+}
+.btn-red:hover {
+  box-shadow: 0 0 25px rgba(255, 107, 203, 0.6);
+}
+
+.btn-green {
+  background: var(--neon-green);
+  box-shadow: 0 0 20px rgba(52, 199, 89, 0.4);
+}
+.btn-green:hover {
+  box-shadow: 0 0 25px rgba(52, 199, 89, 0.6);
+}
+
+.text-red { color: var(--neon-pink); }
+.text-green { color: var(--neon-green); }
+
+/* Game Entities placement */
+.td-tower-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  cursor: default;
+}
+
+.tower-turret {
+  width: 44px;
+  height: 44px;
+  background: #0f0f1d;
+  border: 2px solid var(--neon-blue);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  z-index: 12;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.td-tower-node:hover .tower-turret {
+  transform: scale(1.1);
+}
+
+.tower-meta {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 15;
+}
+
+.td-tower-node:hover .tower-meta {
+  opacity: 1;
+}
+
+.tower-name {
+  font-size: 0.65rem;
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+
+.tower-range-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 1.5px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* Tower Pulse animations (V2 time-triggered timeline) */
+.tower-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  margin-top: -30px;
+  margin-left: -30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9;
+}
+
+/* Enemy elements styles */
+.td-enemy {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32px;
+  height: 32px;
+  margin-left: -16px;
+  margin-top: -16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.enemy-emoji {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.enemy-hp-bar {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.enemy-hp-fill {
+  height: 100%;
+  background: var(--neon-green);
+  transition: width 0.1s ease;
+}
+
+/* Projectiles particles styling */
+.td-projectile {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #ffffff, 0 0 20px var(--neon-blue);
+  z-index: 30;
+  pointer-events: none;
+}

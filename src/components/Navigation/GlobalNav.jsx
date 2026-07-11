@@ -35,6 +35,9 @@ export default function GlobalNav() {
           <NavLink to="/pasarmalam-observer" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Night Market (Obs)
           </NavLink>
+          <NavLink to="/tower-defense" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            Tower Defense
+          </NavLink>
           <NavLink to="/spike-refresh" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Spike
           </NavLink>
@@ -72,6 +75,9 @@ export default function GlobalNav() {
           </NavLink>
           <NavLink to="/pasarmalam-observer" className="drawer-link" onClick={closeMenu}>
             👁️ Night Market (Scroll Observer)
+          </NavLink>
+          <NavLink to="/tower-defense" className="drawer-link" onClick={closeMenu}>
+            🗼 Tower Defense
           </NavLink>
           <NavLink to="/spike-refresh" className="drawer-link" onClick={closeMenu}>
             ⚡ Performance Spike

@@ -54,6 +54,16 @@ const DEMOS = [
     features: ['ScrollTrigger toggleActions', 'Viewport entry triggers', 'Separated timeline controller']
   },
   {
+    id: 'tower-defense',
+    title: 'Tower Defense Game',
+    badge: 'Delegate / Overrides Game Loop',
+    path: '/tower-defense',
+    icon: '🗼',
+    color: 'glow-amber',
+    description: 'A pure, V2 resolveMotion-powered game loop tower defense. Enemies follow S-curves synchronously while energy projectile arcs are dynamically resolved and updated via overrides.',
+    features: ['Tween-cached coordinate lookup', 'Dynamic coordinate overrides', 'Time-triggered autonomous pulse']
+  },
+  {
     id: 'spike-refresh',
     title: 'Performance Spike',
     badge: 'Stress Test / Benchmark',
