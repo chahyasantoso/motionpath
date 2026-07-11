@@ -1,6 +1,6 @@
 import { createSimplePropertyPlugin } from './plugins/simpleProperty.js';
 import { createColorPropertyPlugin } from './plugins/colorProperty.js';
-import { createFilterPropertyPlugin } from './plugins/filterProperty.js';
+import { filterGroupPlugin } from './plugins/filterProperty.js';
 import { pathPlugin } from './plugins/pathPlugin.js';
 import { cssVarPlugin } from './plugins/cssVarProperty.js';
 import { imageSequencePlugin } from './plugins/imageSequenceProperty.js';
@@ -17,13 +17,8 @@ const colorKeys = [
   'backgroundColor', 'color', 'borderColor'
 ];
 
-const filterKeys = [
-  'blur', 'brightness', 'contrast', 'saturate'
-];
-
 const simplePlugins = Object.fromEntries(simpleKeys.map(k => [k, createSimplePropertyPlugin(k)]));
 const colorPlugins = Object.fromEntries(colorKeys.map(k => [k, createColorPropertyPlugin(k)]));
-const filterPlugins = Object.fromEntries(filterKeys.map(k => [k, createFilterPropertyPlugin(k)]));
 
 // Individual exports for legacy references (if any exist)
 export { pathPlugin, cssVarPlugin, imageSequencePlugin };
@@ -37,7 +32,7 @@ export const scrambleTextPlugin = { keys: ['scrambleText'], lazy: true, claimsKe
 export const ALL_PLUGINS = [
   ...Object.values(simplePlugins),
   ...Object.values(colorPlugins),
-  ...Object.values(filterPlugins),
+  filterGroupPlugin,
   pathPlugin,
   cssVarPlugin,
   imageSequencePlugin,

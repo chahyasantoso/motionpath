@@ -1,16 +1,16 @@
-import { gsap } from 'gsap';
 import { useEffect, useRef } from 'react';
 import { productionEngine } from '../lib/ProductionEngine';
+import { domRenderer } from '../lib/renderers/domRenderer';
 
 /**
  * Smart Subscriber Hook — Listens to coordinate broadcasts from productionEngine
- * and applies them directly to a DOM element via gsap.set(), bypassing
+ * and applies them directly to a DOM element via domRenderer, bypassing
  * React's Virtual DOM entirely (Zero Re-render).
  *
  * @param {string} elementId - ID of the element to subscribe to (matches elements[].id in scene JSON)
  * @param {React.RefObject} ref - React ref to the target DOM element
  * @param {Function} [transformFn] - Optional transform function. Receives data (rawData)
- *   and compose function (rawData => patch) and must return an object of CSS properties for gsap.set().
+ *   and compose function (rawData => patch) and must return an object of CSS properties for domRenderer.
  *   Should be wrapped in useCallback by the consumer.
  *   When absent, defaults to applying productionEngine.compose(elementId, rawData).
  */
@@ -30,10 +30,10 @@ export default function useMotionSubscriber(elementId, ref, transformFn) {
       const activeTransformFn = transformFnRef.current;
 
       if (typeof activeTransformFn === 'function') {
-        gsap.set(ref.current, activeTransformFn(rawData, (data) => productionEngine.compose(elementId, data)));
+        domRenderer(ref.current, activeTransformFn(rawData, (data) => productionEngine.compose(elementId, data)));
       } else {
         // Default: compose raw data to target DOM-ready values and apply
-        gsap.set(ref.current, productionEngine.compose(elementId, rawData));
+        domRenderer(ref.current, productionEngine.compose(elementId, rawData));
       }
     });
 

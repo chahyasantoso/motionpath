@@ -1,45 +1,28 @@
-const filterKeyMap = {
-  blur: 'blur',
-  brightness: 'brightness',
-  contrast: 'contrast',
-  saturate: 'saturate'
-};
+const filterKeys = ['blur', 'brightness', 'contrast', 'saturate'];
 
-/**
- * Creates a plugin for CSS filter sub-properties that compiles to a synthetic proxy key.
- *
- * @param {string} propKey - The filter key name (e.g. 'blur', 'brightness').
- * @returns {Plugin} A plugin definition object.
- */
-export function createFilterPropertyPlugin(propKey) {
-  const proxyKey = filterKeyMap[propKey];
-  return {
-    keys: [propKey],
-    lazy: false,
-    claimsKey(key) {
-      return key === propKey;
-    },
-    contribute(key, stops) {
-      const percentPatch = {};
-      stops.forEach(stop => {
-        const pctKey = `${stop.p * 100}%`;
-        percentPatch[pctKey] = { [proxyKey]: stop.v };
-        if (stop.ease) {
-          percentPatch[pctKey].ease = stop.ease;
-        }
-      });
-      return { percentPatch, tweenVars: {} };
-    },
-    compose(rawData, elementCfg) {
-      if (rawData[proxyKey] === undefined) return {};
-      const val = rawData[proxyKey];
-      const filterFnMap = {
-        blur: `blur(${val}px)`,
-        brightness: `brightness(${val})`,
-        contrast: `contrast(${val})`,
-        saturate: `saturate(${val})`,
-      };
-      return { [proxyKey + '_filter']: filterFnMap[proxyKey] };
-    }
-  };
-}
+export const filterGroupPlugin = {
+  keys: filterKeys,
+  lazy: false,
+  claimsKey(key) {
+    return filterKeys.includes(key);
+  },
+  contribute(key, stops) {
+    const percentPatch = {};
+    stops.forEach(stop => {
+      const pctKey = `${stop.p * 100}%`;
+      percentPatch[pctKey] = { [key]: stop.v };
+      if (stop.ease) {
+        percentPatch[pctKey].ease = stop.ease;
+      }
+    });
+    return { percentPatch, tweenVars: {} };
+  },
+  compose(rawData, elementCfg) {
+    const filterValues = {};
+    if (rawData.blur !== undefined) filterValues.blur = rawData.blur;
+    if (rawData.brightness !== undefined) filterValues.brightness = rawData.brightness;
+    if (rawData.contrast !== undefined) filterValues.contrast = rawData.contrast;
+    if (rawData.saturate !== undefined) filterValues.saturate = rawData.saturate;
+    return Object.keys(filterValues).length ? { filter: filterValues } : {};
+  }
+};

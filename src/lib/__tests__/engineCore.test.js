@@ -22,7 +22,7 @@ describe('EngineCore', () => {
       keys: ['blur'],
       compose: vi.fn((rawData) => {
         if (rawData.blur === undefined) return {};
-        return { blur_filter: `blur(${rawData.blur}px)` };
+        return { filter: { blur: rawData.blur } };
       })
     };
 
@@ -110,7 +110,7 @@ describe('EngineCore', () => {
       expect(mockPlugin2.compose).toHaveBeenCalled();
       expect(patch).toEqual({
         x: 10,
-        filter: 'blur(5px)'
+        filter: { blur: 5 }
       });
     });
 
@@ -124,7 +124,7 @@ describe('EngineCore', () => {
 
       // mockPlugin2's compose should still succeed and be in the patch
       expect(patch).toEqual({
-        filter: 'blur(5px)'
+        filter: { blur: 5 }
       });
     });
   });

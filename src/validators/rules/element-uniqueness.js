@@ -1,12 +1,15 @@
 /**
  * Rule: element-uniqueness
- * Cross-scenario element ID uniqueness check within the same sceneId.
- *
- * Requirements:
- * - Group scenarios by sceneId.
- * - Within each group, collect all element IDs across all scenarios sharing that sceneId.
- * - Any ID appearing more than once within that group -> error.
- *
+ * * Project-wide element ID uniqueness check across ALL scenarios.
+ * 
+ * * Requirements:
+ * - Collect every element ID across the entire project's scenarios.
+ * - Any ID appearing in more than one scenario -> error (regardless of
+ *   sceneId — the builder's elements map is flat and global, so any
+ *   cross-scenario collision silently discards one tween. See the Pasar
+ *   Malam lantern bug in .agent/lantern-animation-composition.md for the
+ *   original real-world case this closes).
+ * 
  * @param {unknown[]} scenarios
  * @returns {ValidationError[]}
  */

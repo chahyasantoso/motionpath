@@ -110,7 +110,6 @@ export function createEngineCore(buildResult) {
       }
 
       const patch = {};
-      const filterParts = [];
 
       for (const plugin of plugins) {
         if (typeof plugin.compose !== 'function') continue;
@@ -123,17 +122,8 @@ export function createEngineCore(buildResult) {
         }
         if (!contribution) continue;
         for (const [k, v] of Object.entries(contribution)) {
-          if (k.endsWith('_filter')) {
-            // Collect filter contributions in plugin-resolution order
-            filterParts.push(v);
-          } else {
-            patch[k] = v;
-          }
+          patch[k] = v;
         }
-      }
-
-      if (filterParts.length > 0) {
-        patch.filter = filterParts.join(' ');
       }
 
       return patch;
