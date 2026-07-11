@@ -132,6 +132,18 @@ export default function TowerDefensePage() {
   const [lives, setLives] = useState(20);
   const [score, setScore] = useState(0);
 
+  // Keep refs in sync for the requestAnimationFrame loop to avoid stale closure issues
+  const gameStateRef = useRef(gameState);
+  const waveRef = useRef(wave);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
+  useEffect(() => {
+    waveRef.current = wave;
+  }, [wave]);
+
   // Use refs for gameplay variables to prevent re-render thrashing the RAF loop
   const gameLoopRef = useRef(null);
   const enemiesRef = useRef([]);
@@ -163,16 +175,17 @@ export default function TowerDefensePage() {
   };
 
   const startNextWave = () => {
-    if (gameState === 'gameover' || gameState === 'won') return;
+    const currentGState = gameStateRef.current;
+    if (currentGState === 'gameover' || currentGState === 'won') return;
     setWave(w => w + 1);
-    waveEnemyCountRef.current = WAVE_ENEMY_COUNT + wave * 2;
+    waveEnemyCountRef.current = WAVE_ENEMY_COUNT + waveRef.current * 2;
     waveSpawnTimerRef.current = 0;
     setGameState('playing');
   };
 
   // Main Game Loop (V2 pure coordinate resolution)
   const updateGame = () => {
-    if (gameState !== 'playing') {
+    if (gameStateRef.current !== 'playing') {
       gameLoopRef.current = requestAnimationFrame(updateGame);
       return;
     }
@@ -186,7 +199,7 @@ export default function TowerDefensePage() {
 
         const lane = Math.random() > 0.5 ? 1 : 2;
         const types = ['crawler', 'scout'];
-        if (wave > 2) types.push('goliath');
+        if (waveRef.current > 2) types.push('goliath');
         const typeKey = types[Math.floor(Math.random() * types.length)];
         const baseType = ENEMY_TYPES[typeKey];
 
@@ -197,7 +210,7 @@ export default function TowerDefensePage() {
           emoji: baseType.emoji,
           maxHp: baseType.hp,
           hp: baseType.hp,
-          speed: baseType.speed * (1 + wave * 0.1), // slightly faster each wave
+          speed: baseType.speed * (1 + waveRef.current * 0.1), // slightly faster each wave
           progress: 0,
           x: 0,
           y: lane === 1 ? 150 : 350,
@@ -321,7 +334,7 @@ export default function TowerDefensePage() {
 
     // 5. Wave Completion / Win Check
     if (waveEnemyCountRef.current === 0 && enemiesRef.current.length === 0 && projectilesRef.current.length === 0) {
-      if (wave >= 5) {
+      if (waveRef.current >= 5) {
         setGameState('won');
       } else {
         setGameState('idle');
@@ -338,7 +351,7 @@ export default function TowerDefensePage() {
   useEffect(() => {
     gameLoopRef.current = requestAnimationFrame(updateGame);
     return () => cancelAnimationFrame(gameLoopRef.current);
-  }, [gameState, wave]);
+  }, []); // Run once on mount to establish a single stable game loop
 
   return (
     <div className="td-page">
