@@ -37,7 +37,7 @@ describe('useMotionProject', () => {
 
   it('calls loadProject exactly once with the project schema on mount and destroy on unmount', async () => {
     productionEngine.loadProject.mockResolvedValue();
-    const project = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
+    const project = { schemaVersion: 2, projectId: 'p1', motions: [] };
 
     const { unmount } = renderHook(() => useMotionProject(project));
 
@@ -50,8 +50,8 @@ describe('useMotionProject', () => {
 
   it('destroys old engine state and loads new project when project reference changes', async () => {
     productionEngine.loadProject.mockResolvedValue();
-    const project1 = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
-    const project2 = { schemaVersion: 1, projectId: 'p2', scenarios: [] };
+    const project1 = { schemaVersion: 2, projectId: 'p1', motions: [] };
+    const project2 = { schemaVersion: 2, projectId: 'p2', motions: [] };
 
     const { rerender } = renderHook(({ project }) => useMotionProject(project), {
       initialProps: { project: project1 }
@@ -72,7 +72,7 @@ describe('useMotionProject', () => {
   it('logs loadProject failure without throwing synchronously', async () => {
     const error = new Error('load failed');
     productionEngine.loadProject.mockRejectedValue(error);
-    const project = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
+    const project = { schemaVersion: 2, projectId: 'p1', motions: [] };
 
     // Should not throw synchronously
     expect(() => {
@@ -91,14 +91,14 @@ describe('useMotionProject', () => {
 
     expect(productionEngine.loadProject).toHaveBeenCalledTimes(1);
     const loadedSchema = productionEngine.loadProject.mock.calls[0][0];
-    expect(loadedSchema.scenarios).toHaveLength(2);
-    expect(loadedSchema.scenarios.map(s => s.sceneId)).toContain('strawberry-burst-scroll');
-    expect(loadedSchema.scenarios.map(s => s.sceneId)).toContain('ice-cream-card-slide');
+    expect(loadedSchema.motions).toHaveLength(2);
+    expect(loadedSchema.motions.map(s => s.motionId)).toContain('strawberry-burst-scroll');
+    expect(loadedSchema.motions.map(s => s.motionId)).toContain('ice-cream-card-slide');
   });
 
   it('forwards initialPlayStates option to loadProject so paused-on-load works', async () => {
     productionEngine.loadProject.mockResolvedValue();
-    const project = { schemaVersion: 1, projectId: 'p1', scenarios: [] };
+    const project = { schemaVersion: 2, projectId: 'p1', motions: [] };
 
     renderHook(() => useMotionProject(project, { initialPlayStates: { 'my-tl': false } }));
 

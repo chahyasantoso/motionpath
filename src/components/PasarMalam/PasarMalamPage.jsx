@@ -14,15 +14,19 @@ const IMAGE_SEQUENCE_FRAMES = Array.from({ length: 192 }, (_, i) => {
 
 // ─── Scene Data Config ──────────────────────────────────────────
 const pasarMalamScene = {
-  sceneId: 'pasar-malam-storytelling',
-  trigger: {
-    type: 'scroll',
-    scrub: 0.5,
-    pin: 'pm-stage',
-    start: 'top top',
-    end: 'bottom bottom'
+  motionId: 'pasar-malam-storytelling',
+  driver: {
+    type: 'timeline',
+    sectionId: 'pasar-malam-storytelling',
+    trigger: {
+      type: 'scroll',
+      scrub: 0.5,
+      pin: 'pm-stage',
+      start: 'top top',
+      end: 'bottom bottom'
+    }
   },
-  elements: [
+  tracks: [
     {
       id: 'pasar-malam-bg',
       keyframes: {
@@ -169,15 +173,19 @@ const pasarMalamScene = {
 };
 
 const lanternScene = {
-  sceneId: 'lantern-scene',
-  trigger: {
-    type: 'scroll',
-    scrub: 0.5,
-    trigger: 'pasar-malam-storytelling',  // same section as the main scene
-    start: 'top top',
-    end: 'bottom bottom'
+  motionId: 'lantern-scene',
+  driver: {
+    type: 'timeline',
+    sectionId: 'lantern-scene',
+    trigger: {
+      type: 'scroll',
+      scrub: 0.5,
+      trigger: 'pasar-malam-storytelling',  // same section as the main scene
+      start: 'top top',
+      end: 'bottom bottom'
+    }
   },
-  elements: [
+  tracks: [
     {
       id: 'lantern-1-wrap',
       keyframes: {
@@ -203,11 +211,14 @@ const lanternScene = {
 };
 
 const lanternBounceScene = {
-  sceneId: 'lantern-bounce',
-  timelineId: 'lantern-bounce-tl',
-  primary: true,
-  trigger: { type: 'time', duration: 1.2, repeat: -1, yoyo: true },
-  elements: [
+  motionId: 'lantern-bounce',
+  driver: {
+    type: 'timeline',
+    timelineId: 'lantern-bounce-tl',
+    primary: true,
+    trigger: { type: 'time', duration: 1.2, repeat: -1, yoyo: true }
+  },
+  tracks: [
     {
       id: 'lantern-1',
       keyframes: {
@@ -230,10 +241,10 @@ const lanternBounceScene = {
 };
 
 const pmProject = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   projectId: 'pasar-malam-page',
   perspective: 800,
-  scenarios: [pasarMalamScene, lanternScene, lanternBounceScene]
+  motions: [pasarMalamScene, lanternScene, lanternBounceScene]
 };
 
 // ─── Sub-Components ─────────────────────────────────────────────

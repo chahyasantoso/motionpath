@@ -9,15 +9,19 @@ import './DemoPage.css';
 
 // ─── Scene Data ────────────────────────────────────────────────
 const scrollScene = {
-  sceneId: 'hero-scrollytelling',
-  trigger: {
-    type: 'scroll',
-    scrub: 1,
-    pin: 'stage',
-    start: 'top top',
-    end: 'bottom bottom'
+  motionId: 'hero-scrollytelling',
+  driver: {
+    type: 'timeline',
+    sectionId: 'hero-scrollytelling',
+    trigger: {
+      type: 'scroll',
+      scrub: 1,
+      pin: 'stage',
+      start: 'top top',
+      end: 'bottom bottom'
+    }
   },
-  elements: [
+  tracks: [
     {
       id: 'rocket-track',
       keyframes: {
@@ -76,16 +80,20 @@ const MOCK_CARDS = [
 ];
 
 const dynamicCarouselScene = {
-  sceneId: 'carousel-storytelling',
-  trigger: {
-    type: 'scroll',
-    scrub: 1.2,
-    pin: 'carousel-stage',
-    start: 'top top',
-    end: 'bottom bottom'
+  motionId: 'carousel-storytelling',
+  driver: {
+    type: 'timeline',
+    sectionId: 'carousel-storytelling',
+    trigger: {
+      type: 'scroll',
+      scrub: 1.2,
+      pin: 'carousel-stage',
+      start: 'top top',
+      end: 'bottom bottom'
+    }
   },
   stagger: 0.14,
-  elements: MOCK_CARDS.map((card, i) => ({
+  tracks: MOCK_CARDS.map((card, i) => ({
     id: `carousel-card-${i}`,
     keyframes: {
       path: {
@@ -112,16 +120,20 @@ const dynamicCarouselScene = {
 };
 
 const dynamicHelixScene = {
-  sceneId: 'helix-storytelling',
-  trigger: {
-    type: 'scroll',
-    scrub: 1.2,
-    pin: 'helix-stage',
-    start: 'top top',
-    end: 'bottom bottom'
+  motionId: 'helix-storytelling',
+  driver: {
+    type: 'timeline',
+    sectionId: 'helix-storytelling',
+    trigger: {
+      type: 'scroll',
+      scrub: 1.2,
+      pin: 'helix-stage',
+      start: 'top top',
+      end: 'bottom bottom'
+    }
   },
   stagger: 0.16,
-  elements: MOCK_CARDS.slice(0, 6).map((card, i) => ({
+  tracks: MOCK_CARDS.slice(0, 6).map((card, i) => ({
     id: `helix-card-${i}`,
     keyframes: {
       path: {
@@ -133,10 +145,10 @@ const dynamicHelixScene = {
 };
 
 const project = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   projectId: 'demo-page',
   perspective: 1200,
-  scenarios: [
+  motions: [
     scrollScene,
     dynamicCarouselScene,
     dynamicHelixScene
@@ -306,7 +318,7 @@ function ScrollDemo() {
       <div ref={stageRef} className="stage">
         {/* Render paths using the exact coordinate config to overlay guide lines */}
         <svg className="path-guide" width="100%" height="100%">
-          {scrollScene.elements.map(el => (
+          {scrollScene.tracks.map(el => (
             <path
               key={el.id}
               id={`path-guide-${el.id}`}
@@ -350,7 +362,7 @@ function CarouselDemo() {
         {/* Path guides generated from scene data */}
         <svg className="path-guide" width="100%" height="100%">
           <path
-            d={buildMotionPath(dynamicCarouselScene.elements[0].keyframes.path.points)}
+            d={buildMotionPath(dynamicCarouselScene.tracks[0].keyframes.path.points)}
             fill="none"
             stroke="rgba(255,255,255,0.1)"
             strokeWidth="2"
@@ -375,7 +387,7 @@ function HelixDemo() {
 
   // Project 3D path nodes to 2D for the SVG guide
   const projectedHelixNodes = projectPathNodes3DTo2D(
-    dynamicHelixScene.elements[0].keyframes.path.points,
+    dynamicHelixScene.tracks[0].keyframes.path.points,
     cx, cy, tiltDeg, true
   );
 

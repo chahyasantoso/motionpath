@@ -13,15 +13,19 @@ const IMAGE_SEQUENCE_FRAMES = Array.from({ length: 192 }, (_, i) => {
 
 // ─── Scene Data Config ──────────────────────────────────────────
 const pasarMalamScene = {
-  sceneId: 'pasar-malam-storytelling',
-  trigger: {
-    type: 'scroll',
-    scrub: 0.5,
-    pin: 'pm-stage',
-    start: 'top top',
-    end: 'bottom bottom'
+  motionId: 'pasar-malam-storytelling',
+  driver: {
+    type: 'timeline',
+    sectionId: 'pasar-malam-storytelling',
+    trigger: {
+      type: 'scroll',
+      scrub: 0.5,
+      pin: 'pm-stage',
+      start: 'top top',
+      end: 'bottom bottom'
+    }
   },
-  elements: [
+  tracks: [
     {
       id: 'pasar-malam-bg',
       keyframes: {
@@ -168,15 +172,19 @@ const pasarMalamScene = {
 };
 
 const lanternScene = {
-  sceneId: 'lantern-scene',
-  trigger: {
-    type: 'scroll',
-    scrub: 0.5,
-    trigger: 'pasar-malam-storytelling',
-    start: 'top top',
-    end: 'bottom bottom'
+  motionId: 'lantern-scene',
+  driver: {
+    type: 'timeline',
+    sectionId: 'lantern-scene',
+    trigger: {
+      type: 'scroll',
+      scrub: 0.5,
+      trigger: 'pasar-malam-storytelling',  // same section as the main scene
+      start: 'top top',
+      end: 'bottom bottom'
+    }
   },
-  elements: [
+  tracks: [
     {
       id: 'lantern-1-wrap',
       keyframes: {
@@ -204,18 +212,22 @@ const lanternScene = {
 // Pure scrollytelling observer. No timelineId/grouping is needed.
 // ScrollTrigger naturally handles toggleActions to play/pause the infinite bounce loop.
 const lanternBounceObserverScene = {
-  sceneId: 'lantern-bounce-observer',
-  trigger: {
-    type: 'scroll',
-    scrub: false,
-    trigger: 'pasar-malam-storytelling',
-    start: '50% top', // triggers past 50% scroll progress (50% from top of hero section)
-    toggleActions: 'play pause resume pause',
-    duration: 1.2,
-    repeat: -1,
-    yoyo: true
+  motionId: 'lantern-bounce-observer',
+  driver: {
+    type: 'timeline',
+    sectionId: 'lantern-bounce-observer',
+    trigger: {
+      type: 'scroll',
+      scrub: false,
+      trigger: 'pasar-malam-storytelling',
+      start: '50% top', // triggers past 50% scroll progress (50% from top of hero section)
+      toggleActions: 'play pause resume pause',
+      duration: 1.2,
+      repeat: -1,
+      yoyo: true
+    }
   },
-  elements: [
+  tracks: [
     {
       id: 'lantern-1',
       keyframes: {
@@ -238,10 +250,10 @@ const lanternBounceObserverScene = {
 };
 
 const pmObserverProject = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   projectId: 'pasar-malam-observer-page',
   perspective: 800,
-  scenarios: [pasarMalamScene, lanternScene, lanternBounceObserverScene]
+  motions: [pasarMalamScene, lanternScene, lanternBounceObserverScene]
 };
 
 // ─── Sub-Components ─────────────────────────────────────────────

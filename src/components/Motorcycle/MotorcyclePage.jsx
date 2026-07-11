@@ -37,14 +37,17 @@ const streakBNodes = [{ x: -400, y: 470 }, { x: 1400, y: 470 }];
 const RIDE_DURATION = 5; // seconds end-to-end
 
 const project = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   projectId: 'motorcycle-page',
-  scenarios: [
+  motions: [
     // Main bike along the S-curve
     {
-      sceneId: 'moto-bike-scene',
-      trigger: { type: 'time', duration: RIDE_DURATION, repeat: -1, yoyo: false },
-      elements: [
+      motionId: 'moto-bike-scene',
+      driver: {
+        type: 'timeline',
+        trigger: { type: 'time', duration: RIDE_DURATION, repeat: -1, yoyo: false }
+      },
+      tracks: [
         {
           id: 'moto-bike',
           keyframes: {
@@ -67,9 +70,12 @@ const project = {
     },
     // Shadow — same path, offset, slight lag via stagger
     {
-      sceneId: 'moto-shadow-scene',
-      trigger: { type: 'time', duration: RIDE_DURATION, repeat: -1, yoyo: false },
-      elements: [
+      motionId: 'moto-shadow-scene',
+      driver: {
+        type: 'timeline',
+        trigger: { type: 'time', duration: RIDE_DURATION, repeat: -1, yoyo: false }
+      },
+      tracks: [
         {
           id: 'moto-shadow',
           keyframes: {
@@ -92,9 +98,12 @@ const project = {
     },
     // Clouds
     {
-      sceneId: 'moto-clouds-scene',
-      trigger: { type: 'time', duration: RIDE_DURATION * 1.8, repeat: -1, yoyo: false },
-      elements: [
+      motionId: 'moto-clouds-scene',
+      driver: {
+        type: 'timeline',
+        trigger: { type: 'time', duration: RIDE_DURATION * 1.8, repeat: -1, yoyo: false }
+      },
+      tracks: [
         {
           id: 'moto-cloud-a',
           keyframes: {
@@ -125,9 +134,12 @@ const project = {
     },
     // Speed streaks
     {
-      sceneId: 'moto-streaks-scene',
-      trigger: { type: 'time', duration: RIDE_DURATION * 0.9, repeat: -1, yoyo: false },
-      elements: [
+      motionId: 'moto-streaks-scene',
+      driver: {
+        type: 'timeline',
+        trigger: { type: 'time', duration: RIDE_DURATION * 0.9, repeat: -1, yoyo: false }
+      },
+      tracks: [
         {
           id: 'moto-streak-a',
           keyframes: {

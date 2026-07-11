@@ -10,15 +10,19 @@ import { projectPathNodes3DTo2D } from '../../lib/projection3d';
 const STRAW_PERSPECTIVE = 800;
 
 const strawberryScene = {
-  sceneId: 'strawberry-burst-scroll',
-  trigger: {
-    type: 'scroll',
-    scrub: 0.5,
-    pin: 'burst-stage',
-    start: 'top top',
-    end: 'bottom bottom'
+  motionId: 'strawberry-burst-scroll',
+  driver: {
+    type: 'timeline',
+    sectionId: 'strawberry-burst-scroll',
+    trigger: {
+      type: 'scroll',
+      scrub: 0.5,
+      pin: 'burst-stage',
+      start: 'top top',
+      end: 'bottom bottom'
+    }
   },
-  elements: [
+  tracks: [
     {
       id: 'strawberry-1',
       keyframes: {
@@ -271,15 +275,19 @@ const strawberryScene = {
 };
 
 const iceCreamCardScene = {
-  sceneId: 'ice-cream-card-slide',
-  trigger: {
-    type: 'scroll',
-    scrub: false,
-    startTrigger: 'strawberry-burst-scroll',
-    start: 'top 30%',
-    toggleActions: 'play none none none'
+  motionId: 'ice-cream-card-slide',
+  driver: {
+    type: 'timeline',
+    sectionId: 'ice-cream-card-slide',
+    trigger: {
+      type: 'scroll',
+      scrub: false,
+      startTrigger: 'strawberry-burst-scroll',
+      start: 'top 30%',
+      toggleActions: 'play none none none'
+    }
   },
-  elements: [
+  tracks: [
     {
       id: 'strawberry-card',
       duration: 2.2,
@@ -410,10 +418,10 @@ export default function BurstPage() {
   }, []);
 
   const project = useMemo(() => ({
-    schemaVersion: 1,
+    schemaVersion: 2,
     projectId: 'burst-page',
     perspective: STRAW_PERSPECTIVE,
-    scenarios: [strawberryScene, iceCreamCardScene],
+    motions: [strawberryScene, iceCreamCardScene],
   }), []);
 
   useMotionProject(project);
@@ -425,7 +433,7 @@ export default function BurstPage() {
   const strawCy = dimensions.height * 0.5;
 
   // Map 3D path nodes to 2D for all 10 strawberries dynamically (excluding ice cream center)
-  const strawberryPaths = strawberryScene.elements
+  const strawberryPaths = strawberryScene.tracks
     .filter((el) => el.id.startsWith('strawberry'))
     .map((el) => {
       const nodes = projectPathNodes3DTo2D(
@@ -442,7 +450,7 @@ export default function BurstPage() {
       };
     });
 
-  const cardNodes = iceCreamCardScene.elements[0].keyframes.path.points;
+  const cardNodes = iceCreamCardScene.tracks[0].keyframes.path.points;
 
   return (
     <div className="app">
@@ -475,7 +483,7 @@ export default function BurstPage() {
               </g>
             </svg>
 
-            {strawberryScene.elements
+            {strawberryScene.tracks
               .filter((el) => el.id.startsWith('strawberry'))
               .map((el) => (
                 <Strawberry key={el.id} elementId={el.id} emoji="🍓" />
