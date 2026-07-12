@@ -1,5 +1,6 @@
 import { gsap } from 'gsap';
 import { ALL_PLUGINS } from './plugins.js';
+import { composePatch } from './composePatch.js';
 
 /**
  * Creates a shared EngineCore that both ProductionEngine and EditorEngine compose.
@@ -110,24 +111,7 @@ export function createEngineCore(buildResult) {
         }
       }
 
-      const patch = {};
-
-      for (const plugin of plugins) {
-        if (typeof plugin.compose !== 'function') continue;
-        let contribution;
-        try {
-          contribution = plugin.compose(source, trackBuild.trackConfig ?? trackBuild);
-        } catch {
-          // Defensive: one broken plugin must not blank the whole patch
-          continue;
-        }
-        if (!contribution) continue;
-        for (const [k, v] of Object.entries(contribution)) {
-          patch[k] = v;
-        }
-      }
-
-      return patch;
+      return composePatch(plugins, source, trackBuild.trackConfig ?? trackBuild, `track "${trackId}"`);
     },
 
     /**

@@ -79,11 +79,6 @@ export function createProductionEngine(deps) {
         const processedGroups = new Set();
 
         for (const motion of motions) {
-          // If motion is delegate, it doesn't have trigger-wiring (no timelineId/sectionId/triggerType)
-          if (motion.driverType === 'delegate') {
-            continue;
-          }
-
           const { timelineId, sectionId, triggerType, triggerConfig } = motion;
 
           if (timelineId) {

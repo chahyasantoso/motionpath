@@ -8,7 +8,7 @@ import { imageSequencePlugin } from './plugins/imageSequenceProperty.js';
 const simpleKeys = [
   'x', 'y', 'z',
   'rotation', 'rotationX', 'rotationY',
-  'scaleX', 'scaleY',
+  'scale', 'scaleX', 'scaleY',
   'skewX', 'skewY',
   'opacity'
 ];

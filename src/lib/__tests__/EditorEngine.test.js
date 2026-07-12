@@ -120,6 +120,29 @@ describe('EditorEngine', () => {
     expect(() => engine.setProgress('unknown-id', 0.5)).toThrow(/no group or motion found/);
   });
 
+  it('setProgress throws on delegate motions (since they are not compiled into timeline motions)', async () => {
+    validatorModule.validateProject.mockReturnValue([]);
+    builderModule.buildProject.mockResolvedValue({
+      motions: [],
+      timelineGroups: new Map(),
+      tracks: new Map(),
+      trackPlugins: new Map()
+    });
+
+    const engine = createEditorEngine(mockDeps);
+    await engine.loadProject({
+      motions: [
+        {
+          motionId: 'my-delegate-motion',
+          driver: { type: 'delegate' },
+          tracks: [{ id: 'tr1', keyframes: {} }]
+        }
+      ]
+    });
+
+    expect(() => engine.setProgress('my-delegate-motion', 0.5)).toThrow(/no group or motion found for target "my-delegate-motion"/);
+  });
+
   it('allows subscribing before project is loaded, queueing and wiring them on load', async () => {
     const customResult = {
       motions: [

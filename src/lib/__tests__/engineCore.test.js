@@ -114,18 +114,13 @@ describe('EngineCore', () => {
       });
     });
 
-    it('defensively handles plugin compose errors', () => {
+    it('throws with context on plugin compose errors', () => {
       mockPlugin1.compose.mockImplementationOnce(() => {
         throw new Error('Plugin crash');
       });
 
       const core = createEngineCore(buildResult);
-      const patch = core.compose('el-1');
-
-      // mockPlugin2's compose should still succeed and be in the patch
-      expect(patch).toEqual({
-        filter: { blur: 5 }
-      });
+      expect(() => core.compose('el-1')).toThrow(/composePatch: plugin compose failed for track "el-1", property key\(s\) \[x\]: Plugin crash/);
     });
   });
 

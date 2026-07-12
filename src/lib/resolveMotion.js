@@ -1,5 +1,6 @@
 import { resolveTrack } from './templateResolver.js';
 import { buildTrackTweenSync } from './builder.js';
+import { composePatch } from './composePatch.js';
 
 /**
  * Shared resolver for driver:"delegate" motions. Used by both ProductionEngine
@@ -103,32 +104,12 @@ export function createMotionResolver() {
       }
 
       cached.tween.progress(progress);
-
-      const patch = {};
-      for (const plugin of cached.resolvedPlugins) {
-        const rawData = {};
-        for (const key of plugin.keys) {
-          if (key in cached.proxy) rawData[key] = cached.proxy[key];
-        }
-
-        let contribution;
-        try {
-          contribution = plugin.compose(rawData, cached.resolvedTrack);
-        } catch (e) {
-          throw new Error(
-            `resolveMotion: plugin compose failed for motion "${motionId}", track "${track.id}", ` +
-            `property key(s) [${plugin.keys.join(', ')}]: ${e.message}`
-          );
-        }
-
-        for (const [k, v] of Object.entries(contribution || {})) {
-          if (k === 'filter' && typeof v === 'object') {
-            patch.filter = { ...(patch.filter || {}), ...v };
-          } else {
-            patch[k] = v;
-          }
-        }
-      }
+      const patch = composePatch(
+        cached.resolvedPlugins,
+        cached.proxy,
+        cached.resolvedTrack,
+        `motion "${motionId}", track "${track.id}"`
+      );
 
       if (trackOverride) {
         // One-off resolve (has an override) — never cached, clean up immediately.

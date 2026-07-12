@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
+import { buildMotionPath } from '../../lib/pathUtils';
 import productionEngine from '../../lib/ProductionEngine';
+import { domRenderer } from '../../lib/renderers/domRenderer';
 import './TowerDefensePage.css';
 
 // ─── Game Constants ─────────────────────────────────────────────
@@ -104,22 +106,44 @@ const towerPulse = {
   ]
 };
 
+const enemyDeath = {
+  motionId: 'enemy-death',
+  driver: { type: 'delegate' },
+  tracks: [
+    {
+      id: 'death-track',
+      keyframes: {
+        rotation: { stops: [{ p: 0, v: 0 }, { p: 1, v: 270 }] },
+        scale: { stops: [{ p: 0, v: 1 }, { p: 0.3, v: 1.4 }, { p: 1, v: 0 }] },
+        opacity: { stops: [{ p: 0, v: 1 }, { p: 1, v: 0 }] }
+      }
+    }
+  ]
+};
+
 const project = {
   schemaVersion: 2,
   projectId: 'tower-defense-game',
-  motions: [lane1Path, lane2Path, projectileArc, towerPulse]
+  motions: [lane1Path, lane2Path, projectileArc, towerPulse, enemyDeath]
 };
 
 // ─── Sub-Component for Tower Ambient Animation ─────────────────
-function TowerRing({ towerId }) {
+function TowerRing({ color }) {
   const ref = useRef(null);
 
   // Subscribe to time-triggered tower pulse
-  useMotionSubscriber('tower-pulse-ring', ref, useCallback((rawData, composeFn) => {
-    return composeFn(rawData);
-  }, []));
+  useMotionSubscriber('tower-pulse-ring', ref);
 
-  return <div ref={ref} className="tower-pulse-ring" />;
+  return (
+    <div 
+      ref={ref} 
+      className="tower-pulse-ring" 
+      style={{ 
+        borderColor: color, 
+        boxShadow: `0 0 12px ${color}`
+      }} 
+    />
+  );
 }
 
 // ─── Main Game Page Export ──────────────────────────────────────
@@ -144,6 +168,10 @@ export default function TowerDefensePage() {
     waveRef.current = wave;
   }, [wave]);
 
+  // DOM element maps for direct rendering bypassing React
+  const enemyElsRef = useRef(new Map());
+  const projElsRef = useRef(new Map());
+
   // Use refs for gameplay variables to prevent re-render thrashing the RAF loop
   const gameLoopRef = useRef(null);
   const enemiesRef = useRef([]);
@@ -166,6 +194,8 @@ export default function TowerDefensePage() {
     nextProjIdRef.current = 1;
     waveEnemyCountRef.current = 0;
     waveSpawnTimerRef.current = 0;
+    enemyElsRef.current.clear();
+    projElsRef.current.clear();
     setLives(20);
     setScore(0);
     setWave(0);
@@ -224,6 +254,37 @@ export default function TowerDefensePage() {
     const remainingEnemies = [];
 
     for (let enemy of currentEnemies) {
+      if (enemy.dying) {
+        enemy.deathProgress += 0.05; // 20 frames to complete
+        if (enemy.deathProgress >= 1.0) {
+          enemyElsRef.current.delete(enemy.id);
+          continue;
+        }
+
+        // Evaluate death animation with static target coordinates overrides
+        try {
+          const override = {
+            'death-track': {
+              keyframes: {
+                x: { stops: [{ p: 0, v: enemy.deathX }, { p: 1, v: enemy.deathX }] },
+                y: { stops: [{ p: 0, v: enemy.deathY }, { p: 1, v: enemy.deathY }] }
+              }
+            }
+          };
+
+          const result = productionEngine.resolveMotion('enemy-death', enemy.deathProgress, override);
+          const el = enemyElsRef.current.get(enemy.id);
+          if (el) {
+            domRenderer(el, result['death-track']);
+          }
+        } catch (err) {
+          console.error('resolveMotion error for enemy death:', err);
+        }
+
+        remainingEnemies.push(enemy);
+        continue;
+      }
+
       enemy.progress += enemy.speed;
 
       if (enemy.progress >= 1.0) {
@@ -246,6 +307,12 @@ export default function TowerDefensePage() {
           enemy.x = result[trackId].x;
           enemy.y = result[trackId].y;
           enemy.rotation = result[trackId].rotation || 0;
+
+          // Render directly to DOM bypassing React render path
+          const el = enemyElsRef.current.get(enemy.id);
+          if (el) {
+            domRenderer(el, result[trackId]);
+          }
         }
       } catch (err) {
         console.error('resolveMotion error for enemy:', err);
@@ -262,8 +329,9 @@ export default function TowerDefensePage() {
         continue;
       }
 
-      // Target first enemy within range
+      // Target first enemy within range (ignoring dying ones)
       const inRangeEnemy = enemiesRef.current.find(enemy => {
+        if (enemy.dying) return false;
         const dx = enemy.x - tower.x;
         const dy = enemy.y - tower.y;
         return Math.sqrt(dx * dx + dy * dy) <= TOWER_RANGE;
@@ -290,8 +358,8 @@ export default function TowerDefensePage() {
     for (let proj of currentProjectiles) {
       proj.progress += PROJECTILE_SPEED;
 
-      // Find the current target position (homing behavior)
-      const target = enemiesRef.current.find(e => e.id === proj.targetId);
+      // Find the current target position (homing behavior) - must be alive
+      const target = enemiesRef.current.find(e => e.id === proj.targetId && !e.dying);
 
       if (!target || proj.progress >= 1.0) {
         // If target was already killed or progress finished, explode
@@ -299,7 +367,10 @@ export default function TowerDefensePage() {
           target.hp--;
           if (target.hp <= 0) {
             setScore(s => s + 10);
-            enemiesRef.current = enemiesRef.current.filter(e => e.id !== target.id);
+            target.dying = true;
+            target.deathProgress = 0;
+            target.deathX = target.x;
+            target.deathY = target.y;
           }
         }
         continue;
@@ -323,6 +394,12 @@ export default function TowerDefensePage() {
           proj.y = result['proj-track'].y;
           proj.scale = result['proj-track'].scale ?? 1;
           proj.opacity = result['proj-track'].opacity ?? 1;
+
+          // Render directly to DOM bypassing React render path
+          const el = projElsRef.current.get(proj.id);
+          if (el) {
+            domRenderer(el, result['proj-track']);
+          }
         }
       } catch (err) {
         console.error('resolveMotion error for projectile:', err);
@@ -404,14 +481,14 @@ export default function TowerDefensePage() {
           <svg className="td-path-svg" width={STAGE_WIDTH} height={STAGE_HEIGHT}>
             {/* Top Lane path */}
             <path
-              d="M 0 150 C 110 30, 320 420, 450 380 C 580 100, 800 280, 900 200"
+              d={buildMotionPath(lane1Path.tracks[0].keyframes.path.points)}
               fill="none"
               stroke="rgba(0, 242, 254, 0.08)"
               strokeWidth="12"
               strokeLinecap="round"
             />
             <path
-              d="M 0 150 C 110 30, 320 420, 450 380 C 580 100, 800 280, 900 200"
+              d={buildMotionPath(lane1Path.tracks[0].keyframes.path.points)}
               fill="none"
               stroke="rgba(255, 255, 255, 0.15)"
               strokeWidth="2"
@@ -420,14 +497,14 @@ export default function TowerDefensePage() {
 
             {/* Bottom Lane path */}
             <path
-              d="M 0 350 C 110 470, 320 80, 450 120 C 580 400, 800 220, 900 300"
+              d={buildMotionPath(lane2Path.tracks[0].keyframes.path.points)}
               fill="none"
               stroke="rgba(255, 107, 203, 0.08)"
               strokeWidth="12"
               strokeLinecap="round"
             />
             <path
-              d="M 0 350 C 110 470, 320 80, 450 120 C 580 400, 800 220, 900 300"
+              d={buildMotionPath(lane2Path.tracks[0].keyframes.path.points)}
               fill="none"
               stroke="rgba(255, 255, 255, 0.15)"
               strokeWidth="2"
@@ -442,7 +519,7 @@ export default function TowerDefensePage() {
               className="td-tower-node"
               style={{ left: tower.x, top: tower.y }}
             >
-              <TowerRing towerId={tower.id} />
+              <TowerRing color={tower.color} />
               <div 
                 className="tower-turret" 
                 style={{ 
@@ -463,10 +540,11 @@ export default function TowerDefensePage() {
           {uiEnemies.map(enemy => (
             <div 
               key={enemy.id} 
-              className="td-enemy"
-              style={{ 
-                transform: `translate3d(${enemy.x}px, ${enemy.y}px, 0) rotate(${enemy.rotation}deg)` 
+              ref={el => {
+                if (el) enemyElsRef.current.set(enemy.id, el);
+                else enemyElsRef.current.delete(enemy.id);
               }}
+              className="td-enemy"
             >
               <div className="enemy-emoji">{enemy.emoji}</div>
               {/* HP Bar */}
@@ -483,11 +561,11 @@ export default function TowerDefensePage() {
           {uiProjectiles.map(proj => (
             <div 
               key={proj.id} 
-              className="td-projectile"
-              style={{ 
-                transform: `translate3d(${proj.x}px, ${proj.y}px, 0) scale(${proj.scale || 1})`,
-                opacity: proj.opacity || 1
+              ref={el => {
+                if (el) projElsRef.current.set(proj.id, el);
+                else projElsRef.current.delete(proj.id);
               }}
+              className="td-projectile"
             />
           ))}
         </main>

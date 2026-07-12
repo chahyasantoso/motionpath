@@ -100,7 +100,14 @@ export async function buildProject(schema, deps) {
   const motions = [];
   const timelineGroups = new Map();
 
-  const motionsArray = schema.motions || [];
+  // Delegate motions have a fundamentally different lifecycle — lazily built
+  // and privately cached by resolveMotion.js, never triggered, never
+  // subscribed/composed via the DOM path. They never belong in this eager
+  // build's working set. Filtering here means nothing below this line needs
+  // to know delegate motions exist at all.
+  const motionsArray = (schema.motions || []).filter(
+    m => m.driver?.type !== 'delegate'
+  );
 
   for (let i = 0; i < motionsArray.length; i++) {
     const motion = motionsArray[i];
