@@ -137,6 +137,7 @@ describe('motion-structure rule', () => {
 
   it('should error on negative track.id (missing or empty)', () => {
     const schema = {
+      templates: [{ templateId: 't1' }],
       motions: [
         { motionId: 'm1', driver: { type: 'timeline', trigger: {} }, tracks: [{ use: 't1' }] }
       ]
@@ -149,6 +150,7 @@ describe('motion-structure rule', () => {
 
   it('should error on empty string track.id', () => {
     const schema = {
+      templates: [{ templateId: 't1' }],
       motions: [
         { motionId: 'm1', driver: { type: 'timeline', trigger: {} }, tracks: [{ id: '', use: 't1' }] }
       ]

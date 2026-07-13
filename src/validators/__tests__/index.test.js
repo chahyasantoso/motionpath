@@ -18,6 +18,7 @@ describe('validateProject integration tests', () => {
       perspective: 1000,
       motions: [
         {
+          motionId: 'motion-1',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1',

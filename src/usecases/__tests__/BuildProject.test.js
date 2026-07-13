@@ -49,6 +49,7 @@ describe('builder unit and integration tests', () => {
       const project = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-1',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1'
@@ -99,6 +100,7 @@ describe('builder unit and integration tests', () => {
       const project = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-2',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1'
@@ -144,6 +146,7 @@ describe('builder unit and integration tests', () => {
       const project = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-3',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1'
@@ -185,6 +188,7 @@ describe('builder unit and integration tests', () => {
       const project = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-4',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1'
@@ -226,6 +230,7 @@ describe('builder unit and integration tests', () => {
       const project = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-5',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1'
@@ -266,6 +271,7 @@ describe('builder unit and integration tests', () => {
       const project = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-6',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1'
@@ -291,6 +297,7 @@ describe('builder unit and integration tests', () => {
       const project = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-7',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1'
@@ -322,6 +329,7 @@ describe('builder unit and integration tests', () => {
         schemaVersion: 2,
         motions: [
           {
+            motionId: 'test-motion-8',
             driver: {
               type: 'timeline',
               sectionId: 'scene-1',
@@ -330,6 +338,7 @@ describe('builder unit and integration tests', () => {
             tracks: [{ id: 'el-1', keyframes: { propA: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
           },
           {
+            motionId: 'test-motion-9',
             driver: {
               type: 'timeline',
               sectionId: 'scene-2',
@@ -363,6 +372,7 @@ describe('builder unit and integration tests', () => {
       const projectWithDelay = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-10',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1',
@@ -375,6 +385,7 @@ describe('builder unit and integration tests', () => {
       const projectWithoutDelay = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-11',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1',
@@ -401,6 +412,7 @@ describe('builder unit and integration tests', () => {
         schemaVersion: 2,
         motions: [
           {
+            motionId: 'test-motion-12',
             driver: {
               type: 'timeline',
               sectionId: 'scene-1',
@@ -416,6 +428,7 @@ describe('builder unit and integration tests', () => {
             }]
           },
           {
+            motionId: 'test-motion-13',
             driver: {
               type: 'timeline',
               sectionId: 'scene-2',
@@ -461,6 +474,7 @@ describe('builder unit and integration tests', () => {
       const project = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-14',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1',
@@ -502,6 +516,7 @@ describe('builder unit and integration tests', () => {
       const project = {
         schemaVersion: 2,
         motions: [{
+          motionId: 'test-motion-15',
           driver: {
             type: 'timeline',
             sectionId: 'scene-1',

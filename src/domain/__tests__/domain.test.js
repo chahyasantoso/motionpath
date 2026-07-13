@@ -126,20 +126,22 @@ describe('Domain Models and Parser', () => {
     expect(manualMotion.driver).toBeInstanceOf(ManualDriver);
   });
 
-  it('correctly keys unnamed motions by their positional index string to prevent map collision', () => {
+  it('correctly keys all motions by their motionId without collision', () => {
     const rawSchema = {
       schemaVersion: 2,
       motions: [
         {
+          motionId: 'motion-1',
           driver: { type: 'manual' },
           tracks: [{ id: 'track-1' }]
         },
         {
+          motionId: 'motion-2',
           driver: { type: 'manual' },
           tracks: [{ id: 'track-2' }]
         },
         {
-          motionId: 'named-motion',
+          motionId: 'motion-3',
           driver: { type: 'manual' },
           tracks: [{ id: 'track-3' }]
         }
@@ -148,26 +150,25 @@ describe('Domain Models and Parser', () => {
 
     const project = parseProjectSchema(rawSchema);
 
-    // Verify motions map is not collapsed onto `undefined` key.
-    // 3 motions total. Unnamed motions are indexed '0' and '1'.
+    // Verify all 3 motions are stored correctly in the map
     expect(project.motions.size).toBe(3);
     
-    const motion0 = project.getMotion('0');
-    const motion1 = project.getMotion('1');
-    const namedMotion = project.getMotion('named-motion');
+    const motion1 = project.getMotion('motion-1');
+    const motion2 = project.getMotion('motion-2');
+    const motion3 = project.getMotion('motion-3');
 
-    expect(motion0).toBeDefined();
     expect(motion1).toBeDefined();
-    expect(namedMotion).toBeDefined();
+    expect(motion2).toBeDefined();
+    expect(motion3).toBeDefined();
 
-    expect(motion0.tracks[0].id).toBe('track-1');
-    expect(motion1.tracks[0].id).toBe('track-2');
-    expect(namedMotion.tracks[0].id).toBe('track-3');
+    expect(motion1.tracks[0].id).toBe('track-1');
+    expect(motion2.tracks[0].id).toBe('track-2');
+    expect(motion3.tracks[0].id).toBe('track-3');
 
     // getMotionsList preserves the original order
     const list = project.getMotionsList();
-    expect(list[0]).toBe(motion0);
-    expect(list[1]).toBe(motion1);
-    expect(list[2]).toBe(namedMotion);
+    expect(list[0]).toBe(motion1);
+    expect(list[1]).toBe(motion2);
+    expect(list[2]).toBe(motion3);
   });
 });
