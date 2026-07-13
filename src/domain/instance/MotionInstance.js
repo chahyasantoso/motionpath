@@ -206,10 +206,6 @@ export class MotionInstance {
     }
   }
 
-  get scrollTrigger() {
-    return this.#scrollTrigger;
-  }
-
   // Subscribers
   subscribe(trackId, callback) {
     const trackBuild = this.tracksMap.get(trackId);

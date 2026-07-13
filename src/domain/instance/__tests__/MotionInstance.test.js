@@ -246,7 +246,7 @@ describe('MotionInstance Class', () => {
 
       const instance = createTestInstance('scroll-motion', {}, scrollSchema);
       expect(ScrollTrigger.create).toHaveBeenCalled();
-      expect(instance.scrollTrigger).toBeDefined();
+      expect(ScrollTrigger.create.mock.results[0].value).toBeDefined();
     });
 
     it('extracts required trigger IDs from the schema trigger configuration', () => {
@@ -274,7 +274,7 @@ describe('MotionInstance Class', () => {
       };
 
       const instance = createTestInstance('scroll-motion', {}, scrollSchema);
-      const trigger = instance.scrollTrigger;
+      const trigger = ScrollTrigger.create.mock.results[0].value;
       
       instance.disableTrigger();
       expect(trigger.disable).toHaveBeenCalledWith(false);
