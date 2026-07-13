@@ -58,7 +58,7 @@ export function createProductionEngine(deps = {}) {
     _motionResolver.clearCache();
   }
 
-  return {
+  const engine = {
     async loadProject(schema, options = {}) {
       const loadId = ++_loadGeneration;
 
@@ -132,7 +132,7 @@ export function createProductionEngine(deps = {}) {
         project: _project,
         resolveElement: _deps.resolveElement,
         mountInstance: (childMotionId, childConfig) => {
-          return this.mountInstance(childMotionId, childConfig);
+          return engine.mountInstance(childMotionId, childConfig);
         },
         onSubscriberChange
       });
@@ -178,6 +178,8 @@ export function createProductionEngine(deps = {}) {
       }
     }
   };
+
+  return engine;
 }
 
 export const productionEngine = createProductionEngine();
