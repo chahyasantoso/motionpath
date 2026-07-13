@@ -4,7 +4,7 @@ import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import { buildMotionPath, convertToCubicPath } from '../../utils/pathUtils';
 import productionEngine from '../../engines/ProductionEngine.js';
-import { domRenderer } from '../../utils/domRenderer.js';
+import { domRenderer } from '../../renderers/domRenderer.js';
 import './TowerDefensePage.css';
 
 // ─── Game Constants ─────────────────────────────────────────────
