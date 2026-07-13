@@ -1,12 +1,9 @@
-import {
-  TimelineMotionInstance,
-  ScrollMotionInstance,
-  ManualMotionInstance
-} from '../domain/MotionInstance.js';
+import { createMotionInstance } from '../domain/instance/index.js';
 
 /**
  * MountMotionInstance use case.
- * Determines the correct subclass of MotionInstance and instantiates it.
+ * Creates a motion instance using the functional factory pattern.
+ * Normalizes driver type based on trigger configuration before routing.
  *
  * @param {string} motionId
  * @param {object} config
@@ -14,9 +11,10 @@ import {
  * @param {object|Map} templates
  * @param {object} deps
  * @param {function} onSubscriberChange
- * @returns {MotionInstance}
+ * @returns {object} Motion instance
  */
 export function mountMotionInstance(motionId, config, schemaMotion, templates, deps, onSubscriberChange) {
+  // Normalize driver type for correct behavior routing
   let driverType = schemaMotion.driver?.type || 'manual';
   if (driverType === 'timeline') {
     if (schemaMotion.driver?.trigger?.type === 'scroll') {
@@ -26,15 +24,14 @@ export function mountMotionInstance(motionId, config, schemaMotion, templates, d
     }
   }
 
-  switch (driverType) {
-    case 'gsap-timeline':
-      return new TimelineMotionInstance(motionId, config, schemaMotion, templates, deps, onSubscriberChange);
-    case 'gsap-scroll':
-      return new ScrollMotionInstance(motionId, config, schemaMotion, templates, deps, onSubscriberChange);
-    case 'manual':
-    case 'delegate':
-      return new ManualMotionInstance(motionId, config, schemaMotion, templates, deps, onSubscriberChange);
-    default:
-      throw new Error(`Unknown driver type: ${driverType}`);
-  }
+  // Create normalized schema with updated driver type
+  const normalizedSchema = {
+    ...schemaMotion,
+    driver: {
+      ...schemaMotion.driver,
+      type: driverType
+    }
+  };
+
+  return createMotionInstance(motionId, config, normalizedSchema, templates, deps, onSubscriberChange);
 }

@@ -1,4 +1,4 @@
-import { AnimationPlugin } from '../AnimationPlugin.js';
+import { createAnimationPlugin } from '../AnimationPlugin.js';
 
 const imageSequenceWarmCache = new Map();
 
@@ -39,51 +39,56 @@ export function _resetPreloadCache() {
   imageSequenceWarmCache.clear();
 }
 
-export class ImageSequencePlugin extends AnimationPlugin {
-  constructor() {
-    super(['imageSequence', 'imageSequenceIndex'], false);
-  }
-
-  contribute(propKey, stops, elementCfg) {
-    const config = elementCfg?.keyframes?.imageSequence;
-    if (!config) {
-      return { percentPatch: {}, tweenVars: {} };
-    }
-
-    if (Array.isArray(config.frames)) {
-      warmFrames(config.frames);
-    }
-
-    const percentPatch = {};
-    stops.forEach((stop) => {
-      const pctKey = `${stop.p * 100}%`;
-      percentPatch[pctKey] = { imageSequenceIndex: Number(stop.v) };
-      if (stop.ease) {
-        percentPatch[pctKey].ease = stop.ease;
+/**
+ * Image sequence plugin - handles frame-by-frame animation.
+ * Animates through an array of image URLs based on normalized index.
+ *
+ * @returns {Object} Plugin object
+ */
+export function createImageSequencePlugin() {
+  return createAnimationPlugin({
+    keys: ['imageSequence', 'imageSequenceIndex'],
+    lazy: false,
+    contribute(propKey, stops, elementCfg) {
+      const config = elementCfg?.keyframes?.imageSequence;
+      if (!config) {
+        return { percentPatch: {}, tweenVars: {} };
       }
-    });
 
-    return { percentPatch, tweenVars: {} };
-  }
+      if (Array.isArray(config.frames)) {
+        warmFrames(config.frames);
+      }
 
-  compose(rawData, elementCfg) {
-    const config = elementCfg?.keyframes?.imageSequence;
-    if (!config || !Array.isArray(config.frames) || config.frames.length === 0) {
-      return {};
+      const percentPatch = {};
+      stops.forEach((stop) => {
+        const pctKey = `${stop.p * 100}%`;
+        percentPatch[pctKey] = { imageSequenceIndex: Number(stop.v) };
+        if (stop.ease) {
+          percentPatch[pctKey].ease = stop.ease;
+        }
+      });
+
+      return { percentPatch, tweenVars: {} };
+    },
+    compose(rawData, elementCfg) {
+      const config = elementCfg?.keyframes?.imageSequence;
+      if (!config || !Array.isArray(config.frames) || config.frames.length === 0) {
+        return {};
+      }
+
+      const rawIndex = rawData.imageSequenceIndex;
+      if (rawIndex === undefined || rawIndex === null) {
+        return {};
+      }
+
+      const frames = config.frames;
+      const idx = Math.max(0, Math.min(frames.length - 1, Math.round(rawIndex)));
+
+      return {
+        backgroundImage: `url(${frames[idx]})`
+      };
     }
-
-    const rawIndex = rawData.imageSequenceIndex;
-    if (rawIndex === undefined || rawIndex === null) {
-      return {};
-    }
-
-    const frames = config.frames;
-    const idx = Math.max(0, Math.min(frames.length - 1, Math.round(rawIndex)));
-
-    return {
-      backgroundImage: `url(${frames[idx]})`
-    };
-  }
+  });
 }
 
-export const imageSequencePlugin = new ImageSequencePlugin();
+export const imageSequencePlugin = createImageSequencePlugin();

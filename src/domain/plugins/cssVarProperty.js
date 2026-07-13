@@ -1,33 +1,37 @@
-import { AnimationPlugin } from '../AnimationPlugin.js';
+import { createAnimationPlugin } from '../AnimationPlugin.js';
 
-export class CSSVarPlugin extends AnimationPlugin {
-  constructor() {
-    super([], false);
-  }
-
-  claimsKey(key) {
-    return key.startsWith('--');
-  }
-
-  contribute(propKey, stops) {
-    const percentPatch = {};
-    stops.forEach(stop => {
-      const pctKey = `${stop.p * 100}%`;
-      percentPatch[pctKey] = { [propKey]: stop.v };
-      if (stop.ease) {
-        percentPatch[pctKey].ease = stop.ease;
+/**
+ * CSS custom property (CSS variables) plugin.
+ * Handles any property key that starts with '--' (e.g., '--color', '--size').
+ *
+ * @returns {Object} Plugin object
+ */
+export function createCSSVarPlugin() {
+  return createAnimationPlugin({
+    keys: [],
+    lazy: false,
+    claimsKey(key) {
+      return key.startsWith('--');
+    },
+    contribute(propKey, stops) {
+      const percentPatch = {};
+      stops.forEach(stop => {
+        const pctKey = `${stop.p * 100}%`;
+        percentPatch[pctKey] = { [propKey]: stop.v };
+        if (stop.ease) {
+          percentPatch[pctKey].ease = stop.ease;
+        }
+      });
+      return { percentPatch, tweenVars: {} };
+    },
+    compose(rawData, elementCfg) {
+      const patch = {};
+      for (const key of Object.keys(rawData)) {
+        if (key.startsWith('--')) patch[key] = rawData[key];
       }
-    });
-    return { percentPatch, tweenVars: {} };
-  }
-
-  compose(rawData, elementCfg) {
-    const patch = {};
-    for (const key of Object.keys(rawData)) {
-      if (key.startsWith('--')) patch[key] = rawData[key];
+      return patch;
     }
-    return patch;
-  }
+  });
 }
 
-export const cssVarPlugin = new CSSVarPlugin();
+export const cssVarPlugin = createCSSVarPlugin();

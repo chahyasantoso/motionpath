@@ -2,11 +2,6 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as validatorModule from '../../validators/index.js';
 import { createProductionEngine } from '../ProductionEngine.js';
-import {
-  TimelineMotionInstance,
-  ScrollMotionInstance,
-  ManualMotionInstance
-} from '../../domain/MotionInstance.js';
 
 vi.mock('gsap/ScrollTrigger', () => {
   return {
@@ -78,15 +73,20 @@ describe('ProductionEngine (Lazy/Instance Architecture)', () => {
 
     // 1. Timeline
     const inst1 = engine.mountInstance('time-motion');
-    expect(inst1).toBeInstanceOf(TimelineMotionInstance);
+    expect(inst1).toBeDefined();
+    expect(inst1.timeline).toBeDefined();
+    expect(typeof inst1.play).toBe('function');
+    expect(typeof inst1.pause).toBe('function');
 
     // 2. Scroll
     const inst2 = engine.mountInstance('scroll-motion');
-    expect(inst2).toBeInstanceOf(ScrollMotionInstance);
+    expect(inst2).toBeDefined();
+    expect(inst2.timeline).toBeDefined();
 
     // 3. Manual
     const inst3 = engine.mountInstance('manual-motion');
-    expect(inst3).toBeInstanceOf(ManualMotionInstance);
+    expect(inst3).toBeDefined();
+    expect(inst3.timeline).toBeDefined();
   });
 
   it('addChild auto-staggers child instances independently', async () => {
