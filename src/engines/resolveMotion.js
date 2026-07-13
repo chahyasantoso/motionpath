@@ -1,6 +1,7 @@
 import { resolveTrack } from '../usecases/ResolveTrack.js';
 import { buildTrackTweenSync } from '../usecases/BuildProject.js';
 import { composePatch } from '../usecases/ComposeTrackPatch.js';
+import { getMotion } from '../domain/models.js';
 
 /**
  * Shared resolver for driver:"delegate" motions. Used by both ProductionEngine
@@ -78,9 +79,9 @@ export function createMotionResolver() {
    * @returns {Record<string, object>} keyed by track id, always — regardless of track count
    */
   function resolve(schema, motionId, progress, overrides = {}) {
-    const isDomain = schema && typeof schema.getMotion === 'function';
+    const isDomain = schema && typeof schema.motions === 'object' && schema.motions instanceof Map;
     const originalMotion = isDomain
-      ? schema.getMotion(motionId)
+      ? getMotion(schema, motionId)
       : schema.motions?.find(m => m && m.motionId === motionId);
 
     if (!originalMotion) {

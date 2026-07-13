@@ -1,6 +1,7 @@
 import { compileProject } from '../usecases/CompileProject.js';
 import { createDeferredCall } from '../utils/deferredCall.js';
 import { createMotionResolver } from './resolveMotion.js';
+import { getMotion } from '../domain/models.js';
 
 /**
  * Factory function per Brief 5.
@@ -87,7 +88,7 @@ export function createEditorEngine(deps) {
       if (!_project) {
         throw new Error('mountTimeline: project not loaded.');
       }
-      const originalMotion = _project.getMotion(motionId);
+      const originalMotion = getMotion(_project, motionId);
       if (!originalMotion) {
         throw new Error(`mountTimeline: motion with id "${motionId}" not found.`);
       }

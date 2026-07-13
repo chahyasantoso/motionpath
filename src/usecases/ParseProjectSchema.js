@@ -1,20 +1,20 @@
 import {
-  MotionProject,
-  MotionTemplate,
-  MotionDefinition,
-  TimelineDriver,
-  DelegateDriver,
-  ManualDriver,
-  ScrollTriggerConfig,
-  TimeTriggerConfig,
-  MotionTrack
+  createMotionProject,
+  createMotionTemplate,
+  createMotionDefinition,
+  createTimelineDriver,
+  createDelegateDriver,
+  createManualDriver,
+  createScrollTriggerConfig,
+  createTimeTriggerConfig,
+  createMotionTrack
 } from '../domain/models.js';
 
 export function parseProjectSchema(schema) {
   if (!schema) return null;
 
   const templates = (schema.templates || []).map(t => {
-    return new MotionTemplate({
+    return createMotionTemplate({
       templateId: t.templateId,
       duration: t.duration,
       transformOrigin: t.transformOrigin,
@@ -35,23 +35,23 @@ export function parseProjectSchema(schema) {
         const isTime = rawTrigger.type === 'time' || driverType === 'gsap-timeline';
         
         if (isScroll) {
-          trigger = new ScrollTriggerConfig({ type: 'scroll', ...rawTrigger });
+          trigger = createScrollTriggerConfig({ type: 'scroll', ...rawTrigger });
         } else if (isTime) {
-          trigger = new TimeTriggerConfig({ type: 'time', ...rawTrigger });
+          trigger = createTimeTriggerConfig({ type: 'time', ...rawTrigger });
         }
       }
-      driver = new TimelineDriver({
+      driver = createTimelineDriver({
         ...rawDriver,
         trigger
       });
     } else if (driverType === 'delegate') {
-      driver = new DelegateDriver(rawDriver);
+      driver = createDelegateDriver(rawDriver);
     } else {
-      driver = new ManualDriver(rawDriver);
+      driver = createManualDriver(rawDriver);
     }
 
     const tracks = (m.tracks || []).map(t => {
-      return new MotionTrack({
+      return createMotionTrack({
         id: t.id,
         use: t.use,
         duration: t.duration,
@@ -60,7 +60,7 @@ export function parseProjectSchema(schema) {
       });
     });
 
-    return new MotionDefinition({
+    return createMotionDefinition({
       motionId: m.motionId,
       driver,
       stagger: m.stagger,
@@ -68,7 +68,7 @@ export function parseProjectSchema(schema) {
     });
   });
 
-  return new MotionProject({
+  return createMotionProject({
     schemaVersion: schema.schemaVersion,
     perspective: schema.perspective,
     templates,

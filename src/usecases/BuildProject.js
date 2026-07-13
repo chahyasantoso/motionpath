@@ -1,6 +1,7 @@
 import { gsap } from 'gsap';
 import { resolvePluginForKey } from '../domain/plugins.js';
 import { resolveTrack } from './ResolveTrack.js';
+import { getMotionsList } from '../domain/models.js';
 
 // Module-level Map persists across buildProject calls — concurrent calls for
 // the same plugin share the same in-flight Promise, preventing double-load.
@@ -30,8 +31,8 @@ export async function buildProject(schema, deps) {
   const motions = [];
   const timelineGroups = new Map();
 
-  const isDomain = schema && typeof schema.getMotionsList === 'function';
-  const motionsList = isDomain ? schema.getMotionsList() : (schema.motions || []);
+  const isDomain = schema && typeof schema.motions === 'object' && schema.motions instanceof Map;
+  const motionsList = isDomain ? getMotionsList(schema) : (schema.motions || []);
   const templates = isDomain ? schema.templates : (schema.templates || []);
 
   // Delegate motions have a fundamentally different lifecycle — lazily built

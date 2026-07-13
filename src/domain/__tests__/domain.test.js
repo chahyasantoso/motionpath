@@ -1,15 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { parseProjectSchema } from '../../usecases/ParseProjectSchema.js';
 import {
-  MotionProject,
-  MotionTemplate,
-  MotionDefinition,
-  TimelineDriver,
-  DelegateDriver,
-  ManualDriver,
-  ScrollTriggerConfig,
-  TimeTriggerConfig,
-  MotionTrack
+  getMotion,
+  getTemplate,
+  getMotionsList
 } from '../models.js';
 
 describe('Domain Models and Parser', () => {
@@ -80,50 +74,61 @@ describe('Domain Models and Parser', () => {
 
     const project = parseProjectSchema(rawSchema);
 
-    expect(project).toBeInstanceOf(MotionProject);
+    // Verify project structure (plain object, not class instance)
+    expect(project).toBeDefined();
     expect(project.schemaVersion).toBe(2);
     expect(project.perspective).toBe('1200px');
+    expect(project.motions).toBeInstanceOf(Map);
+    expect(project.templates).toBeInstanceOf(Map);
 
-    // Test templates
-    const template = project.getTemplate('tmpl-1');
-    expect(template).toBeInstanceOf(MotionTemplate);
+    // Test templates using helper function
+    const template = getTemplate(project, 'tmpl-1');
+    expect(template).toBeDefined();
+    expect(template.templateId).toBe('tmpl-1');
     expect(template.duration).toBe(1.5);
     expect(template.transformOrigin).toBe('top left');
 
-    // Test motions
-    const motionsList = project.getMotionsList();
+    // Test motions using helper function
+    const motionsList = getMotionsList(project);
     expect(motionsList).toHaveLength(4);
 
     // Scroll timeline motion
-    const scrollMotion = project.getMotion('motion-timeline-scroll');
-    expect(scrollMotion).toBeInstanceOf(MotionDefinition);
+    const scrollMotion = getMotion(project, 'motion-timeline-scroll');
+    expect(scrollMotion).toBeDefined();
+    expect(scrollMotion.motionId).toBe('motion-timeline-scroll');
     expect(scrollMotion.stagger).toBe(0.25);
-    expect(scrollMotion.driver).toBeInstanceOf(TimelineDriver);
+    expect(scrollMotion.driver).toBeDefined();
+    expect(scrollMotion.driver.type).toBe('timeline');
     expect(scrollMotion.driver.sectionId).toBe('sec-1');
     expect(scrollMotion.driver.timelineId).toBe('time-g1');
     expect(scrollMotion.driver.primary).toBe(true);
-    expect(scrollMotion.driver.trigger).toBeInstanceOf(ScrollTriggerConfig);
+    expect(scrollMotion.driver.trigger).toBeDefined();
+    expect(scrollMotion.driver.trigger.type).toBe('scroll');
     expect(scrollMotion.driver.trigger.scrub).toBe(true);
     expect(scrollMotion.driver.trigger.pin).toBe('#sec-1');
-    expect(scrollMotion.tracks[0]).toBeInstanceOf(MotionTrack);
+    expect(scrollMotion.tracks[0]).toBeDefined();
     expect(scrollMotion.tracks[0].id).toBe('track-a');
     expect(scrollMotion.tracks[0].use).toBe('tmpl-1');
 
     // Time timeline motion
-    const timeMotion = project.getMotion('motion-timeline-time');
-    expect(timeMotion.driver).toBeInstanceOf(TimelineDriver);
-    expect(timeMotion.driver.trigger).toBeInstanceOf(TimeTriggerConfig);
+    const timeMotion = getMotion(project, 'motion-timeline-time');
+    expect(timeMotion).toBeDefined();
+    expect(timeMotion.driver.type).toBe('timeline');
+    expect(timeMotion.driver.trigger).toBeDefined();
+    expect(timeMotion.driver.trigger.type).toBe('time');
     expect(timeMotion.driver.trigger.repeat).toBe(-1);
     expect(timeMotion.driver.trigger.yoyo).toBe(true);
     expect(timeMotion.driver.trigger.delay).toBe(2);
 
     // Delegate motion
-    const delegateMotion = project.getMotion('motion-delegate');
-    expect(delegateMotion.driver).toBeInstanceOf(DelegateDriver);
+    const delegateMotion = getMotion(project, 'motion-delegate');
+    expect(delegateMotion).toBeDefined();
+    expect(delegateMotion.driver.type).toBe('delegate');
 
     // Manual motion
-    const manualMotion = project.getMotion('motion-manual');
-    expect(manualMotion.driver).toBeInstanceOf(ManualDriver);
+    const manualMotion = getMotion(project, 'motion-manual');
+    expect(manualMotion).toBeDefined();
+    expect(manualMotion.driver.type).toBe('manual');
   });
 
   it('correctly keys all motions by their motionId without collision', () => {
@@ -153,9 +158,9 @@ describe('Domain Models and Parser', () => {
     // Verify all 3 motions are stored correctly in the map
     expect(project.motions.size).toBe(3);
     
-    const motion1 = project.getMotion('motion-1');
-    const motion2 = project.getMotion('motion-2');
-    const motion3 = project.getMotion('motion-3');
+    const motion1 = getMotion(project, 'motion-1');
+    const motion2 = getMotion(project, 'motion-2');
+    const motion3 = getMotion(project, 'motion-3');
 
     expect(motion1).toBeDefined();
     expect(motion2).toBeDefined();
@@ -166,7 +171,7 @@ describe('Domain Models and Parser', () => {
     expect(motion3.tracks[0].id).toBe('track-3');
 
     // getMotionsList preserves the original order
-    const list = project.getMotionsList();
+    const list = getMotionsList(project);
     expect(list[0]).toBe(motion1);
     expect(list[1]).toBe(motion2);
     expect(list[2]).toBe(motion3);

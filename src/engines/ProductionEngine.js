@@ -3,6 +3,7 @@ import { ensureLoaded } from '../usecases/BuildProject.js';
 import { mountMotionInstance } from '../usecases/MountMotionInstance.js';
 import { parseProjectSchema } from '../usecases/ParseProjectSchema.js';
 import { resolveTrack } from '../usecases/ResolveTrack.js';
+import { getMotion } from '../domain/models.js';
 import { createDeferredCall } from '../utils/deferredCall.js';
 import { validateProject } from '../validators/index.js';
 import { createEngineCore } from './engineCore.js';
@@ -119,7 +120,7 @@ export function createProductionEngine(deps = {}) {
         throw new Error('mountInstance: project not loaded.');
       }
       
-      const schemaMotion = _project.getMotion(motionId);
+      const schemaMotion = getMotion(_project, motionId);
       if (!schemaMotion) {
         throw new Error(`mountInstance: motion with id "${motionId}" not found.`);
       }
@@ -170,7 +171,7 @@ export function createProductionEngine(deps = {}) {
       if (!_project) {
         throw new Error('mountTimeline: project not loaded.');
       }
-      const originalMotion = _project.getMotion(motionId);
+      const originalMotion = getMotion(_project, motionId);
       if (!originalMotion) {
         throw new Error(`mountTimeline: motion with id "${motionId}" not found.`);
       }
