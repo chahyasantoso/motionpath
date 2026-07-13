@@ -1,4 +1,5 @@
 import { resolvePluginForKey } from '../domain/plugins.js';
+import { getMotionsList } from '../domain/models.js';
 import { ensureLoaded } from '../usecases/BuildProject.js';
 import { createMotionInstance } from '../usecases/CreateMotionInstance.js';
 import { parseProjectSchema } from '../usecases/ParseProjectSchema.js';
@@ -7,6 +8,7 @@ import { createDeferredCall } from '../utils/deferredCall.js';
 import { validateProject } from '../validators/index.js';
 import { createEngineCore } from './engineCore.js';
 import { createMotionResolver } from './resolveMotion.js';
+import { createTimelineGroupController } from './TimelineGroupController.js';
 
 /**
  * Factory function for ProductionEngine using Lazy/Instance architecture.
@@ -35,8 +37,19 @@ export function createProductionEngine(deps = {}) {
   let _project = null;
   let _loadGeneration = 0;
   const _instances = new Map(); // instanceId -> instance
+  const _groupIndex = new Map(); // timelineId -> { memberIds: Set<motionId>, primaryId: string }
+  const _groups = new Map(); // timelineId -> TimelineGroupController
   const _deferredCall = createDeferredCall();
   const _motionResolver = createMotionResolver();
+
+  function _groupSpecForMotion(motionId) {
+    for (const [timelineId, spec] of _groupIndex.entries()) {
+      if (spec.memberIds.has(motionId)) {
+        return { timelineId, primaryId: spec.primaryId };
+      }
+    }
+    return null;
+  }
 
   function _cleanup() {
     _loadGeneration++;
@@ -48,7 +61,17 @@ export function createProductionEngine(deps = {}) {
       }
     }
     _instances.clear();
-    
+
+    for (const controller of _groups.values()) {
+      try {
+        controller.destroy();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    _groups.clear();
+    _groupIndex.clear();
+
     if (_core) {
       _core.destroy();
       _core = null;
@@ -112,12 +135,33 @@ export function createProductionEngine(deps = {}) {
       _project = parseProjectSchema(schema);
       _core = createEngineCore();
       _deferredCall.setCore(_core);
+
+      // Build timeline group index
+      for (const motion of getMotionsList(_project)) {
+        const tid = motion.driver?.timelineId;
+        if (!tid) continue;
+        if (!_groupIndex.has(tid)) {
+          _groupIndex.set(tid, { memberIds: new Set(), primaryId: null });
+        }
+        const entry = _groupIndex.get(tid);
+        entry.memberIds.add(motion.motionId);
+        if (motion.driver.primary) {
+          entry.primaryId = motion.motionId;
+        }
+      }
     },
 
     mountInstance(motionId, config = {}) {
       if (!_project || !_core) {
         throw new Error('mountInstance: project not loaded.');
       }
+
+      const groupSpec = _groupSpecForMotion(motionId);
+      const isGrouped = !!groupSpec;
+
+      const effectiveConfig = isGrouped
+        ? { ...config, _groupMember: true }
+        : config;
 
       const onSubscriberChange = (inst, hasSubscribers) => {
         if (!_core) return;
@@ -128,7 +172,7 @@ export function createProductionEngine(deps = {}) {
         }
       };
 
-      const instance = createMotionInstance(motionId, config, {
+      const instance = createMotionInstance(motionId, effectiveConfig, {
         project: _project,
         resolveElement: _deps.resolveElement,
         mountInstance: (childMotionId, childConfig) => {
@@ -139,9 +183,35 @@ export function createProductionEngine(deps = {}) {
 
       _instances.set(instance.id, instance);
 
+      if (isGrouped) {
+        const { timelineId, primaryId } = groupSpec;
+
+        if (!_groups.has(timelineId)) {
+          _groups.set(timelineId, createTimelineGroupController(timelineId, primaryId));
+        }
+        const controller = _groups.get(timelineId);
+        controller.addMember(instance);
+
+        instance._timelineGroupId = timelineId;
+        instance.play = () => controller.play();
+        instance.pause = () => controller.pause();
+      }
+
       const originalDestroy = instance.destroy.bind(instance);
       instance.destroy = () => {
         _instances.delete(instance.id);
+
+        if (instance._timelineGroupId) {
+          const controller = _groups.get(instance._timelineGroupId);
+          if (controller) {
+            const isEmpty = controller.removeMember(instance.id, instance.motionId);
+            if (isEmpty) {
+              controller.destroy();
+              _groups.delete(instance._timelineGroupId);
+            }
+          }
+        }
+
         originalDestroy();
       };
 

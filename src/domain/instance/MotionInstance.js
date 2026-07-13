@@ -98,7 +98,7 @@ export class MotionInstance {
         .repeatDelay(trigger.repeatDelay ?? 0);
 
       // Auto-play if not a child instance and autoplay is enabled
-      const shouldPlay = !config.parentId && (config.autoplay ?? true);
+      const shouldPlay = !config.parentId && !config._groupMember && (config.autoplay ?? true);
       if (shouldPlay) {
         this.timeline.play();
       }
@@ -128,7 +128,7 @@ export class MotionInstance {
         );
       }
 
-      if (!config.parentId) {
+      if (!config.parentId && !config._groupMember) {
         if (trigger.scrub) {
           this.#scrollTrigger = ScrollTrigger.create({
             ...resolvedConfig,

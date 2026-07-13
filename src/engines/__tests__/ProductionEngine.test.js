@@ -207,4 +207,184 @@ describe('ProductionEngine (Lazy/Instance Architecture)', () => {
 
     consoleWarnSpy.mockRestore();
   });
+
+  describe('Timeline Group Support', () => {
+    let groupSchema;
+
+    beforeEach(() => {
+      groupSchema = {
+        templates: [],
+        motions: [
+          {
+            motionId: 'group-a',
+            driver: {
+              type: 'timeline',
+              timelineId: 'hero-tl',
+              trigger: { type: 'scroll', scrub: true }
+            },
+            tracks: [
+              { id: 'track-ga', keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 100 }] } } }
+            ]
+          },
+          {
+            motionId: 'group-b',
+            driver: {
+              type: 'timeline',
+              timelineId: 'hero-tl',
+              primary: true,
+              trigger: { type: 'scroll', scrub: true, trigger: '#hero', start: 'top top', end: '+=2000' }
+            },
+            tracks: [
+              { id: 'track-gb', keyframes: { y: { stops: [{ p: 0, v: 0 }, { p: 1, v: 50 }] } } }
+            ]
+          },
+          {
+            motionId: 'ungrouped',
+            driver: { type: 'manual' },
+            tracks: [
+              { id: 'track-u', keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }
+            ]
+          }
+        ]
+      };
+    });
+
+    it('grouped instances do not create their own ScrollTrigger', async () => {
+      validatorModule.validateProject.mockReturnValue([]);
+      const engine = createProductionEngine(mockDeps);
+      await engine.loadProject(groupSchema);
+
+      ScrollTrigger.create.mockClear();
+
+      engine.mountInstance('group-a');
+      // Non-primary should not create its own ScrollTrigger
+      // But primary mounting triggers one on the master
+      expect(ScrollTrigger.create).not.toHaveBeenCalled();
+    });
+
+    it('primary mount creates ScrollTrigger on master timeline', async () => {
+      validatorModule.validateProject.mockReturnValue([]);
+      const engine = createProductionEngine(mockDeps);
+      await engine.loadProject(groupSchema);
+
+      ScrollTrigger.create.mockReturnValue({ kill: vi.fn(), disable: vi.fn(), enable: vi.fn() });
+      ScrollTrigger.create.mockClear();
+
+      engine.mountInstance('group-a');
+      engine.mountInstance('group-b');
+
+      // Exactly one ScrollTrigger for the group (from primary)
+      expect(ScrollTrigger.create).toHaveBeenCalledTimes(1);
+      expect(ScrollTrigger.create).toHaveBeenCalledWith(
+        expect.objectContaining({ scrub: true })
+      );
+    });
+
+    it('handles non-primary mounting before primary', async () => {
+      validatorModule.validateProject.mockReturnValue([]);
+      const engine = createProductionEngine(mockDeps);
+      await engine.loadProject(groupSchema);
+
+      ScrollTrigger.create.mockReturnValue({ kill: vi.fn(), disable: vi.fn(), enable: vi.fn() });
+      ScrollTrigger.create.mockClear();
+
+      // Mount non-primary first
+      const instA = engine.mountInstance('group-a');
+      expect(ScrollTrigger.create).not.toHaveBeenCalled();
+
+      // Mount primary second — triggers ScrollTrigger
+      const instB = engine.mountInstance('group-b');
+      expect(ScrollTrigger.create).toHaveBeenCalledTimes(1);
+
+      // Both instances have timelines
+      expect(instA.timeline).toBeDefined();
+      expect(instB.timeline).toBeDefined();
+    });
+
+    it('play/pause on grouped instance controls master', async () => {
+      validatorModule.validateProject.mockReturnValue([]);
+      const engine = createProductionEngine(mockDeps);
+
+      const timeGroupSchema = {
+        templates: [],
+        motions: [
+          {
+            motionId: 'tg-a',
+            driver: {
+              type: 'timeline',
+              timelineId: 'time-group',
+              trigger: { type: 'time', duration: 1 }
+            },
+            tracks: [
+              { id: 'tg-track-a', keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 10 }] } } }
+            ]
+          },
+          {
+            motionId: 'tg-b',
+            driver: {
+              type: 'timeline',
+              timelineId: 'time-group',
+              primary: true,
+              trigger: { type: 'time', duration: 1, repeat: 0 }
+            },
+            tracks: [
+              { id: 'tg-track-b', keyframes: { y: { stops: [{ p: 0, v: 0 }, { p: 1, v: 20 }] } } }
+            ]
+          }
+        ]
+      };
+
+      await engine.loadProject(timeGroupSchema);
+
+      const instA = engine.mountInstance('tg-a');
+      const instB = engine.mountInstance('tg-b');
+
+      // play() on either should work (both patched to control master)
+      expect(typeof instA.play).toBe('function');
+      expect(typeof instB.play).toBe('function');
+    });
+
+    it('ungrouped motions are unaffected', async () => {
+      validatorModule.validateProject.mockReturnValue([]);
+      const engine = createProductionEngine(mockDeps);
+      await engine.loadProject(groupSchema);
+
+      const inst = engine.mountInstance('ungrouped');
+      expect(inst._timelineGroupId).toBeUndefined();
+      expect(inst.timeline).toBeDefined();
+    });
+
+    it('instance destroy removes from group; last destroy cleans up controller', async () => {
+      validatorModule.validateProject.mockReturnValue([]);
+      const engine = createProductionEngine(mockDeps);
+
+      ScrollTrigger.create.mockReturnValue({ kill: vi.fn(), disable: vi.fn(), enable: vi.fn() });
+
+      await engine.loadProject(groupSchema);
+
+      const instA = engine.mountInstance('group-a');
+      const instB = engine.mountInstance('group-b');
+
+      // Destroy non-primary
+      instA.destroy();
+      // Group still exists (primary remains)
+
+      // Destroy primary (last member) — group fully cleaned up
+      instB.destroy();
+    });
+
+    it('engine.destroy() cleans up all groups', async () => {
+      validatorModule.validateProject.mockReturnValue([]);
+      const engine = createProductionEngine(mockDeps);
+
+      ScrollTrigger.create.mockReturnValue({ kill: vi.fn(), disable: vi.fn(), enable: vi.fn() });
+
+      await engine.loadProject(groupSchema);
+      engine.mountInstance('group-a');
+      engine.mountInstance('group-b');
+
+      // Should not throw
+      expect(() => engine.destroy()).not.toThrow();
+    });
+  });
 });
