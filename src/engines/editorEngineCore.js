@@ -8,7 +8,7 @@ import { composePatch } from '../usecases/ComposeTrackPatch.js';
  * @param {BuildResult} buildResult
  * @returns {EditorEngineCore}
  */
-export function createEngineCore(buildResult) {
+export function createEditorEngineCore(buildResult) {
   const subscribers = new Map();
   let tickerCallback = null;
 

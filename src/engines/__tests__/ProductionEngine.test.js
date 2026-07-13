@@ -35,21 +35,21 @@ describe('ProductionEngine (Lazy/Instance Architecture)', () => {
           motionId: 'time-motion',
           driver: { type: 'gsap-timeline', trigger: { autoplay: false } },
           tracks: [
-            { id: 'track-1', keyframes: { x: { stops: [0, 10] } } }
+            { id: 'track-1', keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 10 }] } } }
           ]
         },
         {
           motionId: 'scroll-motion',
           driver: { type: 'gsap-scroll', trigger: { trigger: '#el', scrub: true } },
           tracks: [
-            { id: 'track-2', keyframes: { opacity: { stops: [0, 1] } } }
+            { id: 'track-2', keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }
           ]
         },
         {
           motionId: 'manual-motion',
           driver: { type: 'manual' },
           tracks: [
-            { id: 'track-3', keyframes: { scale: { stops: [1, 2] } } }
+            { id: 'track-3', keyframes: { scale: { stops: [{ p: 0, v: 1 }, { p: 1, v: 2 }] } } }
           ]
         }
       ]
@@ -151,7 +151,7 @@ describe('ProductionEngine (Lazy/Instance Architecture)', () => {
         {
           motionId: 'scroll-motion',
           driver: { type: 'gsap-scroll', trigger: { trigger: '#el', scrub: true } },
-          tracks: [{ id: 'track-1', keyframes: { opacity: { stops: [0, 1] } } }]
+          tracks: [{ id: 'track-1', keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
         }
       ]
     };
@@ -171,5 +171,40 @@ describe('ProductionEngine (Lazy/Instance Architecture)', () => {
     expect(() => engine2.mountInstance('scroll-motion')).toThrow(
       /MotionPath: trigger ref '#el' is not registered/
     );
+  });
+
+  it('mitigates double registration and safely ignores unregistration of overwritten refs', async () => {
+    validatorModule.validateProject.mockReturnValue([]);
+    const engine = createProductionEngine();
+    const ref1 = { current: {} };
+    const ref2 = { current: {} };
+
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    engine.registerTriggerRef('#el', ref1);
+    engine.registerTriggerRef('#el', ref2);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Double-registration detected'));
+
+    const scrollSchema = {
+      motions: [
+        {
+          motionId: 'scroll-motion',
+          driver: { type: 'gsap-scroll', trigger: { trigger: '#el', scrub: true } },
+          tracks: []
+        }
+      ]
+    };
+
+    await engine.loadProject(scrollSchema);
+
+    // Unregister first (should be ignored because current is ref2)
+    engine.unregisterTriggerRef('#el', ref1);
+    expect(() => engine.mountInstance('scroll-motion')).not.toThrow();
+
+    // Unregister second (should delete)
+    engine.unregisterTriggerRef('#el', ref2);
+    expect(() => engine.mountInstance('scroll-motion')).toThrow(/is not registered/);
+
+    consoleWarnSpy.mockRestore();
   });
 });

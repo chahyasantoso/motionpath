@@ -72,14 +72,7 @@ describe('resolveMotion and mountTimeline API tests', () => {
     ]
   };
 
-  it('mountTimeline works on timeline motion and throws on delegate motion', async () => {
-    const engine = createProductionEngine(mockDeps);
-    await engine.loadProject(validProject);
 
-    expect(() => engine.mountTimeline('timelineMotion')).not.toThrow();
-    expect(() => engine.mountTimeline('delegateMotion')).toThrow(/cannot mount delegate motion/);
-    expect(() => engine.mountTimeline('nonexistent')).toThrow(/not found/);
-  });
 
   it('resolveMotion works on delegate motion and throws on timeline motion', async () => {
     const engine = createProductionEngine(mockDeps);

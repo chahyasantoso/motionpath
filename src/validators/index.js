@@ -10,6 +10,7 @@ import { timelineGroupRule } from './rules/timeline-group.js';
 import { elementUniquenessRule } from './rules/element-uniqueness.js';
 import { imageSequenceRule } from './rules/image-sequence.js';
 import { motionStructureRule } from './rules/motion-structure.js';
+import { stopShapeRule } from './rules/stop-shape.js';
 import { resolveTrack } from '../usecases/ResolveTrack.js';
 
 const motionRules = [
@@ -21,6 +22,7 @@ const motionRules = [
 
 const trackRules = [
   stopCountRule,
+  stopShapeRule,
   pathXYExclusivityRule,
   pathShapeRule,
   imageSequenceRule,

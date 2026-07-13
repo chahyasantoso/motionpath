@@ -1,5 +1,5 @@
-import { createAnimationPlugin } from '../AnimationPlugin.js';
-import { getPointOnCubicPath, convertToCubicPath } from '../../utils/pathUtils.js';
+import { convertToCubicPath, getPointOnCubicPath } from '../../utils/pathUtils.js';
+import { createAnimationPlugin } from '../createAnimationPlugin.js';
 
 /**
  * Path plugin - handles 2D/3D Bézier path animation with auto-rotation.

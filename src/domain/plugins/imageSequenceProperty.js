@@ -1,4 +1,4 @@
-import { createAnimationPlugin } from '../AnimationPlugin.js';
+import { createAnimationPlugin } from '../createAnimationPlugin.js';
 
 const imageSequenceWarmCache = new Map();
 

@@ -1,6 +1,6 @@
 import { validateProject } from '../validators/index.js';
 import { buildProject } from './BuildProject.js';
-import { createEngineCore } from '../engines/editorEngineCore.js';
+import { createEditorEngineCore } from '../engines/editorEngineCore.js';
 import { parseProjectSchema } from './ParseProjectSchema.js';
 
 /**
@@ -33,7 +33,7 @@ export async function compileProject(schema, deps, engineName = 'MotionPath') {
 
   const project = parseProjectSchema(schema);
   const buildResult = await buildProject(project, deps);
-  const core = createEngineCore(buildResult);
+  const core = createEditorEngineCore(buildResult);
 
   return { core, buildResult, project };
 }

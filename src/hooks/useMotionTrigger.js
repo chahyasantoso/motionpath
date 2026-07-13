@@ -14,6 +14,6 @@ export default function useMotionTrigger(id, ref) {
   useEffect(() => {
     if (!id || !ref) return undefined;
     productionEngine.registerTriggerRef(id, ref);
-    return () => productionEngine.unregisterTriggerRef(id);
+    return () => productionEngine.unregisterTriggerRef(id, ref);
   }, [id, ref]);
 }

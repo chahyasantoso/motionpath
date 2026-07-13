@@ -1,4 +1,4 @@
-import { createAnimationPlugin } from '../AnimationPlugin.js';
+import { createAnimationPlugin } from '../createAnimationPlugin.js';
 
 /**
  * Factory for simple CSS property plugins (x, y, opacity, scale, rotation, etc.)

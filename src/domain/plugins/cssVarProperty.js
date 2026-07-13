@@ -1,4 +1,4 @@
-import { createAnimationPlugin } from '../AnimationPlugin.js';
+import { createAnimationPlugin } from '../createAnimationPlugin.js';
 
 /**
  * CSS custom property (CSS variables) plugin.

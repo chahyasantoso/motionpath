@@ -1,19 +1,22 @@
-import { createMotionInstance } from '../domain/instance/index.js';
+import { MotionInstance } from '../domain/instance/MotionInstance.js';
+import { getMotion } from '../domain/models.js';
 
 /**
- * MountMotionInstance use case.
+ * CreateMotionInstance use case.
  * Creates a motion instance using the functional factory pattern.
  * Normalizes driver type based on trigger configuration before routing.
  *
  * @param {string} motionId
  * @param {object} config
- * @param {object} schemaMotion
- * @param {object|Map} templates
- * @param {object} deps
- * @param {function} onSubscriberChange
+ * @param {object} context
  * @returns {object} Motion instance
  */
-export function mountMotionInstance(motionId, config, schemaMotion, templates, deps, onSubscriberChange) {
+export function createMotionInstance(motionId, config, context) {
+  const schemaMotion = getMotion(context.project, motionId);
+  if (!schemaMotion) {
+    throw new Error(`createMotionInstance: motion with id "${motionId}" not found.`);
+  }
+
   // Normalize driver type for correct behavior routing
   let driverType = schemaMotion.driver?.type || 'manual';
   if (driverType === 'timeline') {
@@ -33,5 +36,5 @@ export function mountMotionInstance(motionId, config, schemaMotion, templates, d
     }
   };
 
-  return createMotionInstance(motionId, config, normalizedSchema, templates, deps, onSubscriberChange);
+  return new MotionInstance(motionId, config, normalizedSchema, context);
 }

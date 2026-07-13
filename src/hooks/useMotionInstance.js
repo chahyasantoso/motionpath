@@ -16,6 +16,25 @@ export default function useMotionInstance(motionId, config) {
     if (!motionId) return undefined;
     
     const inst = productionEngine.mountInstance(motionId, config);
+    
+    // Attach declarative ref callback binders
+    const triggers = {};
+    inst.requiredTriggerIds.forEach(id => {
+      let activeRef = null;
+      triggers[id] = (el) => {
+        if (el) {
+          activeRef = { current: el };
+          productionEngine.registerTriggerRef(id, activeRef);
+        } else {
+          if (activeRef) {
+            productionEngine.unregisterTriggerRef(id, activeRef);
+            activeRef = null;
+          }
+        }
+      };
+    });
+    inst.triggers = triggers;
+
     setInstance(inst);
 
     return () => {

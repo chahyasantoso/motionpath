@@ -9,6 +9,7 @@ import { triggerShapeRule } from '../rules/trigger-shape.js';
 import { easeCollisionRule } from '../rules/ease-collision.js';
 import { staggerShapeRule } from '../rules/stagger-shape.js';
 import { perspectiveUsageRule } from '../rules/perspective-usage.js';
+import { stopShapeRule } from '../rules/stop-shape.js';
 
 describe('validateProject integration tests', () => {
   it('should return empty array for a fully valid minimal project', () => {
@@ -118,7 +119,7 @@ describe('validateProject integration tests', () => {
 
   it('every rule function has the correct arity for its type', () => {
     const motionRules = [triggerShapeRule, easeCollisionRule, staggerShapeRule, perspectiveUsageRule];
-    const trackRules = [stopCountRule, pathXYExclusivityRule, pathShapeRule];
+    const trackRules = [stopCountRule, stopShapeRule, pathXYExclusivityRule, pathShapeRule];
     const crossMotionRules = [timelineGroupRule, elementUniquenessRule];
 
     motionRules.forEach(rule => expect(rule.length).toBe(3));   // (motion, context, path)
@@ -147,5 +148,33 @@ describe('validateProject integration tests', () => {
     const errorsPS = pathShapeRule(trackPS, motion, 'not-a-context-object', realPath);
     expect(errorsPS.length).toBeGreaterThan(0);
     errorsPS.forEach(e => expect(e.path.startsWith(realPath)).toBe(true));
+  });
+
+  it('should validate malformed stop shape during full project validation', () => {
+    const project = {
+      projectId: 'demo',
+      schemaVersion: 2,
+      motions: [
+        {
+          motionId: 'motion-1',
+          driver: { type: 'manual' },
+          tracks: [
+            {
+              id: 'el-1',
+              keyframes: {
+                x: { stops: [1, 2] }
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    const errors = validateProject(project);
+    expect(errors.length).toBeGreaterThanOrEqual(2);
+    const stopShapeErrors = errors.filter(e => e.ruleId === 'stop-shape');
+    expect(stopShapeErrors).toHaveLength(2);
+    expect(stopShapeErrors[0].path).toBe('motions[0].tracks[0].keyframes.x.stops[0]');
+    expect(stopShapeErrors[1].path).toBe('motions[0].tracks[0].keyframes.x.stops[1]');
   });
 });

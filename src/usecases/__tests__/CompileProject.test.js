@@ -13,7 +13,7 @@ vi.mock('../../validators/index.js', () => ({
 }));
 
 vi.mock('../../engines/editorEngineCore.js', () => ({
-  createEngineCore: vi.fn()
+  createEditorEngineCore: vi.fn()
 }));
 
 describe('compileProject', () => {
@@ -28,7 +28,7 @@ describe('compileProject', () => {
     mockCore = { subscribe: vi.fn(), compose: vi.fn(), destroy: vi.fn() };
     
     builderModule.buildProject.mockResolvedValue(mockBuildResult);
-    engineCoreModule.createEngineCore.mockReturnValue(mockCore);
+    engineCoreModule.createEditorEngineCore.mockReturnValue(mockCore);
     validatorModule.validateProject.mockReturnValue([]);
   });
 
@@ -38,7 +38,7 @@ describe('compileProject', () => {
 
     expect(validatorModule.validateProject).toHaveBeenCalledWith(schema);
     expect(builderModule.buildProject).toHaveBeenCalledWith(expect.any(Object), mockDeps);
-    expect(engineCoreModule.createEngineCore).toHaveBeenCalledWith(mockBuildResult);
+    expect(engineCoreModule.createEditorEngineCore).toHaveBeenCalledWith(mockBuildResult);
     expect(result).toEqual({ core: mockCore, buildResult: mockBuildResult, project: expect.any(Object) });
   });
 
@@ -73,7 +73,7 @@ describe('compileProject', () => {
 
     expect(warnSpy).toHaveBeenCalledWith('[TestEngine]', 'Mild warning');
     expect(builderModule.buildProject).not.toHaveBeenCalled();
-    expect(engineCoreModule.createEngineCore).not.toHaveBeenCalled();
+    expect(engineCoreModule.createEditorEngineCore).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });

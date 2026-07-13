@@ -1,9 +1,8 @@
 import { resolvePluginForKey } from '../domain/plugins.js';
 import { ensureLoaded } from '../usecases/BuildProject.js';
-import { mountMotionInstance } from '../usecases/MountMotionInstance.js';
+import { createMotionInstance } from '../usecases/CreateMotionInstance.js';
 import { parseProjectSchema } from '../usecases/ParseProjectSchema.js';
 import { resolveTrack } from '../usecases/ResolveTrack.js';
-import { getMotion } from '../domain/models.js';
 import { createDeferredCall } from '../utils/deferredCall.js';
 import { validateProject } from '../validators/index.js';
 import { createEngineCore } from './engineCore.js';
@@ -119,11 +118,6 @@ export function createProductionEngine(deps = {}) {
       if (!_project || !_core) {
         throw new Error('mountInstance: project not loaded.');
       }
-      
-      const schemaMotion = getMotion(_project, motionId);
-      if (!schemaMotion) {
-        throw new Error(`mountInstance: motion with id "${motionId}" not found.`);
-      }
 
       const onSubscriberChange = (inst, hasSubscribers) => {
         if (!_core) return;
@@ -134,15 +128,14 @@ export function createProductionEngine(deps = {}) {
         }
       };
 
-      const instanceDeps = {
-        ..._deps,
+      const instance = createMotionInstance(motionId, config, {
+        project: _project,
+        resolveElement: _deps.resolveElement,
         mountInstance: (childMotionId, childConfig) => {
           return this.mountInstance(childMotionId, childConfig);
-        }
-      };
-
-      const templates = _project.templates;
-      const instance = mountMotionInstance(motionId, config, schemaMotion, templates, instanceDeps, onSubscriberChange);
+        },
+        onSubscriberChange
+      });
 
       _instances.set(instance.id, instance);
 
@@ -167,26 +160,22 @@ export function createProductionEngine(deps = {}) {
       return _motionResolver.resolve(_project, motionId, progress, overrides);
     },
 
-    mountTimeline(motionId) {
-      if (!_project) {
-        throw new Error('mountTimeline: project not loaded.');
-      }
-      const originalMotion = getMotion(_project, motionId);
-      if (!originalMotion) {
-        throw new Error(`mountTimeline: motion with id "${motionId}" not found.`);
-      }
-      const driverType = originalMotion.driver.type;
-      if (driverType === 'delegate' || driverType === 'manual') {
-        throw new Error(`mountTimeline: cannot mount delegate motion "${motionId}".`);
-      }
-    },
+
 
     registerTriggerRef(id, ref) {
+      if (_triggerRefs.has(id)) {
+        console.warn(
+          `[MotionPath] Double-registration detected: Trigger ref with ID '${id}' is being overwritten. ` +
+          `Make sure you do not have multiple elements using the same trigger ID at the same time.`
+        );
+      }
       _triggerRefs.set(id, ref);
     },
 
-    unregisterTriggerRef(id) {
-      _triggerRefs.delete(id);
+    unregisterTriggerRef(id, ref) {
+      if (ref === undefined || _triggerRefs.get(id) === ref) {
+        _triggerRefs.delete(id);
+      }
     }
   };
 }
