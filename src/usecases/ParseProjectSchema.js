@@ -64,6 +64,7 @@ export function parseProjectSchema(schema) {
       motionId: m.motionId,
       driver,
       stagger: m.stagger,
+      staggerTransition: m.staggerTransition,
       tracks
     });
   });

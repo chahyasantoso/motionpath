@@ -54,3 +54,17 @@ export function resolvePluginForKey(key) {
   if (typeof key !== 'string') return undefined;
   return ALL_PLUGINS.find(p => p.claimsKey(key));
 }
+
+const loadPromises = new Map();
+
+export function _resetLoadPromises() {
+  loadPromises.clear();
+}
+
+export function ensureLoaded(plugin) {
+  if (!plugin.lazy) return Promise.resolve();
+  if (!loadPromises.has(plugin)) {
+    loadPromises.set(plugin, typeof plugin.load === 'function' ? plugin.load() : Promise.resolve());
+  }
+  return loadPromises.get(plugin);
+}

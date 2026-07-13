@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useRef } from 'react';
-// Prevent editor auto-cleanup from removing unused React import
-const _dummyReactRef = React;
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { productionEngine } from '../../engines/ProductionEngine.js';
 import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
@@ -10,6 +9,8 @@ import useSmoothScroll from '../../hooks/useSmoothScroll';
 import { buildMotionPath } from '../../utils/pathUtils';
 import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../utils/projection3d';
 import './DemoPage.css';
+// Prevent editor auto-cleanup from removing unused React import
+const _dummyReactRef = React;
 
 // ─── Scene Data ────────────────────────────────────────────────
 const scrollScene = {
@@ -96,7 +97,8 @@ const dynamicCarouselScene = {
       end: 'bottom bottom'
     }
   },
-  stagger: 0.14,
+  stagger: 0.1,
+  staggerTransition: { duration: 0.4, ease: 'power3.out' },
   tracks: [
     {
       id: 'card-track',
@@ -394,6 +396,16 @@ function CarouselDemo({ instance }) {
 
   const [cards, setCards] = React.useState(MOCK_CARDS);
   const childInstancesMap = useRef(new Map());
+
+  React.useEffect(() => {
+    if (!instance) return;
+    const unsubscribe = instance.onChildChange(() => {
+      requestAnimationFrame(() => {
+        ScrollTrigger.refresh();
+      });
+    });
+    return () => unsubscribe();
+  }, [instance]);
 
   const getOrAddChildInstance = useCallback((cardId) => {
     if (!instance) return null;

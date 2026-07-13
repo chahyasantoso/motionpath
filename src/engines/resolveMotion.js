@@ -1,5 +1,5 @@
 import { resolveTrack } from '../usecases/ResolveTrack.js';
-import { buildTrackTweenSync } from '../usecases/BuildProject.js';
+import { buildTrackTween as buildTrackTweenSync } from '../usecases/BuildTrackTween.js';
 import { composePatch } from '../usecases/ComposeTrackPatch.js';
 import { getMotion } from '../domain/models.js';
 

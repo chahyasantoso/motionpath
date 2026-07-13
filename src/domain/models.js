@@ -98,11 +98,12 @@ export function createMotionTemplate({ templateId, duration = null, transformOri
  * @param {Array} params.tracks - Array of track objects
  * @returns {Object} MotionDefinition data object
  */
-export function createMotionDefinition({ motionId, driver, stagger = null, tracks = [] }) {
+export function createMotionDefinition({ motionId, driver, stagger = null, staggerTransition = null, tracks = [] }) {
   return {
     motionId,
     driver,
     stagger,
+    staggerTransition,
     tracks
   };
 }

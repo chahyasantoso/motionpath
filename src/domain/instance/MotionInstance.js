@@ -303,9 +303,9 @@ export class MotionInstance {
 
     this.#childListeners.forEach(cb => cb());
 
-    if (typeof window !== 'undefined' && ScrollTrigger) {
-      ScrollTrigger.refresh();
-    }
+    // if (typeof window !== 'undefined' && ScrollTrigger) {
+    //   ScrollTrigger.refresh();
+    // }
 
     return child;
   }
@@ -339,9 +339,9 @@ export class MotionInstance {
 
       this.#childListeners.forEach(cb => cb());
 
-      if (typeof window !== 'undefined' && ScrollTrigger) {
-        ScrollTrigger.refresh();
-      }
+      // if (typeof window !== 'undefined' && ScrollTrigger) {
+      //   ScrollTrigger.refresh();
+      // }
     }
   }
 

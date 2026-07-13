@@ -8,7 +8,10 @@ vi.mock('gsap/ScrollTrigger', () => {
       create: vi.fn(() => ({
         kill: vi.fn(),
         disable: vi.fn(),
-        enable: vi.fn()
+        enable: vi.fn(),
+        scroll: vi.fn(),
+        start: 0,
+        end: 1000
       })),
       refresh: vi.fn()
     }
@@ -281,6 +284,78 @@ describe('MotionInstance Class', () => {
 
       instance.enableTrigger();
       expect(trigger.enable).toHaveBeenCalled();
+    });
+  });
+
+  describe('Scroll-Driver Stagger Freeze/Unfreeze', () => {
+    let scrollStaggerSchema;
+
+    beforeEach(() => {
+      scrollStaggerSchema = {
+        motionId: 'scroll-stagger',
+        stagger: 0.2,
+        driver: {
+          type: 'gsap-scroll',
+          trigger: { trigger: '#el', scrub: true }
+        },
+        tracks: [
+          {
+            id: 'track-s',
+            keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 100 }] } }
+          }
+        ]
+      };
+    });
+
+    it('disables ScrollTrigger before addChild mutation', () => {
+      const instance = createTestInstance('scroll-stagger', {}, scrollStaggerSchema);
+      const trigger = ScrollTrigger.create.mock.results[0].value;
+
+      instance.addChild('child-motion', {});
+
+      expect(trigger.disable).toHaveBeenCalledWith(false);
+    });
+
+    it('does NOT freeze ScrollTrigger on removeChild (deferred removal)', () => {
+      const instance = createTestInstance('scroll-stagger', {}, scrollStaggerSchema);
+      const trigger = ScrollTrigger.create.mock.results[0].value;
+
+      const child = instance.addChild('child-motion', {});
+      trigger.disable.mockClear();
+
+      instance.removeChild(child);
+
+      // removeChild no longer freezes — the dead child stays in the timeline
+      // until the stagger slide finishes, so no duration change occurs yet
+      expect(trigger.disable).not.toHaveBeenCalled();
+    });
+
+    it('calls scroll() to sync position after unfreeze on addChild with no stagger change', () => {
+      const instance = createTestInstance('scroll-stagger', {}, scrollStaggerSchema);
+      const trigger = ScrollTrigger.create.mock.results[0].value;
+
+      instance.addChild('child-motion', {});
+
+      expect(trigger.enable).toHaveBeenCalled();
+      expect(ScrollTrigger.refresh).toHaveBeenCalled();
+      expect(trigger.scroll).toHaveBeenCalled();
+    });
+
+    it('defers actual timeline removal until stagger slide completes on removeChild', () => {
+      const instance = createTestInstance('scroll-stagger', {}, scrollStaggerSchema);
+
+      const child1 = instance.addChild('child-motion', {});
+      const child2 = instance.addChild('child-motion', {});
+      ScrollTrigger.refresh.mockClear();
+
+      const removeSpy = vi.spyOn(instance.timeline, 'remove');
+
+      instance.removeChild(child1);
+
+      // With only 1 surviving child and no stagger change needed,
+      // the deferred removal fires immediately (pendingTweens === 0)
+      expect(removeSpy).toHaveBeenCalledWith(child1.timeline);
+      expect(ScrollTrigger.refresh).toHaveBeenCalled();
     });
   });
 
