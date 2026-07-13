@@ -2,133 +2,73 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { gsap } from 'gsap';
 import { createEngineCore } from '../engineCore.js';
 
+vi.mock('gsap', () => {
+  return {
+    gsap: {
+      ticker: {
+        add: vi.fn(),
+        remove: vi.fn()
+      }
+    }
+  };
+});
+
 describe('EngineCore', () => {
-  let mockPlugin1;
-  let mockPlugin2;
-  let buildResult;
+  let mockInstance1;
+  let mockInstance2;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockPlugin1 = {
-      keys: ['x'],
-      compose: vi.fn((rawData) => {
-        if (rawData.x === undefined) return {};
-        return { x: rawData.x };
-      })
+    mockInstance1 = {
+      broadcast: vi.fn()
     };
 
-    mockPlugin2 = {
-      keys: ['blur'],
-      compose: vi.fn((rawData) => {
-        if (rawData.blur === undefined) return {};
-        return { filter: { blur: rawData.blur } };
-      })
-    };
-
-    buildResult = {
-      motions: [
-        {
-          sectionId: 'scene-1',
-          timeline: {
-            kill: vi.fn(),
-            getChildren: vi.fn(() => [])
-          }
-        }
-      ],
-      timelineGroups: new Map(),
-      tracks: new Map([
-        ['el-1', { proxy: { x: 10, blur: 5 } }]
-      ]),
-      trackPlugins: new Map([
-        ['el-1', [mockPlugin1, mockPlugin2]]
-      ])
+    mockInstance2 = {
+      broadcast: vi.fn()
     };
   });
 
-  describe('subscribe()', () => {
-    it('throws when subscribing to non-existent track', () => {
-      const core = createEngineCore(buildResult);
-      expect(() => core.subscribe('non-existent', () => {})).toThrow();
-    });
+  it('adds and removes gsap.ticker callback based on active instance counts', () => {
+    const addSpy = vi.spyOn(gsap.ticker, 'add');
+    const removeSpy = vi.spyOn(gsap.ticker, 'remove');
 
-    it('adds and removes gsap.ticker callback and calls back with proxy copy', () => {
-      const addSpy = vi.spyOn(gsap.ticker, 'add');
-      const removeSpy = vi.spyOn(gsap.ticker, 'remove');
+    const core = createEngineCore();
+    
+    // 1st instance registered -> starts ticker
+    core.registerActiveInstance(mockInstance1);
+    expect(addSpy).toHaveBeenCalledTimes(1);
+    const tickerFn = addSpy.mock.calls[0][0];
 
-      const core = createEngineCore(buildResult);
-      const cb = vi.fn();
+    // 2nd instance registered -> does not add ticker again
+    core.registerActiveInstance(mockInstance2);
+    expect(addSpy).toHaveBeenCalledTimes(1);
 
-      const unsubscribe = core.subscribe('el-1', cb);
+    // Simulate ticker tick -> both should broadcast
+    tickerFn();
+    expect(mockInstance1.broadcast).toHaveBeenCalled();
+    expect(mockInstance2.broadcast).toHaveBeenCalled();
 
-      expect(addSpy).toHaveBeenCalledTimes(1);
-      const tickerFn = addSpy.mock.calls[0][0];
+    // Unregister 1st instance -> ticker stays running
+    core.unregisterActiveInstance(mockInstance1);
+    expect(removeSpy).not.toHaveBeenCalled();
 
-      // Simulate ticker tick
-      tickerFn();
-      expect(cb).toHaveBeenCalledWith({ x: 10, blur: 5 });
-
-      unsubscribe();
-      expect(removeSpy).toHaveBeenCalledWith(tickerFn);
-
-      // Re-subscribe should trigger startTicker() again
-      const unsubscribe2 = core.subscribe('el-1', cb);
-      expect(addSpy).toHaveBeenCalledTimes(2);
-      unsubscribe2();
-    });
-
-    it('replays current proxy state synchronously on subscribe, before any tick', () => {
-      const core = createEngineCore(buildResult);
-      const callback = vi.fn();
-      core.subscribe('el-1', callback);
-      // No gsap.ticker advance here — zero ticks have occurred.
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(expect.objectContaining({ x: 10, blur: 5 }));
-    });
-
-    it('clears ticker callback on destroy()', () => {
-      const addSpy = vi.spyOn(gsap.ticker, 'add');
-      const removeSpy = vi.spyOn(gsap.ticker, 'remove');
-
-      const core = createEngineCore(buildResult);
-      core.subscribe('el-1', () => {});
-
-      expect(addSpy).toHaveBeenCalled();
-      const tickerFn = addSpy.mock.calls[0][0];
-
-      core.destroy();
-      expect(removeSpy).toHaveBeenCalledWith(tickerFn);
-    });
+    // Unregister 2nd instance -> ticker stops
+    core.unregisterActiveInstance(mockInstance2);
+    expect(removeSpy).toHaveBeenCalledWith(tickerFn);
   });
 
-  describe('compose()', () => {
-    it('composes and aggregates patches, including filter properties', () => {
-      const core = createEngineCore(buildResult);
-      const patch = core.compose('el-1');
+  it('stops ticker and clears instances on destroy()', () => {
+    const addSpy = vi.spyOn(gsap.ticker, 'add');
+    const removeSpy = vi.spyOn(gsap.ticker, 'remove');
 
-      expect(mockPlugin1.compose).toHaveBeenCalled();
-      expect(mockPlugin2.compose).toHaveBeenCalled();
-      expect(patch).toEqual({
-        x: 10,
-        filter: { blur: 5 }
-      });
-    });
+    const core = createEngineCore();
+    core.registerActiveInstance(mockInstance1);
 
-    it('throws with context on plugin compose errors', () => {
-      mockPlugin1.compose.mockImplementationOnce(() => {
-        throw new Error('Plugin crash');
-      });
+    expect(addSpy).toHaveBeenCalled();
+    const tickerFn = addSpy.mock.calls[0][0];
 
-      const core = createEngineCore(buildResult);
-      expect(() => core.compose('el-1')).toThrow(/composePatch: plugin compose failed for track "el-1", property key\(s\) \[x\]: Plugin crash/);
-    });
-  });
-
-  describe('destroySection()', () => {
-    it('kills timeline of section', () => {
-      const core = createEngineCore(buildResult);
-      core.destroySection('scene-1');
-      expect(buildResult.motions[0].timeline.kill).toHaveBeenCalled();
-    });
+    core.destroy();
+    expect(removeSpy).toHaveBeenCalledWith(tickerFn);
   });
 });

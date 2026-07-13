@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import './BurstPage.css';
+import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import useMotionTrigger from '../../hooks/useMotionTrigger';
@@ -317,7 +318,7 @@ const iceCreamCardScene = {
 };
 
 // ─── Strawberry Burst Demo Components ───────────────────────────
-function Strawberry({ elementId, emoji }) {
+function Strawberry({ instance, elementId, emoji }) {
   const ref = useRef(null);
   
   // Stable random starting rotation angle between 0 and 360 degrees
@@ -348,7 +349,7 @@ function Strawberry({ elementId, emoji }) {
     };
   }, [startRotation]);
 
-  useMotionSubscriber(elementId, ref, transform);
+  useMotionSubscriber(instance, elementId, ref, transform);
 
   return (
     <div ref={ref} className="strawberry-element">
@@ -357,14 +358,14 @@ function Strawberry({ elementId, emoji }) {
   );
 }
 
-function IceCreamCard() {
+function IceCreamCard({ instance }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
     return composeFn(rawData);
   }, []);
 
-  useMotionSubscriber('strawberry-card', ref, transform);
+  useMotionSubscriber(instance, 'strawberry-card', ref, transform);
 
   return (
     <div ref={ref} className="burst-card">
@@ -378,14 +379,14 @@ function IceCreamCard() {
   );
 }
 
-function IceCreamCenterpiece() {
+function IceCreamCenterpiece({ instance }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
     return composeFn(rawData);
   }, []);
 
-  useMotionSubscriber('ice-cream-center', ref, transform);
+  useMotionSubscriber(instance, 'ice-cream-center', ref, transform);
 
   return (
     <div ref={ref} className="ice-cream-wrapper">
@@ -424,7 +425,10 @@ export default function BurstPage() {
     motions: [strawberryScene, iceCreamCardScene],
   }), []);
 
-  useMotionProject(project);
+  const isLoaded = useMotionProject(project);
+
+  const strawberryInstance = useMotionInstance(isLoaded ? 'strawberry-burst-scroll' : null);
+  const cardInstance = useMotionInstance(isLoaded ? 'ice-cream-card-slide' : null);
 
   useMotionTrigger('strawberry-burst-scroll', containerRef);
   useMotionTrigger('burst-stage', stageRef);
@@ -486,12 +490,12 @@ export default function BurstPage() {
             {strawberryScene.tracks
               .filter((el) => el.id.startsWith('strawberry'))
               .map((el) => (
-                <Strawberry key={el.id} elementId={el.id} emoji="🍓" />
+                <Strawberry key={el.id} instance={strawberryInstance} elementId={el.id} emoji="🍓" />
               ))}
 
-            <IceCreamCenterpiece />
+            <IceCreamCenterpiece instance={strawberryInstance} />
 
-            <IceCreamCard />
+            <IceCreamCard instance={cardInstance} />
           </div>
         </div>
       </section>

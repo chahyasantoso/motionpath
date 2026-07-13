@@ -38,16 +38,13 @@ describe('stagger-shape rule', () => {
     expect(errors[0].path).toBe('motions[0].stagger');
   });
 
-  it('should warn when stagger is non-zero and motion has fewer than 2 tracks', () => {
+  it('should pass when stagger is non-zero and motion has fewer than 2 tracks (valid for dynamic stagger)', () => {
     const motion = {
       stagger: 0.2,
       tracks: [{}]
     };
     const errors = staggerShapeRule(motion, {}, 'motions[0]');
-    expect(errors).toHaveLength(1);
-    expect(errors[0].ruleId).toBe('stagger-shape');
-    expect(errors[0].severity).toBe('warning');
-    expect(errors[0].path).toBe('motions[0].stagger');
+    expect(errors).toHaveLength(0);
   });
 
   it('should pass with positive stagger and 2+ tracks', () => {

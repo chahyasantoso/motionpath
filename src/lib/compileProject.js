@@ -1,6 +1,6 @@
 import { validateProject } from '../validators/index.js';
 import { buildProject } from './builder.js';
-import { createEngineCore } from './engineCore.js';
+import { createEngineCore } from './editorEngineCore.js';
 
 /**
  * Shared compile preamble used by both ProductionEngine and EditorEngine:

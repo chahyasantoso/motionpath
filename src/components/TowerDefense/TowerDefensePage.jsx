@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
-import { buildMotionPath } from '../../lib/pathUtils';
+import { buildMotionPath, convertToCubicPath } from '../../lib/pathUtils';
 import productionEngine from '../../lib/ProductionEngine';
 import { domRenderer } from '../../lib/renderers/domRenderer';
 import './TowerDefensePage.css';
@@ -80,8 +81,7 @@ const projectileArc = {
     {
       id: 'proj-track',
       keyframes: {
-        x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
-        y: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
+        path: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
         scale: { stops: [{ p: 0, v: 0.5 }, { p: 0.2, v: 1.3 }, { p: 1, v: 0.7 }] },
         opacity: { stops: [{ p: 0, v: 1 }, { p: 0.8, v: 1 }, { p: 1, v: 0 }] }
       }
@@ -128,11 +128,11 @@ const project = {
 };
 
 // ─── Sub-Component for Tower Ambient Animation ─────────────────
-function TowerRing({ color }) {
+function TowerRing({ instance, color }) {
   const ref = useRef(null);
 
   // Subscribe to time-triggered tower pulse
-  useMotionSubscriber('tower-pulse-ring', ref);
+  useMotionSubscriber(instance, 'tower-pulse-ring', ref);
 
   return (
     <div 
@@ -149,7 +149,9 @@ function TowerRing({ color }) {
 // ─── Main Game Page Export ──────────────────────────────────────
 export default function TowerDefensePage() {
   // Load Project Schemas into V2 Production Engine
-  useMotionProject(project);
+  const isLoaded = useMotionProject(project);
+
+  const pulseInstance = useMotionInstance(isLoaded ? 'tower-pulse-motion' : null);
 
   const [gameState, setGameState] = useState('idle'); // idle, playing, won, gameover
   const [wave, setWave] = useState(0);
@@ -187,6 +189,13 @@ export default function TowerDefensePage() {
   const [uiProjectiles, setUiProjectiles] = useState([]);
 
   const resetGame = () => {
+    enemiesRef.current.forEach(e => {
+      if (e.instance) e.instance.destroy();
+      if (e.deathInstance) e.deathInstance.destroy();
+    });
+    projectilesRef.current.forEach(p => {
+      if (p.instance) p.instance.destroy();
+    });
     enemiesRef.current = [];
     projectilesRef.current = [];
     towersRef.current = TOWERS_CONFIG.map(t => ({ ...t }));
@@ -233,6 +242,9 @@ export default function TowerDefensePage() {
         const typeKey = types[Math.floor(Math.random() * types.length)];
         const baseType = ENEMY_TYPES[typeKey];
 
+        const laneId = `lane-${lane}-path`;
+        const enemyInstance = productionEngine.mountInstance(laneId);
+
         enemiesRef.current.push({
           id: nextEnemyIdRef.current++,
           lane,
@@ -244,7 +256,8 @@ export default function TowerDefensePage() {
           progress: 0,
           x: 0,
           y: lane === 1 ? 150 : 350,
-          rotation: 0
+          rotation: 0,
+          instance: enemyInstance
         });
       }
     }
@@ -255,30 +268,39 @@ export default function TowerDefensePage() {
 
     for (let enemy of currentEnemies) {
       if (enemy.dying) {
+        if (!enemy.deathInstance) {
+          if (enemy.instance) {
+            enemy.instance.destroy();
+            enemy.instance = null;
+          }
+          enemy.deathProgress = 0;
+          enemy.deathInstance = productionEngine.mountInstance('enemy-death');
+        }
+
         enemy.deathProgress += 0.05; // 20 frames to complete
         if (enemy.deathProgress >= 1.0) {
+          if (enemy.deathInstance) {
+            enemy.deathInstance.destroy();
+          }
           enemyElsRef.current.delete(enemy.id);
           continue;
         }
 
         // Evaluate death animation with static target coordinates overrides
         try {
-          const override = {
-            'death-track': {
-              keyframes: {
-                x: { stops: [{ p: 0, v: enemy.deathX }, { p: 1, v: enemy.deathX }] },
-                y: { stops: [{ p: 0, v: enemy.deathY }, { p: 1, v: enemy.deathY }] }
-              }
-            }
-          };
-
-          const result = productionEngine.resolveMotion('enemy-death', enemy.deathProgress, override);
+          enemy.deathInstance.seek(enemy.deathProgress);
+          const track = enemy.deathInstance.tracksMap.get('death-track');
+          const patch = enemy.deathInstance.compose('death-track', {
+            ...track.proxy,
+            x: enemy.deathX,
+            y: enemy.deathY
+          });
           const el = enemyElsRef.current.get(enemy.id);
-          if (el) {
-            domRenderer(el, result['death-track']);
+          if (el && patch) {
+            domRenderer(el, patch);
           }
         } catch (err) {
-          console.error('resolveMotion error for enemy death:', err);
+          console.error('MotionInstance error for enemy death:', err);
         }
 
         remainingEnemies.push(enemy);
@@ -289,6 +311,9 @@ export default function TowerDefensePage() {
 
       if (enemy.progress >= 1.0) {
         // Leaked - lose a life
+        if (enemy.instance) {
+          enemy.instance.destroy();
+        }
         setLives(l => {
           const nextLives = l - 1;
           if (nextLives <= 0) setGameState('gameover');
@@ -299,23 +324,25 @@ export default function TowerDefensePage() {
 
       // Query coordinates from the productionEngine using V2 resolveMotion
       try {
-        const laneId = `lane-${enemy.lane}-path`;
-        const result = productionEngine.resolveMotion(laneId, enemy.progress);
-        const trackId = `lane-${enemy.lane}-track`;
-        
-        if (result && result[trackId]) {
-          enemy.x = result[trackId].x;
-          enemy.y = result[trackId].y;
-          enemy.rotation = result[trackId].rotation || 0;
+        if (enemy.instance) {
+          enemy.instance.seek(enemy.progress);
+          const trackId = `lane-${enemy.lane}-track`;
+          const patch = enemy.instance.compose(trackId);
+          
+          if (patch) {
+            enemy.x = patch.x;
+            enemy.y = patch.y;
+            enemy.rotation = patch.rotation || 0;
 
-          // Render directly to DOM bypassing React render path
-          const el = enemyElsRef.current.get(enemy.id);
-          if (el) {
-            domRenderer(el, result[trackId]);
+            // Render directly to DOM bypassing React render path
+            const el = enemyElsRef.current.get(enemy.id);
+            if (el) {
+              domRenderer(el, patch);
+            }
           }
         }
       } catch (err) {
-        console.error('resolveMotion error for enemy:', err);
+        console.error('MotionInstance error for enemy:', err);
       }
 
       remainingEnemies.push(enemy);
@@ -339,13 +366,15 @@ export default function TowerDefensePage() {
 
       if (inRangeEnemy) {
         // Fire projectile
+        const projInstance = productionEngine.mountInstance('projectile-arc');
         projectilesRef.current.push({
           id: nextProjIdRef.current++,
           towerId: tower.id,
           targetId: inRangeEnemy.id,
           startX: tower.x,
           startY: tower.y,
-          progress: 0
+          progress: 0,
+          instance: projInstance
         });
         tower.cooldown = FIRE_COOLDOWN;
       }
@@ -362,6 +391,10 @@ export default function TowerDefensePage() {
       const target = enemiesRef.current.find(e => e.id === proj.targetId && !e.dying);
 
       if (!target || proj.progress >= 1.0) {
+        if (proj.instance) {
+          proj.instance.destroy();
+          proj.instance = null;
+        }
         // If target was already killed or progress finished, explode
         if (target && proj.progress >= 1.0) {
           target.hp--;
@@ -378,31 +411,30 @@ export default function TowerDefensePage() {
 
       // Interpolate projectile trajectory via V2 resolveMotion with overrides
       try {
-        const override = {
-          'proj-track': {
-            keyframes: {
-              x: { stops: [{ p: 0, v: proj.startX }, { p: 1, v: target.x }] },
-              y: { stops: [{ p: 0, v: proj.startY }, { p: 1, v: target.y }] }
-            }
-          }
-        };
+        proj.instance.seek(proj.progress);
+        const track = proj.instance.tracksMap.get('proj-track');
+        const points = [{ x: proj.startX, y: proj.startY }, { x: target.x, y: target.y }];
+        const customCubicPath = convertToCubicPath(points);
 
-        const result = productionEngine.resolveMotion('projectile-arc', proj.progress, override);
+        const patch = proj.instance.compose('proj-track', {
+          ...track.proxy,
+          cubicPath: customCubicPath
+        });
         
-        if (result && result['proj-track']) {
-          proj.x = result['proj-track'].x;
-          proj.y = result['proj-track'].y;
-          proj.scale = result['proj-track'].scale ?? 1;
-          proj.opacity = result['proj-track'].opacity ?? 1;
+        if (patch) {
+          proj.x = patch.x;
+          proj.y = patch.y;
+          proj.scale = patch.scale ?? 1;
+          proj.opacity = patch.opacity ?? 1;
 
           // Render directly to DOM bypassing React render path
           const el = projElsRef.current.get(proj.id);
           if (el) {
-            domRenderer(el, result['proj-track']);
+            domRenderer(el, patch);
           }
         }
       } catch (err) {
-        console.error('resolveMotion error for projectile:', err);
+        console.error('MotionInstance error for projectile:', err);
       }
 
       remainingProjectiles.push(proj);
@@ -427,7 +459,17 @@ export default function TowerDefensePage() {
 
   useEffect(() => {
     gameLoopRef.current = requestAnimationFrame(updateGame);
-    return () => cancelAnimationFrame(gameLoopRef.current);
+    return () => {
+      cancelAnimationFrame(gameLoopRef.current);
+      // Teardown any remaining stateful instances to prevent memory leaks
+      enemiesRef.current.forEach(e => {
+        if (e.instance) e.instance.destroy();
+        if (e.deathInstance) e.deathInstance.destroy();
+      });
+      projectilesRef.current.forEach(p => {
+        if (p.instance) p.instance.destroy();
+      });
+    };
   }, []); // Run once on mount to establish a single stable game loop
 
   return (
@@ -519,7 +561,7 @@ export default function TowerDefensePage() {
               className="td-tower-node"
               style={{ left: tower.x, top: tower.y }}
             >
-              <TowerRing color={tower.color} />
+              <TowerRing instance={pulseInstance} color={tower.color} />
               <div 
                 className="tower-turret" 
                 style={{ 

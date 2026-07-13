@@ -50,13 +50,6 @@ export function staggerShapeRule(motion, context, path) {
       message: `motion.stagger must not be negative. Got: ${JSON.stringify(stagger)}.`,
       path: staggerPath
     });
-  } else if (val !== 0 && tracks.length < 2) {
-    errors.push({
-      ruleId: "stagger-shape",
-      severity: "warning",
-      message: `motion.stagger has no effect when motion has fewer than 2 tracks.`,
-      path: staggerPath
-    });
   }
 
   return errors;

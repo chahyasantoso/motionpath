@@ -313,10 +313,24 @@ Carried forward from v1, still true in v2 (verified: no evidence of any of these
 
 ---
 
-## 10. Known Live Risks (not schema bugs, but worth knowing when authoring against this doc)
+## 10. Resolved Issues (kept for history — both confirmed fixed)
 
-These are implementation-level findings from direct code review, not schema-level rules — included here because they affect what you can safely rely on:
+Two implementation-level gaps were found, fixed, and verified via fresh clone
+(`v2` @ `bcbc46f`, 228/228 tests, 35 files). Recorded here so future readers
+don't need to re-derive the history if either regresses:
 
-- **`engineCore.compose()`** (the DOM-rendering path) currently **silently swallows** a plugin's `compose()` throwing, unlike `resolveMotion`'s throw-with-context behavior. A fix-note unifying both into one shared `composePatch()` helper is drafted but not yet confirmed landed as of this doc.
-- **`engineCore.compose()`**'s `filter` merge is a flat overwrite rather than a per-key merge — currently harmless (only `filterGroupPlugin` ever contributes to `filter`), but would silently drop data if a second filter-contributing plugin is ever added. Same fix-note as above covers this.
-- **Delegate-driver tracks were, until a pending fix-note lands, eagerly built into a throwaway GSAP timeline at `loadProject()` time** even though nothing ever uses that copy (`resolveMotion` builds and caches its own, independent tween). A fix-note (filter-at-source in `buildProject`) is drafted to eliminate this; confirm it landed before assuming delegate tracks are load-cheap.
+- **`engineCore.compose()`/`resolveMotion` merge logic was duplicated and had
+  drifted** — silent-swallow vs. throw-with-context, flat-overwrite vs.
+  merge on `filter`. Fixed by extracting a shared `src/lib/composePatch.js`,
+  used by both call sites. Both behaviors (throw, filter-merge) now have
+  dedicated tests, including one specifically covering the DOM path
+  (`engineCore.test.js`), which previously had no test that would have caught
+  the old silent-swallow behavior.
+- **Delegate-driver tracks were eagerly built into a throwaway GSAP timeline
+  at `loadProject()` time**, duplicating the real tween `resolveMotion`
+  builds and caches on first use. Fixed by filtering `driver.type !== "delegate"`
+  before `buildProject`'s per-motion loop, rather than branching inside it.
+  One accepted, intentional side effect: `EditorEngine.setProgress()` called
+  with a delegate `motionId` now throws `no group or motion found` (previously
+  silently succeeded against the orphaned, unused tween) — confirmed via a
+  dedicated test in `EditorEngine.test.js`.

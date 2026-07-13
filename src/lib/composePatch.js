@@ -1,3 +1,5 @@
+import { resolvePluginForKey } from './plugins.js';
+
 /**
  * Runs plugin.compose() for every plugin in `plugins`, merges the results into
  * one patch object. Shared by engineCore.compose() (DOM path) and
@@ -39,6 +41,23 @@ export function composePatch(plugins, rawData, trackConfig, context = '') {
         patch.filter = { ...(patch.filter || {}), ...v };
       } else {
         patch[k] = v;
+      }
+    }
+  }
+
+  // Dynamically resolve and compose any extra properties present in rawData
+  for (const key of Object.keys(rawData || {})) {
+    if (patch[key] !== undefined) continue;
+
+    const plugin = resolvePluginForKey(key);
+    if (plugin && typeof plugin.compose === 'function') {
+      const contribution = plugin.compose(rawData, trackConfig);
+      if (contribution && contribution[key] !== undefined) {
+        if (key === 'filter' && typeof contribution.filter === 'object' && contribution.filter !== null) {
+          patch.filter = { ...(patch.filter || {}), ...contribution.filter };
+        } else {
+          patch[key] = contribution[key];
+        }
       }
     }
   }

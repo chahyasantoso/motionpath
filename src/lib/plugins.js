@@ -7,10 +7,11 @@ import { imageSequencePlugin } from './plugins/imageSequenceProperty.js';
 
 const simpleKeys = [
   'x', 'y', 'z',
-  'rotation', 'rotationX', 'rotationY',
+  'rotation', 'rotationX', 'rotationY', 'rotateX', 'rotateY', 'rotateZ',
   'scale', 'scaleX', 'scaleY',
   'skewX', 'skewY',
-  'opacity'
+  'opacity', 'display', 'zIndex',
+  'xPercent', 'yPercent', 'transformPerspective'
 ];
 
 const colorKeys = [

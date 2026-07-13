@@ -23,5 +23,10 @@ export function domRenderer(target, patch) {
     domPatch.filter = serializeFilter(domPatch.filter);
   }
 
+  // Filter out non-CSS internal computation properties to prevent GSAP warnings
+  delete domPatch.pathProgress;
+  delete domPatch.cubicPath;
+  delete domPatch.autoRotate;
+
   gsap.set(target, domPatch);
 }

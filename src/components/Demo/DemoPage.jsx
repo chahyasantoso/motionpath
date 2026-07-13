@@ -1,4 +1,8 @@
 import React, { useCallback, useMemo, useRef } from 'react';
+// Prevent editor auto-cleanup from removing unused React import
+const _dummyReactRef = React;
+import { productionEngine } from '../../lib/ProductionEngine';
+import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import useMotionTrigger from '../../hooks/useMotionTrigger';
@@ -93,30 +97,32 @@ const dynamicCarouselScene = {
     }
   },
   stagger: 0.14,
-  tracks: MOCK_CARDS.map((card, i) => ({
-    id: `carousel-card-${i}`,
-    keyframes: {
-      path: {
-        points: [
-          { x: -350, y: 400 },
-          { x: 300, y: 150, ctrlX: -20, ctrlY: 100 },
-          { x: 950, y: 500, ctrlX: 620, ctrlY: 200 },
-          { x: 1600, y: 200, ctrlX: 1280, ctrlY: 800 },
-          { x: 2200, y: 400, ctrlX: 1920, ctrlY: -400 },
-        ],
-        stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
-        autoRotate: true
-      },
-      opacity: {
-        stops: [
-          { p: 0.0, v: 0 },
-          { p: 0.15, v: 1 },
-          { p: 0.85, v: 1 },
-          { p: 1.0, v: 0 }
-        ]
+  tracks: [
+    {
+      id: 'card-track',
+      keyframes: {
+        path: {
+          points: [
+            { x: -350, y: 400 },
+            { x: 300, y: 150, ctrlX: -20, ctrlY: 100 },
+            { x: 950, y: 500, ctrlX: 620, ctrlY: 200 },
+            { x: 1600, y: 200, ctrlX: 1280, ctrlY: 800 },
+            { x: 2200, y: 400, ctrlX: 1920, ctrlY: -400 },
+          ],
+          stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }],
+          autoRotate: true
+        },
+        opacity: {
+          stops: [
+            { p: 0.0, v: 0 },
+            { p: 0.15, v: 1 },
+            { p: 0.85, v: 1 },
+            { p: 1.0, v: 0 }
+          ]
+        }
       }
     }
-  }))
+  ]
 };
 
 const dynamicHelixScene = {
@@ -133,15 +139,48 @@ const dynamicHelixScene = {
     }
   },
   stagger: 0.16,
-  tracks: MOCK_CARDS.slice(0, 6).map((card, i) => ({
-    id: `helix-card-${i}`,
-    keyframes: {
-      path: {
-        points: helixPathPoints,
-        stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
+  tracks: [
+    {
+      id: 'card-track',
+      keyframes: {
+        path: {
+          points: helixPathPoints,
+          stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }]
+        }
       }
     }
-  }))
+  ]
+};
+
+const cardExitScene = {
+  motionId: 'card-exit',
+  driver: {
+    type: 'timeline',
+    trigger: {
+      type: 'time',
+      autoplay: false,
+      duration: 0.4
+    }
+  },
+  tracks: [
+    {
+      id: 'card-exit-track',
+      keyframes: {
+        scale: {
+          stops: [
+            { p: 0.0, v: 1.0 },
+            { p: 1.0, v: 0.0 }
+          ]
+        },
+        opacity: {
+          stops: [
+            { p: 0.0, v: 1.0 },
+            { p: 1.0, v: 0.0 }
+          ]
+        }
+      }
+    }
+  ]
 };
 
 const project = {
@@ -151,19 +190,18 @@ const project = {
   motions: [
     scrollScene,
     dynamicCarouselScene,
-    dynamicHelixScene
+    dynamicHelixScene,
+    cardExitScene
   ]
 };
 
 // ─── Animated Elements ─────────────────────────────────────────
 
-function Rocket({ offset = 0 }) {
+function Rocket({ instance, offset = 0 }) {
   const ref = useRef(null);
 
-  // transformFn receives rawData and composeFn
   const transform = useCallback((rawData, composeFn) => {
     const progress = Math.max(0, Math.min(1, (rawData.pathProgress ?? 0) + offset));
-    // Spread rawData to preserve cubicPath and autoRotate — only override progress
     const composed = composeFn({ ...rawData, pathProgress: progress });
 
     return {
@@ -173,12 +211,12 @@ function Rocket({ offset = 0 }) {
     };
   }, [offset]);
 
-  useMotionSubscriber('rocket-track', ref, transform);
+  useMotionSubscriber(instance, 'rocket-track', ref, transform);
 
   return <div ref={ref} className="element rocket">🚀</div>;
 }
 
-function Cloud() {
+function Cloud({ instance }) {
   const ref = useRef(null);
   
   const transform = useCallback((rawData, composeFn) => {
@@ -186,17 +224,22 @@ function Cloud() {
     return composed;
   }, []);
 
-  useMotionSubscriber('cloud', ref, transform);
+  useMotionSubscriber(instance, 'cloud', ref, transform);
   return <div ref={ref} className="element cloud">☁️</div>;
 }
 
-function CarouselCard({ elementId, cardData }) {
+function CarouselCard({ instance, cardData, onRemove }) {
   const ref = useRef(null);
+  const [activeInstance, setActiveInstance] = React.useState(instance);
+  const [activeTrackId, setActiveTrackId] = React.useState('card-track');
 
   const transform = useCallback((rawData, composeFn) => {
+    if (activeTrackId === 'card-exit-track') {
+      return composeFn(rawData);
+    }
+
     const cardProgress = rawData.pathProgress ?? 0;
 
-    // Filter visibility (hide cards outside active path progress segment)
     if (cardProgress <= 0 || cardProgress >= 1) {
       return {
         display: 'none',
@@ -205,35 +248,47 @@ function CarouselCard({ elementId, cardData }) {
     }
 
     const composed = composeFn(rawData);
-
-    // Scale peaks in the middle of the screen
     const scale = 0.75 + Math.sin(cardProgress * Math.PI) * 0.35;
-
-    // Premium 3D rotation: lean the card slightly based on curve tangent
-    const targetTilt = Math.max(-20, Math.min(20, composed.rotation * 0.35));
+    const targetTilt = Math.max(-20, Math.min(20, (composed.rotation ?? 0) * 0.35));
 
     return {
       ...composed,
       display: 'flex',
       rotation: targetTilt,
       scale: scale,
-      transformPerspective: 1000,
       rotateY: targetTilt * -0.6,
     };
-  }, []);
+  }, [activeTrackId]);
 
-  useMotionSubscriber(elementId, ref, transform);
+  useMotionSubscriber(activeInstance, activeTrackId, ref, transform);
+
+  const handleClick = useCallback(() => {
+    if (activeTrackId === 'card-exit-track') return;
+
+    const exitInstance = productionEngine.mountInstance('card-exit');
+    if (!exitInstance) return;
+
+    setActiveInstance(exitInstance);
+    setActiveTrackId('card-exit-track');
+
+    exitInstance.play();
+    exitInstance.onComplete(() => {
+      exitInstance.destroy();
+      onRemove(cardData.id, instance);
+    });
+  }, [activeTrackId, instance, cardData.id, onRemove]);
 
   return (
-    <div ref={ref} className="element carousel-card">
+    <div ref={ref} className="element carousel-card" onClick={handleClick} style={{ cursor: 'pointer' }}>
       <div className="card-badge">{cardData.badge}</div>
       <h3>{cardData.title}</h3>
       <p>{cardData.desc}</p>
+      <div style={{ fontSize: '10px', opacity: 0.5, marginTop: '8px' }}>(Click to Remove)</div>
     </div>
   );
 }
 
-function HelixCard({ elementId, cardData }) {
+function HelixCard({ instance, cardData }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
@@ -246,10 +301,7 @@ function HelixCard({ elementId, cardData }) {
       };
     }
 
-    // Get 3D coordinate on path natively via composeFn
     const point3D = composeFn(rawData);
-
-    // Project 3D coordinate to 2D
     const projected = project3DTo2D(
       point3D.x,
       point3D.y,
@@ -257,18 +309,14 @@ function HelixCard({ elementId, cardData }) {
       HELIX_CONFIG.cx,
       HELIX_CONFIG.cy,
       HELIX_CONFIG.tiltDeg,
-      true // invertTilt
+      true
     );
 
-    // Normalize depth: 0 (furthest back) to 1 (closest front)
-    // point3D.z goes from -radius to +radius
     const depthFactor = (point3D.z + HELIX_CONFIG.radius) / (2 * HELIX_CONFIG.radius);
-
     const scale = 0.6 + depthFactor * 0.65;
     const opacityBase = 0.4 + depthFactor * 0.6;
     const blur = Math.max(0, (1 - depthFactor) * 4);
     
-    // Y-axis rotation based on theta
     const theta = cardProgress * HELIX_CONFIG.turns * 2 * Math.PI;
     const rotateY = -(theta - Math.PI / 2) * (180 / Math.PI);
     const zIndex = Math.round(depthFactor * 100);
@@ -288,7 +336,7 @@ function HelixCard({ elementId, cardData }) {
     };
   }, []);
 
-  useMotionSubscriber(elementId, ref, transform);
+  useMotionSubscriber(instance, 'card-track', ref, transform);
 
   return (
     <div ref={ref} className="element helix-card">
@@ -301,7 +349,7 @@ function HelixCard({ elementId, cardData }) {
 
 // ─── Demo Scenes Container Wrappers ────────────────────────────
 
-function ScrollDemo() {
+function ScrollDemo({ instance }) {
   const containerRef = useRef(null);
   const stageRef = useRef(null);
 
@@ -316,7 +364,6 @@ function ScrollDemo() {
       </div>
 
       <div ref={stageRef} className="stage">
-        {/* Render paths using the exact coordinate config to overlay guide lines */}
         <svg className="path-guide" width="100%" height="100%">
           {scrollScene.tracks.map(el => (
             <path
@@ -331,35 +378,60 @@ function ScrollDemo() {
           ))}
         </svg>
 
-        <Cloud />
-        <Rocket offset={0.0} />
+        <Cloud instance={instance} />
+        <Rocket instance={instance} offset={0.0} />
       </div>
     </section>
   );
 }
 
-function CarouselDemo() {
+function CarouselDemo({ instance }) {
   const containerRef = useRef(null);
   const stageRef = useRef(null);
 
   useMotionTrigger('carousel-storytelling', containerRef);
   useMotionTrigger('carousel-stage', stageRef);
 
+  const [cards, setCards] = React.useState(MOCK_CARDS);
+  const childInstancesMap = useRef(new Map());
+
+  const getOrAddChildInstance = useCallback((cardId) => {
+    if (!instance) return null;
+    if (childInstancesMap.current.has(cardId)) {
+      return childInstancesMap.current.get(cardId);
+    }
+    const child = instance.addChild();
+    childInstancesMap.current.set(cardId, child);
+    return child;
+  }, [instance]);
+
+  const handleRemoveCard = useCallback((cardId, childInstance) => {
+    if (instance && childInstance) {
+      instance.removeChild(childInstance);
+    }
+    childInstancesMap.current.delete(cardId);
+    setCards(prev => prev.filter(c => c.id !== cardId));
+  }, [instance]);
+
   return (
     <section ref={containerRef} className="carousel-scene">
       <div className="scene-label">
         <h2>Unlimited Carousel Scene (Scroll Stagger)</h2>
-        <p>Dynamic mock cards flowing smoothly on a single Bezier S-curve track with engine-level stagger</p>
+        <p>Dynamic mock cards flowing smoothly on a single Bezier S-curve track with engine-level stagger. (Click any card to trigger schema-defined exit animation!)</p>
       </div>
       <div ref={stageRef} className="carousel-stage">
-        {MOCK_CARDS.map((card, i) => (
-          <CarouselCard
-            key={card.id}
-            elementId={`carousel-card-${i}`}
-            cardData={card}
-          />
-        ))}
-        {/* Path guides generated from scene data */}
+        {cards.map((card) => {
+          const childInstance = getOrAddChildInstance(card.id);
+          if (!childInstance) return null;
+          return (
+            <CarouselCard
+              key={card.id}
+              instance={childInstance}
+              cardData={card}
+              onRemove={handleRemoveCard}
+            />
+          );
+        })}
         <svg className="path-guide" width="100%" height="100%">
           <path
             d={buildMotionPath(dynamicCarouselScene.tracks[0].keyframes.path.points)}
@@ -374,7 +446,7 @@ function CarouselDemo() {
   );
 }
 
-function HelixDemo() {
+function HelixDemo({ instance }) {
   const containerRef = useRef(null);
   const stageRef = useRef(null);
 
@@ -385,11 +457,18 @@ function HelixDemo() {
   const tiltRad = (tiltDeg * Math.PI) / 180;
   const cylinderHeight2D = height * Math.cos(tiltRad);
 
-  // Project 3D path nodes to 2D for the SVG guide
   const projectedHelixNodes = projectPathNodes3DTo2D(
     dynamicHelixScene.tracks[0].keyframes.path.points,
     cx, cy, tiltDeg, true
   );
+
+  const childInstances = useMemo(() => {
+    if (!instance) return [];
+    if (instance.children.length > 0) {
+      return instance.children;
+    }
+    return MOCK_CARDS.slice(0, 6).map(() => instance.addChild());
+  }, [instance]);
 
   return (
     <section ref={containerRef} className="helix-scene">
@@ -399,7 +478,6 @@ function HelixDemo() {
       </div>
 
       <div ref={stageRef} className="helix-stage">
-        {/* SVG guides for the cylinder outlines */}
         <svg className="path-guide" width="100%" height="100%">
           <defs>
             <linearGradient id="helix-path-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -409,7 +487,6 @@ function HelixDemo() {
             </linearGradient>
           </defs>
 
-          {/* Dotted path of the spring track */}
           <path
             id="path-guide-helix-track"
             d={buildMotionPath(projectedHelixNodes)}
@@ -419,7 +496,6 @@ function HelixDemo() {
             strokeDasharray="6 4"
           />
 
-          {/* Virtual cylinder visual boundaries */}
           <line
             x1={cx - radius}
             y1={cy}
@@ -449,22 +525,30 @@ function HelixDemo() {
           />
         </svg>
 
-        {/* The list of cards flowing down the spiral */}
-        {MOCK_CARDS.slice(0, 6).map((card, i) => (
-          <HelixCard
-            key={card.id}
-            elementId={`helix-card-${i}`}
-            cardData={card}
-          />
-        ))}
+        {MOCK_CARDS.slice(0, 6).map((card, i) => {
+          const childInstance = childInstances[i];
+          if (!childInstance) return null;
+          return (
+            <HelixCard
+              key={card.id}
+              instance={childInstance}
+              cardData={card}
+            />
+          );
+        })}
       </div>
     </section>
   );
 }
 
 export default function DemoPage() {
-  useMotionProject(project);
+  const isLoaded = useMotionProject(project);
   useSmoothScroll();
+
+  // Mount instances explicitly using the new useMotionInstance hook once project has loaded
+  const scrollInstance = useMotionInstance(isLoaded ? 'hero-scrollytelling' : null);
+  const carouselInstance = useMotionInstance(isLoaded ? 'carousel-storytelling' : null);
+  const helixInstance = useMotionInstance(isLoaded ? 'helix-storytelling' : null);
 
   return (
     <div className="app">
@@ -473,15 +557,15 @@ export default function DemoPage() {
         <p className="subtitle">Zero Re-render • GSAP Pub/Sub • Direct DOM</p>
       </header>
 
-      <ScrollDemo />
+      <ScrollDemo instance={scrollInstance} />
 
       <div className="spacer" />
 
-      <CarouselDemo />
+      <CarouselDemo instance={carouselInstance} />
 
       <div className="spacer" />
 
-      <HelixDemo />
+      <HelixDemo instance={helixInstance} />
 
       <footer className="footer">
         <p>Scroll back up to replay the scroll scene</p>

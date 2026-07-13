@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { productionEngine } from '../lib/ProductionEngine';
 
 /**
@@ -13,8 +13,10 @@ import { productionEngine } from '../lib/ProductionEngine';
  *   before a separate useMotionTimelinePlayback pause can land). Changing
  *   this after mount has no effect — use useMotionTimelinePlayback for
  *   ongoing control.
+ * @returns {boolean} True once the project has successfully loaded
  */
 export default function useMotionProject(project, { initialPlayStates = {} } = {}) {
+  const [isLoaded, setIsLoaded] = useState(false);
   const projectRef = useRef(project);
   projectRef.current = project;
   const initialPlayStatesRef = useRef(initialPlayStates);
@@ -23,9 +25,13 @@ export default function useMotionProject(project, { initialPlayStates = {} } = {
   useEffect(() => {
     if (!projectRef.current) return;
     let cancelled = false;
+    setIsLoaded(false);
 
     productionEngine
       .loadProject(projectRef.current, { playStates: initialPlayStatesRef.current })
+      .then(() => {
+        if (!cancelled) setIsLoaded(true);
+      })
       .catch(err => {
         if (!cancelled) console.error('[useMotionProject] loadProject failed:', err);
       });
@@ -35,5 +41,7 @@ export default function useMotionProject(project, { initialPlayStates = {} } = {
       productionEngine.destroy();
     };
   }, [project]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return isLoaded;
 }
 

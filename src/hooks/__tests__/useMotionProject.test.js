@@ -4,18 +4,28 @@ import { render, renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useMotionProject from '../useMotionProject';
 import { productionEngine } from '../../lib/ProductionEngine';
-import BurstPage from '../../components/Burst/BurstPage';
+import DemoPage from '../../components/Demo/DemoPage';
 
-vi.mock('../../lib/ProductionEngine', () => ({
-  productionEngine: {
-    loadProject: vi.fn(),
-    destroy: vi.fn(),
+vi.mock('../../lib/ProductionEngine', () => {
+  const mockInstance = {
+    id: 'mock-inst',
+    tracksMap: new Map(),
     subscribe: vi.fn(() => vi.fn()),
     compose: vi.fn(() => ({})),
-    registerTriggerRef: vi.fn(),
-    unregisterTriggerRef: vi.fn(),
-  }
-}));
+    destroy: vi.fn()
+  };
+  return {
+    productionEngine: {
+      loadProject: vi.fn(),
+      destroy: vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
+      compose: vi.fn(() => ({})),
+      registerTriggerRef: vi.fn(),
+      unregisterTriggerRef: vi.fn(),
+      mountInstance: vi.fn(() => mockInstance),
+    }
+  };
+});
 
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
@@ -85,15 +95,14 @@ describe('useMotionProject', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith('[useMotionProject] loadProject failed:', error);
   });
 
-  it('integration: rendering BurstPage loads both scenarios in a single project exactly once', async () => {
+  it('integration: rendering DemoPage loads the project exactly once', async () => {
     productionEngine.loadProject.mockResolvedValue();
-    render(React.createElement(BurstPage));
+    render(React.createElement(DemoPage));
 
     expect(productionEngine.loadProject).toHaveBeenCalledTimes(1);
     const loadedSchema = productionEngine.loadProject.mock.calls[0][0];
-    expect(loadedSchema.motions).toHaveLength(2);
-    expect(loadedSchema.motions.map(s => s.motionId)).toContain('strawberry-burst-scroll');
-    expect(loadedSchema.motions.map(s => s.motionId)).toContain('ice-cream-card-slide');
+    expect(loadedSchema.motions).toHaveLength(4);
+    expect(loadedSchema.motions.map(s => s.motionId)).toContain('hero-scrollytelling');
   });
 
   it('forwards initialPlayStates option to loadProject so paused-on-load works', async () => {

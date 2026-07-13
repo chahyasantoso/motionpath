@@ -39,7 +39,10 @@ export default function GlobalNav() {
             Tower Defense
           </NavLink>
           <NavLink to="/spike-refresh" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-            Spike
+            Spike (Refresh)
+          </NavLink>
+          <NavLink to="/spike-stagger" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            Spike (Stagger)
           </NavLink>
         </div>
 
@@ -80,7 +83,10 @@ export default function GlobalNav() {
             🗼 Tower Defense
           </NavLink>
           <NavLink to="/spike-refresh" className="drawer-link" onClick={closeMenu}>
-            ⚡ Performance Spike
+            ⚡ Performance Spike (Refresh)
+          </NavLink>
+          <NavLink to="/spike-stagger" className="drawer-link" onClick={closeMenu}>
+            🎯 Stagger Jump Spike (Solution)
           </NavLink>
         </div>
       </div>

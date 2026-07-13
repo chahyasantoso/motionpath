@@ -84,7 +84,7 @@ export function createMotionResolver() {
     if (!originalMotion) {
       throw new Error(`resolveMotion: motion with id "${motionId}" not found.`);
     }
-    if (originalMotion.driver?.type !== 'delegate') {
+    if (originalMotion.driver?.type !== 'delegate' && originalMotion.driver?.type !== 'manual') {
       throw new Error(`resolveMotion: motion with id "${motionId}" is not a delegate motion.`);
     }
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { compileProject } from '../compileProject.js';
 import * as builderModule from '../builder.js';
 import * as validatorModule from '../../validators/index.js';
-import * as engineCoreModule from '../engineCore.js';
+import * as engineCoreModule from '../editorEngineCore.js';
 
 vi.mock('../builder.js', () => ({
   buildProject: vi.fn()
@@ -12,7 +12,7 @@ vi.mock('../../validators/index.js', () => ({
   validateProject: vi.fn()
 }));
 
-vi.mock('../engineCore.js', () => ({
+vi.mock('../editorEngineCore.js', () => ({
   createEngineCore: vi.fn()
 }));
 

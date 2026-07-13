@@ -2,51 +2,49 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useMotionTimelinePlayback from '../useMotionTimelinePlayback';
-import { productionEngine } from '../../lib/ProductionEngine';
-
-vi.mock('../../lib/ProductionEngine', () => ({
-  productionEngine: {
-    playTimer: vi.fn(),
-    pauseTimer: vi.fn(),
-  }
-}));
 
 describe('useMotionTimelinePlayback', () => {
+  let mockInstance;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockInstance = {
+      play: vi.fn(),
+      pause: vi.fn()
+    };
   });
 
-  it('calls playTimer when playing is true', () => {
-    renderHook(() => useMotionTimelinePlayback('my-tl', true));
+  it('calls play when playing is true', () => {
+    renderHook(() => useMotionTimelinePlayback(mockInstance, true));
 
-    expect(productionEngine.playTimer).toHaveBeenCalledWith('my-tl');
-    expect(productionEngine.pauseTimer).not.toHaveBeenCalled();
+    expect(mockInstance.play).toHaveBeenCalled();
+    expect(mockInstance.pause).not.toHaveBeenCalled();
   });
 
-  it('calls pauseTimer when playing is false', () => {
-    renderHook(() => useMotionTimelinePlayback('my-tl', false));
+  it('calls pause when playing is false', () => {
+    renderHook(() => useMotionTimelinePlayback(mockInstance, false));
 
-    expect(productionEngine.pauseTimer).toHaveBeenCalledWith('my-tl');
-    expect(productionEngine.playTimer).not.toHaveBeenCalled();
+    expect(mockInstance.pause).toHaveBeenCalled();
+    expect(mockInstance.play).not.toHaveBeenCalled();
   });
 
   it('calls correct function when playing status updates', () => {
     const { rerender } = renderHook(
-      ({ playing }) => useMotionTimelinePlayback('my-tl', playing),
+      ({ playing }) => useMotionTimelinePlayback(mockInstance, playing),
       { initialProps: { playing: false } }
     );
 
-    expect(productionEngine.pauseTimer).toHaveBeenCalledWith('my-tl');
+    expect(mockInstance.pause).toHaveBeenCalled();
     vi.clearAllMocks();
 
     rerender({ playing: true });
-    expect(productionEngine.playTimer).toHaveBeenCalledWith('my-tl');
+    expect(mockInstance.play).toHaveBeenCalled();
   });
 
-  it('ignores calls if timelineId is falsy', () => {
-    renderHook(() => useMotionTimelinePlayback('', true));
+  it('ignores calls if instance is falsy', () => {
+    renderHook(() => useMotionTimelinePlayback(null, true));
 
-    expect(productionEngine.playTimer).not.toHaveBeenCalled();
-    expect(productionEngine.pauseTimer).not.toHaveBeenCalled();
+    expect(mockInstance.play).not.toHaveBeenCalled();
+    expect(mockInstance.pause).not.toHaveBeenCalled();
   });
 });
