@@ -1,5 +1,4 @@
 import { gsap } from 'gsap';
-import { ALL_PLUGINS } from '../domain/plugins.js';
 import { composePatch } from '../usecases/ComposeTrackPatch.js';
 
 /**
@@ -72,28 +71,7 @@ export function createEditorEngineCore(buildResult) {
       const trackBuild = buildResult.tracks.get(trackId);
       if (!trackBuild) return {};
       const source = rawData ?? { ...trackBuild.proxy };
-      const resolved = buildResult.trackPlugins.get(trackId) ?? [];
-      
-      const resolvedKeys = new Set();
-      for (const p of resolved) {
-        if (p.keys) {
-          for (const k of p.keys) {
-            resolvedKeys.add(k);
-          }
-        }
-      }
-
-      const plugins = [...resolved];
-      for (const p of ALL_PLUGINS) {
-        if (resolved.includes(p)) continue;
-        if (p.keys && p.keys.some(k => resolvedKeys.has(k))) continue;
-
-        const hasMatchingKey = Object.keys(source).some(key => p.claimsKey(key));
-
-        if (hasMatchingKey) {
-          plugins.push(p);
-        }
-      }
+      const plugins = buildResult.trackPlugins.get(trackId) ?? [];
 
       return composePatch(plugins, source, trackBuild.trackConfig ?? trackBuild, `track "${trackId}"`);
     },
