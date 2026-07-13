@@ -1,14 +1,14 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 // Prevent editor auto-cleanup from removing unused React import
 const _dummyReactRef = React;
-import { productionEngine } from '../../lib/ProductionEngine';
+import { productionEngine } from '../../engines/ProductionEngine.js';
 import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import useMotionTrigger from '../../hooks/useMotionTrigger';
 import useSmoothScroll from '../../hooks/useSmoothScroll';
-import { buildMotionPath } from '../../lib/pathUtils';
-import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../lib/projection3d';
+import { buildMotionPath } from '../../utils/pathUtils';
+import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../utils/projection3d';
 import './DemoPage.css';
 
 // ─── Scene Data ────────────────────────────────────────────────

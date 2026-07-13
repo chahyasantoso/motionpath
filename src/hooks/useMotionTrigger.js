@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { productionEngine } from '../lib/ProductionEngine';
+import { productionEngine } from '../engines/ProductionEngine.js';
 
 /**
  * Registers a DOM ref as the resolution target for a trigger-anchor id

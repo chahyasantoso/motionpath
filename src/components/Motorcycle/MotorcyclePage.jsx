@@ -1,7 +1,8 @@
 import React, { useCallback, useRef } from 'react';
 import useMotionProject from '../../hooks/useMotionProject';
+import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
-import { buildMotionPath } from '../../lib/pathUtils';
+import { buildMotionPath } from '../../utils/pathUtils';
 import './MotorcyclePage.css';
 
 // ─── Path Data ────────────────────────────────────────────────────
@@ -181,7 +182,7 @@ const project = {
 
 // ─── Subscriber Components ─────────────────────────────────────────
 
-function Bike() {
+function Bike({ instance }) {
   const ref = useRef(null);
   // Scale up slightly as the bike accelerates across the screen
   const transform = useCallback((rawData, composeFn) => {
@@ -190,7 +191,7 @@ function Bike() {
     const scale = 0.65 + t * 0.55;
     return { ...composed, scale };
   }, []);
-  useMotionSubscriber('moto-bike', ref, transform);
+  useMotionSubscriber(instance, 'moto-bike', ref, transform);
   return (
     <div ref={ref} className="moto-element moto-bike">
       🏍️
@@ -198,7 +199,7 @@ function Bike() {
   );
 }
 
-function BikeShadow() {
+function BikeShadow({ instance }) {
   const ref = useRef(null);
   const transform = useCallback((rawData, composeFn) => {
     const composed = composeFn(rawData);
@@ -206,7 +207,7 @@ function BikeShadow() {
     const scale = 0.5 + t * 0.4;
     return { ...composed, scale, scaleY: 0.28, skewX: -18, blur: 2 };
   }, []);
-  useMotionSubscriber('moto-shadow', ref, transform);
+  useMotionSubscriber(instance, 'moto-shadow', ref, transform);
   return (
     <div ref={ref} className="moto-element moto-shadow">
       🏍️
@@ -214,10 +215,10 @@ function BikeShadow() {
   );
 }
 
-function MotoCloud({ elementId, label }) {
+function MotoCloud({ instance, elementId, label }) {
   const ref = useRef(null);
   const transform = useCallback((rawData, composeFn) => composeFn(rawData), []);
-  useMotionSubscriber(elementId, ref, transform);
+  useMotionSubscriber(instance, elementId, ref, transform);
   return (
     <div ref={ref} className="moto-element moto-cloud">
       {label}
@@ -225,10 +226,10 @@ function MotoCloud({ elementId, label }) {
   );
 }
 
-function Streak({ elementId, className }) {
+function Streak({ instance, elementId, className }) {
   const ref = useRef(null);
   const transform = useCallback((rawData, composeFn) => composeFn(rawData), []);
-  useMotionSubscriber(elementId, ref, transform);
+  useMotionSubscriber(instance, elementId, ref, transform);
   return (
     <div
       ref={ref}
@@ -240,7 +241,12 @@ function Streak({ elementId, className }) {
 // ─── Page ──────────────────────────────────────────────────────────
 
 export default function MotorcyclePage() {
-  useMotionProject(project);
+  const isLoaded = useMotionProject(project);
+
+  const bikeInstance = useMotionInstance(isLoaded ? 'moto-bike-scene' : null);
+  const shadowInstance = useMotionInstance(isLoaded ? 'moto-shadow-scene' : null);
+  const cloudsInstance = useMotionInstance(isLoaded ? 'moto-clouds-scene' : null);
+  const streaksInstance = useMotionInstance(isLoaded ? 'moto-streaks-scene' : null);
 
   // SVG overlay: road guide from original nodes (with ctrlX/ctrlY)
   const roadSvgD = buildMotionPath(roadNodes);
@@ -273,12 +279,12 @@ export default function MotorcyclePage() {
         </svg>
 
         {/* Animated elements */}
-        <Streak elementId="moto-streak-a" className="streak-a" />
-        <Streak elementId="moto-streak-b" className="streak-b" />
-        <MotoCloud elementId="moto-cloud-a" label="☁️" />
-        <MotoCloud elementId="moto-cloud-b" label="☁️" />
-        <BikeShadow />
-        <Bike />
+        <Streak instance={streaksInstance} elementId="moto-streak-a" className="streak-a" />
+        <Streak instance={streaksInstance} elementId="moto-streak-b" className="streak-b" />
+        <MotoCloud instance={cloudsInstance} elementId="moto-cloud-a" label="☁️" />
+        <MotoCloud instance={cloudsInstance} elementId="moto-cloud-b" label="☁️" />
+        <BikeShadow instance={shadowInstance} />
+        <Bike instance={bikeInstance} />
 
         {/* HUD */}
         <div className="moto-hud">

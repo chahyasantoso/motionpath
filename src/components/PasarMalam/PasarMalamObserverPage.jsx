@@ -1,6 +1,7 @@
 import { gsap } from 'gsap';
 import { useCallback, useRef } from 'react';
 import useMotionProject from '../../hooks/useMotionProject';
+import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import useMotionTrigger from '../../hooks/useMotionTrigger';
 import useSmoothScroll from '../../hooks/useSmoothScroll';
@@ -258,21 +259,21 @@ const pmObserverProject = {
 
 // ─── Sub-Components ─────────────────────────────────────────────
 
-function BackgroundSequence() {
+function BackgroundSequence({ instance }) {
   const ref = useRef(null);
-  useMotionSubscriber('pasar-malam-bg', ref);
+  useMotionSubscriber(instance, 'pasar-malam-bg', ref);
   return <div ref={ref} className="pm-bg-sequence" />;
 }
 
-function Lantern({ wrapId, innerId, assetUrl, className }) {
+function Lantern({ wrapInstance, bounceInstance, wrapId, innerId, assetUrl, className }) {
   const wrapRef = useRef(null);
   const innerRef = useRef(null);
 
   // Outer wrapper: entry animation
-  useMotionSubscriber(wrapId, wrapRef);
+  useMotionSubscriber(wrapInstance, wrapId, wrapRef);
 
   // Inner element: observer-driven bounce
-  useMotionSubscriber(innerId, innerRef);
+  useMotionSubscriber(bounceInstance, innerId, innerRef);
 
   return (
     <div
@@ -288,7 +289,7 @@ function Lantern({ wrapId, innerId, assetUrl, className }) {
   );
 }
 
-function HeroTitle() {
+function HeroTitle({ instance }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
@@ -301,7 +302,7 @@ function HeroTitle() {
     };
   }, []);
 
-  useMotionSubscriber('hero-title', ref, transform);
+  useMotionSubscriber(instance, 'hero-title', ref, transform);
 
   return (
     <div ref={ref} className="pm-title-element">
@@ -311,9 +312,9 @@ function HeroTitle() {
   );
 }
 
-function LeftCard() {
+function LeftCard({ instance }) {
   const ref = useRef(null);
-  useMotionSubscriber('card-left', ref);
+  useMotionSubscriber(instance, 'card-left', ref);
 
   return (
     <div ref={ref} className="pm-glass-card pm-card-left pm-interactive">
@@ -324,9 +325,9 @@ function LeftCard() {
   );
 }
 
-function RightCard() {
+function RightCard({ instance }) {
   const ref = useRef(null);
-  useMotionSubscriber('card-right', ref);
+  useMotionSubscriber(instance, 'card-right', ref);
 
   return (
     <div ref={ref} className="pm-glass-card pm-card-right pm-interactive">
@@ -339,7 +340,7 @@ function RightCard() {
 
 const easeOut = gsap.parseEase('power2.out');
 
-function StatsCard() {
+function StatsCard({ instance }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
@@ -359,7 +360,7 @@ function StatsCard() {
     return composeFn(rawData);
   }, []);
 
-  useMotionSubscriber('stats-card', ref, transform);
+  useMotionSubscriber(instance, 'stats-card', ref, transform);
 
   return (
     <div ref={ref} className="pm-stats-card pm-interactive">
@@ -386,7 +387,11 @@ export default function PasarMalamObserverPage() {
   useMotionTrigger('pm-stage', stageRef);
 
   // Pure observer-driven approach. No local React state and no hook wiring required.
-  useMotionProject(pmObserverProject);
+  const isLoaded = useMotionProject(pmObserverProject);
+  const storytellingInstance = useMotionInstance(isLoaded ? 'pasar-malam-storytelling' : null);
+  const lanternInstance = useMotionInstance(isLoaded ? 'lantern-scene' : null);
+  const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce-observer' : null);
+
   useSmoothScroll();
 
   return (
@@ -394,23 +399,23 @@ export default function PasarMalamObserverPage() {
       {/* Scroll storytelling stage */}
       <section ref={storytellingRef} className="pm-hero-section">
         <div ref={stageRef} className="pm-stage">
-          <BackgroundSequence />
+          <BackgroundSequence instance={storytellingInstance} />
           <div className="pm-overlay" />
           
           {/* Ambient Floating Lanterns */}
           <div className="pm-lanterns-glow">
-            <Lantern wrapId="lantern-1-wrap" innerId="lantern-1" assetUrl="/lanterns/lantern-red.svg"  className="pm-lantern-1" />
-            <Lantern wrapId="lantern-2-wrap" innerId="lantern-2" assetUrl="/lanterns/lantern-gold.svg" className="pm-lantern-2" />
-            <Lantern wrapId="lantern-3-wrap" innerId="lantern-3" assetUrl="/lanterns/lantern-pink.svg" className="pm-lantern-3" />
+            <Lantern wrapInstance={lanternInstance} bounceInstance={bounceInstance} wrapId="lantern-1-wrap" innerId="lantern-1" assetUrl="/lanterns/lantern-red.svg"  className="pm-lantern-1" />
+            <Lantern wrapInstance={lanternInstance} bounceInstance={bounceInstance} wrapId="lantern-2-wrap" innerId="lantern-2" assetUrl="/lanterns/lantern-gold.svg" className="pm-lantern-2" />
+            <Lantern wrapInstance={lanternInstance} bounceInstance={bounceInstance} wrapId="lantern-3-wrap" innerId="lantern-3" assetUrl="/lanterns/lantern-pink.svg" className="pm-lantern-3" />
           </div>
 
           <div className="pm-content-wrapper">
-            <HeroTitle />
+            <HeroTitle instance={storytellingInstance} />
 
             <div className="pm-cards-grid">
-              <LeftCard />
-              <RightCard />
-              <StatsCard />
+              <LeftCard instance={storytellingInstance} />
+              <RightCard instance={storytellingInstance} />
+              <StatsCard instance={storytellingInstance} />
             </div>
           </div>
         </div>

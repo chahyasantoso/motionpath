@@ -1,0 +1,51 @@
+# Walkthrough — Schema-to-Domain Models Refactor
+
+We successfully refactored the MotionPath JSON schema handling to use object-oriented Domain Models and clean Use Cases. All raw schema object manipulation inside the core compiler, builder, engines, and resolvers has been replaced with structured class properties, ensuring type safety and code cleanliness.
+
+## Changes Made
+
+### 1. Domain Models
+We created a single cohesive models file to represent the schema concepts cleanly and with minimal boilerplate:
+- [models.js](file:///d:/dev/motionpath/src/domain/models.js)
+  - `MotionProject`: Root entity containing templates and motions maps.
+  - `MotionTemplate`: Reusable animation fragments.
+  - `MotionDefinition`: Defines a single motion structure.
+  - `MotionDriver` subclasses (`TimelineDriver`, `DelegateDriver`, `ManualDriver`): Preserves type-specific and mock-specific custom attributes using `Object.assign(this, raw)`.
+  - `TriggerConfig` subclasses (`ScrollTriggerConfig`, `TimeTriggerConfig`): Generic configuration container.
+  - `MotionTrack`: Individual animation tracks.
+
+### 2. Use Case (Parser)
+- [ParseProjectSchema.js](file:///d:/dev/motionpath/src/usecases/ParseProjectSchema.js)
+  - Maps raw JSON payload parameters to the domain hierarchy.
+  - Transparently maps legacy or test-specific driver formats (e.g. `gsap-timeline`, `gsap-scroll`) to modern `TimelineDriver` format to guarantee backward compatibility.
+
+### 3. Pipeline Integration
+- [templateResolver.js](file:///d:/dev/motionpath/src/lib/templateResolver.js)
+  - Adapted track resolution to accept templates from either domain Maps or legacy raw arrays.
+- [builder.js](file:///d:/dev/motionpath/src/lib/builder.js)
+  - Updated `buildProject` to support both domain `MotionProject` objects and legacy raw schema objects.
+  - Cleaned up nested property access to query domain properties safely.
+- [compileProject.js](file:///d:/dev/motionpath/src/lib/compileProject.js)
+  - Intercepted compilation flow: parses raw schema into `MotionProject` right after validation passes.
+- [resolveMotion.js](file:///d:/dev/motionpath/src/lib/resolveMotion.js)
+  - Adapted resolution loop to read from `MotionProject` maps and `MotionDefinition` structures.
+- [ProductionEngine.js](file:///d:/dev/motionpath/src/lib/ProductionEngine.js) & [EditorEngine.js](file:///d:/dev/motionpath/src/lib/EditorEngine.js)
+  - Replaced internal `_schema` state with parsed `_project` domain model.
+  - Adapted `mountInstance`, `resolveMotion`, and `mountTimeline` to query from `_project`.
+
+## Verification Results
+
+### Automated Tests
+1. **Domain & Parser Tests**: Added a dedicated test suite [domain.test.js](file:///d:/dev/motionpath/src/domain/__tests__/domain.test.js) checking the mapping and parsing pipeline.
+2. **Full Regression Check**: Ran the complete test suite. All tests pass successfully:
+   ```bash
+   npm run test
+   ```
+   **Result**: `36 passed (36 files, 214 tests)`
+
+### Knowledge Graph
+Updated the local graph:
+```bash
+graphify update .
+```
+**Result**: Code graph rebuilt successfully (824 nodes, 1121 edges).

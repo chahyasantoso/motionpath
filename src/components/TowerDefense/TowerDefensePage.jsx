@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
-import { buildMotionPath, convertToCubicPath } from '../../lib/pathUtils';
-import productionEngine from '../../lib/ProductionEngine';
-import { domRenderer } from '../../lib/renderers/domRenderer';
+import { buildMotionPath, convertToCubicPath } from '../../utils/pathUtils';
+import productionEngine from '../../engines/ProductionEngine.js';
+import { domRenderer } from '../../utils/domRenderer.js';
 import './TowerDefensePage.css';
 
 // ─── Game Constants ─────────────────────────────────────────────

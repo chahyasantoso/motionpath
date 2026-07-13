@@ -1,0 +1,43 @@
+# Walkthrough — MotionPath Clean Architecture Layout Reorganization
+
+We have successfully migrated the codebase from a flat/scattered layout in `src/lib/` to a structured Clean Architecture folder layout.
+
+---
+
+## 1. Reorganized Directory Layout
+
+The new codebase structure is organized as follows:
+
+* **[`src/domain/`](file:///d:/dev/motionpath/src/domain/)**: Pure models representing static structures, players, and animation rules.
+  - `models.js` — Domain configurations (`MotionProject`, `MotionDefinition`, etc.)
+  - `MotionInstance.js` — Stateful runtime players (`TimelineMotionInstance`, etc.)
+  - `AnimationPlugin.js` — Base class representing property animation controllers.
+  - `plugins/` — Concrete animated property plugin subclasses (`simpleProperty.js`, `colorProperty.js`, `filterProperty.js`, etc.)
+* **[`src/usecases/`](file:///d:/dev/motionpath/src/usecases/)**: Orchestrators/interactors executing specific animation compilation steps.
+  - `CompileProject.js` — Entry point orchestrating validation, parsing, and construction.
+  - `ParseProjectSchema.js` — Maps JSON configurations to domain models.
+  - `BuildProject.js` — Compiles models to GSAP.
+  - `BuildTrackTween.js` — Compiles a single track to its GSAP tween.
+  - `ComposeTrackPatch.js` — Composes DOM property patches.
+  - `MountMotionInstance.js` — Instantiates the appropriate `MotionInstance` subclass.
+  - `ResolveTrack.js` — Resolves/merges track configurations and templates.
+* **[`src/engines/`](file:///d:/dev/motionpath/src/engines/)**: Outer API interface and stateful tick drivers.
+  - `ProductionEngine.js` — Eager engine compiling and caching player instances.
+  - `EditorEngine.js` — Direct playback control engine.
+  - `engineCore.js` — Manages production execution ticking.
+  - `editorEngineCore.js` — Manages editor state ticking.
+  - `resolveMotion.js` — Lazily compiles/evaluates delegate animation segments.
+* **[`src/utils/`](file:///d:/dev/motionpath/src/utils/)**: Pure mathematical operations, preloading logic, and basic DOM set helpers.
+  - `pathUtils.js` — Bezier conversion & distance path queries.
+  - `pathMath.js` — Cubic path coordinate interpolation.
+  - `projection3d.js` — Tilted viewport 3D perspective projection.
+  - `deferredCall.js` — Buffered calls before EngineCore load.
+  - `domRenderer.js` — Writes composed patches directly to active element style properties via `gsap.set`.
+
+---
+
+## 2. verification
+
+* **Imports Verification**: Every relative import path in source, tests, hooks, and pages has been updated to resolve cleanly.
+* **Unit Tests**: All 214 tests pass successfully (`npm run test`).
+* **Code Graph**: Codebase index has been updated via `graphify update .`.

@@ -4,8 +4,8 @@ import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import useMotionTrigger from '../../hooks/useMotionTrigger';
-import { buildMotionPath } from '../../lib/pathUtils';
-import { projectPathNodes3DTo2D } from '../../lib/projection3d';
+import { buildMotionPath } from '../../utils/pathUtils';
+import { projectPathNodes3DTo2D } from '../../utils/projection3d';
 
 // ─── Strawberry Burst Demo Configs ──────────────────────────────
 const STRAW_PERSPECTIVE = 800;

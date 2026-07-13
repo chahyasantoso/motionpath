@@ -1,6 +1,7 @@
 import { gsap } from 'gsap';
 import { useCallback, useRef, useState } from 'react';
 import useMotionProject from '../../hooks/useMotionProject';
+import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import useMotionTimelinePlayback from '../../hooks/useMotionTimelinePlayback';
 import useMotionTrigger from '../../hooks/useMotionTrigger';
@@ -249,13 +250,13 @@ const pmProject = {
 
 // ─── Sub-Components ─────────────────────────────────────────────
 
-function BackgroundSequence() {
+function BackgroundSequence({ instance }) {
   const ref = useRef(null);
-  useMotionSubscriber('pasar-malam-bg', ref);
+  useMotionSubscriber(instance, 'pasar-malam-bg', ref);
   return <div ref={ref} className="pm-bg-sequence" />;
 }
 
-function Lantern({ wrapId, innerId, assetUrl, className, onProgress }) {
+function Lantern({ wrapInstance, bounceInstance, wrapId, innerId, assetUrl, className, onProgress }) {
   const wrapRef = useRef(null);
   const innerRef = useRef(null);
 
@@ -266,12 +267,12 @@ function Lantern({ wrapId, innerId, assetUrl, className, onProgress }) {
       onProgress?.(rawData.progress);
     }
     return composeFn(rawData);
-  }, [onProgress, wrapId]);
+  }, [onProgress]);
 
-  useMotionSubscriber(wrapId, wrapRef, wrapTransform);
+  useMotionSubscriber(wrapInstance, wrapId, wrapRef, wrapTransform);
 
   // Inner element: driven by time/bounce scenario (y oscillation)
-  useMotionSubscriber(innerId, innerRef);
+  useMotionSubscriber(bounceInstance, innerId, innerRef);
 
   return (
     <div
@@ -287,7 +288,7 @@ function Lantern({ wrapId, innerId, assetUrl, className, onProgress }) {
   );
 }
 
-function HeroTitle() {
+function HeroTitle({ instance }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
@@ -301,7 +302,7 @@ function HeroTitle() {
     };
   }, []);
 
-  useMotionSubscriber('hero-title', ref, transform);
+  useMotionSubscriber(instance, 'hero-title', ref, transform);
 
   return (
     <div ref={ref} className="pm-title-element">
@@ -311,9 +312,9 @@ function HeroTitle() {
   );
 }
 
-function LeftCard() {
+function LeftCard({ instance }) {
   const ref = useRef(null);
-  useMotionSubscriber('card-left', ref);
+  useMotionSubscriber(instance, 'card-left', ref);
 
   return (
     <div ref={ref} className="pm-glass-card pm-card-left pm-interactive">
@@ -324,9 +325,9 @@ function LeftCard() {
   );
 }
 
-function RightCard() {
+function RightCard({ instance }) {
   const ref = useRef(null);
-  useMotionSubscriber('card-right', ref);
+  useMotionSubscriber(instance, 'card-right', ref);
 
   return (
     <div ref={ref} className="pm-glass-card pm-card-right pm-interactive">
@@ -339,7 +340,7 @@ function RightCard() {
 
 const easeOut = gsap.parseEase('power2.out');
 
-function StatsCard() {
+function StatsCard({ instance }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
@@ -359,7 +360,7 @@ function StatsCard() {
     return composeFn(rawData);
   }, []);
 
-  useMotionSubscriber('stats-card', ref, transform);
+  useMotionSubscriber(instance, 'stats-card', ref, transform);
 
   return (
     <div ref={ref} className="pm-stats-card pm-interactive">
@@ -390,8 +391,12 @@ export default function PasarMalamPage() {
 
   // initialPlayStates starts the bounce scenario paused to prevent a one-frame flash on load.
   // Dynamic play/pause control is handled by useMotionTimelinePlayback below.
-  useMotionProject(pmProject, { initialPlayStates: { 'lantern-bounce-tl': false } });
-  useMotionTimelinePlayback('lantern-bounce-tl', bouncing);
+  const isLoaded = useMotionProject(pmProject, { initialPlayStates: { 'lantern-bounce-tl': false } });
+  const storytellingInstance = useMotionInstance(isLoaded ? 'pasar-malam-storytelling' : null);
+  const lanternInstance = useMotionInstance(isLoaded ? 'lantern-scene' : null);
+  const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce' : null);
+
+  useMotionTimelinePlayback(bounceInstance, bouncing);
   useSmoothScroll();
 
   // Gate: lantern-1 reports its scroll progress via onProgress.
@@ -409,21 +414,21 @@ export default function PasarMalamPage() {
       {/* Scroll storytelling stage */}
       <section ref={storytellingRef} className="pm-hero-section">
         <div ref={stageRef} className="pm-stage">
-          <BackgroundSequence />
+          <BackgroundSequence instance={storytellingInstance} />
           <div className="pm-overlay" />
           
           {/* Ambient Floating Lanterns */}
           <div className="pm-lanterns-glow">
-            <Lantern wrapId="lantern-1-wrap" innerId="lantern-1" assetUrl="/lanterns/lantern-red.svg"  className="pm-lantern-1" onProgress={onLanternProgress} />
-            <Lantern wrapId="lantern-2-wrap" innerId="lantern-2" assetUrl="/lanterns/lantern-gold.svg" className="pm-lantern-2" />
-            <Lantern wrapId="lantern-3-wrap" innerId="lantern-3" assetUrl="/lanterns/lantern-pink.svg" className="pm-lantern-3" />
+            <Lantern wrapInstance={lanternInstance} bounceInstance={bounceInstance} wrapId="lantern-1-wrap" innerId="lantern-1" assetUrl="/lanterns/lantern-red.svg"  className="pm-lantern-1" onProgress={onLanternProgress} />
+            <Lantern wrapInstance={lanternInstance} bounceInstance={bounceInstance} wrapId="lantern-2-wrap" innerId="lantern-2" assetUrl="/lanterns/lantern-gold.svg" className="pm-lantern-2" />
+            <Lantern wrapInstance={lanternInstance} bounceInstance={bounceInstance} wrapId="lantern-3-wrap" innerId="lantern-3" assetUrl="/lanterns/lantern-pink.svg" className="pm-lantern-3" />
           </div>
 
           <div className="pm-content-wrapper">
-          <HeroTitle />
-          <LeftCard />
-          <RightCard />
-          <StatsCard />
+          <HeroTitle instance={storytellingInstance} />
+          <LeftCard instance={storytellingInstance} />
+          <RightCard instance={storytellingInstance} />
+          <StatsCard instance={storytellingInstance} />
         </div>
       </div>
 

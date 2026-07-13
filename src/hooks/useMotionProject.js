@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { productionEngine } from '../lib/ProductionEngine';
+import { productionEngine } from '../engines/ProductionEngine.js';
 
 /**
  * React Hook to load a complete MotionPath project once.

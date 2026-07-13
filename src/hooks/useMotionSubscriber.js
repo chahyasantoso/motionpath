@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { domRenderer } from '../lib/renderers/domRenderer';
+import { domRenderer } from '../utils/domRenderer.js';
 
 /**
  * Smart Subscriber Hook — Listens to coordinate broadcasts from a MotionInstance

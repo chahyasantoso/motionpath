@@ -3,10 +3,10 @@ import React from 'react';
 import { render, renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useMotionProject from '../useMotionProject';
-import { productionEngine } from '../../lib/ProductionEngine';
+import { productionEngine } from '../../engines/ProductionEngine.js';
 import DemoPage from '../../components/Demo/DemoPage';
 
-vi.mock('../../lib/ProductionEngine', () => {
+vi.mock('../../engines/ProductionEngine.js', () => {
   const mockInstance = {
     id: 'mock-inst',
     tracksMap: new Map(),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { productionEngine } from '../lib/ProductionEngine';
+import { productionEngine } from '../engines/ProductionEngine.js';
 
 /**
  * React Hook to mount and manage a MotionInstance.

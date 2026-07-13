@@ -10,7 +10,7 @@ import { timelineGroupRule } from './rules/timeline-group.js';
 import { elementUniquenessRule } from './rules/element-uniqueness.js';
 import { imageSequenceRule } from './rules/image-sequence.js';
 import { motionStructureRule } from './rules/motion-structure.js';
-import { resolveTrack } from '../lib/templateResolver.js';
+import { resolveTrack } from '../usecases/ResolveTrack.js';
 
 const motionRules = [
   triggerShapeRule,
