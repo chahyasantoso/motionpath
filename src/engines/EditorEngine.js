@@ -1,7 +1,6 @@
 import { compileProject } from '../usecases/CompileProject.js';
 import { createDeferredCall } from '../utils/deferredCall.js';
 import { createMotionResolver } from './resolveMotion.js';
-import { getMotion } from '../domain/models.js';
 
 /**
  * Factory function per Brief 5.
@@ -82,20 +81,6 @@ export function createEditorEngine(deps) {
       const motion = _buildResult.motions.find(m => String(m.motionIndex) === target || m.motionId === target);
       if (motion) { motion.timeline.progress(clamped); return; }
       throw new Error(`setProgress: no group or motion found for target "${target}".`);
-    },
-
-    mountTimeline(motionId) {
-      if (!_project) {
-        throw new Error('mountTimeline: project not loaded.');
-      }
-      const originalMotion = getMotion(_project, motionId);
-      if (!originalMotion) {
-        throw new Error(`mountTimeline: motion with id "${motionId}" not found.`);
-      }
-      const driverType = originalMotion.driver.type;
-      if (driverType === 'delegate') {
-        throw new Error(`mountTimeline: cannot mount delegate motion "${motionId}".`);
-      }
     },
 
     resolveMotion(motionId, progress, overrides = {}) {
