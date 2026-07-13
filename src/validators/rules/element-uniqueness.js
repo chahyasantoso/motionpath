@@ -1,11 +1,14 @@
 /**
  * Rule: element-uniqueness
- * * Project-wide track ID uniqueness check across ALL motions.
- * 
- * * Requirements:
- * - Collect every track ID across the entire project's motions.
- * - Any ID appearing in more than one motion -> error.
- * 
+ *
+ * Track ID uniqueness check, scoped per motion (not project-wide — nothing
+ * in the engine currently looks up a track by id without a motionId
+ * alongside it, so cross-motion duplicates are intentionally allowed).
+ *
+ * Requirements:
+ * - Within a single motion, every track.id must be unique.
+ * - A duplicate id within the same motion -> error.
+ *
  * @param {unknown[]} motions
  * @returns {ValidationError[]}
  */

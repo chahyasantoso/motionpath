@@ -111,6 +111,54 @@ describe('motion-structure rule', () => {
     expect(motionStructureRule(schema2)[0].path).toBe('motions[0].tracks');
   });
 
+  it('should error on missing motionId', () => {
+    const schema = {
+      motions: [
+        { driver: { type: 'timeline', trigger: {} }, tracks: [{ id: 'tr1' }] }
+      ]
+    };
+    const errors = motionStructureRule(schema);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].path).toBe('motions[0].motionId');
+    expect(errors[0].message).toContain('motionId is required');
+  });
+
+  it('should error on empty string motionId', () => {
+    const schema = {
+      motions: [
+        { motionId: '', driver: { type: 'timeline', trigger: {} }, tracks: [{ id: 'tr1' }] }
+      ]
+    };
+    const errors = motionStructureRule(schema);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].path).toBe('motions[0].motionId');
+    expect(errors[0].message).toContain('motionId is required');
+  });
+
+  it('should error on negative track.id (missing or empty)', () => {
+    const schema = {
+      motions: [
+        { motionId: 'm1', driver: { type: 'timeline', trigger: {} }, tracks: [{ use: 't1' }] }
+      ]
+    };
+    const errors = motionStructureRule(schema);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].path).toBe('motions[0].tracks[0].id');
+    expect(errors[0].message).toContain('track.id is required');
+  });
+
+  it('should error on empty string track.id', () => {
+    const schema = {
+      motions: [
+        { motionId: 'm1', driver: { type: 'timeline', trigger: {} }, tracks: [{ id: '', use: 't1' }] }
+      ]
+    };
+    const errors = motionStructureRule(schema);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].path).toBe('motions[0].tracks[0].id');
+    expect(errors[0].message).toContain('track.id is required');
+  });
+
   it('should error if track references non-existent template', () => {
     const schema = {
       templates: [{ templateId: 't1' }],

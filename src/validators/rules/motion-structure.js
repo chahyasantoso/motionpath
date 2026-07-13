@@ -95,26 +95,24 @@ export function motionStructureRule(schema) {
 
     const { motionId, driver, stagger, tracks } = motion;
 
-    // Validate motionId
-    if (motionId !== undefined && motionId !== null) {
-      if (typeof motionId !== 'string') {
+    // Validate motionId — required, unlike templateId no longer optional-with-fallback
+    if (typeof motionId !== 'string' || motionId === '') {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: 'motionId is required and must be a non-empty string.',
+        path: `${motionPath}.motionId`
+      });
+    } else {
+      if (seenMotionIds.has(motionId)) {
         errors.push({
           ruleId: 'motion-structure',
           severity: 'error',
-          message: 'motionId must be a string.',
+          message: `Duplicate motionId '${motionId}' found.`,
           path: `${motionPath}.motionId`
         });
-      } else {
-        if (seenMotionIds.has(motionId)) {
-          errors.push({
-            ruleId: 'motion-structure',
-            severity: 'error',
-            message: `Duplicate motionId '${motionId}' found.`,
-            path: `${motionPath}.motionId`
-          });
-        }
-        seenMotionIds.add(motionId);
       }
+      seenMotionIds.add(motionId);
     }
 
     // Validate driver
@@ -211,7 +209,18 @@ export function motionStructureRule(schema) {
     } else {
       // Validate tracks template references
       for (const [j, track] of tracks.entries()) {
-        if (track && typeof track === 'object' && track.use !== undefined) {
+        if (!track || typeof track !== 'object') continue;
+
+        if (typeof track.id !== 'string' || track.id === '') {
+          errors.push({
+            ruleId: 'motion-structure',
+            severity: 'error',
+            message: `Motion "${motionId || i}": track.id is required and must be a non-empty string.`,
+            path: `${motionPath}.tracks[${j}].id`
+          });
+        }
+
+        if (track.use !== undefined) {
           if (!seenTemplateIds.has(track.use)) {
             errors.push({
               ruleId: 'motion-structure',

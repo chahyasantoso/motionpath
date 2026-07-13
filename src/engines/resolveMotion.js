@@ -81,9 +81,7 @@ export function createMotionResolver() {
     const isDomain = schema && typeof schema.getMotion === 'function';
     const originalMotion = isDomain
       ? schema.getMotion(motionId)
-      : schema.motions?.find(
-          m => m && (m.motionId === motionId || (m.motionId === undefined && String(schema.motions.indexOf(m)) === motionId))
-        );
+      : schema.motions?.find(m => m && m.motionId === motionId);
 
     if (!originalMotion) {
       throw new Error(`resolveMotion: motion with id "${motionId}" not found.`);
