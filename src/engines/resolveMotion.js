@@ -79,18 +79,11 @@ export function createMotionResolver() {
    */
   function resolve(schema, motionId, progress, overrides = {}) {
     const isDomain = schema && typeof schema.getMotion === 'function';
-    let originalMotion = isDomain 
-      ? schema.getMotion(motionId) 
+    const originalMotion = isDomain
+      ? schema.getMotion(motionId)
       : schema.motions?.find(
           m => m && (m.motionId === motionId || (m.motionId === undefined && String(schema.motions.indexOf(m)) === motionId))
         );
-
-    if (!originalMotion && isDomain) {
-      const motionsList = schema.getMotionsList();
-      originalMotion = motionsList.find(
-        (m, idx) => m.motionId === motionId || String(idx) === motionId
-      );
-    }
 
     if (!originalMotion) {
       throw new Error(`resolveMotion: motion with id "${motionId}" not found.`);

@@ -10,10 +10,26 @@ import { createMotionResolver } from './resolveMotion.js';
 
 /**
  * Factory function for ProductionEngine using Lazy/Instance architecture.
- * @param {{ resolveElement: (id: string) => Element }} deps
+ * @param {{ resolveElement: (id: string) => Element }} [deps]
  * @returns {ProductionEngine}
  */
-export function createProductionEngine(deps) {
+export function createProductionEngine(deps = {}) {
+  const _triggerRefs = new Map(); // id -> React.RefObject, scoped to this engine instance
+
+  const resolveElement = deps.resolveElement ?? ((id) => {
+    const ref = _triggerRefs.get(id);
+    if (!ref || !ref.current) {
+      throw new Error(
+        `MotionPath: trigger ref '${id}' is not registered. ` +
+        `Ensure useMotionTrigger('${id}', ref) is mounted (and its ref attached) ` +
+        `before this project's scenarios are wired.`
+      );
+    }
+    return ref.current;
+  });
+
+  const _deps = { ...deps, resolveElement };
+
   let _core = null;
   let _schema = null;
   let _project = null;
@@ -103,13 +119,7 @@ export function createProductionEngine(deps) {
         throw new Error('mountInstance: project not loaded.');
       }
       
-      let schemaMotion = _project.getMotion(motionId);
-      if (!schemaMotion) {
-        const motionsList = _project.getMotionsList();
-        schemaMotion = motionsList.find(
-          (m, idx) => m.motionId === motionId || String(idx) === motionId
-        );
-      }
+      const schemaMotion = _project.getMotion(motionId);
       if (!schemaMotion) {
         throw new Error(`mountInstance: motion with id "${motionId}" not found.`);
       }
@@ -124,7 +134,7 @@ export function createProductionEngine(deps) {
       };
 
       const instanceDeps = {
-        ...deps,
+        ..._deps,
         mountInstance: (childMotionId, childConfig) => {
           return this.mountInstance(childMotionId, childConfig);
         }
@@ -160,13 +170,7 @@ export function createProductionEngine(deps) {
       if (!_project) {
         throw new Error('mountTimeline: project not loaded.');
       }
-      let originalMotion = _project.getMotion(motionId);
-      if (!originalMotion) {
-        const motionsList = _project.getMotionsList();
-        originalMotion = motionsList.find(
-          (m, idx) => m.motionId === motionId || String(idx) === motionId
-        );
-      }
+      const originalMotion = _project.getMotion(motionId);
       if (!originalMotion) {
         throw new Error(`mountTimeline: motion with id "${motionId}" not found.`);
       }
@@ -186,20 +190,5 @@ export function createProductionEngine(deps) {
   };
 }
 
-const _triggerRefs = new Map(); // id -> React.RefObject
-
-export const productionEngine = createProductionEngine({
-  resolveElement: (id) => {
-    const ref = _triggerRefs.get(id);
-    if (!ref || !ref.current) {
-      throw new Error(
-        `MotionPath: trigger ref '${id}' is not registered. ` +
-        `Ensure useMotionTrigger('${id}', ref) is mounted (and its ref attached) ` +
-        `before this project's scenarios are wired.`
-      );
-    }
-    return ref.current;
-  },
-});
-
+export const productionEngine = createProductionEngine();
 export default productionEngine;

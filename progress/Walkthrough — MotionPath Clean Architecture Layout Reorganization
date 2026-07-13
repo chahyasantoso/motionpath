@@ -1,6 +1,6 @@
 # Walkthrough — MotionPath Clean Architecture Layout Reorganization
 
-We have successfully migrated the codebase from a flat/scattered layout in `src/lib/` to a structured Clean Architecture folder layout.
+We have successfully migrated the codebase to a structured Clean Architecture layout and fully updated all demo pages to conform to the stateful `MotionInstance` architecture.
 
 ---
 
@@ -27,17 +27,26 @@ The new codebase structure is organized as follows:
   - `engineCore.js` — Manages production execution ticking.
   - `editorEngineCore.js` — Manages editor state ticking.
   - `resolveMotion.js` — Lazily compiles/evaluates delegate animation segments.
+* **[`src/renderers/`](file:///d:/dev/motionpath/src/renderers/)**: Outbound rendering adapters.
+  - `domRenderer.js` — Writes composed patches directly to active element style properties via `gsap.set`.
 * **[`src/utils/`](file:///d:/dev/motionpath/src/utils/)**: Pure mathematical operations, preloading logic, and basic DOM set helpers.
   - `pathUtils.js` — Bezier conversion & distance path queries.
   - `pathMath.js` — Cubic path coordinate interpolation.
   - `projection3d.js` — Tilted viewport 3D perspective projection.
   - `deferredCall.js` — Buffered calls before EngineCore load.
-  - `domRenderer.js` — Writes composed patches directly to active element style properties via `gsap.set`.
 
 ---
 
-## 2. verification
+## 2. Page & Bug Fixes
 
-* **Imports Verification**: Every relative import path in source, tests, hooks, and pages has been updated to resolve cleanly.
+* **Scroll Trigger Lookup Fix**: Fixed a bug in [`ScrollMotionInstance`](file:///d:/dev/motionpath/src/domain/MotionInstance.js#L292-L308) where the trigger element resolver checked only `trigger.startTrigger` from the schema. It now correctly checks `trigger.trigger` (which conforms to the schema specification) first before falling back to `startTrigger`. This fixes the `"trigger ref 'lantern-scene' is not registered"` crash in Pasar Malam pages.
+* **MotorcyclePage.jsx**: Mounted all scene timeline players explicitly and updated sub-components to subscribe to the stateful instance.
+* **PasarMalamPage.jsx** / **PasarMalamObserverPage.jsx**: Mounted the story, entry-lantern, and bounce-lantern scenes, and fed them down to all sub-components.
+
+---
+
+## 3. Verification
+
+* **Strict Mode Compliance**: Every `useMotionSubscriber` and `useMotionTimelinePlayback` hook call in the repository now uses the clean object-oriented `MotionInstance` contract.
 * **Unit Tests**: All 214 tests pass successfully (`npm run test`).
 * **Code Graph**: Codebase index has been updated via `graphify update .`.

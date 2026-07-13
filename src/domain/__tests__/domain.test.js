@@ -125,4 +125,49 @@ describe('Domain Models and Parser', () => {
     const manualMotion = project.getMotion('motion-manual');
     expect(manualMotion.driver).toBeInstanceOf(ManualDriver);
   });
+
+  it('correctly keys unnamed motions by their positional index string to prevent map collision', () => {
+    const rawSchema = {
+      schemaVersion: 2,
+      motions: [
+        {
+          driver: { type: 'manual' },
+          tracks: [{ id: 'track-1' }]
+        },
+        {
+          driver: { type: 'manual' },
+          tracks: [{ id: 'track-2' }]
+        },
+        {
+          motionId: 'named-motion',
+          driver: { type: 'manual' },
+          tracks: [{ id: 'track-3' }]
+        }
+      ]
+    };
+
+    const project = parseProjectSchema(rawSchema);
+
+    // Verify motions map is not collapsed onto `undefined` key.
+    // 3 motions total. Unnamed motions are indexed '0' and '1'.
+    expect(project.motions.size).toBe(3);
+    
+    const motion0 = project.getMotion('0');
+    const motion1 = project.getMotion('1');
+    const namedMotion = project.getMotion('named-motion');
+
+    expect(motion0).toBeDefined();
+    expect(motion1).toBeDefined();
+    expect(namedMotion).toBeDefined();
+
+    expect(motion0.tracks[0].id).toBe('track-1');
+    expect(motion1.tracks[0].id).toBe('track-2');
+    expect(namedMotion.tracks[0].id).toBe('track-3');
+
+    // getMotionsList preserves the original order
+    const list = project.getMotionsList();
+    expect(list[0]).toBe(motion0);
+    expect(list[1]).toBe(motion1);
+    expect(list[2]).toBe(namedMotion);
+  });
 });

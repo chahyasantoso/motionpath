@@ -87,13 +87,7 @@ export function createEditorEngine(deps) {
       if (!_project) {
         throw new Error('mountTimeline: project not loaded.');
       }
-      let originalMotion = _project.getMotion(motionId);
-      if (!originalMotion) {
-        const motionsList = _project.getMotionsList();
-        originalMotion = motionsList.find(
-          (m, idx) => m.motionId === motionId || String(idx) === motionId
-        );
-      }
+      const originalMotion = _project.getMotion(motionId);
       if (!originalMotion) {
         throw new Error(`mountTimeline: motion with id "${motionId}" not found.`);
       }

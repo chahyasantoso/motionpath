@@ -3,7 +3,7 @@ export class MotionProject {
     this.schemaVersion = schemaVersion;
     this.perspective = perspective;
     this.templates = new Map(templates.map(t => [t.templateId, t]));
-    this.motions = new Map(motions.map(m => [m.motionId, m]));
+    this.motions = new Map(motions.map((m, i) => [m.motionId ?? String(i), m]));
   }
 
   getMotion(motionId) {

@@ -140,4 +140,36 @@ describe('ProductionEngine (Lazy/Instance Architecture)', () => {
     expect(result).toHaveProperty('track-3');
     expect(result['track-3']).toHaveProperty('scale');
   });
+
+  it('isolates triggerRefs registry between independent engine instances', async () => {
+    validatorModule.validateProject.mockReturnValue([]);
+    const engine1 = createProductionEngine();
+    const engine2 = createProductionEngine();
+
+    const scrollSchema = {
+      motions: [
+        {
+          motionId: 'scroll-motion',
+          driver: { type: 'gsap-scroll', trigger: { trigger: '#el', scrub: true } },
+          tracks: [{ id: 'track-1', keyframes: { opacity: { stops: [0, 1] } } }]
+        }
+      ]
+    };
+
+    await engine1.loadProject(scrollSchema);
+    await engine2.loadProject(scrollSchema);
+
+    const ref = { current: {} };
+
+    // Register on engine1 only
+    engine1.registerTriggerRef('#el', ref);
+
+    // engine1 should mount successfully
+    expect(() => engine1.mountInstance('scroll-motion')).not.toThrow();
+
+    // engine2 should fail because it has its own isolated registry
+    expect(() => engine2.mountInstance('scroll-motion')).toThrow(
+      /MotionPath: trigger ref '#el' is not registered/
+    );
+  });
 });
