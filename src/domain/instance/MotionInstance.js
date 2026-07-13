@@ -69,7 +69,7 @@ export class MotionInstance {
 
     this.timeline = gsap.timeline({
       paused: true,
-      onUpdate: () => this.#onTimelineUpdate()
+      onUpdate: () => this.broadcast()
     });
 
     const trigger = this.schemaMotion.driver?.trigger || {};
@@ -85,22 +85,6 @@ export class MotionInstance {
     });
 
     this.tracks = resolvedTracks;
-  }
-
-  #onTimelineUpdate() {
-    this.broadcast();
-    this.#seekChildren();
-  }
-
-  #seekChildren() {
-    const parentTime = this.timeline.time();
-    this.children.forEach(child => {
-      const childDelay = child.currentDelay ?? child.config.delay ?? 0;
-      const childDuration = child.timeline.duration() || 1.0;
-      const childTime = parentTime - childDelay;
-      const childProgress = Math.max(0, Math.min(1, childTime / childDuration));
-      child.seek(childProgress);
-    });
   }
 
   #setupDriver(config) {
@@ -312,11 +296,10 @@ export class MotionInstance {
     child.currentDelay = calculatedDelay;
     this.children.push(child);
 
-    const childDuration = child.timeline.duration() || 1.0;
-    const childEndTime = calculatedDelay + childDuration;
-    const paddingCb = () => {};
-    child.paddingCallback = paddingCb;
-    this.timeline.add(paddingCb, childEndTime);
+    // Native GSAP Nesting
+    child.timeline.paused(false);
+    child.timeline.delay(0);
+    this.timeline.add(child.timeline, calculatedDelay);
 
     this.#childListeners.forEach(cb => cb());
 
@@ -331,9 +314,9 @@ export class MotionInstance {
     const idx = this.children.indexOf(child);
     if (idx !== -1) {
       this.children.splice(idx, 1);
-      if (child.paddingCallback) {
-        this.timeline.remove(child.paddingCallback);
-      }
+      
+      // Native GSAP detach
+      this.timeline.remove(child.timeline);
       child.destroy();
 
       const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
@@ -343,16 +326,13 @@ export class MotionInstance {
           c.currentDelay = c.config.delay || 0;
         }
         if (c.delayTween) c.delayTween.kill();
-        c.delayTween = gsap.to(c, {
-          currentDelay: newDelay,
+        c.delayTween = gsap.to(c.timeline, {
+          startTime: newDelay,
           duration: 0.6,
           ease: 'power2.out',
           onUpdate: () => {
-            const parentTime = this.timeline.time();
-            const childDuration = c.timeline.duration() || 1.0;
-            const childTime = parentTime - c.currentDelay;
-            const childProgress = Math.max(0, Math.min(1, childTime / childDuration));
-            c.seek(childProgress);
+            // Force parent timeline to re-evaluate and broadcast at its current playhead position
+            this.timeline.time(this.timeline.time());
           }
         });
       });
