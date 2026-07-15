@@ -373,5 +373,30 @@ describe('MotionInstance Class', () => {
       expect(childDestroySpy).toHaveBeenCalled();
       expect(instance.children).toHaveLength(0);
     });
+
+    it('notifies onSubscriberChange(false) on destroy if it had active subscribers', () => {
+      const instance = createTestInstance('manual-motion', {}, manualSchema);
+      const callback = vi.fn();
+
+      instance.subscribe('track-2', callback);
+      expect(mockOnSubscriberChange).toHaveBeenCalledWith(instance, true);
+
+      mockOnSubscriberChange.mockClear();
+
+      instance.destroy();
+
+      expect(mockOnSubscriberChange).toHaveBeenCalledTimes(1);
+      expect(mockOnSubscriberChange).toHaveBeenCalledWith(instance, false);
+    });
+
+    it('does not notify onSubscriberChange on destroy if it had no active subscribers', () => {
+      const instance = createTestInstance('manual-motion', {}, manualSchema);
+
+      mockOnSubscriberChange.mockClear();
+
+      instance.destroy();
+
+      expect(mockOnSubscriberChange).not.toHaveBeenCalled();
+    });
   });
 });

@@ -346,6 +346,9 @@ export class MotionInstance {
   }
 
   destroy() {
+    const hadActiveSubscribers = Array.from(this.#subscribers.values())
+      .reduce((sum, set) => sum + set.size, 0) > 0;
+
     if (this.#scrollTrigger) {
       this.#scrollTrigger.kill();
       this.#scrollTrigger = null;
@@ -363,7 +366,7 @@ export class MotionInstance {
     });
     this.children.length = 0;
 
-    if (this.#onSubscriberChange && this.tracksMap.size > 0) {
+    if (this.#onSubscriberChange && hadActiveSubscribers) {
       this.#onSubscriberChange(this, false);
     }
   }
