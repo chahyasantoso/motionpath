@@ -1,0 +1,45 @@
+flowchart TD
+    PE["productionEngine<br/>(singleton, BaseEngine)<br/>_instances: Map"]
+
+    subgraph LIFECYCLE["Mounted via useMotionInstance(isLoaded ? 'carousel-storytelling' : null)"]
+        PARENT["carouselInstance<br/>motionId: 'carousel-storytelling'<br/>driver: scroll/scrub<br/>owns real ScrollTrigger<br/>owns: timeline, children[]"]
+    end
+
+    PE -- "mountInstance('carousel-storytelling')" --> PARENT
+
+    subgraph COMPOSITION["carouselInstance.children — created via addChild(), reuse same motionId"]
+        C1["child1<br/>parentId: carouselInstance.id<br/>nested in parent.timeline<br/>NO own ScrollTrigger"]
+        C2["child2 ... child6<br/>(same pattern)"]
+    end
+
+    PARENT -- "addChild()<br/>(per MOCK_CARDS entry)" --> C1
+    PARENT -- "addChild() x5 more" --> C2
+
+    subgraph REACT["React tree — CarouselDemo renders one CarouselCard per card"]
+        CARD1["CarouselCard #1<br/>owns: ref → real DOM &lt;div&gt;<br/>state: activeInstance, activeTrackId"]
+    end
+
+    C1 -. "useMotionSubscriber(childInstance, 'card-track', ref)<br/>[initial state]" .-> CARD1
+
+    CLICK{{"user clicks card #1"}}
+    CARD1 --> CLICK
+
+    subgraph EXIT["Fully independent — NOT a child of carouselInstance or child1"]
+        EXITINST["exitInstance<br/>motionId: 'card-exit'<br/>mounted fresh, top-level"]
+    end
+
+    CLICK -- "productionEngine.mountInstance('card-exit')" --> EXITINST
+    PE -- "mountInstance('card-exit')" --> EXITINST
+
+    CARD1 -. "setActiveInstance(exitInstance)<br/>setActiveTrackId('card-exit-track')<br/>SAME ref, new subscription" .-> EXITINST
+
+    EXITINST -- "onComplete fires<br/>(exit animation finished on screen)" --> DONE["exitInstance.destroy()<br/>+ carouselInstance.removeChild(child1)<br/>+ setCards(filter) → unmounts CarouselCard #1"]
+
+    DONE -. "removeChild triggers reflow<br/>on child2...child6 only<br/>(sibling stagger-slide)" .-> C2
+
+    style PARENT fill:#2d3748,color:#fff,stroke:#4299e1,stroke-width:2px
+    style C1 fill:#2d3748,color:#fff,stroke:#68d391,stroke-width:2px
+    style C2 fill:#2d3748,color:#fff,stroke:#68d391,stroke-width:2px
+    style EXITINST fill:#2d3748,color:#fff,stroke:#f6ad55,stroke-width:2px
+    style CARD1 fill:#1a202c,color:#fff,stroke:#a0aec0
+    style DONE fill:#742a2a,color:#fff,stroke:#fc8181
