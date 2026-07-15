@@ -27,7 +27,7 @@ describe('MotionInstance Class', () => {
   let manualSchema;
 
   function createTestInstance(motionId, config, schemaMotion) {
-    const { reflowSiblings, mountInstance, ...restConfig } = config || {};
+    const { mountInstance, ...restConfig } = config || {};
     return new MotionInstance(
       motionId,
       restConfig,
@@ -36,8 +36,7 @@ describe('MotionInstance Class', () => {
         project: { templates },
         resolveElement: mockDeps.resolveElement,
         mountInstance: mountInstance || mockDeps.mountInstance,
-        onSubscriberChange: mockOnSubscriberChange,
-        reflowSiblings
+        onSubscriberChange: mockOnSubscriberChange
       }
     );
   }
@@ -339,34 +338,32 @@ describe('MotionInstance Class', () => {
       if (tweenKillSpy) expect(tweenKillSpy).toHaveBeenCalled();
     });
 
-    it('uses an injected reflowSiblings function instead of the default tween', async () => {
-      const customReflow = vi.fn().mockResolvedValue(undefined);
-      const instance = createTestInstance('time-motion', { reflowSiblings: customReflow }, timelineSchema);
-      const child1 = instance.addChild('child-motion', {});
-      instance.addChild('child-motion', {});
-
-      instance.removeChild(child1);
-      await Promise.resolve(); // flush microtasks so #finishRemoval's await resolves
-
-      expect(customReflow).toHaveBeenCalledTimes(1);
-      const [targets] = customReflow.mock.calls[0];
-      expect(targets).toEqual([{ child: expect.anything(), delay: 0 }]);
-    });
-
     it('onChildChange fires for removeChild only after reflow completes, not at splice time', async () => {
-      const customReflow = vi.fn().mockResolvedValue(undefined);
-      const instance = createTestInstance('time-motion', { reflowSiblings: customReflow }, timelineSchema);
+      const schemaWithTransition = {
+        ...timelineSchema,
+        staggerTransition: { duration: 0.6 }
+      };
+      const instance = createTestInstance('time-motion', {}, schemaWithTransition);
       const child1 = instance.addChild('child-motion', {});
+      instance.addChild('child-motion', {}); // survivor — gives the reflow something to do
+
+      let capturedOnComplete;
+      const toSpy = vi.spyOn(gsap, 'to').mockImplementation((target, vars) => {
+        capturedOnComplete = vars.onComplete;
+        return { kill: vi.fn() };
+      });
 
       const listener = vi.fn();
       instance.onChildChange(listener);
       instance.removeChild(child1);
 
-      expect(listener).not.toHaveBeenCalled(); // reflow (mocked) hasn't resolved yet
+      expect(listener).not.toHaveBeenCalled(); // reflow tween hasn't completed yet
 
+      capturedOnComplete(); // simulate the tween finishing
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(listener).toHaveBeenCalledTimes(1);
+      toSpy.mockRestore();
     });
 
     it('does not reflow a child that was given an explicit custom delay', async () => {
@@ -406,6 +403,24 @@ describe('MotionInstance Class', () => {
       const lastCallArgs = toSpy.mock.calls[toSpy.mock.calls.length - 1];
       expect(lastCallArgs[1].duration).toBe(0.25);
       expect(lastCallArgs[1].ease).toBe('power1.in');
+      toSpy.mockRestore();
+    });
+
+    it('instantly snaps delay updates without gsap.to when staggerTransition.duration is 0', async () => {
+      const schemaWithTransition = {
+        ...timelineSchema,
+        staggerTransition: { duration: 0 }
+      };
+      const instance = createTestInstance('time-motion', {}, schemaWithTransition);
+      const child1 = instance.addChild('child-motion', {});
+      const child2 = instance.addChild('child-motion', {});
+
+      const toSpy = vi.spyOn(gsap, 'to');
+      instance.removeChild(child1);
+
+      expect(toSpy).toHaveBeenCalled();
+      const lastCallArgs = toSpy.mock.calls[toSpy.mock.calls.length - 1];
+      expect(lastCallArgs[1].duration).toBe(0);
       toSpy.mockRestore();
     });
 
@@ -494,6 +509,16 @@ describe('MotionInstance Class', () => {
       instance.destroy();
 
       expect(mockOnSubscriberChange).not.toHaveBeenCalled();
+    });
+
+    it('exposes isDestroyed as false before destroy() and true after', () => {
+      const instance = createTestInstance('time-motion', {}, timelineSchema);
+
+      expect(instance.isDestroyed).toBe(false);
+
+      instance.destroy();
+
+      expect(instance.isDestroyed).toBe(true);
     });
   });
 });

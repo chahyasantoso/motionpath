@@ -10,6 +10,7 @@ import RefreshSpikePage from './components/Spikes/RefreshSpikePage';
 import StaggerSpikePage from './components/Spikes/StaggerSpikePage';
 import TowerDefensePage from './components/TowerDefense/TowerDefensePage';
 import GlobalNav from './components/Navigation/GlobalNav';
+import SpiralPage from './components/Spiral/SpiralPage';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/spike-refresh" element={<RefreshSpikePage />} />
         <Route path="/spike-stagger" element={<StaggerSpikePage />} />
         <Route path="/tower-defense" element={<TowerDefensePage />} />
+        <Route path="/spiral" element={<SpiralPage />} />
       </Routes>
     </>
   );

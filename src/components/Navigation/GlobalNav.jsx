@@ -38,6 +38,9 @@ export default function GlobalNav() {
           <NavLink to="/tower-defense" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Tower Defense
           </NavLink>
+          <NavLink to="/spiral" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            Zuma Spiral
+          </NavLink>
           <NavLink to="/spike-refresh" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Spike (Refresh)
           </NavLink>
@@ -81,6 +84,9 @@ export default function GlobalNav() {
           </NavLink>
           <NavLink to="/tower-defense" className="drawer-link" onClick={closeMenu}>
             🗼 Tower Defense
+          </NavLink>
+          <NavLink to="/spiral" className="drawer-link" onClick={closeMenu}>
+            🌀 Zuma Spiral
           </NavLink>
           <NavLink to="/spike-refresh" className="drawer-link" onClick={closeMenu}>
             ⚡ Performance Spike (Refresh)

@@ -64,6 +64,16 @@ const DEMOS = [
     features: ['Tween-cached coordinate lookup', 'Dynamic coordinate overrides', 'Time-triggered autonomous pulse']
   },
   {
+    id: 'spiral',
+    title: 'Zuma Spiral Game',
+    badge: 'Time Trigger / Spawner',
+    path: '/spiral',
+    icon: '🌀',
+    color: 'glow-blue',
+    description: 'An endless Zuma-style spiral path. Balls auto-spawn on a parent timeline, travel towards a central black hole, and disappear. Pop balls to trigger exit animations and watch siblings reflow natively.',
+    features: ['Archimedean spiral path generator', 'Time-triggered auto spawner', 'Parent timeline with native stagger reflow']
+  },
+  {
     id: 'spike-refresh',
     title: 'Performance Spike',
     badge: 'Stress Test / Benchmark',

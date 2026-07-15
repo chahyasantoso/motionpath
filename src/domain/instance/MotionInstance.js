@@ -30,8 +30,7 @@ export class MotionInstance {
     this.schemaMotion = schemaMotion;
     this.deps = {
       resolveElement: context.resolveElement,
-      mountInstance: context.mountInstance,
-      reflowSiblings: context.reflowSiblings
+      mountInstance: context.mountInstance
     };
     this.templates = context.project?.templates || {};
     this.children = [];
@@ -354,15 +353,12 @@ export class MotionInstance {
   }
 
   #reflowSiblings(targets) {
-    const reflow = this.#deps.reflowSiblings ?? MotionInstance.#defaultReflow;
     const transition = this.schemaMotion.staggerTransition ?? {};
-    return Promise.resolve(reflow(targets, this.timeline, transition));
-  }
-
-  static #defaultReflow(targets, parentTimeline, transition = {}) {
-    const duration = transition.duration ?? 0.6;
+    const duration = transition.duration ?? 0;
     const ease = transition.ease ?? 'power2.out';
 
+    // kalau duration 0 masih kurang efisien karena 
+    // masih bikin object tween meskipun langsung resolve
     return Promise.all(targets.map(({ child, delay }) => {
       if (child.currentDelay === undefined) {
         child.currentDelay = child.config.delay || 0;
@@ -375,7 +371,7 @@ export class MotionInstance {
           duration,
           ease,
           onUpdate: () => {
-            parentTimeline.time(parentTimeline.time());
+            this.timeline.time(this.timeline.time());
           },
           onComplete: () => {
             child.currentDelay = delay;
@@ -430,5 +426,9 @@ export class MotionInstance {
       }
     });
     return ids;
+  }
+
+  get isDestroyed() {
+    return this.#destroyed;
   }
 }

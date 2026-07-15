@@ -137,6 +137,41 @@
   justify-content: center;
 }
 
+.add-card-btn-floating {
+  position: absolute;
+  bottom: 2.5rem;
+  right: 2.5rem;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #ff6bca);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 1.8rem;
+  font-weight: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(124, 92, 255, 0.4);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, filter 0.2s ease;
+  z-index: 100;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.add-card-btn-floating:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 12px 30px rgba(124, 92, 255, 0.6);
+  filter: brightness(1.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.add-card-btn-floating:active {
+  transform: scale(0.95) translateY(0);
+  box-shadow: 0 4px 12px rgba(124, 92, 255, 0.3);
+}
+
 .carousel-card {
   width: 280px;
   height: 380px;

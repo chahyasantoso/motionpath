@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useRef } from 'react';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { productionEngine } from '../../engines/ProductionEngine.js';
 import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
@@ -399,12 +399,22 @@ function CarouselDemo({ instance }) {
 
   React.useEffect(() => {
     if (!instance) return;
+    let rafId = null;
     const unsubscribe = instance.onChildChange(() => {
-      requestAnimationFrame(() => {
+      if (rafId) cancelAnimationFrame(rafId);
+      const capturedTime = instance.timeline.time();
+      console.log("child changed");
+      rafId = requestAnimationFrame(() => {
+        const nextdur =  instance.timeline.duration();
         ScrollTrigger.refresh();
+        instance.timeline.time(Math.min(capturedTime, nextdur));
+        console.log("child changed refresh");
       });
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [instance]);
 
   const getOrAddChildInstance = useCallback((cardId) => {
@@ -424,6 +434,19 @@ function CarouselDemo({ instance }) {
     childInstancesMap.current.delete(cardId);
     setCards(prev => prev.filter(c => c.id !== cardId));
   }, [instance]);
+
+  // ponytail: reuse existing MOCK_CARDS template array to avoid duplicate static definitions
+  const handleAddCard = useCallback(() => {
+    const nextId = cards.length > 0 ? Math.max(...cards.map(c => c.id)) + 1 : 1;
+    const template = MOCK_CARDS[Math.floor(Math.random() * MOCK_CARDS.length)];
+    const newCard = {
+      ...template,
+      id: nextId,
+      badge: `${String(nextId).padStart(2, '0')} / ${template.badge.split(' / ')[1] || 'DYNAMIC'}`
+    };
+
+    setCards(prev => [...prev, newCard]);
+  }, [cards]);
 
   return (
     <section ref={containerRef} className="carousel-scene">
@@ -453,6 +476,9 @@ function CarouselDemo({ instance }) {
             strokeDasharray="8 6"
           />
         </svg>
+        <button className="add-card-btn-floating" onClick={handleAddCard} title="Add Random Card">
+          +
+        </button>
       </div>
     </section>
   );

@@ -21,7 +21,6 @@ export class BaseEngine {
   #motionResolver = createMotionResolver();
   #deferredCall = createDeferredCall();
   #resolveElement;
-  #reflowSiblings;
 
   constructor(deps = {}) {
     this.#resolveElement = deps.resolveElement ?? ((id) => {
@@ -35,7 +34,6 @@ export class BaseEngine {
       }
       return ref.current;
     });
-    this.#reflowSiblings = deps.reflowSiblings;
   }
 
   async loadProject(schema, options = {}) {
@@ -127,8 +125,7 @@ export class BaseEngine {
       mountInstance: (childMotionId, childConfig) => {
         return this.mountInstance(childMotionId, childConfig);
       },
-      onSubscriberChange,
-      reflowSiblings: this.#reflowSiblings
+      onSubscriberChange
     });
 
     this._instances.set(instance.id, instance);
