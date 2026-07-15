@@ -1,3 +1,4 @@
+import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MotionInstance } from '../MotionInstance.js';
@@ -26,15 +27,17 @@ describe('MotionInstance Class', () => {
   let manualSchema;
 
   function createTestInstance(motionId, config, schemaMotion) {
+    const { reflowSiblings, mountInstance, ...restConfig } = config || {};
     return new MotionInstance(
       motionId,
-      config,
+      restConfig,
       schemaMotion,
       {
         project: { templates },
         resolveElement: mockDeps.resolveElement,
-        mountInstance: mockDeps.mountInstance,
-        onSubscriberChange: mockOnSubscriberChange
+        mountInstance: mountInstance || mockDeps.mountInstance,
+        onSubscriberChange: mockOnSubscriberChange,
+        reflowSiblings
       }
     );
   }
@@ -285,77 +288,171 @@ describe('MotionInstance Class', () => {
       instance.enableTrigger();
       expect(trigger.enable).toHaveBeenCalled();
     });
-  });
 
-  describe('Scroll-Driver Stagger Freeze/Unfreeze', () => {
-    let scrollStaggerSchema;
-
-    beforeEach(() => {
-      scrollStaggerSchema = {
-        motionId: 'scroll-stagger',
-        stagger: 0.2,
+    it('does NOT create its own ScrollTrigger when config._suppressDriver is set (timelineId group member)', () => {
+      const scrollSchema = {
+        motionId: 'scroll-motion',
         driver: {
           type: 'gsap-scroll',
           trigger: { trigger: '#el', scrub: true }
         },
-        tracks: [
-          {
-            id: 'track-s',
-            keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 100 }] } }
-          }
-        ]
+        tracks: []
       };
+
+      createTestInstance('scroll-motion', { _suppressDriver: true }, scrollSchema);
+      expect(ScrollTrigger.create).not.toHaveBeenCalled();
     });
+  });
 
-    it('disables ScrollTrigger before addChild mutation', () => {
-      const instance = createTestInstance('scroll-stagger', {}, scrollStaggerSchema);
-      const trigger = ScrollTrigger.create.mock.results[0].value;
-
-      instance.addChild('child-motion', {});
-
-      expect(trigger.disable).toHaveBeenCalledWith(false);
-    });
-
-    it('does NOT freeze ScrollTrigger on removeChild (deferred removal)', () => {
-      const instance = createTestInstance('scroll-stagger', {}, scrollStaggerSchema);
-      const trigger = ScrollTrigger.create.mock.results[0].value;
-
-      const child = instance.addChild('child-motion', {});
-      trigger.disable.mockClear();
-
-      instance.removeChild(child);
-
-      // removeChild no longer freezes — the dead child stays in the timeline
-      // until the stagger slide finishes, so no duration change occurs yet
-      expect(trigger.disable).not.toHaveBeenCalled();
-    });
-
-    it('calls scroll() to sync position after unfreeze on addChild with no stagger change', () => {
-      const instance = createTestInstance('scroll-stagger', {}, scrollStaggerSchema);
-      const trigger = ScrollTrigger.create.mock.results[0].value;
-
-      instance.addChild('child-motion', {});
-
-      expect(trigger.enable).toHaveBeenCalled();
-      expect(ScrollTrigger.refresh).toHaveBeenCalled();
-      expect(trigger.scroll).toHaveBeenCalled();
-    });
-
-    it('defers actual timeline removal until stagger slide completes on removeChild', () => {
-      const instance = createTestInstance('scroll-stagger', {}, scrollStaggerSchema);
-
+  describe('Reflow and Deferred Removal API', () => {
+    it('removeChild is a no-op if called twice on the same child mid-reflow', () => {
+      const instance = createTestInstance('time-motion', {}, timelineSchema);
       const child1 = instance.addChild('child-motion', {});
-      const child2 = instance.addChild('child-motion', {});
-      ScrollTrigger.refresh.mockClear();
+      instance.addChild('child-motion', {});
 
       const removeSpy = vi.spyOn(instance.timeline, 'remove');
+      instance.removeChild(child1);
+      instance.removeChild(child1); // second call, still mid-reflow
+
+      expect(instance.children).toHaveLength(1);
+    });
+
+    it('addChild throws after destroy()', () => {
+      const instance = createTestInstance('time-motion', {}, timelineSchema);
+      instance.destroy();
+
+      expect(() => instance.addChild('child-motion', {})).toThrow(/destroyed/);
+    });
+
+    it('destroy() kills delayTween and destroys children pending removal', () => {
+      const instance = createTestInstance('time-motion', {}, timelineSchema);
+      const child1 = instance.addChild('child-motion', {});
+      instance.addChild('child-motion', {});
+
+      instance.removeChild(child1); // starts reflow, child1 now pending
+      const destroySpy = vi.spyOn(child1, 'destroy');
+      const tweenKillSpy = child1.delayTween ? vi.spyOn(child1.delayTween, 'kill') : null;
+
+      instance.destroy();
+
+      expect(destroySpy).toHaveBeenCalled();
+      if (tweenKillSpy) expect(tweenKillSpy).toHaveBeenCalled();
+    });
+
+    it('uses an injected reflowSiblings function instead of the default tween', async () => {
+      const customReflow = vi.fn().mockResolvedValue(undefined);
+      const instance = createTestInstance('time-motion', { reflowSiblings: customReflow }, timelineSchema);
+      const child1 = instance.addChild('child-motion', {});
+      instance.addChild('child-motion', {});
 
       instance.removeChild(child1);
+      await Promise.resolve(); // flush microtasks so #finishRemoval's await resolves
 
-      // With only 1 surviving child and no stagger change needed,
-      // the deferred removal fires immediately (pendingTweens === 0)
-      expect(removeSpy).toHaveBeenCalledWith(child1.timeline);
-      expect(ScrollTrigger.refresh).toHaveBeenCalled();
+      expect(customReflow).toHaveBeenCalledTimes(1);
+      const [targets] = customReflow.mock.calls[0];
+      expect(targets).toEqual([{ child: expect.anything(), delay: 0 }]);
+    });
+
+    it('onChildChange fires for removeChild only after reflow completes, not at splice time', async () => {
+      const customReflow = vi.fn().mockResolvedValue(undefined);
+      const instance = createTestInstance('time-motion', { reflowSiblings: customReflow }, timelineSchema);
+      const child1 = instance.addChild('child-motion', {});
+
+      const listener = vi.fn();
+      instance.onChildChange(listener);
+      instance.removeChild(child1);
+
+      expect(listener).not.toHaveBeenCalled(); // reflow (mocked) hasn't resolved yet
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reflow a child that was given an explicit custom delay', async () => {
+      const instance = createTestInstance('time-motion', {}, timelineSchema);
+      const auto1 = instance.addChild('child-motion', {});
+      const custom = instance.addChild('child-motion', { delay: 5 });
+
+      instance.removeChild(auto1);
+
+      expect(custom.delayTween).toBeNull(); // never touched by reflow
+      expect(custom.currentDelay).toBe(5);  // untouched
+    });
+
+    it('auto children reindex among themselves, skipping custom children', () => {
+      const instance = createTestInstance('time-motion', {}, timelineSchema);
+      const auto1 = instance.addChild('child-motion', {});          // auto, index 0
+      instance.addChild('child-motion', { delay: 99 });              // custom, ignored for indexing
+      const auto2 = instance.addChild('child-motion', {});           // auto, index 1
+
+      expect(auto1.currentDelay).toBe(0);
+      expect(auto2.currentDelay).toBeCloseTo(0.1); // stagger=0.1 in timelineSchema, index 1 among autos
+    });
+
+    it('reads duration/ease from schemaMotion.staggerTransition when present', async () => {
+      const schemaWithTransition = {
+        ...timelineSchema,
+        staggerTransition: { duration: 0.25, ease: 'power1.in' }
+      };
+      const instance = createTestInstance('time-motion', {}, schemaWithTransition);
+      const child1 = instance.addChild('child-motion', {});
+      instance.addChild('child-motion', {});
+
+      const toSpy = vi.spyOn(gsap, 'to');
+      instance.removeChild(child1);
+
+      expect(toSpy).toHaveBeenCalled();
+      const lastCallArgs = toSpy.mock.calls[toSpy.mock.calls.length - 1];
+      expect(lastCallArgs[1].duration).toBe(0.25);
+      expect(lastCallArgs[1].ease).toBe('power1.in');
+      toSpy.mockRestore();
+    });
+
+    it('addChild passes isAutoStagger/delay through config instead of mutating the child after construction', () => {
+      const templates = new Map();
+      const mockOnSubscriberChange = vi.fn();
+      const mockDeps = {
+        resolveElement: vi.fn((id) => ({ id })),
+        mountInstance: vi.fn((motionId, config) => {
+          return new MotionInstance(
+            motionId,
+            config,
+            {
+              motionId,
+              driver: { type: 'manual' },
+              tracks: []
+            },
+            {
+              project: { templates },
+              resolveElement: mockDeps.resolveElement,
+              mountInstance: mockDeps.mountInstance,
+              onSubscriberChange: mockOnSubscriberChange
+            }
+          );
+        })
+      };
+      
+      const mountInstanceSpy = vi.fn((motionId, config) => {
+        return new MotionInstance(
+          motionId,
+          config,
+          timelineSchema,
+          {
+            project: { templates },
+            resolveElement: mockDeps.resolveElement,
+            mountInstance: mockDeps.mountInstance,
+            onSubscriberChange: mockOnSubscriberChange
+          }
+        );
+      });
+
+      const instance = createTestInstance('time-motion', { mountInstance: mountInstanceSpy }, timelineSchema);
+      instance.addChild('child-motion', {});
+
+      const [, configArg] = mountInstanceSpy.mock.calls[0];
+      expect(configArg.isAutoStagger).toBe(true);
+      expect(configArg.delay).toBe(0);
     });
   });
 

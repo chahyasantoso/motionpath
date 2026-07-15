@@ -20,6 +20,8 @@ export class MotionInstance {
   #onSubscriberChange;
   #deps;
   #scrollTrigger = null;
+  #pendingRemovals = new Set(); // children mid-reflow, not yet detached from timeline
+  #destroyed = false;
 
   constructor(motionId, config, schemaMotion, context) {
     this.id = MotionInstance.#generateUniqueId();
@@ -28,12 +30,14 @@ export class MotionInstance {
     this.schemaMotion = schemaMotion;
     this.deps = {
       resolveElement: context.resolveElement,
-      mountInstance: context.mountInstance
+      mountInstance: context.mountInstance,
+      reflowSiblings: context.reflowSiblings
     };
     this.templates = context.project?.templates || {};
     this.children = [];
     this.tracksMap = new Map();
-    this.currentDelay = undefined;
+    this.currentDelay = config.delay ?? undefined;
+    this.isAutoStagger = config.isAutoStagger ?? true;
     this.delayTween = null;
     this.paddingCallback = null;
 
@@ -87,6 +91,10 @@ export class MotionInstance {
     this.tracks = resolvedTracks;
   }
 
+  #ownsTrigger(config) {
+    return !config.parentId && !config._suppressDriver;
+  }
+
   #setupDriver(config) {
     const driverType = this.schemaMotion.driver?.type;
     const trigger = this.schemaMotion.driver?.trigger || {};
@@ -98,7 +106,7 @@ export class MotionInstance {
         .repeatDelay(trigger.repeatDelay ?? 0);
 
       // Auto-play if not a child instance and autoplay is enabled
-      const shouldPlay = !config.parentId && !config._groupMember && (config.autoplay ?? true);
+      const shouldPlay = this.#ownsTrigger(config) && (config.autoplay ?? true);
       if (shouldPlay) {
         this.timeline.play();
       }
@@ -128,7 +136,7 @@ export class MotionInstance {
         );
       }
 
-      if (!config.parentId && !config._groupMember) {
+      if (this.#ownsTrigger(config)) {
         if (trigger.scrub) {
           this.#scrollTrigger = ScrollTrigger.create({
             ...resolvedConfig,
@@ -272,7 +280,16 @@ export class MotionInstance {
     return () => this.#childListeners.delete(callback);
   }
 
+  #staggerDelay(index) {
+    const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
+    return index * stagger;
+  }
+
   addChild(motionIdOrConfig, config) {
+    if (this.#destroyed) {
+      throw new Error(`addChild: instance "${this.id}" is destroyed.`);
+    }
+
     let targetMotionId = this.motionId;
     let targetConfig = {};
 
@@ -283,17 +300,17 @@ export class MotionInstance {
       targetConfig = motionIdOrConfig;
     }
 
-    const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
-    const childIndex = this.children.length;
-    const calculatedDelay = targetConfig.delay ?? (childIndex * stagger);
+    const isAutoStagger = targetConfig.delay === undefined;
+    const autoIndex = this.children.filter(c => c.isAutoStagger).length;
+    const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(autoIndex);
 
     const child = this.#deps.mountInstance(targetMotionId, {
       ...targetConfig,
       delay: calculatedDelay,
+      isAutoStagger,
       parentId: this.id
     });
 
-    child.currentDelay = calculatedDelay;
     this.children.push(child);
 
     // Native GSAP Nesting
@@ -303,49 +320,75 @@ export class MotionInstance {
 
     this.#childListeners.forEach(cb => cb());
 
-    // if (typeof window !== 'undefined' && ScrollTrigger) {
-    //   ScrollTrigger.refresh();
-    // }
-
     return child;
   }
 
   removeChild(child) {
     const idx = this.children.indexOf(child);
-    if (idx !== -1) {
-      this.children.splice(idx, 1);
-      
-      // Native GSAP detach
+    if (idx === -1 || this.#pendingRemovals.has(child)) return;
+
+    this.children.splice(idx, 1);
+    this.#pendingRemovals.add(child);
+
+    const targets = this.children
+      .filter(c => c.isAutoStagger)
+      .map((c, autoIdx) => ({ child: c, delay: this.#staggerDelay(autoIdx) }));
+
+    this.#finishRemoval(child, targets);
+  }
+
+  async #finishRemoval(child, targets) {
+    try {
+      await this.#reflowSiblings(targets);
+    } catch (err) {
+      console.error(`MotionInstance "${this.id}": reflow failed for removed child`, err);
+      // Structural removal must not depend on animation succeeding.
+    } finally {
+      if (this.#destroyed) return; // instance torn down mid-reflow, nothing left to touch
+
       this.timeline.remove(child.timeline);
       child.destroy();
-
-      const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
-      this.children.forEach((c, newIdx) => {
-        const newDelay = newIdx * stagger;
-        if (c.currentDelay === undefined) {
-          c.currentDelay = c.config.delay || 0;
-        }
-        if (c.delayTween) c.delayTween.kill();
-        c.delayTween = gsap.to(c.timeline, {
-          startTime: newDelay,
-          duration: 0.6,
-          ease: 'power2.out',
-          onUpdate: () => {
-            // Force parent timeline to re-evaluate and broadcast at its current playhead position
-            this.timeline.time(this.timeline.time());
-          }
-        });
-      });
-
+      this.#pendingRemovals.delete(child);
       this.#childListeners.forEach(cb => cb());
-
-      // if (typeof window !== 'undefined' && ScrollTrigger) {
-      //   ScrollTrigger.refresh();
-      // }
     }
   }
 
+  #reflowSiblings(targets) {
+    const reflow = this.#deps.reflowSiblings ?? MotionInstance.#defaultReflow;
+    const transition = this.schemaMotion.staggerTransition ?? {};
+    return Promise.resolve(reflow(targets, this.timeline, transition));
+  }
+
+  static #defaultReflow(targets, parentTimeline, transition = {}) {
+    const duration = transition.duration ?? 0.6;
+    const ease = transition.ease ?? 'power2.out';
+
+    return Promise.all(targets.map(({ child, delay }) => {
+      if (child.currentDelay === undefined) {
+        child.currentDelay = child.config.delay || 0;
+      }
+      if (child.delayTween) child.delayTween.kill();
+
+      return new Promise(resolve => {
+        child.delayTween = gsap.to(child.timeline, {
+          startTime: delay,
+          duration,
+          ease,
+          onUpdate: () => {
+            parentTimeline.time(parentTimeline.time());
+          },
+          onComplete: () => {
+            child.currentDelay = delay;
+            resolve();
+          }
+        });
+      });
+    }));
+  }
+
   destroy() {
+    this.#destroyed = true;
+
     const hadActiveSubscribers = Array.from(this.#subscribers.values())
       .reduce((sum, set) => sum + set.size, 0) > 0;
 
@@ -365,6 +408,12 @@ export class MotionInstance {
       child.destroy();
     });
     this.children.length = 0;
+
+    this.#pendingRemovals.forEach(child => {
+      if (child.delayTween) child.delayTween.kill();
+      child.destroy();
+    });
+    this.#pendingRemovals.clear();
 
     if (this.#onSubscriberChange && hadActiveSubscribers) {
       this.#onSubscriberChange(this, false);
