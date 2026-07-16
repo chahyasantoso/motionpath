@@ -344,7 +344,8 @@ describe('MotionInstance Class', () => {
         staggerTransition: { duration: 0.6 }
       };
       const instance = createTestInstance('time-motion', {}, schemaWithTransition);
-      const child1 = instance.addChild('child-motion', {});
+      instance.addChild('child-motion', {});
+      const child2 = instance.addChild('child-motion', {}); // remove this one (rank 1)
       instance.addChild('child-motion', {}); // survivor — gives the reflow something to do
 
       let capturedOnComplete;
@@ -355,7 +356,7 @@ describe('MotionInstance Class', () => {
 
       const listener = vi.fn();
       instance.onChildChange(listener);
-      instance.removeChild(child1);
+      instance.removeChild(child2);
 
       expect(listener).not.toHaveBeenCalled(); // reflow tween hasn't completed yet
 
@@ -368,13 +369,14 @@ describe('MotionInstance Class', () => {
 
     it('reflows a manually-delayed child too — no more auto/manual distinction', async () => {
       const instance = createTestInstance('time-motion', {}, timelineSchema);
-      const auto1 = instance.addChild('child-motion', {});                // delay 0
-      const custom = instance.addChild('child-motion', { delay: 99 });    // manual, far out
+      instance.addChild('child-motion', {});                              // delay 0 (rank 0)
+      const auto2 = instance.addChild('child-motion', {});               // delay 0.1 (rank 1)
+      const custom = instance.addChild('child-motion', { delay: 99 });   // manual, far out (rank 2)
 
-      instance.removeChild(auto1);
+      instance.removeChild(auto2); // rank 1 removal — cascade fires
 
-      // custom is now a survivor ranked after auto1 in position order, so it
-      // must be reflowed onto auto1's vacated slot (delay 0), same as any
+      // custom is now a survivor ranked after auto2 in position order, so it
+      // must be reflowed onto auto2's vacated slot (0.1), same as any
       // other survivor.
       expect(custom.delayTween).not.toBeNull();
     });
@@ -425,11 +427,6 @@ describe('MotionInstance Class', () => {
 
       instance.removeChild(c2); // triggers cascade: c3 -> 0.2, c4 -> 0.3
 
-      // simulate the reflow having settled (what currentDelay becomes once
-      // the tween's onComplete fires)
-      c3.currentDelay = 0.2;
-      c4.currentDelay = 0.3;
-
       const c5 = instance.addChild('child-motion', {});
 
       // must be 0.4 — one clean stagger after the reflowed frontmost (0.3).
@@ -445,11 +442,12 @@ describe('MotionInstance Class', () => {
         staggerTransition: { duration: 0.25, ease: 'power1.in' }
       };
       const instance = createTestInstance('time-motion', {}, schemaWithTransition);
-      const child1 = instance.addChild('child-motion', {});
+      instance.addChild('child-motion', {});
+      const child2 = instance.addChild('child-motion', {}); // rank 1
       instance.addChild('child-motion', {});
 
       const toSpy = vi.spyOn(gsap, 'to');
-      instance.removeChild(child1);
+      instance.removeChild(child2);
 
       expect(toSpy).toHaveBeenCalled();
       const lastCallArgs = toSpy.mock.calls[toSpy.mock.calls.length - 1];
@@ -464,11 +462,12 @@ describe('MotionInstance Class', () => {
         staggerTransition: { duration: 0 }
       };
       const instance = createTestInstance('time-motion', {}, schemaWithTransition);
-      const child1 = instance.addChild('child-motion', {});
-      const child2 = instance.addChild('child-motion', {});
+      instance.addChild('child-motion', {});
+      const child2 = instance.addChild('child-motion', {}); // rank 1
+      instance.addChild('child-motion', {});
 
       const toSpy = vi.spyOn(gsap, 'to');
-      instance.removeChild(child1);
+      instance.removeChild(child2);
 
       expect(toSpy).toHaveBeenCalled();
       const lastCallArgs = toSpy.mock.calls[toSpy.mock.calls.length - 1];

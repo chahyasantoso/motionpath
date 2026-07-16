@@ -9,7 +9,7 @@ An endless Zuma-style wave-spawner demo showcasing parent-child timeline nesting
 2. [Uniform Path Geometry](#-uniform-path-geometry)
 3. [Linear Speed Progression](#-linear-speed-progression)
 4. [Wave-Based Game Loop (rAF)](#-wave-based-game-loop-raf)
-5. [Event-Driven Reset (`onChildChange`)](#-event-driven-reset-onchildchange)
+5. [Wave Reset & Playhead Re-anchoring](#-wave-reset--playhead-re-anchoring)
 6. [Declarative Sizing Schema](#-declarative-sizing-schema)
 
 ---
@@ -24,10 +24,12 @@ graph TD
     ParentTimeline -->|Controls Playhead| Child2[spiral-zuma child 2]
     ParentTimeline -->|Controls Playhead| Child3[spiral-zuma child 3]
     
-    RAF[requestAnimationFrame loop] -->|Checks spacing & progress| Spawner[Spawner]
-    RAF -->|Destroys completed entities| GarbageCollector[Garbage Collector]
+    Child1 -->|onComplete Event| GC[Garbage Collector: handleAutoRemove]
+    Child2 -->|onComplete Event| GC
+    Child3 -->|onComplete Event| GC
     
-    Engine[onChildChange Event] -->|Active children === 0| ResetWave[Reset Wave & parent.play0]
+    RAF[requestAnimationFrame loop] -->|Checks spacing & progress| Spawner[Spawner]
+    RAF -->|children.length === 0| ResetWave[Reset Wave & parent.play0]
 ```
 
 ---
@@ -67,36 +69,37 @@ This allows us to accurately infer the progress checks (`MIN_SPAWN_PROGRESS`) an
 
 ## 🔄 Wave-Based Game Loop (rAF)
 
-The spawner runs on a native browser `requestAnimationFrame` paint loop, clean of react state renders, split into two specific concerns:
+The spawner runs on a native browser `requestAnimationFrame` paint loop, clean of React state renders.
 
 ### 1. Spawning (The Spawner)
 * **Goal**: Launch balls in a tight, touching chain from the outer tip of the spiral.
 * **Logic**: Only spawns if the count of balls launched in the current wave is less than $30$. Spawns a new ball if no preceding ball exists, or if the last launched ball has progressed past the center-to-center spacing threshold:
   $$\text{MIN\_SPAWN\_PROGRESS} = \frac{\text{BALL\_SIZE}}{\text{totalPathLength}}$$
 
-### 2. Unspawning (The Garbage Collector)
+### 2. Event-Driven Unspawning (The Garbage Collector)
 * **Goal**: Safely clean up and destroy entities that enter the black hole.
-* **GSAP Nesting Limitation**: In GSAP, when child timelines are nested inside a parent timeline, the child's `onComplete` callback does not reliably trigger because their playheads are governed by the parent.
-* **Fix**: The loop scans active ball timelines at 60fps. When a ball's progress reaches $\ge 0.999$ (swallowed), it automatically triggers `handleAutoRemove(id, inst)`, removing the ball from React state and calling `containerInstance.removeChild(inst)` on the engine.
+* **Mechanism**: On-complete events are fully reliable due to the engine's correct playhead sync and predecessor-anchored spawn placement (which avoids cascade reflow drift). When a ball finishes its path, its event-driven `onComplete` callback fires immediately, triggering `handleAutoRemove(id, inst)` to remove the ball from React state and invoke `containerInstance.removeChild(inst)`.
 
 ---
 
-## 🔔 Event-Driven Reset (`onChildChange`)
+## 🔄 Wave Reset & Playhead Re-anchoring
 
-Rather than polling the active counts on every frame, we subscribe to the engine's built-in event listener `onChildChange` to manage wave resets:
+Wave resets are evaluated directly inside the spawner's tick loop when spawning completes:
 
 ```javascript
-    const unsubscribe = containerInstance.onChildChange(() => {
-      if (containerInstance.children.length === 0 && spawnedCount.current > 0) {
+    const handleSpawningNewBalls = () => {
+      if (spawnedCount.current < 30) {
+        // Spawning logic...
+      } else if (containerInstance.children.length === 0) {
         spawnedCount.current = 0;
         containerInstance.timeline.play(0);
       }
-    });
+    };
 ```
 
 * When all balls are cleared (popped by clicks or swallowed by the black hole), `children.length` becomes `0`.
-* The callback resets `spawnedCount.current` to `0` and forces the parent timeline back to time `0` using `.play(0)`.
-* Moving the playhead back to `0` is critical because GSAP completes and pauses the parent timeline at the end of the first wave; calling `.play(0)` resumes the playhead so that the next wave's balls play correctly from the outer edge.
+* The tick loop detects this, resets `spawnedCount.current` to `0`, and forces the parent timeline back to time `0` using `.play(0)`.
+* Replaying from `0` is critical because GSAP completes and pauses the parent timeline at the end of a wave; calling `.play(0)` resumes the playhead so that the next wave's balls play correctly from the outer edge.
 
 ---
 

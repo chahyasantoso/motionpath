@@ -101,7 +101,7 @@ const dynamicCarouselScene = {
   staggerTransition: { duration: 0.4, ease: 'power3.out' },
   tracks: [
     {
-      id: 'card-track',
+      id: 'carousel-card-track',
       keyframes: {
         path: {
           points: [
@@ -143,7 +143,7 @@ const dynamicHelixScene = {
   stagger: 0.16,
   tracks: [
     {
-      id: 'card-track',
+      id: 'helix-card-track',
       keyframes: {
         path: {
           points: helixPathPoints,
@@ -233,7 +233,7 @@ function Cloud({ instance }) {
 function CarouselCard({ instance, cardData, onRemove }) {
   const ref = useRef(null);
   const [activeInstance, setActiveInstance] = React.useState(instance);
-  const [activeTrackId, setActiveTrackId] = React.useState('card-track');
+  const [activeTrackId, setActiveTrackId] = React.useState('carousel-card-track');
 
   const transform = useCallback((rawData, composeFn) => {
     if (activeTrackId === 'card-exit-track') {
@@ -338,7 +338,7 @@ function HelixCard({ instance, cardData }) {
     };
   }, []);
 
-  useMotionSubscriber(instance, 'card-track', ref, transform);
+  useMotionSubscriber(instance, 'helix-card-track', ref, transform);
 
   return (
     <div ref={ref} className="element helix-card">

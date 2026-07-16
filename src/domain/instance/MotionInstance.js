@@ -340,13 +340,17 @@ export class MotionInstance {
     this.children.splice(idx, 1);
     this.#pendingRemovals.add(child);
 
-    // Every survivor after the removed slot inherits the position that
-    // belonged to whoever was immediately ahead of it (a cascade), not a
-    // recomputed index*stagger formula. This works uniformly for auto- and
-    // manually-placed children and needs no reference to schemaMotion.stagger.
+    // Cascade only when removing from the middle of the chain (rank > 0).
+    // Removing the frontmost child (rank 0) never creates a gap — it's the
+    // leading edge, and the next child naturally becomes the new leader.
+    // Cascading rank 0 removals shifts all survivors' startTimes earlier on
+    // the parent timeline, which can push children past completion and
+    // trigger an avalanche of instant completions during natural drain.
     const targets = [];
-    for (let k = removedRank + 1; k < ordered.length; k++) {
-      targets.push({ child: ordered[k], delay: ordered[k - 1].currentDelay ?? 0 });
+    if (removedRank > 0) {
+      for (let k = removedRank + 1; k < ordered.length; k++) {
+        targets.push({ child: ordered[k], delay: ordered[k - 1].currentDelay ?? 0 });
+      }
     }
 
     this.#finishRemoval(child, targets);
@@ -381,6 +385,7 @@ export class MotionInstance {
         child.currentDelay = child.config.delay || 0;
       }
       if (child.delayTween) child.delayTween.kill();
+      child.currentDelay = delay;
 
       return new Promise(resolve => {
         child.delayTween = gsap.to(child.timeline, {
@@ -391,7 +396,6 @@ export class MotionInstance {
             this.timeline.time(this.timeline.time());
           },
           onComplete: () => {
-            child.currentDelay = delay;
             resolve();
           }
         });
