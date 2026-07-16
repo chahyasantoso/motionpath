@@ -22,7 +22,6 @@ export class MotionInstance {
   #scrollTrigger = null;
   #pendingRemovals = new Set(); // children mid-reflow, not yet detached from timeline
   #destroyed = false;
-  #autoStaggerSpawnCount = 0; // monotonic; never decremented by removals — see addChild()
 
   constructor(motionId, config, schemaMotion, context) {
     this.id = MotionInstance.#generateUniqueId();
@@ -279,11 +278,6 @@ export class MotionInstance {
     return () => this.#childListeners.delete(callback);
   }
 
-  #staggerDelay(index) {
-    const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
-    return index * stagger;
-  }
-
   addChild(motionIdOrConfig, config) {
     if (this.#destroyed) {
       throw new Error(`addChild: instance "${this.id}" is destroyed.`);
@@ -299,12 +293,19 @@ export class MotionInstance {
       targetConfig = motionIdOrConfig;
     }
 
-    // Placement uses a monotonic spawn counter, not live sibling count.
-    // Live count plateaus under continuous spawn+remove (removals keep pace
-    // with spawns), which would place new children behind the parent
-    // timeline's actual playhead — see brief 15 for the failure mode this
-    // caused (stuck children.length, orphaned never-completing children).
-    const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(this.#autoStaggerSpawnCount++);
+    // Placement is derived from actual current sibling state, not a formula
+    // counted from a fixed origin — same principle removeChild's cascade
+    // already uses. A counter-based approach (tried in brief 15) fixes live
+    // count plateauing under churn, but goes stale the moment removeChild's
+    // cascade shifts the existing chain: the counter has no way to know that
+    // happened, so every removal-with-reflow before a spawn leaves a
+    // permanent extra stagger-width gap between the old chain and everything
+    // spawned after it. Anchoring to the real frontmost position is immune
+    // to both failure modes at once, and needs no reset bookkeeping — an
+    // empty children array naturally resolves to delay 0.
+    const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
+    const frontmostDelay = this.children.reduce((max, c) => Math.max(max, c.currentDelay ?? 0), -stagger);
+    const calculatedDelay = targetConfig.delay ?? (frontmostDelay + stagger);
 
     const child = this.#deps.mountInstance(targetMotionId, {
       ...targetConfig,
@@ -363,12 +364,6 @@ export class MotionInstance {
       this.timeline.remove(child.timeline);
       child.destroy();
       this.#pendingRemovals.delete(child);
-
-      // Wave cleared — next spawn should restart the placement rhythm from 0
-      // rather than keep climbing on top of a wave that's now fully gone.
-      if (this.children.length === 0) {
-        this.#autoStaggerSpawnCount = 0;
-      }
 
       this.#childListeners.forEach(cb => cb());
     }
