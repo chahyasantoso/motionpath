@@ -283,6 +283,26 @@ export default function SpiralPage() {
     }]);
   }, [isLoaded, containerInstance]);
  
+  // Debug listener for child changes
+  useEffect(() => {
+    if (!containerInstance) return;
+
+    const unsubscribe = containerInstance.onChildChange(() => {
+      const activeChildren = containerInstance.children;
+      const childDelays = activeChildren.map(c => c.currentDelay?.toFixed(3));
+      console.log(
+        `[SpiralPage Debug] Child list changed! ` +
+        `Active Count: ${activeChildren.length}, ` +
+        `Current Delays: [${childDelays.join(', ')}], ` +
+        `Current Wave Spawned: ${spawnedCount.current}/30`
+      );
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [containerInstance]);
+
   // Auto-spawn: spawn a wave of 30 balls, then pause (using native requestAnimationFrame).
   // Ball removal on completion is handled entirely by SpiralBall's onComplete callback
   // (event-driven) — no polling needed here.
