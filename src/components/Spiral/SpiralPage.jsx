@@ -283,20 +283,13 @@ export default function SpiralPage() {
     }]);
   }, [isLoaded, containerInstance]);
  
-  // Auto-spawn: spawn a wave of 30 balls, then pause (using native requestAnimationFrame)
+  // Auto-spawn: spawn a wave of 30 balls, then pause (using native requestAnimationFrame).
+  // Ball removal on completion is handled entirely by SpiralBall's onComplete callback
+  // (event-driven) — no polling needed here.
   useEffect(() => {
     if (!isLoaded || !containerInstance) return;
  
     let rafId;
- 
-    // unspawn: identify and remove balls that reach the black hole
-    const checkAndUnspawnCompletedBalls = () => {
-      ballInstancesMap.current.forEach((inst, id) => {
-        if (inst.timeline.progress() >= 0.999) {
-          handleAutoRemove(id, inst);
-        }
-      });
-    };
  
     // spawn: launch new balls based on progress spacing
     const handleSpawningNewBalls = () => {
@@ -314,7 +307,6 @@ export default function SpiralPage() {
     };
  
     const tick = () => {
-      checkAndUnspawnCompletedBalls();
       handleSpawningNewBalls();
       rafId = requestAnimationFrame(tick);
     };
@@ -325,7 +317,7 @@ export default function SpiralPage() {
       ballInstancesMap.current.clear();
       spawnedCount.current = 0;
     };
-  }, [addBall, handleAutoRemove, isLoaded, containerInstance]);
+  }, [addBall, isLoaded, containerInstance]);
  
   return (
     <div className="app zuma-app">
