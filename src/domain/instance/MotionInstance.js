@@ -22,6 +22,7 @@ export class MotionInstance {
   #scrollTrigger = null;
   #pendingRemovals = new Set(); // children mid-reflow, not yet detached from timeline
   #destroyed = false;
+  #autoStaggerSpawnCount = 0; // monotonic; never decremented by removals — see addChild()
 
   constructor(motionId, config, schemaMotion, context) {
     this.id = MotionInstance.#generateUniqueId();
@@ -36,7 +37,6 @@ export class MotionInstance {
     this.children = [];
     this.tracksMap = new Map();
     this.currentDelay = config.delay ?? undefined;
-    this.isAutoStagger = config.isAutoStagger ?? true;
     this.delayTween = null;
     this.paddingCallback = null;
 
@@ -299,14 +299,16 @@ export class MotionInstance {
       targetConfig = motionIdOrConfig;
     }
 
-    const isAutoStagger = targetConfig.delay === undefined;
-    const autoIndex = this.children.filter(c => c.isAutoStagger).length;
-    const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(autoIndex);
+    // Placement uses a monotonic spawn counter, not live sibling count.
+    // Live count plateaus under continuous spawn+remove (removals keep pace
+    // with spawns), which would place new children behind the parent
+    // timeline's actual playhead — see brief 15 for the failure mode this
+    // caused (stuck children.length, orphaned never-completing children).
+    const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(this.#autoStaggerSpawnCount++);
 
     const child = this.#deps.mountInstance(targetMotionId, {
       ...targetConfig,
       delay: calculatedDelay,
-      isAutoStagger,
       parentId: this.id
     });
 
@@ -326,12 +328,25 @@ export class MotionInstance {
     const idx = this.children.indexOf(child);
     if (idx === -1 || this.#pendingRemovals.has(child)) return;
 
+    // Reflow must walk children in actual timeline-position order, not
+    // insertion order — a manually-delayed child can land anywhere relative
+    // to auto-placed siblings. Source of truth is currentDelay (the settled
+    // logical position), never timeline.startTime() live, which is actively
+    // animating during an in-flight reflow and would give unstable targets.
+    const ordered = [...this.children].sort((a, b) => (a.currentDelay ?? 0) - (b.currentDelay ?? 0));
+    const removedRank = ordered.indexOf(child);
+
     this.children.splice(idx, 1);
     this.#pendingRemovals.add(child);
 
-    const targets = this.children
-      .filter(c => c.isAutoStagger)
-      .map((c, autoIdx) => ({ child: c, delay: this.#staggerDelay(autoIdx) }));
+    // Every survivor after the removed slot inherits the position that
+    // belonged to whoever was immediately ahead of it (a cascade), not a
+    // recomputed index*stagger formula. This works uniformly for auto- and
+    // manually-placed children and needs no reference to schemaMotion.stagger.
+    const targets = [];
+    for (let k = removedRank + 1; k < ordered.length; k++) {
+      targets.push({ child: ordered[k], delay: ordered[k - 1].currentDelay ?? 0 });
+    }
 
     this.#finishRemoval(child, targets);
   }
@@ -348,6 +363,13 @@ export class MotionInstance {
       this.timeline.remove(child.timeline);
       child.destroy();
       this.#pendingRemovals.delete(child);
+
+      // Wave cleared — next spawn should restart the placement rhythm from 0
+      // rather than keep climbing on top of a wave that's now fully gone.
+      if (this.children.length === 0) {
+        this.#autoStaggerSpawnCount = 0;
+      }
+
       this.#childListeners.forEach(cb => cb());
     }
   }

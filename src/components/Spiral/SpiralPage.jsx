@@ -283,25 +283,6 @@ export default function SpiralPage() {
     }]);
   }, [isLoaded, containerInstance]);
  
-  // Listen for children changes in the parent timeline to reset the wave when all balls are gone
-  useEffect(() => {
-    if (!containerInstance) return;
- 
-    const unsubscribe = containerInstance.onChildChange(() => {
-      // If all children have been removed, reset the wave count and play parent timeline from 0
-      console.log('Child changed', containerInstance.children.length, spawnedCount.current);
-      if (containerInstance.children.length === 0 && spawnedCount.current > 0) {
-        spawnedCount.current = 0;
-        containerInstance.timeline.play(0);
-        console.log('All balls removed, resetting wave');
-      }
-    });
- 
-    return () => {
-      unsubscribe();
-    };
-  }, [containerInstance]);
- 
   // Auto-spawn: spawn a wave of 30 balls, then pause (using native requestAnimationFrame)
   useEffect(() => {
     if (!isLoaded || !containerInstance) return;
@@ -326,6 +307,9 @@ export default function SpiralPage() {
           addBall();
           spawnedCount.current += 1;
         }
+      } else if (containerInstance.children.length === 0) {
+        spawnedCount.current = 0;
+        containerInstance.timeline.play(0);
       }
     };
  

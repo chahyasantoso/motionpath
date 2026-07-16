@@ -8,6 +8,7 @@ describe('domRenderer', () => {
   beforeEach(() => {
     target = {};
     vi.spyOn(gsap, 'set').mockImplementation(() => {});
+    vi.clearAllMocks();
   });
 
   it('serializes a numeric filter object into a CSS filter string', () => {

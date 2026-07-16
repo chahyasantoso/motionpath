@@ -1,9 +1,15 @@
-import { resolvePluginForKey } from '../domain/plugins.js';
-
 /**
  * ComposeTrackPatch use case.
  * Runs plugin.compose() for every plugin in `plugins`, merges the results into
  * one patch object.
+ *
+ * Note: `plugins` must already be the fully-resolved plugin list for this
+ * track (same list used to build the track's tween/proxy). There is
+ * deliberately no secondary "resolve extra properties from rawData" fallback
+ * here — every key in `rawData` is written by contribute() from a plugin
+ * already in `plugins`, so a second resolution pass would either be dead
+ * code or, if it ever did fire, an untracked compose() call that bypasses
+ * the error-context wrapping below. One loop, one error-handling path.
  *
  * @param {Array} plugins - already-resolved plugins for this track
  * @param {object} rawData
@@ -34,23 +40,6 @@ export function composeTrackPatch(plugins, rawData, trackConfig, context = '') {
         patch.filter = { ...(patch.filter || {}), ...v };
       } else {
         patch[k] = v;
-      }
-    }
-  }
-
-  // Dynamically resolve and compose any extra properties present in rawData
-  for (const key of Object.keys(rawData || {})) {
-    if (patch[key] !== undefined) continue;
-
-    const plugin = resolvePluginForKey(key);
-    if (plugin && typeof plugin.compose === 'function') {
-      const contribution = plugin.compose(rawData, trackConfig);
-      if (contribution && contribution[key] !== undefined) {
-        if (key === 'filter' && typeof contribution.filter === 'object' && contribution.filter !== null) {
-          patch.filter = { ...(patch.filter || {}), ...contribution.filter };
-        } else {
-          patch[key] = contribution[key];
-        }
       }
     }
   }

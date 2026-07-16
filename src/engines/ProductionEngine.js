@@ -10,6 +10,7 @@ export class ProductionEngine extends BaseEngine {
       const controller = this._groups.get(groupSpec.timelineId);
       instance.play = () => controller.play();
       instance.pause = () => controller.pause();
+      instance.seek = (progress) => controller.seek(progress);
     }
   }
 }

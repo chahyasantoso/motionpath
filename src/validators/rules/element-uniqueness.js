@@ -1,13 +1,21 @@
 /**
  * Rule: element-uniqueness
  *
- * Track ID uniqueness check, scoped per motion (not project-wide — nothing
- * in the engine currently looks up a track by id without a motionId
- * alongside it, so cross-motion duplicates are intentionally allowed).
+ * Track ID uniqueness check, scoped PROJECT-WIDE across all motions.
+ *
+ * This must stay project-wide, not per-motion: EditorEngine.loadProject()
+ * builds one flat Map keyed only by track id (`#trackIndex`) across every
+ * motion in the project, for its subscribe()/compose()/setProgress() API.
+ * A per-motion-only check would let two motions declare the same track id,
+ * which would then silently collide in that flat map (last motion mounted
+ * wins, the other's track becomes unreachable) with no error surfaced
+ * anywhere. This rule exists specifically to make that conflict a build-time
+ * error instead of a silent runtime bug.
  *
  * Requirements:
- * - Within a single motion, every track.id must be unique.
- * - A duplicate id within the same motion -> error.
+ * - Every track.id must be unique across the entire project (all motions).
+ * - A duplicate id anywhere in the project -> error, reported at the second
+ *   (later) occurrence, with a pointer back to the first occurrence.
  *
  * @param {unknown[]} motions
  * @returns {ValidationError[]}
@@ -19,27 +27,30 @@ export function elementUniquenessRule(motions, context) {
     return errors;
   }
 
+  const seenIds = new Map(); // trackId -> { motionIndex, trackIndex }
+
   motions.forEach((motion, motionIndex) => {
     if (!motion || typeof motion !== 'object') return;
     const tracks = motion.tracks;
     if (!Array.isArray(tracks)) return;
-
-    const seenIds = new Set();
 
     tracks.forEach((track, trackIndex) => {
       if (!track || typeof track !== 'object') return;
       const { id } = track;
       if (id !== undefined && id !== null && id !== '') {
         const tid = String(id);
-        if (seenIds.has(tid)) {
+        const first = seenIds.get(tid);
+        if (first) {
           errors.push({
             ruleId: "element-uniqueness",
             severity: "error",
-            message: `Duplicate track ID '${tid}' found within the same motion (motion index: ${motionIndex}).`,
+            message: `Duplicate track ID '${tid}' found in motions[${motionIndex}].tracks[${trackIndex}] ` +
+              `(already used in motions[${first.motionIndex}].tracks[${first.trackIndex}]). ` +
+              `Track IDs must be unique project-wide, not just within a motion.`,
             path: `motions[${motionIndex}].tracks[${trackIndex}].id`
           });
         } else {
-          seenIds.add(tid);
+          seenIds.set(tid, { motionIndex, trackIndex });
         }
       }
     });

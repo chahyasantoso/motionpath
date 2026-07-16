@@ -344,6 +344,57 @@ describe('ProductionEngine (Lazy/Instance Architecture)', () => {
       expect(typeof instB.play).toBe('function');
     });
 
+    it('seek on grouped instance controls master, not the member\'s own timeline', async () => {
+      validatorModule.validateProject.mockReturnValue([]);
+      const engine = createProductionEngine(mockDeps);
+
+      const timeGroupSchema = {
+        templates: [],
+        motions: [
+          {
+            motionId: 'tg-a',
+            driver: {
+              type: 'timeline',
+              timelineId: 'time-group',
+              trigger: { type: 'time', duration: 1 }
+            },
+            tracks: [
+              { id: 'tg-track-a', keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 10 }] } } }
+            ]
+          },
+          {
+            motionId: 'tg-b',
+            driver: {
+              type: 'timeline',
+              timelineId: 'time-group',
+              primary: true,
+              trigger: { type: 'time', duration: 1, repeat: 0 }
+            },
+            tracks: [
+              { id: 'tg-track-b', keyframes: { y: { stops: [{ p: 0, v: 0 }, { p: 1, v: 20 }] } } }
+            ]
+          }
+        ]
+      };
+
+      await engine.loadProject(timeGroupSchema);
+
+      const instA = engine.mountInstance('tg-a');
+      const instB = engine.mountInstance('tg-b');
+
+      expect(typeof instA.seek).toBe('function');
+      expect(typeof instB.seek).toBe('function');
+
+      const memberOwnProgressSpy = vi.spyOn(instA.timeline, 'progress');
+
+      instA.seek(0.5);
+
+      // The member's own nested timeline must NOT have been driven directly —
+      // seek() on a grouped instance must go through the master, exactly like
+      // play()/pause() already do.
+      expect(memberOwnProgressSpy).not.toHaveBeenCalledWith(0.5);
+    });
+
     it('ungrouped motions are unaffected', async () => {
       validatorModule.validateProject.mockReturnValue([]);
       const engine = createProductionEngine(mockDeps);
