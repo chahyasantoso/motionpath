@@ -143,6 +143,38 @@ During entrance and exit transitions, a ball follower requires inputs from **two
 
 Instead of writing to the DOM via two independent, racing hooks, `SpiralBall.jsx` binds to both timelines using `useMotionSubscribers(sources, ref, mergeFn)`:
 
+```mermaid
+graph TD
+    subgraph Timelines [Independent Timeline Sources]
+        T1["baseInstance (ball-track)<br>• Animates path position: x, y, rotation<br>• Utility: pathProgress"]
+        T2["activeInstance (ball-entrance-track or ball-exit-track)<br>• Animates offset properties: scale, opacity"]
+    end
+
+    subgraph Hook [useMotionSubscribers Coordination]
+        Sub1["subscribeToTrack 1<br>(evaluates path coordinates)"]
+        Sub2["subscribeToTrack 2<br>(evaluates entrance/exit scaling)"]
+        
+        Frame1["Frame 0<br>raw: { pathProgress }<br>patch: { transform }"]
+        Frame2["Frame 1<br>raw: {}<br>patch: { scale, opacity }"]
+    end
+
+    subgraph Consumer [SpiralBall.jsx mergeFn]
+        Merge["mergeFn(frames)<br>1. Checks base pathProgress<br>2. Combines base.patch + transition.patch<br>3. Forces display: 'flex'"]
+    end
+
+    subgraph DOM [Target DOM Node]
+        Render["domRenderer<br>Writes: transform, scale, opacity, display"]
+    end
+
+    T1 -->|rawData 1| Sub1
+    T2 -->|rawData 2| Sub2
+    Sub1 -->|produces| Frame1
+    Sub2 -->|produces| Frame2
+    Frame1 -->|evaluates| Merge
+    Frame2 -->|evaluates| Merge
+    Merge -->|final CSS patch| Render
+```
+
 ### The Frame-Object Contract
 To prevent raw coordinate metadata (e.g. `pathProgress`) from leaking into final DOM patches (which violates boundaries and can cause visual bugs), the hook operates on **Frames** rather than flat patches:
 ```javascript
