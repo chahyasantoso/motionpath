@@ -11,6 +11,7 @@ An endless Zuma-style wave-spawner demo showcasing parent-child timeline nesting
 4. [Wave-Based Game Loop (rAF)](#-wave-based-game-loop-raf)
 5. [Wave Reset & Playhead Re-anchoring](#-wave-reset--playhead-re-anchoring)
 6. [Declarative Sizing Schema](#-declarative-sizing-schema)
+7. [Multi-Source Subscription & Composition](#-multi-source-subscription--composition)
 
 ---
 
@@ -131,3 +132,49 @@ Sizing is completely decoupled from inline React styles and CSS class lookups by
 ```
 
 The engine's native `cssVarPlugin` automatically captures this variable, composes the patch, and applies it straight to the DOM ref. This variable is registered in both `spiralZumaScene` and `ballExitScene` to ensure the ball preserves its correct size when transitioning into pop animations.
+
+---
+
+## 🔗 Multi-Source Subscription & Composition
+
+During entrance and exit transitions, a ball follower requires inputs from **two independent timelines**:
+1. The **base timeline** (`ball-track`) providing the latest $x$, $y$, and $rotation$ coordinates along the spiral.
+2. The **transition timeline** (`ball-entrance-track` or `ball-exit-track`) providing scale, opacity, and custom offset animations.
+
+Instead of writing to the DOM via two independent, racing hooks, `SpiralBall.jsx` binds to both timelines using `useMotionSubscribers(sources, ref, mergeFn)`:
+
+### The Frame-Object Contract
+To prevent raw coordinate metadata (e.g. `pathProgress`) from leaking into final DOM patches (which violates boundaries and can cause visual bugs), the hook operates on **Frames** rather than flat patches:
+```javascript
+// Each frame yield contains:
+{
+  raw: rawData,  // Raw unprocessed track values (e.g. pathProgress)
+  patch: patch   // Composed renderer-ready CSS properties
+}
+```
+
+### The Merge Logic
+The consumer's custom `mergeFn` receives an array of these frame objects and dynamically decides how to combine them:
+
+```javascript
+const mergeFn = useCallback((frames) => {
+  const base = frames[0];
+  const transition = frames[1]; // Present only during entrance/exit states
+
+  const p = base.raw?.pathProgress ?? 0;
+
+  // 1. Single Source: Normal path travel (checks boundary on raw data)
+  if (!transition && (p <= 0 || p >= 1)) {
+    return { display: 'none', opacity: 0 };
+  }
+
+  // 2. Dual Source: Spawning/Exiting (forces display flex, merges base path + transition offsets)
+  if (transition) {
+    return { ...base.patch, ...transition.patch, display: 'flex' };
+  }
+
+  return { ...base.patch, display: 'flex' };
+}, []);
+```
+
+This keeps the engine's core hook focused solely on subscription coordination, while leaving the layout-level decision of when and how to compose patches entirely to the consumer.
