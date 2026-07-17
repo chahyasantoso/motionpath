@@ -192,7 +192,6 @@ export class BaseEngine {
   }
 
   _cleanup() {
-    this.#loadGeneration++;
     for (const instance of this._instances.values()) {
       try { instance.destroy(); } catch (e) { /* ignore */ }
     }

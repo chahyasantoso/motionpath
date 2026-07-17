@@ -96,17 +96,22 @@ export class MotionInstance {
   #setupDriver(config) {
     const driverType = this.schemaMotion.driver?.type;
     const trigger = this.schemaMotion.driver?.trigger || {};
+    const owns = this.#ownsTrigger(config);
 
     if (driverType === 'timeline' || driverType === 'gsap-timeline') {
-      this.timeline
-        .repeat(trigger.repeat ?? 0)
-        .yoyo(!!trigger.yoyo)
-        .repeatDelay(trigger.repeatDelay ?? 0);
+      // Only configure repeat/yoyo/repeatDelay when this instance owns its
+      // driver. Grouped members have _suppressDriver set by the engine so
+      // their own timelines stay as plain holders; TimelineGroupController
+      // configures the master timeline instead.
+      if (owns) {
+        this.timeline
+          .repeat(trigger.repeat ?? 0)
+          .yoyo(!!trigger.yoyo)
+          .repeatDelay(trigger.repeatDelay ?? 0);
 
-      // Auto-play if not a child instance and autoplay is enabled
-      const shouldPlay = this.#ownsTrigger(config) && (config.autoplay ?? true);
-      if (shouldPlay) {
-        this.timeline.play();
+        if (config.autoplay ?? true) {
+          this.timeline.play();
+        }
       }
     } else if (driverType === 'scroll' || driverType === 'gsap-scroll') {
       const resolvedConfig = {
@@ -134,7 +139,7 @@ export class MotionInstance {
         );
       }
 
-      if (this.#ownsTrigger(config)) {
+      if (owns) {
         if (trigger.scrub) {
           this.#scrollTrigger = ScrollTrigger.create({
             ...resolvedConfig,
@@ -263,6 +268,7 @@ export class MotionInstance {
   }
 
   broadcast() {
+    if (this.#destroyed) return;
     for (const trackId of this.tracksMap.keys()) {
       const snapshot = this.getCurrentSnapshot(trackId);
       const trackSubscribers = this.#subscribers.get(trackId);
@@ -378,14 +384,19 @@ export class MotionInstance {
     const duration = transition.duration ?? 0;
     const ease = transition.ease ?? 'power2.out';
 
-    // kalau duration 0 masih kurang efisien karena 
-    // masih bikin object tween meskipun langsung resolve
     return Promise.all(targets.map(({ child, delay }) => {
       if (child.currentDelay === undefined) {
         child.currentDelay = child.config.delay || 0;
       }
       if (child.delayTween) child.delayTween.kill();
       child.currentDelay = delay;
+
+      // Short-circuit: no tween needed when transition duration is zero.
+      if (duration === 0) {
+        child.timeline.startTime(delay);
+        this.timeline.time(this.timeline.time());
+        return Promise.resolve();
+      }
 
       return new Promise(resolve => {
         child.delayTween = gsap.to(child.timeline, {
@@ -407,8 +418,13 @@ export class MotionInstance {
     if (this.#destroyed) return;
     this.#destroyed = true;
 
+    // Notify the engine BEFORE tearing down state so it can unregister this
+    // instance while the object is still structurally intact.
     const hadActiveSubscribers = Array.from(this.#subscribers.values())
       .reduce((sum, set) => sum + set.size, 0) > 0;
+    if (this.#onSubscriberChange && hadActiveSubscribers) {
+      this.#onSubscriberChange(this, false);
+    }
 
     if (this.#scrollTrigger) {
       this.#scrollTrigger.kill();
@@ -432,10 +448,6 @@ export class MotionInstance {
       child.destroy();
     });
     this.#pendingRemovals.clear();
-
-    if (this.#onSubscriberChange && hadActiveSubscribers) {
-      this.#onSubscriberChange(this, false);
-    }
   }
 
   get requiredTriggerIds() {

@@ -377,8 +377,9 @@ describe('MotionInstance Class', () => {
 
       // custom is now a survivor ranked after auto2 in position order, so it
       // must be reflowed onto auto2's vacated slot (0.1), same as any
-      // other survivor.
-      expect(custom.delayTween).not.toBeNull();
+      // other survivor. With duration === 0, the snap is immediate so there
+      // is no delayTween; instead currentDelay is updated directly.
+      expect(custom.currentDelay).toBeCloseTo(0.1);
     });
 
     it('cascades survivors onto the vacated predecessor slot, not a recomputed formula', () => {
@@ -399,8 +400,9 @@ describe('MotionInstance Class', () => {
 
       // c2 must inherit c1's vacated slot (0.1), c3 must inherit c2's
       // original slot (0.2) — a cascade, not a re-derived index*stagger.
-      expect(c2.delayTween).not.toBeNull();
-      expect(c3.delayTween).not.toBeNull();
+      // With duration === 0, snap is immediate — no delayTween, just currentDelay.
+      expect(c2.currentDelay).toBeCloseTo(0.1);
+      expect(c3.currentDelay).toBeCloseTo(0.2);
     });
 
     it('restarts placement at 0 after all children have been removed', async () => {
@@ -464,14 +466,16 @@ describe('MotionInstance Class', () => {
       const instance = createTestInstance('time-motion', {}, schemaWithTransition);
       instance.addChild('child-motion', {});
       const child2 = instance.addChild('child-motion', {}); // rank 1
-      instance.addChild('child-motion', {});
+      const child3 = instance.addChild('child-motion', {});
 
       const toSpy = vi.spyOn(gsap, 'to');
       instance.removeChild(child2);
 
-      expect(toSpy).toHaveBeenCalled();
-      const lastCallArgs = toSpy.mock.calls[toSpy.mock.calls.length - 1];
-      expect(lastCallArgs[1].duration).toBe(0);
+      // With duration === 0, the short-circuit path runs: no gsap.to, no
+      // delayTween — currentDelay is snapped directly on the child.
+      expect(toSpy).not.toHaveBeenCalled();
+      expect(child3.delayTween).toBeNull();
+      expect(child3.currentDelay).toBeCloseTo(0.1);
       toSpy.mockRestore();
     });
 

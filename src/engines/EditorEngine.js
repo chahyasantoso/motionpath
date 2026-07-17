@@ -4,6 +4,12 @@ import { BaseEngine } from './BaseEngine.js';
 
 export class EditorEngine extends BaseEngine {
   #trackIndex = new Map();
+  // A second, independent deferred-call queue keyed on #trackIndex instead of
+  // EngineCore. BaseEngine's deferredCall buffers subscriber calls until the
+  // GSAP tick core is ready; this one buffers track-level subscribe() calls
+  // until loadProject has finished building the #trackIndex. They manage
+  // different lifecycles and must remain separate — flushing one does not
+  // imply the other is ready.
   #deferredCall = createDeferredCall();
 
   _configForMount(motionId, config, groupSpec) {
