@@ -1,35 +1,31 @@
 import { useCallback, useRef } from 'react';
 import useMotionSubscribers from '../../hooks/useMotionSubscribers';
 
-export function transformActive(basePatch) {
-  const p = basePatch?.pathProgress ?? 0;
-  if (p <= 0 || p >= 1) {
-    return { display: 'none', opacity: 0 };
-  }
-  return { ...basePatch, display: 'flex' };
-}
-
-export function transformTransition(basePatch, transitionPatch) {
-  return {
-    ...basePatch,
-    ...transitionPatch,
-    display: 'flex'
-  };
-}
-
 export default function SpiralBall({ vm }) {
   const ref = useRef(null);
 
   const sources = [
     { instance: vm.baseInstance, trackId: 'ball-track' },
-    ...(vm.activeInstance !== vm.baseInstance ? [{ instance: vm.activeInstance, trackId: vm.activeTrackId }] : [])
+    ...(vm.activeInstance !== vm.baseInstance
+      ? [{ instance: vm.activeInstance, trackId: vm.activeTrackId }]
+      : [])
   ];
 
-  const mergeFn = useCallback((patches) => {
-    if (patches.length === 2) {
-      return transformTransition(patches[0], patches[1]);
+  const mergeFn = useCallback((frames) => {
+    const base = frames[0];
+    const transition = frames[1]; // undefined when not in a spawn/exit transition
+
+    const p = base.raw?.pathProgress ?? 0;
+
+    if (!transition && (p <= 0 || p >= 1)) {
+      return { display: 'none', opacity: 0 };
     }
-    return transformActive(patches[0]);
+
+    if (transition) {
+      return { ...base.patch, ...transition.patch, display: 'flex' };
+    }
+
+    return { ...base.patch, display: 'flex' };
   }, []);
 
   useMotionSubscribers(sources, ref, mergeFn);

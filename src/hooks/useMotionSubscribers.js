@@ -5,15 +5,17 @@ function sourcesSignature(sources) {
   return sources.map(s => `${s.instance?.id ?? ''}::${s.trackId ?? ''}`).join('|');
 }
 
-function subscribeToTrack(instance, trackId, getTransformFn, onPatch) {
+function subscribeToTrack(instance, trackId, getTransformFn, onFrame) {
   if (!instance || !trackId) return () => {};
 
-  const compose = (data) => instance.compose(trackId, data);
+  const composeFn = (data) => instance.compose(trackId, data);
 
   return instance.subscribe(trackId, (rawData) => {
     const transformFn = getTransformFn();
-    const patch = typeof transformFn === 'function' ? transformFn(rawData, compose) : compose(rawData);
-    onPatch(patch);
+    const patch = typeof transformFn === 'function'
+      ? transformFn(rawData, composeFn)
+      : composeFn(rawData);
+    onFrame({ raw: rawData, patch });
   });
 }
 
@@ -21,14 +23,20 @@ function subscribeToTrack(instance, trackId, getTransformFn, onPatch) {
  * Merges N motion/track sources into one DOM write per tick. Each source may
  * have its own optional transformFn (same contract as the single-source
  * transformFn: receives (rawData, composeFn), returns a CSS patch). Every tick
- * from any one source re-merges all sources' latest composed patches and
- * writes once via domRenderer, so precedence on any property two sources both
- * touch is deterministic (array order, or a custom mergeFn) rather than
- * dependent on which source's GSAP timeline happens to tick first.
+ * from any one source re-merges all sources' latest frames and writes once via
+ * domRenderer.
+ *
+ * mergeFn receives frames: Array<{ raw: object, patch: object }>
+ *   - frame.raw  : the unprocessed data from the track (includes pathProgress etc.)
+ *   - frame.patch: the composed CSS patch (from transformFn or default compose)
+ *
+ * The default merge combines only frame.patch values — raw data never leaks to
+ * domRenderer unless a custom mergeFn explicitly includes it.
  *
  * @param {Array<{instance: MotionInstance, trackId: string, transformFn?: Function}>} sources
  * @param {React.RefObject} ref
- * @param {(patches: object[]) => object} [mergeFn] - defaults to Object.assign in array order (last wins)
+ * @param {(frames: Array<{raw: object, patch: object}>) => object} [mergeFn]
+ *   Defaults to Object.assign of all frame.patch values in array order (last wins).
  */
 export default function useMotionSubscribers(sources, ref, mergeFn) {
   const transformFnsRef = useRef([]);
@@ -49,12 +57,12 @@ export default function useMotionSubscribers(sources, ref, mergeFn) {
   useEffect(() => {
     if (!ref) return undefined;
 
-    const latestPatches = stableSources.map(() => ({}));
+    const latestFrames = stableSources.map(() => ({ raw: {}, patch: {} }));
 
     const applyMerged = () => {
       if (!ref.current) return;
-      const merge = mergeFnRef.current ?? ((patches) => Object.assign({}, ...patches));
-      domRenderer(ref.current, merge(latestPatches));
+      const merge = mergeFnRef.current ?? ((frames) => Object.assign({}, ...frames.map(f => f.patch)));
+      domRenderer(ref.current, merge(latestFrames));
     };
 
     const unsubscribes = stableSources.map((source, i) =>
@@ -62,8 +70,8 @@ export default function useMotionSubscribers(sources, ref, mergeFn) {
         source.instance,
         source.trackId,
         () => transformFnsRef.current[i],
-        (patch) => {
-          latestPatches[i] = patch;
+        (frame) => {
+          latestFrames[i] = frame;
           applyMerged();
         }
       )

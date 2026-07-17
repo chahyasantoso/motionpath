@@ -76,6 +76,7 @@ describe('useMotionSubscribers', () => {
     mockInstances[0].compose.mockReturnValue({ opacity: 0.2 });
     mockInstances[1].compose.mockReturnValue({ opacity: 0.9 });
 
+    // No transformFn — default compose is used, result goes into frame.patch
     const sources = [
       { instance: mockInstances[0], trackId: 'track-0' },
       { instance: mockInstances[1], trackId: 'track-1' }
@@ -102,10 +103,9 @@ describe('useMotionSubscribers', () => {
       { instance: mockInstances[1], trackId: 'track-1' }
     ];
 
-    // mergeFn that reverses precedence (first wins)
-    const customMergeFn = vi.fn((patches) => {
-      // reverse elements before assign
-      return Object.assign({}, ...[...patches].reverse());
+    // mergeFn receives frames: [{ raw, patch }, ...] — reverse patch precedence (first wins)
+    const customMergeFn = vi.fn((frames) => {
+      return Object.assign({}, ...[...frames.map(f => f.patch)].reverse());
     });
 
     renderHook(() => useMotionSubscribers(sources, mockRef, customMergeFn));
@@ -115,6 +115,35 @@ describe('useMotionSubscribers', () => {
 
     expect(customMergeFn).toHaveBeenCalled();
     expect(gsap.set).toHaveBeenLastCalledWith(mockRef.current, { opacity: 0.2 });
+  });
+
+  it('should expose raw data to mergeFn even when default compose is used', () => {
+    const mockRef = { current: document.createElement('div') };
+    const rawReceived = [];
+
+    mockInstances[0].compose.mockReturnValue({ x: 50 });
+
+    const sources = [{ instance: mockInstances[0], trackId: 'track-0' }];
+
+    // Custom mergeFn that reads frame.raw (e.g. pathProgress)
+    const mergeFn = (frames) => {
+      rawReceived.push(frames[0].raw);
+      const p = frames[0].raw?.pathProgress ?? 0;
+      if (p <= 0 || p >= 1) return { display: 'none' };
+      return { ...frames[0].patch, display: 'flex' };
+    };
+
+    renderHook(() => useMotionSubscribers(sources, mockRef, mergeFn));
+
+    // Tick with pathProgress in the raw data
+    mockCallbacks['inst-0::track-0']({ pathProgress: 0.5 });
+
+    expect(rawReceived[0]).toEqual({ pathProgress: 0.5 });
+    expect(gsap.set).toHaveBeenLastCalledWith(mockRef.current, { x: 50, display: 'flex' });
+
+    // Tick with out-of-bounds pathProgress
+    mockCallbacks['inst-0::track-0']({ pathProgress: 0 });
+    expect(gsap.set).toHaveBeenLastCalledWith(mockRef.current, { display: 'none' });
   });
 
   it('should not resubscribe when hook is rerendered with new array literals of identical sources', () => {
