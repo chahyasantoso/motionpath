@@ -16,21 +16,37 @@ An endless Zuma-style wave-spawner demo showcasing parent-child timeline nesting
 
 ## 🏗️ Architecture & Flow
 
-The Zuma Spiral utilizes a parent-child timeline structure to achieve smooth and mathematically perfect ball queue management:
+The Zuma Spiral uses a **ViewModel-driven architecture** (MVVM/Controller pattern) to cleanly decouple the motion engine's lifecycle, the game logic, and React presentational rendering:
+
+| Layer | Responsibility | File |
+|---|---|---|
+| **Config & Constants** | Static properties (dimensions, colors, speeds) | [spiralConfig.js](file:///d:/dev/motionpath/src/components/Spiral/spiralConfig.js) |
+| **Path Geometry** | Archimedean spiral generation and uniform segment spacing math | [spiralPath.js](file:///d:/dev/motionpath/src/components/Spiral/spiralPath.js) |
+| **Motion Schemas** | Factory schemas for parent timelines, path followers, and transitions | [spiralMotions.js](file:///d:/dev/motionpath/src/components/Spiral/spiralMotions.js) |
+| **Controller Hook** | Synchronous queue management, wave loops, and transition lifecycles | [useSpiralWaveController.js](file:///d:/dev/motionpath/src/components/Spiral/useSpiralWaveController.js) |
+| **ViewModel Adapter** | Page-facing data coordinator | [useSpiralPageViewModel.js](file:///d:/dev/motionpath/src/components/Spiral/useSpiralPageViewModel.js) |
+| **View Page** | Presentational wrapper holding SVG structures and static scene details | [SpiralPage.jsx](file:///d:/dev/motionpath/src/components/Spiral/SpiralPage.jsx) |
+| **View Entity** | Motion subscriber bound to the VM's active instance and track | [SpiralBall.jsx](file:///d:/dev/motionpath/src/components/Spiral/SpiralBall.jsx) |
+
+### Spawning & Transition Flow
 
 ```mermaid
 graph TD
-    ParentTimeline[parent-container timeline] -->|Controls Playhead| Child1[spiral-zuma child 1]
-    ParentTimeline -->|Controls Playhead| Child2[spiral-zuma child 2]
-    ParentTimeline -->|Controls Playhead| Child3[spiral-zuma child 3]
+    Page[SpiralPage.jsx] -->|Renders| BallView[SpiralBall.jsx]
+    Page -->|Reads| VM[useSpiralPageViewModel]
+    VM -->|Drives| Controller[useSpiralWaveController]
     
-    Child1 -->|onComplete Event| GC[Garbage Collector: handleAutoRemove]
-    Child2 -->|onComplete Event| GC
-    Child3 -->|onComplete Event| GC
+    Controller -->|Manages| BallVmList[ballVms Ref & State]
+    Controller -->|Mounts/Plays| TransitionInstance[Transition Instance: ball-exit]
+    Controller -->|Appends/Removes| BaseInstance[Container Child Instance: spiral-zuma]
     
-    RAF[requestAnimationFrame loop] -->|Checks spacing & progress| Spawner[Spawner]
-    RAF -->|children.length === 0| ResetWave[Reset Wave & parent.play0]
+    BallView -->|useMotionSubscriber| MotionEngine[Motion Engine]
 ```
+
+1. **Spawn**: `useSpiralWaveController` appends a child instance to the container and wraps it in a `BallVm` object.
+2. **Entrance**: The controller mounts and plays a temporary entrance transition instance, pointing the VM's `activeInstance` to it to update the subscriber.
+3. **Active Path**: Upon entrance completion, the temporary instance is destroyed and the VM restores `activeInstance` to the base path-travel instance.
+4. **Exit/Pop**: On click or when reaching the center, the controller mounts an exit instance, transitions the subscriber, removes the base instance from the parent, and clears the VM from state.
 
 ---
 
@@ -77,28 +93,26 @@ The spawner runs on a native browser `requestAnimationFrame` paint loop, clean o
   $$\text{MIN\_SPAWN\_PROGRESS} = \frac{\text{BALL\_SIZE}}{\text{totalPathLength}}$$
 
 ### 2. Event-Driven Unspawning (The Garbage Collector)
-* **Goal**: Safely clean up and destroy entities that enter the black hole.
-* **Mechanism**: On-complete events are fully reliable due to the engine's correct playhead sync and predecessor-anchored spawn placement (which avoids cascade reflow drift). When a ball finishes its path, its event-driven `onComplete` callback fires immediately, triggering `handleAutoRemove(id, inst)` to remove the ball from React state and invoke `containerInstance.removeChild(inst)`.
+* **Goal**: Safely clean up and destroy entities that enter the black hole or get clicked.
+* **Mechanism**: On-complete events are fully reliable due to the engine's correct playhead sync and predecessor-anchored spawn placement (which avoids cascade reflow drift). When a ball finishes its path, its event-driven `onComplete` callback fires immediately, triggering `startExit(id)` which mounts the exit transition instance, updates the subscriber, removes the base instance from the container using `containerInstance.removeChild(latest.baseInstance)`, and removes the VM from state.
 
 ---
 
 ## 🔄 Wave Reset & Playhead Re-anchoring
 
-Wave resets are evaluated directly inside the spawner's tick loop when spawning completes:
+Wave resets are evaluated directly inside the controller's spawner tick loop when spawning completes:
 
 ```javascript
-    const handleSpawningNewBalls = () => {
-      if (spawnedCount.current < 30) {
+      if (spawnedCountRef.current < 30) {
         // Spawning logic...
       } else if (containerInstance.children.length === 0) {
-        spawnedCount.current = 0;
+        spawnedCountRef.current = 0;
         containerInstance.timeline.play(0);
       }
-    };
 ```
 
 * When all balls are cleared (popped by clicks or swallowed by the black hole), `children.length` becomes `0`.
-* The tick loop detects this, resets `spawnedCount.current` to `0`, and forces the parent timeline back to time `0` using `.play(0)`.
+* The tick loop detects this, resets `spawnedCountRef.current` to `0`, and forces the parent timeline back to time `0` using `.play(0)`.
 * Replaying from `0` is critical because GSAP completes and pauses the parent timeline at the end of a wave; calling `.play(0)` resumes the playhead so that the next wave's balls play correctly from the outer edge.
 
 ---
