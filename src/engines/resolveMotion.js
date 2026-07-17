@@ -72,28 +72,28 @@ export function createMotionResolver() {
   }
 
   /**
-   * @param {object} schema - the loaded project schema or MotionProject domain model
+   * @param {object} project - the loaded MotionProject domain model
    * @param {string} motionId
    * @param {number} progress - 0..1
    * @param {object} [overrides] - keyed by track id, same shape as track-level overrides
    * @returns {Record<string, object>} keyed by track id, always — regardless of track count
    */
-  function resolve(schema, motionId, progress, overrides = {}) {
-    const isDomain = schema && typeof schema.motions === 'object' && schema.motions instanceof Map;
-    const originalMotion = isDomain
-      ? getMotion(schema, motionId)
-      : schema.motions?.find(m => m && m.motionId === motionId);
+  function resolve(project, motionId, progress, overrides = {}) {
+    if (!project || typeof project.motions?.get !== 'function') {
+      throw new Error('resolveMotion: expected a parsed MotionProject domain model.');
+    }
+    const originalMotion = getMotion(project, motionId);
 
     if (!originalMotion) {
       throw new Error(`resolveMotion: motion with id "${motionId}" not found.`);
     }
 
-    const driverType = isDomain ? originalMotion.driver.type : originalMotion.driver?.type;
+    const driverType = originalMotion.driver?.type;
     if (driverType !== 'delegate' && driverType !== 'manual') {
-      throw new Error(`resolveMotion: motion with id "${motionId}" is not a delegate motion.`);
+      throw new Error(`resolveMotion: motion with id "${motionId}" is not a delegate or manual motion.`);
     }
 
-    const templates = isDomain ? schema.templates : (schema.templates || []);
+    const templates = project.templates;
     const result = {};
     const tracks = originalMotion.tracks || [];
 

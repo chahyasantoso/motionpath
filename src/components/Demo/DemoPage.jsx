@@ -1,4 +1,3 @@
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import React, { useCallback, useMemo, useRef } from 'react';
 import { productionEngine } from '../../engines/ProductionEngine.js';
 import useMotionInstance from '../../hooks/useMotionInstance';
@@ -397,25 +396,25 @@ function CarouselDemo({ instance }) {
   const [cards, setCards] = React.useState(MOCK_CARDS);
   const childInstancesMap = useRef(new Map());
 
-  React.useEffect(() => {
-    if (!instance) return;
-    let rafId = null;
-    const unsubscribe = instance.onChildChange(() => {
-      if (rafId) cancelAnimationFrame(rafId);
-      const capturedTime = instance.timeline.time();
-      console.log("child changed");
-      rafId = requestAnimationFrame(() => {
-        const nextdur =  instance.timeline.duration();
-        ScrollTrigger.refresh();
-        instance.timeline.time(Math.min(capturedTime, nextdur));
-        console.log("child changed refresh");
-      });
-    });
-    return () => {
-      unsubscribe();
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-  }, [instance]);
+  // React.useEffect(() => {
+  //   if (!instance) return;
+  //   let rafId = null;
+  //   const unsubscribe = instance.onChildChange(() => {
+  //     if (rafId) cancelAnimationFrame(rafId);
+  //     const capturedTime = instance.timeline.time();
+  //     console.log("child changed");
+  //     rafId = requestAnimationFrame(() => {
+  //       const nextdur =  instance.timeline.duration();
+  //       ScrollTrigger.refresh();
+  //       instance.timeline.time(Math.min(capturedTime, nextdur));
+  //       console.log("child changed refresh");
+  //     });
+  //   });
+  //   return () => {
+  //     unsubscribe();
+  //     if (rafId) cancelAnimationFrame(rafId);
+  //   };
+  // }, [instance]);
 
   const getOrAddChildInstance = useCallback((cardId) => {
     if (!instance) return null;

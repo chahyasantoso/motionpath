@@ -404,6 +404,7 @@ export class MotionInstance {
   }
 
   destroy() {
+    if (this.#destroyed) return;
     this.#destroyed = true;
 
     const hadActiveSubscribers = Array.from(this.#subscribers.values())

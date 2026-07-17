@@ -253,5 +253,34 @@ describe('TimelineGroupController', () => {
       controller.seek(1.5);
       expect(progressSpy).toHaveBeenCalledWith(1);
     });
+
+    it('attaches driver when primary mounts using standard timeline driver with trigger.type === scroll', () => {
+      const controller = createTimelineGroupController('tl-1', 'motion-primary');
+      const primary = createMockInstance('motion-primary', {
+        driverType: 'timeline',
+        trigger: { type: 'scroll', scrub: true, trigger: '#hero' }
+      });
+
+      controller.addMember(primary);
+
+      expect(ScrollTrigger.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          animation: controller.masterTimeline,
+          scrub: true
+        })
+      );
+    });
+
+    it('does not attach driver for unsupported driver type', () => {
+      const controller = createTimelineGroupController('tl-1', 'motion-primary');
+      const primary = createMockInstance('motion-primary', {
+        driverType: 'delegate'
+      });
+
+      controller.addMember(primary);
+
+      expect(controller.masterTimeline.paused()).toBe(true);
+      expect(ScrollTrigger.create).not.toHaveBeenCalled();
+    });
   });
 });

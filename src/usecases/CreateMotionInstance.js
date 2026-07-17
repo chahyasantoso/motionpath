@@ -36,5 +36,18 @@ export function createMotionInstance(motionId, config, context) {
     }
   };
 
-  return new MotionInstance(motionId, config, normalizedSchema, context);
+  const instance = new MotionInstance(motionId, config, normalizedSchema, context);
+
+  const originalDestroy = instance.destroy.bind(instance);
+  let destroyed = false;
+  instance.destroy = () => {
+    if (destroyed) return;
+    destroyed = true;
+    originalDestroy();
+    if (context && typeof context.onDestroy === 'function') {
+      context.onDestroy(instance);
+    }
+  };
+
+  return instance;
 }

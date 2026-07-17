@@ -24,11 +24,28 @@ const colorPlugins = Object.fromEntries(colorKeys.map(k => [k, createColorProper
 // Individual exports for legacy references (if any exist)
 export { pathPlugin, cssVarPlugin, imageSequencePlugin };
 
-// Lazy plugin stubs
-export const splitTextPlugin    = { keys: ['splitText'],    lazy: true, claimsKey(k) { return k === 'splitText';    }, load: () => Promise.resolve(), contribute() {} };
-export const morphSvgPlugin     = { keys: ['morphSVG'],     lazy: true, claimsKey(k) { return k === 'morphSVG';     }, load: () => Promise.resolve(), contribute() {} };
-export const drawSvgPlugin      = { keys: ['drawSVG'],      lazy: true, claimsKey(k) { return k === 'drawSVG';      }, load: () => Promise.resolve(), contribute() {} };
-export const scrambleTextPlugin = { keys: ['scrambleText'], lazy: true, claimsKey(k) { return k === 'scrambleText'; }, load: () => Promise.resolve(), contribute() {} };
+function createUnsupportedLazyPlugin(featureName, key) {
+  return {
+    keys: [key],
+    lazy: true,
+    claimsKey(k) {
+      return k === key;
+    },
+    load() {
+      return Promise.reject(
+        new Error(`[MotionPath] Plugin '${featureName}' for key '${key}' is not implemented.`)
+      );
+    },
+    contribute() {
+      throw new Error(`[MotionPath] Plugin '${featureName}' for key '${key}' is not implemented.`);
+    }
+  };
+}
+
+export const splitTextPlugin    = createUnsupportedLazyPlugin('splitText', 'splitText');
+export const morphSvgPlugin     = createUnsupportedLazyPlugin('morphSVG', 'morphSVG');
+export const drawSvgPlugin      = createUnsupportedLazyPlugin('drawSVG', 'drawSVG');
+export const scrambleTextPlugin = createUnsupportedLazyPlugin('scrambleText', 'scrambleText');
 
 export const ALL_PLUGINS = [
   ...Object.values(simplePlugins),

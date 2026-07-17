@@ -78,7 +78,7 @@ describe('resolveMotion API tests', () => {
     const engine = createProductionEngine(mockDeps);
     await engine.loadProject(validProject);
 
-    expect(() => engine.resolveMotion('timelineMotion', 0.5)).toThrow(/is not a delegate motion/);
+    expect(() => engine.resolveMotion('timelineMotion', 0.5)).toThrow(/is not a delegate or manual motion/);
     expect(() => engine.resolveMotion('nonexistent', 0.5)).toThrow(/not found/);
 
     const result = engine.resolveMotion('delegateMotion', 0.5);
@@ -165,5 +165,14 @@ describe('resolveMotion API tests', () => {
     } finally {
       opacityPlugin.compose = originalCompose;
     }
+  });
+
+  it('throws a clear error if resolveMotion is called with a raw schema instead of a parsed domain model', async () => {
+    const { createMotionResolver } = await import('../resolveMotion.js');
+    const resolver = createMotionResolver();
+    const rawSchema = {
+      motions: [{ motionId: 'm1', driver: { type: 'delegate' } }]
+    };
+    expect(() => resolver.resolve(rawSchema, 'm1', 0.5)).toThrow(/expected a parsed MotionProject domain model/);
   });
 });

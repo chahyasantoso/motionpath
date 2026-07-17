@@ -27,22 +27,19 @@ export function createTimelineGroupController(timelineId, primaryMotionId) {
     driverAttached = true;
 
     const schemaMotion = primaryInstance.schemaMotion;
-    const driverType = schemaMotion.driver?.type;
-    const trigger = schemaMotion.driver?.trigger || {};
+    const driver = schemaMotion.driver || {};
+    const trigger = driver.trigger || {};
 
-    if (driverType === 'gsap-timeline' || driverType === 'timeline') {
-      masterTimeline
-        .repeat(trigger.repeat ?? 0)
-        .yoyo(!!trigger.yoyo)
-        .repeatDelay(trigger.repeatDelay ?? 0);
+    const isTimelineDriver = driver.type === 'timeline' || driver.type === 'gsap-timeline' || driver.type === 'gsap-scroll' || driver.type === 'scroll';
+    if (!isTimelineDriver) {
+      return;
+    }
 
-      const shouldPlay = primaryInstance.config.autoplay ?? true;
-      if (shouldPlay) {
-        masterTimeline.play();
-      }
-    } else if (driverType === 'gsap-scroll' || driverType === 'scroll') {
+    const isScrollTrigger = trigger.type === 'scroll' || driver.type === 'gsap-scroll' || driver.type === 'scroll';
+
+    if (isScrollTrigger) {
       const deps = primaryInstance.deps;
-      const sectionId = schemaMotion.driver?.sectionId;
+      const sectionId = driver.sectionId;
 
       const resolvedConfig = {
         ...trigger,
@@ -86,6 +83,16 @@ export function createTimelineGroupController(timelineId, primaryMotionId) {
           toggleActions: trigger.toggleActions,
           animation: masterTimeline
         });
+      }
+    } else {
+      masterTimeline
+        .repeat(trigger.repeat ?? 0)
+        .yoyo(!!trigger.yoyo)
+        .repeatDelay(trigger.repeatDelay ?? 0);
+
+      const shouldPlay = primaryInstance.config.autoplay ?? true;
+      if (shouldPlay) {
+        masterTimeline.play();
       }
     }
   }

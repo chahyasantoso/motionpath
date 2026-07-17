@@ -147,7 +147,21 @@ const ballExitScene = {
         ]
       }
     },
-  }],
+  },
+  {
+    id: 'ball-entrance-track',
+    keyframes: {
+      scale:   { stops: [{ p: 0, v: 1 }, { p: 0.35, v: 1.7 }, { p: 1, v: 1 }] },
+      opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
+      '--ball-size': {
+        stops: [
+          { p: 0, v: `${BALL_SIZE}px` },
+          { p: 1, v: `${BALL_SIZE}px` }
+        ]
+      }
+    },
+  }
+],
 };
  
 const spiralContainerScene = {
@@ -184,9 +198,22 @@ function SpiralBall({ instance, ballData, onClickRemove, onAutoRemove }) {
   const [activeInstance, setActiveInstance] = useState(instance);
   const [activeTrackId, setActiveTrackId] = useState('ball-track');
   const isRemoving = useRef(false);
+  const isSpawning = useRef(false);
  
   const transform = useCallback((rawData, composeFn) => {
-    if (activeTrackId === 'ball-exit-track') return composeFn(rawData);
+    if (activeTrackId === 'ball-exit-track' || activeTrackId === 'ball-entrance-track') {
+      const currentParentSnapshot = instance.getCurrentSnapshot('ball-track');
+      if (!currentParentSnapshot) return composeFn(rawData);
+      
+      const parentComposed = instance.compose('ball-track', currentParentSnapshot);
+      const transitionData = composeFn(rawData);
+
+      return {
+        ...parentComposed,
+        ...transitionData,
+        display: 'flex'
+      };
+    }
  
     const p = rawData.pathProgress ?? 0;
     if (p <= 0 || p >= 1) return { display: 'none', opacity: 0 };
@@ -198,16 +225,30 @@ function SpiralBall({ instance, ballData, onClickRemove, onAutoRemove }) {
  
   useMotionSubscriber(activeInstance, activeTrackId, ref, transform);
  
-  // Auto-dispose when ball completes its path into the black hole
+  // handle spawn animation
   useEffect(() => {
-    if (!instance) return;
-    instance.onComplete(() => {
-      if (isRemoving.current) return;
-      isRemoving.current = true;
-      onAutoRemove(ballData.id, instance);
+    if (!instance || isSpawning.current) return;
+    isSpawning.current = true;
+  
+    const entranceInstance = productionEngine.mountInstance('ball-exit');
+    if (!entranceInstance) {
+      isSpawning.current = false;
+      return;
+    }
+  
+    setActiveInstance(entranceInstance);
+    setActiveTrackId('ball-entrance-track');
+    entranceInstance.play();
+  
+    entranceInstance.onComplete(() => {
+      entranceInstance.destroy();
+      setActiveInstance(instance);
+      setActiveTrackId('ball-track');
+      isSpawning.current = false;
     });
-  }, [instance, ballData.id, onAutoRemove]);
- 
+  }, [instance]);
+
+  // handle click animation
   const handleClick = useCallback(() => {
     if (activeTrackId === 'ball-exit-track' || isRemoving.current) return;
     isRemoving.current = true;
@@ -226,6 +267,19 @@ function SpiralBall({ instance, ballData, onClickRemove, onAutoRemove }) {
       onClickRemove(ballData.id, instance);
     });
   }, [activeTrackId, instance, ballData.id, onClickRemove]);
+
+  // Auto-dispose when ball completes its path into the black hole
+  useEffect(() => {
+    if (!instance) return;
+    instance.onComplete(() => {
+      // if (isRemoving.current) return;
+      // isRemoving.current = true;
+      // onAutoRemove(ballData.id, instance);
+      handleClick();
+    });
+  }, [instance, handleClick]);
+
+  
  
   return (
     <div
@@ -284,24 +338,24 @@ export default function SpiralPage() {
   }, [isLoaded, containerInstance]);
  
   // Debug listener for child changes
-  useEffect(() => {
-    if (!containerInstance) return;
+  // useEffect(() => {
+  //   if (!containerInstance) return;
 
-    const unsubscribe = containerInstance.onChildChange(() => {
-      const activeChildren = containerInstance.children;
-      const childDelays = activeChildren.map(c => c.currentDelay?.toFixed(3));
-      console.log(
-        `[SpiralPage Debug] Child list changed! ` +
-        `Active Count: ${activeChildren.length}, ` +
-        `Current Delays: [${childDelays.join(', ')}], ` +
-        `Current Wave Spawned: ${spawnedCount.current}/30`
-      );
-    });
+  //   const unsubscribe = containerInstance.onChildChange(() => {
+  //     const activeChildren = containerInstance.children;
+  //     const childDelays = activeChildren.map(c => c.currentDelay?.toFixed(3));
+  //     console.log(
+  //       `[SpiralPage Debug] Child list changed! ` +
+  //       `Active Count: ${activeChildren.length}, ` +
+  //       `Current Delays: [${childDelays.join(', ')}], ` +
+  //       `Current Wave Spawned: ${spawnedCount.current}/30`
+  //     );
+  //   });
 
-    return () => {
-      unsubscribe();
-    };
-  }, [containerInstance]);
+  //   return () => {
+  //     unsubscribe();
+  //   };
+  // }, [containerInstance]);
 
   // Auto-spawn: spawn a wave of 30 balls, then pause (using native requestAnimationFrame).
   // Ball removal on completion is handled entirely by SpiralBall's onComplete callback

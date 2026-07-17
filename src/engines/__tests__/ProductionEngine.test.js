@@ -416,12 +416,31 @@ describe('ProductionEngine (Lazy/Instance Architecture)', () => {
       const instA = engine.mountInstance('group-a');
       const instB = engine.mountInstance('group-b');
 
+      expect(engine._groups.has('hero-tl')).toBe(true);
+
       // Destroy non-primary
       instA.destroy();
       // Group still exists (primary remains)
+      expect(engine._groups.has('hero-tl')).toBe(true);
 
       // Destroy primary (last member) — group fully cleaned up
       instB.destroy();
+      expect(engine._groups.has('hero-tl')).toBe(false);
+    });
+
+    it('instance destroy removes from engine _instances map and handles multiple calls gracefully', async () => {
+      validatorModule.validateProject.mockReturnValue([]);
+      const engine = createProductionEngine(mockDeps);
+      await engine.loadProject(groupSchema);
+
+      const inst = engine.mountInstance('group-a');
+      expect(engine._instances.has(inst.id)).toBe(true);
+
+      inst.destroy();
+      expect(engine._instances.has(inst.id)).toBe(false);
+
+      // Call destroy again, should not throw
+      expect(() => inst.destroy()).not.toThrow();
     });
 
     it('engine.destroy() cleans up all groups', async () => {

@@ -125,7 +125,24 @@ export class BaseEngine {
       mountInstance: (childMotionId, childConfig) => {
         return this.mountInstance(childMotionId, childConfig);
       },
-      onSubscriberChange
+      onSubscriberChange,
+      onDestroy: (destroyedInstance) => {
+        this._instances.delete(destroyedInstance.id);
+
+        if (destroyedInstance._timelineGroupId) {
+          const controller = this._groups.get(destroyedInstance._timelineGroupId);
+          if (controller) {
+            const isEmpty = controller.removeMember(
+              destroyedInstance.id,
+              destroyedInstance.motionId
+            );
+            if (isEmpty) {
+              controller.destroy();
+              this._groups.delete(destroyedInstance._timelineGroupId);
+            }
+          }
+        }
+      }
     });
 
     this._instances.set(instance.id, instance);
@@ -142,24 +159,6 @@ export class BaseEngine {
     }
 
     this._onInstanceMounted(instance, groupSpec);
-
-    const originalDestroy = instance.destroy.bind(instance);
-    instance.destroy = () => {
-      this._instances.delete(instance.id);
-
-      if (instance._timelineGroupId) {
-        const controller = this._groups.get(instance._timelineGroupId);
-        if (controller) {
-          const isEmpty = controller.removeMember(instance.id, instance.motionId);
-          if (isEmpty) {
-            controller.destroy();
-            this._groups.delete(instance._timelineGroupId);
-          }
-        }
-      }
-
-      originalDestroy();
-    };
 
     return instance;
   }
