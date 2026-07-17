@@ -1,0 +1,149 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { productionEngine } from '../../engines/ProductionEngine.js';
+import { BALL_COLORS } from './spiralConfig.js';
+import { MIN_SPAWN_PROGRESS } from './spiralPath.js';
+import { createBallVm } from './createBallVm.js';
+
+export function useSpiralWaveController({ isLoaded, containerInstance }) {
+  const [ballVms, setBallVms] = useState([]);
+  const ballVmsRef = useRef([]);
+  const ballCounterRef = useRef(0);
+  const spawnedCountRef = useRef(0);
+  const rafIdRef = useRef(null);
+
+  // Sync state to ref to avoid stale closures in callbacks
+  useEffect(() => {
+    ballVmsRef.current = ballVms;
+  }, [ballVms]);
+
+  const getBallVm = useCallback((ballId) => {
+    return ballVmsRef.current.find(ball => ball.id === ballId) ?? null;
+  }, []);
+
+  const updateBallVm = useCallback((ballId, patch) => {
+    setBallVms(prev => prev.map(ball => ball.id === ballId ? { ...ball, ...patch } : ball));
+  }, []);
+
+  const removeBallVm = useCallback((ballId) => {
+    setBallVms(prev => prev.filter(ball => ball.id !== ballId));
+  }, []);
+
+  const startExit = useCallback((ballId) => {
+    const current = getBallVm(ballId);
+    if (!current) return;
+    if (current.status === 'exiting') return;
+
+    const exitInstance = productionEngine.mountInstance('ball-exit');
+    if (!exitInstance) {
+      containerInstance?.removeChild(current.baseInstance);
+      removeBallVm(ballId);
+      return;
+    }
+
+    updateBallVm(ballId, {
+      activeInstance: exitInstance,
+      activeTrackId: 'ball-exit-track',
+      status: 'exiting',
+      isClickable: false,
+    });
+
+    exitInstance.play();
+    exitInstance.onComplete(() => {
+      exitInstance.destroy();
+
+      const latest = getBallVm(ballId);
+      if (!latest) return;
+
+      containerInstance?.removeChild(latest.baseInstance);
+      removeBallVm(ballId);
+    });
+  }, [containerInstance, getBallVm, removeBallVm, updateBallVm]);
+
+  const startEntrance = useCallback((ballId) => {
+    const current = getBallVm(ballId);
+    if (!current) return;
+
+    const entranceInstance = productionEngine.mountInstance('ball-exit');
+    if (!entranceInstance) {
+      return;
+    }
+
+    updateBallVm(ballId, {
+      activeInstance: entranceInstance,
+      activeTrackId: 'ball-entrance-track',
+      status: 'spawning',
+      isClickable: false,
+    });
+
+    entranceInstance.play();
+    entranceInstance.onComplete(() => {
+      entranceInstance.destroy();
+
+      const latest = getBallVm(ballId);
+      if (!latest) return;
+
+      updateBallVm(ballId, {
+        activeInstance: latest.baseInstance,
+        activeTrackId: 'ball-track',
+        status: 'active',
+        isClickable: true,
+      });
+    });
+  }, [getBallVm, updateBallVm]);
+
+  const spawnBall = useCallback(() => {
+    if (!containerInstance) return;
+
+    const baseInstance = containerInstance.addChild('spiral-zuma');
+    if (!baseInstance) return;
+
+    const id = ++ballCounterRef.current;
+    const color = BALL_COLORS[id % BALL_COLORS.length];
+
+    const vm = createBallVm({ id, color, baseInstance });
+    vm.onClick = () => startExit(id);
+
+    setBallVms(prev => [...prev, vm]);
+    startEntrance(id);
+
+    baseInstance.onComplete(() => {
+      const current = getBallVm(id);
+      if (!current) return;
+      if (current.status !== 'active') return;
+      startExit(id);
+    });
+  }, [containerInstance, startEntrance, startExit, getBallVm]);
+
+  // Wave spawn loop
+  useEffect(() => {
+    if (!isLoaded || !containerInstance) return;
+
+    const tick = () => {
+      if (spawnedCountRef.current < 30) {
+        const lastBall = ballVmsRef.current[ballVmsRef.current.length - 1] ?? null;
+        const lastInstance = lastBall?.baseInstance ?? null;
+
+        if (!lastInstance || lastInstance.timeline.progress() >= MIN_SPAWN_PROGRESS) {
+          spawnBall();
+          spawnedCountRef.current += 1;
+        }
+      } else if (containerInstance.children.length === 0) {
+        spawnedCountRef.current = 0;
+        containerInstance.timeline.play(0);
+      }
+
+      rafIdRef.current = requestAnimationFrame(tick);
+    };
+
+    rafIdRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      spawnedCountRef.current = 0;
+    };
+  }, [isLoaded, containerInstance, spawnBall]);
+
+  return {
+    ballVms,
+  };
+}
