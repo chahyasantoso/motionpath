@@ -124,6 +124,62 @@ describe('MotionInstance Class', () => {
 
       expect(instance.timeline.delay()).toBe(1.5);
     });
+
+    it('schema trigger.autoplay:false suppresses play() even when config.autoplay is true (schema wins)', () => {
+      // timelineSchema has trigger.autoplay: false — schema must win over config.autoplay: true
+      let capturedPlay;
+      const origTimeline = gsap.timeline.bind(gsap);
+      vi.spyOn(gsap, 'timeline').mockImplementation((opts) => {
+        const tl = origTimeline(opts);
+        capturedPlay = vi.spyOn(tl, 'play');
+        return tl;
+      });
+
+      createTestInstance('time-motion', { autoplay: true }, timelineSchema);
+
+      expect(capturedPlay).not.toHaveBeenCalled();
+      vi.mocked(gsap.timeline).mockRestore();
+    });
+
+    it('config.autoplay:false suppresses play() when trigger.autoplay is absent', () => {
+      const schemaNoAutoplay = {
+        ...timelineSchema,
+        driver: { ...timelineSchema.driver, trigger: { repeat: 0, yoyo: false, repeatDelay: 0 } }
+      };
+
+      let capturedPlay;
+      const origTimeline = gsap.timeline.bind(gsap);
+      vi.spyOn(gsap, 'timeline').mockImplementation((opts) => {
+        const tl = origTimeline(opts);
+        capturedPlay = vi.spyOn(tl, 'play');
+        return tl;
+      });
+
+      createTestInstance('time-motion', { autoplay: false }, schemaNoAutoplay);
+
+      expect(capturedPlay).not.toHaveBeenCalled();
+      vi.mocked(gsap.timeline).mockRestore();
+    });
+
+    it('defaults to play() when both trigger.autoplay and config.autoplay are absent', () => {
+      const schemaNoAutoplay = {
+        ...timelineSchema,
+        driver: { ...timelineSchema.driver, trigger: { repeat: 0, yoyo: false, repeatDelay: 0 } }
+      };
+
+      let capturedPlay;
+      const origTimeline = gsap.timeline.bind(gsap);
+      vi.spyOn(gsap, 'timeline').mockImplementation((opts) => {
+        const tl = origTimeline(opts);
+        capturedPlay = vi.spyOn(tl, 'play');
+        return tl;
+      });
+
+      createTestInstance('time-motion', {}, schemaNoAutoplay);
+
+      expect(capturedPlay).toHaveBeenCalled();
+      vi.mocked(gsap.timeline).mockRestore();
+    });
   });
 
   describe('Playback API', () => {

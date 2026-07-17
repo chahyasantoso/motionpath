@@ -7,20 +7,12 @@ import { productionEngine } from '../engines/ProductionEngine.js';
  * Destroys and cleans up engine resources on unmount.
  *
  * @param {Object} project - The complete project schema object
- * @param {Object} [options]
- * @param {Object} [options.initialPlayStates] - Map of timelineId → boolean,
- *   applied once at load time only (prevents a one-frame flash of motion
- *   before a separate useMotionTimelinePlayback pause can land). Changing
- *   this after mount has no effect — use useMotionTimelinePlayback for
- *   ongoing control.
  * @returns {boolean} True once the project has successfully loaded
  */
-export default function useMotionProject(project, { initialPlayStates = {} } = {}) {
+export default function useMotionProject(project) {
   const [isLoaded, setIsLoaded] = useState(false);
   const projectRef = useRef(project);
   projectRef.current = project;
-  const initialPlayStatesRef = useRef(initialPlayStates);
-  initialPlayStatesRef.current = initialPlayStates;
 
   useEffect(() => {
     if (!projectRef.current) return;
@@ -28,7 +20,7 @@ export default function useMotionProject(project, { initialPlayStates = {} } = {
     setIsLoaded(false);
 
     productionEngine
-      .loadProject(projectRef.current, { playStates: initialPlayStatesRef.current })
+      .loadProject(projectRef.current)
       .then(() => {
         if (!cancelled) setIsLoaded(true);
       })
@@ -44,4 +36,3 @@ export default function useMotionProject(project, { initialPlayStates = {} } = {
 
   return isLoaded;
 }
-

@@ -109,7 +109,7 @@ export class MotionInstance {
           .yoyo(!!trigger.yoyo)
           .repeatDelay(trigger.repeatDelay ?? 0);
 
-        if (config.autoplay ?? true) {
+        if (trigger.autoplay ?? config.autoplay ?? true) {
           this.timeline.play();
         }
       }

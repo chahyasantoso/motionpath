@@ -109,4 +109,13 @@ describe('useMotionSubscriber', () => {
     expect(() => mockSubscribeCallback(data)).not.toThrow();
     expect(gsap.set).not.toHaveBeenCalled();
   });
+
+  it('should call instance.subscribe exactly once per mount (no double-subscription or excessive hook call overhead)', () => {
+    const mockRef = { current: document.createElement('div') };
+
+    renderHook(() => useMotionSubscriber(mockInstance, 'rocket-id', mockRef));
+
+    expect(mockInstance.subscribe).toHaveBeenCalledTimes(1);
+  });
 });
+

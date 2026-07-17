@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react';
-import { domRenderer } from '../renderers/domRenderer.js';
+import useMotionSubscribers from './useMotionSubscribers.js';
 
 /**
  * Smart Subscriber Hook — Listens to coordinate broadcasts from a MotionInstance
  * and applies them directly to a DOM element via domRenderer, bypassing
  * React's Virtual DOM entirely (Zero Re-render).
+ *
+ * A thin single-source wrapper over useMotionSubscribers — see that hook for
+ * the underlying implementation and multi-source composition.
  *
  * @param {MotionInstance} instance - The active MotionInstance object
  * @param {string} trackId - ID of the track to subscribe to (matches tracks[].id in motion JSON)
@@ -13,28 +15,5 @@ import { domRenderer } from '../renderers/domRenderer.js';
  *   and compose function (rawData => patch) and must return an object of CSS properties for domRenderer.
  */
 export default function useMotionSubscriber(instance, trackId, ref, transformFn) {
-  const transformFnRef = useRef(transformFn);
-  transformFnRef.current = transformFn;
-
-  useEffect(() => {
-    if (!instance || !trackId || !ref) {
-      return undefined;
-    }
-
-    const unsubscribe = instance.subscribe(trackId, (rawData) => {
-      if (!ref.current) return;
-
-      const activeTransformFn = transformFnRef.current;
-
-      if (typeof activeTransformFn === 'function') {
-        domRenderer(ref.current, activeTransformFn(rawData, (data) => instance.compose(trackId, data)));
-      } else {
-        domRenderer(ref.current, instance.compose(trackId, rawData));
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [instance, trackId, ref]);
+  useMotionSubscribers([{ instance, trackId, transformFn }], ref);
 }

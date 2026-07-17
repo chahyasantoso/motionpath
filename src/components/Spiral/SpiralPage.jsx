@@ -3,12 +3,12 @@ import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
 import useSmoothScroll from '../../hooks/useSmoothScroll';
 import { buildMotionPath } from '../../utils/pathUtils';
-import { SPIRAL_CONFIG, BALL_SIZE } from './spiralConfig.js';
-import { spiralPathPoints, BALL_TRAVEL_SECONDS, SPAWN_INTERVAL_MS } from './spiralPath.js';
-import { createSpiralProject } from './spiralMotions.js';
-import { useSpiralPageViewModel } from './useSpiralPageViewModel.js';
 import SpiralBall from './SpiralBall.jsx';
+import { BALL_SIZE, SPIRAL_CONFIG } from './spiralConfig.js';
+import { createSpiralProject } from './spiralMotions.js';
 import './SpiralPage.css';
+import { BALL_TRAVEL_SECONDS, SPAWN_INTERVAL_MS, spiralPathPoints } from './spiralPath.js';
+import { useSpiralPageViewModel } from './useSpiralPageViewModel.js';
 
 export default function SpiralPage() {
   const project = useMemo(() => createSpiralProject({

@@ -52,7 +52,7 @@ describe('useMotionProject', () => {
     const { unmount } = renderHook(() => useMotionProject(project));
 
     expect(productionEngine.loadProject).toHaveBeenCalledTimes(1);
-    expect(productionEngine.loadProject).toHaveBeenCalledWith(project, { playStates: {} });
+    expect(productionEngine.loadProject).toHaveBeenCalledWith(project);
 
     unmount();
     expect(productionEngine.destroy).toHaveBeenCalledTimes(1);
@@ -68,7 +68,7 @@ describe('useMotionProject', () => {
     });
 
     expect(productionEngine.loadProject).toHaveBeenCalledTimes(1);
-    expect(productionEngine.loadProject).toHaveBeenLastCalledWith(project1, { playStates: {} });
+    expect(productionEngine.loadProject).toHaveBeenLastCalledWith(project1);
 
     // Rerender with new project
     rerender({ project: project2 });
@@ -76,7 +76,7 @@ describe('useMotionProject', () => {
     // Should call destroy to clear project1, then load project2
     expect(productionEngine.destroy).toHaveBeenCalledTimes(1);
     expect(productionEngine.loadProject).toHaveBeenCalledTimes(2);
-    expect(productionEngine.loadProject).toHaveBeenLastCalledWith(project2, { playStates: {} });
+    expect(productionEngine.loadProject).toHaveBeenLastCalledWith(project2);
   });
 
   it('logs loadProject failure without throwing synchronously', async () => {
@@ -105,15 +105,13 @@ describe('useMotionProject', () => {
     expect(loadedSchema.motions.map(s => s.motionId)).toContain('hero-scrollytelling');
   });
 
-  it('forwards initialPlayStates option to loadProject so paused-on-load works', async () => {
+  it('calls loadProject with exactly one argument (the project)', async () => {
     productionEngine.loadProject.mockResolvedValue();
     const project = { schemaVersion: 2, projectId: 'p1', motions: [] };
 
-    renderHook(() => useMotionProject(project, { initialPlayStates: { 'my-tl': false } }));
+    renderHook(() => useMotionProject(project));
 
-    expect(productionEngine.loadProject).toHaveBeenCalledWith(
-      project,
-      { playStates: { 'my-tl': false } }
-    );
+    expect(productionEngine.loadProject).toHaveBeenCalledWith(project);
+    expect(productionEngine.loadProject.mock.calls[0]).toHaveLength(1);
   });
 });

@@ -389,12 +389,14 @@ export default function PasarMalamPage() {
   useMotionTrigger('pasar-malam-storytelling', storytellingRef);
   useMotionTrigger('pm-stage', stageRef);
 
-  // initialPlayStates starts the bounce scenario paused to prevent a one-frame flash on load.
-  // Dynamic play/pause control is handled by useMotionTimelinePlayback below.
-  const isLoaded = useMotionProject(pmProject, { initialPlayStates: { 'lantern-bounce-tl': false } });
+  // 'lantern-bounce' is the primary of the 'lantern-bounce-tl' group — passing
+  // autoplay:false here suppresses the master timeline's initial play() call
+  // at construction, so it never plays before useMotionTimelinePlayback (below)
+  // takes over ongoing control. No flash, and no reliance on effect-ordering.
+  const isLoaded = useMotionProject(pmProject);
   const storytellingInstance = useMotionInstance(isLoaded ? 'pasar-malam-storytelling' : null);
   const lanternInstance = useMotionInstance(isLoaded ? 'lantern-scene' : null);
-  const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce' : null);
+  const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce' : null, { autoplay: false });
 
   useMotionTimelinePlayback(bounceInstance, bouncing);
   useSmoothScroll();
