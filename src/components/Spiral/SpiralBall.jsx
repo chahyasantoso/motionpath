@@ -6,10 +6,7 @@ export default function SpiralBall({ vm }) {
 
   const transform = useCallback((rawData, composeFn) => {
     if (vm.activeTrackId === 'ball-exit-track' || vm.activeTrackId === 'ball-entrance-track') {
-      const currentParentSnapshot = vm.baseInstance.getCurrentSnapshot('ball-track');
-      if (!currentParentSnapshot) return composeFn(rawData);
-
-      const parentComposed = vm.baseInstance.compose('ball-track', currentParentSnapshot);
+      const parentComposed = vm.baseInstance.compose('ball-track');
       const transitionData = composeFn(rawData);
 
       return {

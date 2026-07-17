@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { productionEngine } from '../../engines/ProductionEngine.js';
+import { createBallVm } from './createBallVm.js';
 import { BALL_COLORS } from './spiralConfig.js';
 import { MIN_SPAWN_PROGRESS } from './spiralPath.js';
-import { createBallVm } from './createBallVm.js';
 
 export function useSpiralWaveController({ isLoaded, containerInstance }) {
   const [ballVms, setBallVms] = useState([]);
@@ -11,21 +11,20 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
   const spawnedCountRef = useRef(0);
   const rafIdRef = useRef(null);
 
-  // Sync state to ref to avoid stale closures in callbacks
-  useEffect(() => {
-    ballVmsRef.current = ballVms;
-  }, [ballVms]);
-
   const getBallVm = useCallback((ballId) => {
     return ballVmsRef.current.find(ball => ball.id === ballId) ?? null;
   }, []);
 
   const updateBallVm = useCallback((ballId, patch) => {
-    setBallVms(prev => prev.map(ball => ball.id === ballId ? { ...ball, ...patch } : ball));
+    ballVmsRef.current = ballVmsRef.current.map(ball =>
+      ball.id === ballId ? { ...ball, ...patch } : ball
+    );
+    setBallVms(ballVmsRef.current);
   }, []);
 
   const removeBallVm = useCallback((ballId) => {
-    setBallVms(prev => prev.filter(ball => ball.id !== ballId));
+    ballVmsRef.current = ballVmsRef.current.filter(ball => ball.id !== ballId);
+    setBallVms(ballVmsRef.current);
   }, []);
 
   const startExit = useCallback((ballId) => {
@@ -103,7 +102,10 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     const vm = createBallVm({ id, color, baseInstance });
     vm.onClick = () => startExit(id);
 
-    setBallVms(prev => [...prev, vm]);
+    // Sync ref mirror synchronously so startEntrance can find it immediately
+    ballVmsRef.current = [...ballVmsRef.current, vm];
+    setBallVms(ballVmsRef.current);
+
     startEntrance(id);
 
     baseInstance.onComplete(() => {
