@@ -1,7 +1,7 @@
 /**
  * Rule: motion-structure
  * Performs structural validation for templates, motions, drivers/triggers, and track template references.
- * Supports both v3 and v4 schema shapes.
+ * Validates the v4 motion shape. v2/v3 fields (driver, timelineId, primary, lifecycle, playback) are explicitly forbidden with a dedicated error each.
  *
  * @param {unknown} schema - Full project schema
  * @returns {ValidationError[]}
@@ -137,7 +137,6 @@ export function motionStructureRule(schema) {
   // 2. Validate motions structure
   const seenMotionIds = new Set();
   const motions = Array.isArray(schema.motions) ? schema.motions : [];
-  const isV4 = schema.schemaVersion === 4 || motions.some(m => m && typeof m === 'object' && m.trigger);
 
   for (const [i, motion] of motions.entries()) {
     const motionPath = `motions[${i}]`;
@@ -167,139 +166,69 @@ export function motionStructureRule(schema) {
       seenMotionIds.add(effectiveId);
     }
 
-    if (isV4 || (driver === undefined && trigger !== undefined)) {
-      // Forbidden v2/v3 fields in v4
-      if (driver !== undefined) {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: '"driver" is a v2/v3 field, not valid in v4 — motions always have a trigger, no driver wrapper needed.',
-          path: `${motionPath}.driver`
-        });
-      }
-      if (timelineId !== undefined) {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: '"timelineId" is a v2/v3 field, not valid in v4 — tracks under the same motion share a trigger automatically.',
-          path: `${motionPath}.timelineId`
-        });
-      }
-      if (primary !== undefined) {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: '"primary" is a v2/v3 field, not valid in v4.',
-          path: `${motionPath}.primary`
-        });
-      }
-      if (lifecycle !== undefined) {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: '"lifecycle" is a v2/v3 field, not valid in v4.',
-          path: `${motionPath}.lifecycle`
-        });
-      }
-      if (playback !== undefined) {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: '"playback" is a v2/v3 field, not valid in v4.',
-          path: `${motionPath}.playback`
-        });
-      }
+    // Forbidden v2/v3 fields in v4
+    if (driver !== undefined) {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: '"driver" is a v2/v3 field, not valid in v4 — motions always have a trigger, no driver wrapper needed.',
+        path: `${motionPath}.driver`
+      });
+    }
+    if (timelineId !== undefined) {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: '"timelineId" is a v2/v3 field, not valid in v4 — tracks under the same motion share a trigger automatically.',
+        path: `${motionPath}.timelineId`
+      });
+    }
+    if (primary !== undefined) {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: '"primary" is a v2/v3 field, not valid in v4.',
+        path: `${motionPath}.primary`
+      });
+    }
+    if (lifecycle !== undefined) {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: '"lifecycle" is a v2/v3 field, not valid in v4.',
+        path: `${motionPath}.lifecycle`
+      });
+    }
+    if (playback !== undefined) {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: '"playback" is a v2/v3 field, not valid in v4.',
+        path: `${motionPath}.playback`
+      });
+    }
 
-      if (trigger === undefined || trigger === null) {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: 'trigger is required on every motion in v4.',
-          path: `${motionPath}.trigger`
-        });
-      } else if (typeof trigger !== 'object') {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: 'trigger must be an object.',
-          path: `${motionPath}.trigger`
-        });
-      } else if (!trigger.type || typeof trigger.type !== 'string') {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: 'trigger.type is required and must be a string.',
-          path: `${motionPath}.trigger.type`
-        });
-      }
-    } else {
-      // Legacy v3 driver validation
-      if (driver === undefined || driver === null) {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: 'driver is required on every motion.',
-          path: `${motionPath}.driver`
-        });
-      } else if (typeof driver !== 'object') {
-        errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
-          message: 'driver must be an object.',
-          path: `${motionPath}.driver`
-        });
-      } else {
-        const { type, trigger: driverTrigger, sectionId, timelineId: dTimelineId, primary: driverPrimary } = driver;
-        if (type !== 'timeline' && type !== 'delegate') {
-          errors.push({
-            ruleId: 'motion-structure',
-            severity: 'error',
-            message: `driver.type must be 'timeline' or 'delegate'. Got: ${JSON.stringify(type)}`,
-            path: `${motionPath}.driver.type`
-          });
-        } else if (type === 'delegate') {
-          if (driverTrigger !== undefined) {
-            errors.push({
-              ruleId: 'motion-structure',
-              severity: 'error',
-              message: `Motion "${effectiveId || i}": trigger is not valid on driver.type "delegate"`,
-              path: `${motionPath}.driver.trigger`
-            });
-          }
-          if (sectionId !== undefined) {
-            errors.push({
-              ruleId: 'motion-structure',
-              severity: 'error',
-              message: `Motion "${effectiveId || i}": sectionId is not valid on driver.type "delegate"`,
-              path: `${motionPath}.driver.sectionId`
-            });
-          }
-          if (dTimelineId !== undefined) {
-            errors.push({
-              ruleId: 'motion-structure',
-              severity: 'error',
-              message: `Motion "${effectiveId || i}": timelineId is not valid on driver.type "delegate"`,
-              path: `${motionPath}.driver.timelineId`
-            });
-          }
-          if (driverPrimary !== undefined) {
-            errors.push({
-              ruleId: 'motion-structure',
-              severity: 'error',
-              message: `Motion "${effectiveId || i}": primary is not valid on driver.type "delegate"`,
-              path: `${motionPath}.driver.primary`
-            });
-          }
-          if (stagger !== undefined) {
-            errors.push({
-              ruleId: 'motion-structure',
-              severity: 'error',
-              message: `Motion "${effectiveId || i}": stagger is not valid on driver.type "delegate"`,
-              path: `${motionPath}.stagger`
-            });
-          }
-        }
-      }
+    if (trigger === undefined || trigger === null) {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: 'trigger is required on every motion in v4.',
+        path: `${motionPath}.trigger`
+      });
+    } else if (typeof trigger !== 'object') {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: 'trigger must be an object.',
+        path: `${motionPath}.trigger`
+      });
+    } else if (!trigger.type || typeof trigger.type !== 'string') {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: 'trigger.type is required and must be a string.',
+        path: `${motionPath}.trigger.type`
+      });
     }
 
     validateTracksArray(tracks, `${motionPath}.tracks`, effectiveId || i);

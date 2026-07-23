@@ -38,8 +38,8 @@ describe('motion-structure rule', () => {
   it('should error on duplicate motionIds', () => {
     const schema = {
       motions: [
-        { motionId: 'm1', driver: { type: 'timeline', trigger: {} }, tracks: [{ id: 'tr1' }] },
-        { motionId: 'm1', driver: { type: 'timeline', trigger: {} }, tracks: [{ id: 'tr2' }] }
+        { motionId: 'm1', trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] },
+        { motionId: 'm1', trigger: { type: 'time' }, tracks: [{ id: 'tr2' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -48,7 +48,31 @@ describe('motion-structure rule', () => {
     expect(errors[0].message).toContain("Duplicate motionId 'm1'");
   });
 
-  it('should error if driver is missing on motion', () => {
+  it('should error if driver or other forbidden fields are present on motion', () => {
+    const schema = {
+      motions: [
+        {
+          motionId: 'm1',
+          trigger: { type: 'time' },
+          driver: { type: 'timeline' },
+          timelineId: 'tl1',
+          primary: true,
+          lifecycle: {},
+          playback: {},
+          tracks: [{ id: 'tr1' }]
+        }
+      ]
+    };
+    const errors = motionStructureRule(schema);
+    const paths = errors.map(e => e.path);
+    expect(paths).toContain('motions[0].driver');
+    expect(paths).toContain('motions[0].timelineId');
+    expect(paths).toContain('motions[0].primary');
+    expect(paths).toContain('motions[0].lifecycle');
+    expect(paths).toContain('motions[0].playback');
+  });
+
+  it('should error if trigger is missing on motion', () => {
     const schema = {
       motions: [
         { motionId: 'm1', tracks: [{ id: 'tr1' }] }
@@ -56,55 +80,43 @@ describe('motion-structure rule', () => {
     };
     const errors = motionStructureRule(schema);
     expect(errors).toHaveLength(1);
-    expect(errors[0].path).toBe('motions[0].driver');
+    expect(errors[0].path).toBe('motions[0].trigger');
+    expect(errors[0].message).toContain('trigger is required on every motion');
   });
 
-  it('should error if driver.type is invalid', () => {
+  it('should error if trigger is not an object', () => {
     const schema = {
       motions: [
-        { motionId: 'm1', driver: { type: 'invalid' }, tracks: [{ id: 'tr1' }] }
+        { motionId: 'm1', trigger: 'not-an-object', tracks: [{ id: 'tr1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
     expect(errors).toHaveLength(1);
-    expect(errors[0].path).toBe('motions[0].driver.type');
+    expect(errors[0].path).toBe('motions[0].trigger');
+    expect(errors[0].message).toContain('trigger must be an object');
   });
 
-  it('should error if delegate driver contains forbidden fields', () => {
+  it('should error if trigger.type is invalid', () => {
     const schema = {
       motions: [
-        {
-          motionId: 'm1',
-          driver: {
-            type: 'delegate',
-            trigger: {},
-            sectionId: 'sec1',
-            timelineId: 'tl1',
-            primary: true
-          },
-          stagger: 0.5,
-          tracks: [{ id: 'tr1' }]
-        }
+        { motionId: 'm1', trigger: { type: 123 }, tracks: [{ id: 'tr1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
-    const paths = errors.map(e => e.path);
-    expect(paths).toContain('motions[0].driver.trigger');
-    expect(paths).toContain('motions[0].driver.sectionId');
-    expect(paths).toContain('motions[0].driver.timelineId');
-    expect(paths).toContain('motions[0].driver.primary');
-    expect(paths).toContain('motions[0].stagger');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].path).toBe('motions[0].trigger.type');
+    expect(errors[0].message).toContain('trigger.type is required and must be a string');
   });
 
   it('should error if tracks is missing or empty', () => {
     const schema1 = {
       motions: [
-        { motionId: 'm1', driver: { type: 'delegate' }, tracks: [] }
+        { motionId: 'm1', trigger: { type: 'time' }, tracks: [] }
       ]
     };
     const schema2 = {
       motions: [
-        { motionId: 'm1', driver: { type: 'delegate' } }
+        { motionId: 'm1', trigger: { type: 'time' } }
       ]
     };
     expect(motionStructureRule(schema1)[0].path).toBe('motions[0].tracks');
@@ -114,7 +126,7 @@ describe('motion-structure rule', () => {
   it('should error on missing motionId', () => {
     const schema = {
       motions: [
-        { driver: { type: 'timeline', trigger: {} }, tracks: [{ id: 'tr1' }] }
+        { trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -126,7 +138,7 @@ describe('motion-structure rule', () => {
   it('should error on empty string motionId', () => {
     const schema = {
       motions: [
-        { motionId: '', driver: { type: 'timeline', trigger: {} }, tracks: [{ id: 'tr1' }] }
+        { motionId: '', trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -135,11 +147,11 @@ describe('motion-structure rule', () => {
     expect(errors[0].message).toContain('motionId is required');
   });
 
-  it('should error on negative track.id (missing or empty)', () => {
+  it('should error on missing track.id', () => {
     const schema = {
       templates: [{ templateId: 't1' }],
       motions: [
-        { motionId: 'm1', driver: { type: 'timeline', trigger: {} }, tracks: [{ use: 't1' }] }
+        { motionId: 'm1', trigger: { type: 'time' }, tracks: [{ use: 't1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -152,7 +164,7 @@ describe('motion-structure rule', () => {
     const schema = {
       templates: [{ templateId: 't1' }],
       motions: [
-        { motionId: 'm1', driver: { type: 'timeline', trigger: {} }, tracks: [{ id: '', use: 't1' }] }
+        { motionId: 'm1', trigger: { type: 'time' }, tracks: [{ id: '', use: 't1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -167,7 +179,7 @@ describe('motion-structure rule', () => {
       motions: [
         {
           motionId: 'm1',
-          driver: { type: 'delegate' },
+          trigger: { type: 'time' },
           tracks: [{ id: 'tr1', use: 'non-existent' }]
         }
       ]
