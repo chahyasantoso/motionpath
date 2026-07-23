@@ -200,6 +200,10 @@ export class Track {
   }
 
 
+  get children() {
+    return Array.from(this.#children.values());
+  }
+
   // --- Composition: "moving together" ---
   addChild(child, opts = {}) {
     if (child.#parent) {
@@ -230,6 +234,10 @@ export class Track {
     const siblingsBeforeRemove = Array.from(this.#children.values());
     this.#children.delete(id);
     child.#parent = null;
+
+    if (this.#host) {
+      this.#host._unmountChild(child);
+    }
 
     const targets = this.#layoutDelegate.computeReflow(siblingsBeforeRemove, child, {});
     for (const target of targets) {

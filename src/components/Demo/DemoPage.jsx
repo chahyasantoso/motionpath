@@ -1,12 +1,15 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { engine } from '../../engines/Engine.js';
+import { createTrack } from '../../lib/createTrack.js';
 import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
+import useMotionSubscribers from '../../hooks/useMotionSubscribers';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import useMotionTrigger from '../../hooks/useMotionTrigger';
 import useSmoothScroll from '../../hooks/useSmoothScroll';
 import { buildMotionPath } from '../../utils/pathUtils';
 import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../utils/projection3d';
+import { gsap } from 'gsap';
 import './DemoPage.css';
 // Prevent editor auto-cleanup from removing unused React import
 const _dummyReactRef = React;
@@ -229,55 +232,69 @@ function Cloud({ instance }) {
   return <div ref={ref} className="element cloud">☁️</div>;
 }
 
-function CarouselCard({ instance, cardData, onRemove }) {
+// CarouselCard receives its own child Track (v4: Track.addChild per card)
+function CarouselCard({ track: cardTrack, cardData, onRemove }) {
   const ref = useRef(null);
-  const [activeInstance, setActiveInstance] = React.useState(instance);
-  const [activeTrackId, setActiveTrackId] = React.useState('carousel-card-track');
+  const [activeTrack, setActiveTrack] = React.useState(cardTrack);
 
   const transform = useCallback((rawData, composeFn) => {
-    if (activeTrackId === 'card-exit-track') {
+    // Exit track: basic compose, no carousel logic
+    if (activeTrack !== cardTrack) {
       return composeFn(rawData);
     }
 
     const cardProgress = rawData.pathProgress ?? 0;
-
     if (cardProgress <= 0 || cardProgress >= 1) {
-      return {
-        display: 'none',
-        opacity: 0,
-      };
+      return { display: 'none', opacity: 0 };
     }
 
     const composed = composeFn(rawData);
     const scale = 0.75 + Math.sin(cardProgress * Math.PI) * 0.35;
     const targetTilt = Math.max(-20, Math.min(20, (composed.rotation ?? 0) * 0.35));
-
     return {
       ...composed,
       display: 'flex',
       rotation: targetTilt,
-      scale: scale,
+      scale,
       rotateY: targetTilt * -0.6,
     };
-  }, [activeTrackId]);
+  }, [activeTrack, cardTrack]);
 
-  useMotionSubscriber(activeInstance, activeTrackId, ref, transform);
+  useMotionSubscribers([{ track: activeTrack, transformFn: transform }], ref);
 
   const handleClick = useCallback(() => {
-    if (activeTrackId === 'card-exit-track') return;
+    if (activeTrack !== cardTrack) return; // already exiting
 
-    const exitInstance = productionEngine.mountInstance('card-exit');
-    if (!exitInstance) return;
-
-    setActiveInstance(exitInstance);
-    setActiveTrackId('card-exit-track');
-
-    exitInstance.play();
-    exitInstance.onComplete(() => {
-      exitInstance.destroy();
-      onRemove(cardData.id, instance);
+    createTrack({
+      id: `exit-${cardData.id}`,
+      keyframes: {
+        scale: {
+          stops: [
+            { p: 0.0, v: 1.0 },
+            { p: 1.0, v: 0.0 }
+          ]
+        },
+        opacity: {
+          stops: [
+            { p: 0.0, v: 1.0 },
+            { p: 1.0, v: 0.0 }
+          ]
+        }
+      },
+      duration: 0.4
+    }).then(exitTrack => {
+      setActiveTrack(exitTrack);
+      gsap.to(exitTrack, {
+        progress: 1,
+        duration: 0.4,
+        ease: 'none',
+        onComplete: () => {
+          exitTrack.destroy();
+          onRemove(cardData.id, cardTrack);
+        }
+      });
     });
-  }, [activeTrackId, instance, cardData.id, onRemove]);
+  }, [activeTrack, cardTrack, cardData.id, onRemove]);
 
   return (
     <div ref={ref} className="element carousel-card" onClick={handleClick} style={{ cursor: 'pointer' }}>
@@ -289,17 +306,15 @@ function CarouselCard({ instance, cardData, onRemove }) {
   );
 }
 
-function HelixCard({ instance, cardData }) {
+// HelixCard receives its own child Track (v4: Track.addChild per card)
+function HelixCard({ track, cardData }) {
   const ref = useRef(null);
 
   const transform = useCallback((rawData, composeFn) => {
     const cardProgress = rawData.pathProgress ?? 0;
 
     if (cardProgress <= 0 || cardProgress >= 1) {
-      return {
-        display: 'none',
-        opacity: 0,
-      };
+      return { display: 'none', opacity: 0 };
     }
 
     const point3D = composeFn(rawData);
@@ -317,7 +332,6 @@ function HelixCard({ instance, cardData }) {
     const scale = 0.6 + depthFactor * 0.65;
     const opacityBase = 0.4 + depthFactor * 0.6;
     const blur = Math.max(0, (1 - depthFactor) * 4);
-    
     const theta = cardProgress * HELIX_CONFIG.turns * 2 * Math.PI;
     const rotateY = -(theta - Math.PI / 2) * (180 / Math.PI);
     const zIndex = Math.round(depthFactor * 100);
@@ -328,16 +342,16 @@ function HelixCard({ instance, cardData }) {
       y: projected.y,
       xPercent: -50,
       yPercent: -50,
-      scale: scale,
+      scale,
       opacity: opacityBase,
       filter: `blur(${blur}px)`,
-      zIndex: zIndex,
+      zIndex,
       transformPerspective: 1000,
-      rotateY: rotateY,
+      rotateY,
     };
   }, []);
 
-  useMotionSubscriber(instance, 'helix-card-track', ref, transform);
+  useMotionSubscribers([{ track, transformFn: transform }], ref);
 
   return (
     <div ref={ref} className="element helix-card">
@@ -394,57 +408,66 @@ function CarouselDemo({ instance }) {
   useMotionTrigger('carousel-stage', stageRef);
 
   const [cards, setCards] = React.useState(MOCK_CARDS);
-  const childInstancesMap = useRef(new Map());
+  // cardId -> child Track (v4: one Track per card, added to parent track)
+  const childTracksMapRef = useRef(new Map());
+  const parentTrackRef = useRef(null);
+  const [trackVersion, setTrackVersion] = React.useState(0);
 
-  // React.useEffect(() => {
-  //   if (!instance) return;
-  //   let rafId = null;
-  //   const unsubscribe = instance.onChildChange(() => {
-  //     if (rafId) cancelAnimationFrame(rafId);
-  //     const capturedTime = instance.timeline.time();
-  //     console.log("child changed");
-  //     rafId = requestAnimationFrame(() => {
-  //       const nextdur =  instance.timeline.duration();
-  //       ScrollTrigger.refresh();
-  //       instance.timeline.time(Math.min(capturedTime, nextdur));
-  //       console.log("child changed refresh");
-  //     });
-  //   });
-  //   return () => {
-  //     unsubscribe();
-  //     if (rafId) cancelAnimationFrame(rafId);
-  //   };
-  // }, [instance]);
-
-  const getOrAddChildInstance = useCallback((cardId) => {
-    if (!instance) return null;
-    if (childInstancesMap.current.has(cardId)) {
-      return childInstancesMap.current.get(cardId);
+  // Get the parent carousel track once the motion is mounted
+  useEffect(() => {
+    if (instance) {
+      parentTrackRef.current = instance.getTrack('carousel-card-track');
     }
-    const child = instance.addChild();
-    childInstancesMap.current.set(cardId, child);
-    return child;
   }, [instance]);
 
-  const handleRemoveCard = useCallback((cardId, childInstance) => {
-    if (instance && childInstance) {
-      instance.removeChild(childInstance);
+  // Create a child Track per card (async), add to parent via Track.addChild
+  useEffect(() => {
+    const parentTrack = parentTrackRef.current;
+    if (!parentTrack) return;
+
+    const map = childTracksMapRef.current;
+    const missingCards = cards.filter(c => !map.has(c.id));
+    if (missingCards.length === 0) return;
+
+    let cancelled = false;
+    const trackCfg = dynamicCarouselScene.tracks[0];
+    Promise.all(
+      missingCards.map(card =>
+        createTrack({ id: `carousel-child-${card.id}`, keyframes: trackCfg.keyframes })
+          .then(track => ({ cardId: card.id, track }))
+      )
+    ).then(results => {
+      if (cancelled) return;
+      for (const { cardId, track } of results) {
+        if (!map.has(cardId)) {
+          parentTrack.addChild(track, { stagger: dynamicCarouselScene.stagger });
+          map.set(cardId, track);
+        }
+      }
+      setTrackVersion(v => v + 1);
+    });
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, instance, trackVersion === 0 ? instance : null]);
+
+  const handleRemoveCard = useCallback((cardId, childTrack) => {
+    const parentTrack = parentTrackRef.current;
+    if (parentTrack && childTrack) {
+      parentTrack.removeChild(childTrack.id);
     }
-    childInstancesMap.current.delete(cardId);
+    childTracksMapRef.current.delete(cardId);
     setCards(prev => prev.filter(c => c.id !== cardId));
-  }, [instance]);
+  }, []);
 
-  // ponytail: reuse existing MOCK_CARDS template array to avoid duplicate static definitions
   const handleAddCard = useCallback(() => {
     const nextId = cards.length > 0 ? Math.max(...cards.map(c => c.id)) + 1 : 1;
     const template = MOCK_CARDS[Math.floor(Math.random() * MOCK_CARDS.length)];
-    const newCard = {
+    setCards(prev => [...prev, {
       ...template,
       id: nextId,
-      badge: `${String(nextId).padStart(2, '0')} / ${template.badge.split(' / ')[1] || 'DYNAMIC'}`
-    };
-
-    setCards(prev => [...prev, newCard]);
+      badge: `${String(nextId).padStart(2, '0')} / ${template.badge.split(' / ')[1] || 'DYNAMIC'}`,
+    }]);
   }, [cards]);
 
   return (
@@ -454,13 +477,13 @@ function CarouselDemo({ instance }) {
         <p>Dynamic mock cards flowing smoothly on a single Bezier S-curve track with engine-level stagger. (Click any card to trigger schema-defined exit animation!)</p>
       </div>
       <div ref={stageRef} className="carousel-stage">
-        {cards.map((card) => {
-          const childInstance = getOrAddChildInstance(card.id);
-          if (!childInstance) return null;
+        {cards.map(card => {
+          const childTrack = childTracksMapRef.current.get(card.id);
+          if (!childTrack) return null;
           return (
             <CarouselCard
               key={card.id}
-              instance={childInstance}
+              track={childTrack}
               cardData={card}
               onRemove={handleRemoveCard}
             />
@@ -499,12 +522,30 @@ function HelixDemo({ instance }) {
     cx, cy, tiltDeg, true
   );
 
-  const childInstances = useMemo(() => {
-    if (!instance) return [];
-    if (instance.children.length > 0) {
-      return instance.children;
-    }
-    return MOCK_CARDS.slice(0, 6).map(() => instance.addChild());
+  // v4: one child Track per card, added to the parent helix track
+  const childTracksRef = useRef([]);
+  const [helixTracksReady, setHelixTracksReady] = React.useState(false);
+
+  useEffect(() => {
+    if (!instance) return;
+    const parentTrack = instance.getTrack('helix-card-track');
+    if (!parentTrack) return;
+
+    let cancelled = false;
+    const helixCards = MOCK_CARDS.slice(0, 6);
+    const trackCfg = dynamicHelixScene.tracks[0];
+    Promise.all(
+      helixCards.map((_, i) =>
+        createTrack({ id: `helix-child-${i}`, keyframes: trackCfg.keyframes })
+      )
+    ).then(tracks => {
+      if (cancelled) return;
+      childTracksRef.current = tracks;
+      tracks.forEach(track => parentTrack.addChild(track, { stagger: dynamicHelixScene.stagger }));
+      setHelixTracksReady(true);
+    });
+
+    return () => { cancelled = true; };
   }, [instance]);
 
   return (
@@ -533,42 +574,21 @@ function HelixDemo({ instance }) {
             strokeDasharray="6 4"
           />
 
-          <line
-            x1={cx - radius}
-            y1={cy}
-            x2={cx - radius}
-            y2={cy + cylinderHeight2D}
-            stroke="rgba(255, 255, 255, 0.04)"
-            strokeWidth="1.5"
-            strokeDasharray="4 4"
-          />
-          <line
-            x1={cx + radius}
-            y1={cy}
-            x2={cx + radius}
-            y2={cy + cylinderHeight2D}
-            stroke="rgba(255, 255, 255, 0.04)"
-            strokeWidth="1.5"
-            strokeDasharray="4 4"
-          />
-          <line
-            x1={cx}
-            y1={cy}
-            x2={cx}
-            y2={cy + cylinderHeight2D}
-            stroke="rgba(255, 255, 255, 0.015)"
-            strokeWidth="1"
-            strokeDasharray="8 6"
-          />
+          <line x1={cx - radius} y1={cy} x2={cx - radius} y2={cy + cylinderHeight2D}
+            stroke="rgba(255, 255, 255, 0.04)" strokeWidth="1.5" strokeDasharray="4 4" />
+          <line x1={cx + radius} y1={cy} x2={cx + radius} y2={cy + cylinderHeight2D}
+            stroke="rgba(255, 255, 255, 0.04)" strokeWidth="1.5" strokeDasharray="4 4" />
+          <line x1={cx} y1={cy} x2={cx} y2={cy + cylinderHeight2D}
+            stroke="rgba(255, 255, 255, 0.015)" strokeWidth="1" strokeDasharray="8 6" />
         </svg>
 
-        {MOCK_CARDS.slice(0, 6).map((card, i) => {
-          const childInstance = childInstances[i];
-          if (!childInstance) return null;
+        {helixTracksReady && MOCK_CARDS.slice(0, 6).map((card, i) => {
+          const childTrack = childTracksRef.current[i];
+          if (!childTrack) return null;
           return (
             <HelixCard
               key={card.id}
-              instance={childInstance}
+              track={childTrack}
               cardData={card}
             />
           );

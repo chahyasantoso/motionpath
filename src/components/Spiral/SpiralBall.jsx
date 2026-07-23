@@ -9,8 +9,7 @@ export default function SpiralBall({ vm }) {
   const ref = useRef(null);
 
   const baseSource = {
-    instance: vm.baseInstance,
-    trackId: 'ball-track',
+    track: vm.baseTrack,
     transformFn: (rawData, compose) => {
       const p = rawData?.pathProgress ?? 0;
       if (p <= 0 || p >= 1) return { display: 'none', opacity: 0 };
@@ -18,8 +17,8 @@ export default function SpiralBall({ vm }) {
     }
   };
 
-  const sources = vm.activeInstance !== vm.baseInstance
-    ? [baseSource, { instance: vm.activeInstance, trackId: vm.activeTrackId }]
+  const sources = vm.activeTrack !== vm.baseTrack
+    ? [baseSource, { track: vm.activeTrack }]
     : [baseSource];
 
   const mergeFn = useCallback((patches) => {
