@@ -8,12 +8,15 @@ import { validateProject } from '../validators/index.js';
 import { createEngineCore } from './engineCore.js';
 import { createMotionResolver } from './resolveMotion.js';
 import { createTimelineGroupController } from './TimelineGroupController.js';
+import { parseV4Project } from '../lib/schema/parseV4Project.js';
 
 export class BaseEngine {
   _instances = new Map();
   _groups = new Map();
   _groupIndex = new Map();
   _project = null;
+  _v4Project = null;
+  _isV4 = false;
   _core = null;
   _schema = null;
   _triggerRefs = new Map();
@@ -54,6 +57,19 @@ export class BaseEngine {
       throw err;
     }
 
+    const isV4 = schema.schemaVersion === 4 ||
+      (Array.isArray(schema.motions) && schema.motions.some(m => m && typeof m === 'object' && m.trigger));
+
+    if (isV4) {
+      if (loadId !== this.#loadGeneration) return;
+      this._cleanup();
+      this._schema = schema;
+      this._isV4 = true;
+      this._v4Project = await parseV4Project(schema, { resolveElement: this.#resolveElement });
+      this._onProjectLoaded();
+      return;
+    }
+
     const templates = schema.templates || [];
     const motions = schema.motions || [];
     const pluginsToLoad = new Set();
@@ -82,6 +98,7 @@ export class BaseEngine {
 
     this._cleanup();
     this._schema = schema;
+    this._isV4 = false;
     this._project = parseProjectSchema(schema);
     this._core = createEngineCore();
     this.#deferredCall.setCore(this._core);
@@ -103,6 +120,24 @@ export class BaseEngine {
   }
 
   mountInstance(motionId, config = {}) {
+    if (this._isV4) {
+      if (!this._v4Project) {
+        throw new Error('mountInstance: v4 project not loaded.');
+      }
+      const motion = this._v4Project.getMotion(motionId);
+      if (motion) {
+        motion.init(this.#resolveElement);
+        this._instances.set(motion.id, motion);
+        return motion;
+      }
+      const track = this._v4Project.getTrack(motionId);
+      if (track) {
+        this._instances.set(track.id, track);
+        return track;
+      }
+      throw new Error(`mountInstance: motion or track "${motionId}" not found in v4 project.`);
+    }
+
     if (!this._project || !this._core) {
       throw new Error('mountInstance: project not loaded.');
     }
@@ -163,7 +198,21 @@ export class BaseEngine {
     return instance;
   }
 
+  getTrack(trackId) {
+    if (this._isV4 && this._v4Project) {
+      return this._v4Project.getTrack(trackId);
+    }
+    return null;
+  }
+
   resolveMotion(motionId, progress, overrides = {}) {
+    if (this._isV4 && this._v4Project) {
+      const motion = this._v4Project.getMotion(motionId);
+      if (motion && typeof motion.trigger?.seek === 'function') {
+        motion.trigger.seek(progress);
+      }
+      return {};
+    }
     if (!this._project) {
       throw new Error('resolveMotion: project not loaded.');
     }
@@ -193,7 +242,9 @@ export class BaseEngine {
 
   _cleanup() {
     for (const instance of this._instances.values()) {
-      try { instance.destroy(); } catch (e) { /* ignore */ }
+      try {
+        if (typeof instance.destroy === 'function') instance.destroy();
+      } catch (e) { /* ignore */ }
     }
     this._instances.clear();
 
@@ -209,6 +260,8 @@ export class BaseEngine {
     }
     this._schema = null;
     this._project = null;
+    this._v4Project = null;
+    this._isV4 = false;
     this.#motionResolver.clearCache();
   }
 

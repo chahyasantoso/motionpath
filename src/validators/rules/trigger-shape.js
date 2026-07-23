@@ -1,13 +1,9 @@
+import { triggerDelegateRegistry } from '../../lib/TriggerDelegate.js';
+
 /**
  * Rule: trigger-shape
  * Per-motion trigger validation.
- *
- * Requirements:
- * - motion.driver.trigger.type must be exactly one of "scroll", "time".
- * - If type === "scroll": scrub must be boolean or number, present.
- * - endTrigger present + NOT (type === "scroll" && scrub === true) -> error.
- * - repeat, yoyo, or repeatDelay present + (type === "scroll" && scrub === true) -> error.
- * - delay present + (type === "scroll" && scrub === true) -> error.
+ * Supports both v4 (motion.trigger) and v3 (motion.driver.trigger) shapes.
  *
  * @param {unknown} motion
  * @param {{ schema: unknown }} context - Rule validation context
@@ -26,14 +22,15 @@ export function triggerShapeRule(motion, context, path) {
     return errors;
   }
 
-  const trigger = motion.driver?.trigger;
-  const triggerPath = `${path}.driver.trigger`;
+  const isV4Trigger = motion.trigger !== undefined;
+  const trigger = motion.trigger ?? motion.driver?.trigger;
+  const triggerPath = isV4Trigger ? `${path}.trigger` : `${path}.driver.trigger`;
 
   if (trigger === undefined || trigger === null) {
     errors.push({
       ruleId: "trigger-shape",
       severity: "error",
-      message: "motion.driver.trigger is required.",
+      message: "motion trigger is required.",
       path: triggerPath
     });
     return errors;
@@ -43,7 +40,7 @@ export function triggerShapeRule(motion, context, path) {
     errors.push({
       ruleId: "trigger-shape",
       severity: "error",
-      message: "motion.driver.trigger must be an object.",
+      message: "motion trigger must be an object.",
       path: triggerPath
     });
     return errors;
@@ -51,13 +48,28 @@ export function triggerShapeRule(motion, context, path) {
 
   const { type, scrub, endTrigger, repeat, yoyo, repeatDelay, delay } = trigger;
 
-  if (type !== 'scroll' && type !== 'time') {
+  if (!type || typeof type !== 'string') {
     errors.push({
       ruleId: "trigger-shape",
       severity: "error",
-      message: `trigger.type must be exactly one of 'scroll', 'time'. Got: ${JSON.stringify(type)}.`,
+      message: `trigger.type is required.`,
       path: `${triggerPath}.type`
     });
+    return errors;
+  }
+
+  // Allow custom registered trigger types or built-in 'scroll' | 'time' | 'manual'
+  if (type !== 'scroll' && type !== 'time' && type !== 'manual' && !triggerDelegateRegistry.has(type)) {
+    errors.push({
+      ruleId: "trigger-shape",
+      severity: "error",
+      message: `trigger.type must be a registered trigger type ('scroll', 'time', 'manual', etc.). Got: ${JSON.stringify(type)}.`,
+      path: `${triggerPath}.type`
+    });
+    return errors;
+  }
+
+  if (type === 'manual') {
     return errors;
   }
 

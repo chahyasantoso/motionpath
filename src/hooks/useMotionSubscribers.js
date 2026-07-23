@@ -1,39 +1,57 @@
 import { useEffect, useRef } from 'react';
 import { domRenderer } from '../renderers/domRenderer.js';
+import { applyAnchor } from '../lib/helpers.js';
 
 function sourcesSignature(sources) {
-  return sources.map(s => `${s.instance?.id ?? ''}::${s.trackId ?? ''}`).join('|');
+  return sources.map(s => {
+    const trackId = s.track?.id ?? s.trackId ?? '';
+    const instId = s.instance?.id ?? '';
+    return `${instId}:${trackId}`;
+  }).join('|');
 }
 
-function subscribeToTrack(instance, trackId, getTransformFn, onPatch) {
-  if (!instance || !trackId) return () => {};
+function subscribeToSource(source, getTransformFn, onPatch) {
+  let targetTrack = source.track;
 
-  const composeFn = (data) => instance.compose(trackId, data);
+  if (!targetTrack && source.instance && source.trackId) {
+    if (typeof source.instance.getTrack === 'function') {
+      targetTrack = source.instance.getTrack(source.trackId);
+    }
+  }
 
-  return instance.subscribe(trackId, (rawData) => {
-    const transformFn = getTransformFn();
-    const patch = typeof transformFn === 'function'
-      ? transformFn(rawData, composeFn)
-      : composeFn(rawData);
-    onPatch(patch);
-  });
+  // v4 Track subscription
+  if (targetTrack && typeof targetTrack.subscribe === 'function') {
+    return targetTrack.subscribe((raw) => {
+      const transformFn = getTransformFn();
+      const basePatch = typeof transformFn === 'function'
+        ? transformFn(raw, (data) => targetTrack.compose(data))
+        : targetTrack.compose(raw);
+      const patch = applyAnchor(basePatch, source.anchor);
+      onPatch(patch);
+    });
+  }
+
+  // v3 MotionInstance subscription
+  const instance = source.instance;
+  const trackId = source.trackId;
+  if (instance && typeof instance.subscribe === 'function' && trackId) {
+    const composeFn = (data) => instance.compose(trackId, data);
+    return instance.subscribe(trackId, (rawData) => {
+      const transformFn = getTransformFn();
+      const basePatch = typeof transformFn === 'function'
+        ? transformFn(rawData, composeFn)
+        : composeFn(rawData);
+      const patch = applyAnchor(basePatch, source.anchor);
+      onPatch(patch);
+    });
+  }
+
+  return () => {};
 }
 
 /**
- * Merges N motion/track sources into one DOM write per tick. Each source may
- * have its own optional transformFn (same contract as the single-source
- * transformFn: receives (rawData, composeFn), returns a CSS patch). Every tick
- * from any one source re-merges all sources' latest patches and writes once via
- * domRenderer.
- *
- * mergeFn receives patches: Array<object> — one composed CSS patch per source.
- * If a source has a transformFn, that fn is responsible for any logic that
- * needs rawData (e.g. boundary checks on pathProgress).
- *
- * @param {Array<{instance: MotionInstance, trackId: string, transformFn?: Function}>} sources
- * @param {React.RefObject} ref
- * @param {(patches: object[]) => object} [mergeFn]
- *   Defaults to Object.assign of all patches in array order (last wins).
+ * Merges N motion/track sources into one DOM write per tick.
+ * Supports both v3 MotionInstance and v4 Motion/Track instances, as well as optional source.anchor.
  */
 export default function useMotionSubscribers(sources, ref, mergeFn) {
   const transformFnsRef = useRef([]);
@@ -63,9 +81,8 @@ export default function useMotionSubscribers(sources, ref, mergeFn) {
     };
 
     const unsubscribes = stableSources.map((source, i) =>
-      subscribeToTrack(
-        source.instance,
-        source.trackId,
+      subscribeToSource(
+        source,
         () => transformFnsRef.current[i],
         (patch) => {
           latestPatches[i] = patch;

@@ -1,11 +1,12 @@
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 4;
+export const SUPPORTED_SCHEMA_VERSIONS = [2, 3, 4];
 
 /**
  * Rule: schema-version
  * Top-level guard.
  *
  * Requirements:
- * - schema.schemaVersion must be present and exactly CURRENT_SCHEMA_VERSION.
+ * - schema.schemaVersion must be present and one of SUPPORTED_SCHEMA_VERSIONS.
  *
  * @param {unknown} schema
  * @param {string} path - Always "$"
@@ -33,11 +34,11 @@ export function schemaVersionRule(schema, path = "$") {
       message: "schemaVersion is missing.",
       path
     });
-  } else if (schemaVersion !== CURRENT_SCHEMA_VERSION) {
+  } else if (!SUPPORTED_SCHEMA_VERSIONS.includes(schemaVersion)) {
     errors.push({
       ruleId: "schema-version",
       severity: "error",
-      message: `schemaVersion must be exactly ${CURRENT_SCHEMA_VERSION}. Got: ${JSON.stringify(schemaVersion)}.`,
+      message: `schemaVersion must be one of [${SUPPORTED_SCHEMA_VERSIONS.join(', ')}]. Got: ${JSON.stringify(schemaVersion)}.`,
       path
     });
   }

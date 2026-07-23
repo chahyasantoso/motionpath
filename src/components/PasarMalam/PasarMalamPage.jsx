@@ -15,17 +15,14 @@ const IMAGE_SEQUENCE_FRAMES = Array.from({ length: 192 }, (_, i) => {
 
 // ─── Scene Data Config ──────────────────────────────────────────
 const pasarMalamScene = {
-  motionId: 'pasar-malam-storytelling',
-  driver: {
-    type: 'timeline',
-    sectionId: 'pasar-malam-storytelling',
-    trigger: {
-      type: 'scroll',
-      scrub: 0.5,
-      pin: 'pm-stage',
-      start: 'top top',
-      end: 'bottom bottom'
-    }
+  id: 'pasar-malam-storytelling',
+  trigger: {
+    type: 'scroll',
+    scrub: 0.5,
+    pin: 'pm-stage',
+    start: 'top top',
+    end: 'bottom bottom',
+    trigger: 'pasar-malam-storytelling'
   },
   tracks: [
     {
@@ -169,24 +166,7 @@ const pasarMalamScene = {
           ]
         }
       }
-    }
-  ]
-};
-
-const lanternScene = {
-  motionId: 'lantern-scene',
-  driver: {
-    type: 'timeline',
-    sectionId: 'lantern-scene',
-    trigger: {
-      type: 'scroll',
-      scrub: 0.5,
-      trigger: 'pasar-malam-storytelling',  // same section as the main scene
-      start: 'top top',
-      end: 'bottom bottom'
-    }
-  },
-  tracks: [
+    },
     {
       id: 'lantern-1-wrap',
       keyframes: {
@@ -212,13 +192,8 @@ const lanternScene = {
 };
 
 const lanternBounceScene = {
-  motionId: 'lantern-bounce',
-  driver: {
-    type: 'timeline',
-    timelineId: 'lantern-bounce-tl',
-    primary: true,
-    trigger: { type: 'time', duration: 1.2, repeat: -1, yoyo: true }
-  },
+  id: 'lantern-bounce',
+  trigger: { type: 'time', duration: 1.2, repeat: -1, yoyo: true },
   tracks: [
     {
       id: 'lantern-1',
@@ -242,10 +217,10 @@ const lanternBounceScene = {
 };
 
 const pmProject = {
-  schemaVersion: 2,
+  schemaVersion: 4,
   projectId: 'pasar-malam-page',
   perspective: 800,
-  motions: [pasarMalamScene, lanternScene, lanternBounceScene]
+  motions: [pasarMalamScene, lanternBounceScene]
 };
 
 // ─── Sub-Components ─────────────────────────────────────────────
@@ -379,6 +354,8 @@ function StatsCard({ instance }) {
 
 // ─── Main Page Export ───────────────────────────────────────────
 
+const BOUNCE_CONFIG = { autoplay: false };
+
 export default function PasarMalamPage() {
   const [bouncing, setBouncing] = useState(false);
   const bouncingRef = useRef(false);
@@ -389,14 +366,9 @@ export default function PasarMalamPage() {
   useMotionTrigger('pasar-malam-storytelling', storytellingRef);
   useMotionTrigger('pm-stage', stageRef);
 
-  // 'lantern-bounce' is the primary of the 'lantern-bounce-tl' group — passing
-  // autoplay:false here suppresses the master timeline's initial play() call
-  // at construction, so it never plays before useMotionTimelinePlayback (below)
-  // takes over ongoing control. No flash, and no reliance on effect-ordering.
   const isLoaded = useMotionProject(pmProject);
   const storytellingInstance = useMotionInstance(isLoaded ? 'pasar-malam-storytelling' : null);
-  const lanternInstance = useMotionInstance(isLoaded ? 'lantern-scene' : null);
-  const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce' : null, { autoplay: false });
+  const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce' : null, BOUNCE_CONFIG);
 
   useMotionTimelinePlayback(bounceInstance, bouncing);
   useSmoothScroll();
@@ -421,9 +393,9 @@ export default function PasarMalamPage() {
           
           {/* Ambient Floating Lanterns */}
           <div className="pm-lanterns-glow">
-            <Lantern wrapInstance={lanternInstance} bounceInstance={bounceInstance} wrapId="lantern-1-wrap" innerId="lantern-1" assetUrl="/lanterns/lantern-red.svg"  className="pm-lantern-1" onProgress={onLanternProgress} />
-            <Lantern wrapInstance={lanternInstance} bounceInstance={bounceInstance} wrapId="lantern-2-wrap" innerId="lantern-2" assetUrl="/lanterns/lantern-gold.svg" className="pm-lantern-2" />
-            <Lantern wrapInstance={lanternInstance} bounceInstance={bounceInstance} wrapId="lantern-3-wrap" innerId="lantern-3" assetUrl="/lanterns/lantern-pink.svg" className="pm-lantern-3" />
+            <Lantern wrapInstance={storytellingInstance} bounceInstance={bounceInstance} wrapId="lantern-1-wrap" innerId="lantern-1" assetUrl="/lanterns/lantern-red.svg"  className="pm-lantern-1" onProgress={onLanternProgress} />
+            <Lantern wrapInstance={storytellingInstance} bounceInstance={bounceInstance} wrapId="lantern-2-wrap" innerId="lantern-2" assetUrl="/lanterns/lantern-gold.svg" className="pm-lantern-2" />
+            <Lantern wrapInstance={storytellingInstance} bounceInstance={bounceInstance} wrapId="lantern-3-wrap" innerId="lantern-3" assetUrl="/lanterns/lantern-pink.svg" className="pm-lantern-3" />
           </div>
 
           <div className="pm-content-wrapper">
