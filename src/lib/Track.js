@@ -32,6 +32,8 @@ export class Track {
   #parent = null;
   #children = new Map();
   #subscribers = new Set();
+  #currentOffset = 0;
+  #staggerOffset = 0;
 
   /**
    * @param {object} params
@@ -150,7 +152,7 @@ export class Track {
     if (this.#children.size === 0) return 0;
     let maxOffset = 0;
     for (const child of this.#children.values()) {
-      const childOffset = child._currentOffset ?? 0;
+      const childOffset = child.#currentOffset ?? 0;
       if (childOffset > maxOffset) {
         maxOffset = childOffset;
       }
@@ -166,8 +168,8 @@ export class Track {
   #reflow() {
     let offset = 0;
     for (const child of this.#children.values()) {
-      child._currentOffset = offset;
-      offset += child._staggerOffset ?? 0;
+      child.#currentOffset = offset;
+      offset += child.#staggerOffset ?? 0;
     }
   }
 
@@ -177,10 +179,10 @@ export class Track {
     }
     child.#parent = this;
     const stagger = opts.stagger ?? 0;
-    child._staggerOffset = stagger;
+    child.#staggerOffset = stagger;
 
     const spawnOffset = this.#computeSpawnOffset(stagger);
-    child._currentOffset = spawnOffset;
+    child.#currentOffset = spawnOffset;
 
     this.#children.set(child.id, child);
     if (this.#host) {
