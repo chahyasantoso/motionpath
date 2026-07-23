@@ -3,7 +3,7 @@ import { triggerDelegateRegistry } from '../../lib/TriggerDelegate.js';
 /**
  * Rule: trigger-shape
  * Per-motion trigger validation.
- * Supports both v4 (motion.trigger) and v3 (motion.driver.trigger) shapes.
+ * v4-only: motion.trigger is the sole trigger source.
  *
  * @param {unknown} motion
  * @param {{ schema: unknown }} context - Rule validation context
@@ -17,14 +17,8 @@ export function triggerShapeRule(motion, context, path) {
     return errors; // handled by top-level or orchestrator checks, don't crash
   }
 
-  // Skip validation for delegate motions (delegate forbids trigger entirely, handled by driver rule)
-  if (motion.driver?.type === 'delegate') {
-    return errors;
-  }
-
-  const isV4Trigger = motion.trigger !== undefined;
-  const trigger = motion.trigger ?? motion.driver?.trigger;
-  const triggerPath = isV4Trigger ? `${path}.trigger` : `${path}.driver.trigger`;
+  const trigger = motion.trigger;
+  const triggerPath = `${path}.trigger`;
 
   if (trigger === undefined || trigger === null) {
     errors.push({

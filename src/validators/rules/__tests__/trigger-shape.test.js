@@ -4,7 +4,7 @@ import { triggerShapeRule } from '../trigger-shape.js';
 describe('trigger-shape rule', () => {
   it('should pass on valid scroll-scrub triggers', () => {
     const motion = {
-      driver: { type: 'timeline', trigger: { type: 'scroll', scrub: true, endTrigger: '#x' } }
+      trigger: { type: 'scroll', scrub: true, endTrigger: '#x' }
     };
     const errors = triggerShapeRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(0);
@@ -12,18 +12,18 @@ describe('trigger-shape rule', () => {
 
   it('should error on scroll observer trigger with endTrigger', () => {
     const motion = {
-      driver: { type: 'timeline', trigger: { type: 'scroll', scrub: false, endTrigger: '#x' } }
+      trigger: { type: 'scroll', scrub: false, endTrigger: '#x' }
     };
     const errors = triggerShapeRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('trigger-shape');
     expect(errors[0].severity).toBe('error');
-    expect(errors[0].path).toBe('motions[0].driver.trigger.endTrigger');
+    expect(errors[0].path).toBe('motions[0].trigger.endTrigger');
   });
 
   it('should pass on valid time triggers', () => {
     const motion = {
-      driver: { type: 'timeline', trigger: { type: 'time', duration: 2, repeat: -1 } }
+      trigger: { type: 'time', duration: 2, repeat: -1 }
     };
     const errors = triggerShapeRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(0);
@@ -31,42 +31,42 @@ describe('trigger-shape rule', () => {
 
   it('should error on scroll-scrub with repeat settings', () => {
     const motion = {
-      driver: { type: 'timeline', trigger: { type: 'scroll', scrub: true, repeat: -1 } }
+      trigger: { type: 'scroll', scrub: true, repeat: -1 }
     };
     const errors = triggerShapeRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(1);
     expect(errors[0].ruleId).toBe('trigger-shape');
-    expect(errors[0].path).toBe('motions[0].driver.trigger');
+    expect(errors[0].path).toBe('motions[0].trigger');
   });
 
   it('should error on scroll-scrub with delay', () => {
     const motion = {
-      driver: { type: 'timeline', trigger: { type: 'scroll', scrub: true, delay: 1 } }
+      trigger: { type: 'scroll', scrub: true, delay: 1 }
     };
     const errors = triggerShapeRule(motion, {}, 'motions[0]');
     expect(errors).toHaveLength(1);
-    expect(errors[0].path).toBe('motions[0].driver.trigger.delay');
+    expect(errors[0].path).toBe('motions[0].trigger.delay');
   });
 
   it('should error if trigger is missing or type is invalid', () => {
-    expect(triggerShapeRule({ driver: { type: 'timeline' } }, {}, 'motions[0]')).toHaveLength(1);
-    expect(triggerShapeRule({ driver: { type: 'timeline', trigger: {} } }, {}, 'motions[0]')).toHaveLength(1);
-    expect(triggerShapeRule({ driver: { type: 'timeline', trigger: { type: 'invalid' } } }, {}, 'motions[0]')).toHaveLength(1);
+    expect(triggerShapeRule({}, {}, 'motions[0]')).toHaveLength(1);
+    expect(triggerShapeRule({ trigger: {} }, {}, 'motions[0]')).toHaveLength(1);
+    expect(triggerShapeRule({ trigger: { type: 'invalid' } }, {}, 'motions[0]')).toHaveLength(1);
   });
 
   it('should error if scrub is missing or not a boolean in scroll trigger', () => {
-    const missingScrub = triggerShapeRule({ driver: { type: 'timeline', trigger: { type: 'scroll' } } }, {}, 'motions[0]');
+    const missingScrub = triggerShapeRule({ trigger: { type: 'scroll' } }, {}, 'motions[0]');
     expect(missingScrub).toHaveLength(1);
-    expect(missingScrub[0].path).toBe('motions[0].driver.trigger.scrub');
+    expect(missingScrub[0].path).toBe('motions[0].trigger.scrub');
 
-    const invalidScrub = triggerShapeRule({ driver: { type: 'timeline', trigger: { type: 'scroll', scrub: 'yes' } } }, {}, 'motions[0]');
+    const invalidScrub = triggerShapeRule({ trigger: { type: 'scroll', scrub: 'yes' } }, {}, 'motions[0]');
     expect(invalidScrub).toHaveLength(1);
-    expect(invalidScrub[0].path).toBe('motions[0].driver.trigger.scrub');
+    expect(invalidScrub[0].path).toBe('motions[0].trigger.scrub');
   });
 
   it('should error if a track inside a scroll-scrub motion defines duration', () => {
     const motion = {
-      driver: { type: 'timeline', trigger: { type: 'scroll', scrub: true } },
+      trigger: { type: 'scroll', scrub: true },
       tracks: [
         { id: 'el-1', duration: 1.5, keyframes: {} },
         { id: 'el-2', keyframes: {} }
@@ -83,13 +83,13 @@ describe('trigger-shape rule', () => {
 
   it('should pass if a track defines duration in a time or scroll-observer motion', () => {
     const timeMotion = {
-      driver: { type: 'timeline', trigger: { type: 'time', duration: 3 } },
+      trigger: { type: 'time', duration: 3 },
       tracks: [{ id: 'el-1', duration: 1.5, keyframes: {} }]
     };
     expect(triggerShapeRule(timeMotion, {}, 'motions[0]')).toHaveLength(0);
 
     const observerMotion = {
-      driver: { type: 'timeline', trigger: { type: 'scroll', scrub: false } },
+      trigger: { type: 'scroll', scrub: false },
       tracks: [{ id: 'el-1', duration: 1.5, keyframes: {} }]
     };
     expect(triggerShapeRule(observerMotion, {}, 'motions[0]')).toHaveLength(0);
