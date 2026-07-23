@@ -21,9 +21,10 @@ export default function SpiralPage() {
   const isLoaded = useMotionProject(project);
   useSmoothScroll();
 
-  const containerInstance = useMotionInstance(isLoaded ? 'spiral-container' : null, {
-    //layoutDelegate: defaultStaticLayoutDelegate,
-  });
+  const containerInstance = useMotionInstance(isLoaded ? 'spiral-container' : null);
+  // Note: layoutDelegate (Gapless vs Static) is a construction-time option on the
+  // 'spiral-container' track config in spiralMotions.js, not a mount-time hook option —
+  // this hook's config bag isn't threaded to track construction. See LayoutDelegate.js.
   const vm = useSpiralPageViewModel({ isLoaded, containerInstance });
 
   return (

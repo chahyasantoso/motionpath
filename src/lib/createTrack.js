@@ -33,5 +33,6 @@ export async function createTrack(config, templates = []) {
     proxyState: proxy,
     plugins: resolvedPlugins,
     resolvedTrack,
+    layoutDelegate: config.layoutDelegate,
   });
 }

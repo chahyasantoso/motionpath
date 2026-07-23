@@ -1,0 +1,484 @@
+diff --git a/src/components/Spiral/SpiralPage.jsx b/src/components/Spiral/SpiralPage.jsx
+index 35db07f..61391ca 100644
+--- a/src/components/Spiral/SpiralPage.jsx
++++ b/src/components/Spiral/SpiralPage.jsx
+@@ -21,9 +21,10 @@ export default function SpiralPage() {
+   const isLoaded = useMotionProject(project);
+   useSmoothScroll();
+ 
+-  const containerInstance = useMotionInstance(isLoaded ? 'spiral-container' : null, {
+-    //layoutDelegate: defaultStaticLayoutDelegate,
+-  });
++  const containerInstance = useMotionInstance(isLoaded ? 'spiral-container' : null);
++  // Note: layoutDelegate (Gapless vs Static) is a construction-time option on the
++  // 'spiral-container' track config in spiralMotions.js, not a mount-time hook option —
++  // this hook's config bag isn't threaded to track construction. See LayoutDelegate.js.
+   const vm = useSpiralPageViewModel({ isLoaded, containerInstance });
+ 
+   return (
+diff --git a/src/lib/GaplessLayoutDelegate.js b/src/lib/GaplessLayoutDelegate.js
+new file mode 100644
+index 0000000..acfc100
+--- /dev/null
++++ b/src/lib/GaplessLayoutDelegate.js
+@@ -0,0 +1,53 @@
++import { LayoutDelegate } from './LayoutDelegate.js';
++
++/**
++ * Default layout policy: new children append after the frontmost existing
++ * child (frontmost + stagger); removing a mid-chain child closes the gap by
++ * cascading every subsequent sibling's currentOffset down by one slot.
++ * Result after any removal: no gaps remain in the offset sequence — hence
++ * "gapless".
++ */
++export class GaplessLayoutDelegate extends LayoutDelegate {
++  computeSpawnOffset(children, { stagger = 0 } = {}) {
++    // Placement is derived from actual current sibling state, not a formula
++    // counted from a fixed origin — same principle computeReflow already
++    // uses. A counter-based approach fixes live count plateauing under
++    // churn, but goes stale the moment a reflow shifts the existing chain:
++    // the counter has no way to know that happened, so every
++    // removal-with-reflow before a spawn leaves a permanent extra
++    // stagger-width gap between the old chain and everything spawned after
++    // it. Anchoring to the real frontmost position is immune to both
++    // failure modes at once, and needs no reset bookkeeping — an empty
++    // children array naturally resolves to offset 0.
++    const frontmostOffset = children.reduce((max, c) => Math.max(max, c.currentOffset ?? 0), -stagger);
++    return frontmostOffset + stagger;
++  }
++
++  computeReflow(children, removedChild) {
++    // Reflow must walk children in actual timeline-position order, not
++    // insertion order — a manually-staggered child can land anywhere
++    // relative to auto-placed siblings. Source of truth is currentOffset
++    // (the settled logical position), never a live timeline position —
++    // that's actively animating during an in-flight reflow and would give
++    // unstable targets.
++    const ordered = [...children].sort((a, b) => (a.currentOffset ?? 0) - (b.currentOffset ?? 0));
++    const removedRank = ordered.indexOf(removedChild);
++
++    // Cascade only when removing from the middle of the chain (rank > 0).
++    // Removing the frontmost child (rank 0) never creates a gap — it's the
++    // leading edge, and the next child naturally becomes the new leader.
++    // Cascading rank 0 removals shifts all survivors' offsets earlier,
++    // which can push children past completion and trigger an avalanche of
++    // instant completions during natural drain.
++    if (removedRank <= 0) return [];
++
++    const targets = [];
++    for (let k = removedRank + 1; k < ordered.length; k++) {
++      targets.push({ child: ordered[k], offset: ordered[k - 1].currentOffset ?? 0 });
++    }
++    return targets;
++  }
++}
++
++// Stateless — one shared instance is safe across every Track.
++export const defaultGaplessLayoutDelegate = new GaplessLayoutDelegate();
+diff --git a/src/lib/LayoutDelegate.js b/src/lib/LayoutDelegate.js
+new file mode 100644
+index 0000000..5532291
+--- /dev/null
++++ b/src/lib/LayoutDelegate.js
+@@ -0,0 +1,37 @@
++/**
++ * @class LayoutDelegate
++ *
++ * Contract for pluggable child-placement policy on Track composition
++ * (addChild/removeChild). Implementations decide WHERE a new child goes
++ * (computeSpawnOffset) and WHETHER/HOW removal triggers a reflow of
++ * surviving siblings (computeReflow). Track owns the mechanics (private
++ * offset fields, GSAP nesting via the host Motion) — the delegate only
++ * returns numbers/plans, it never touches a timeline or a Track's private
++ * state directly.
++ *
++ * Implementations may be stateless (safe to share one instance across
++ * every Track — see defaultGaplessLayoutDelegate) or stateful (e.g. a
++ * hypothetical slot-pooling delegate tracking freed positions for reuse).
++ * Stateful implementations must be constructed per-parent-track, never
++ * shared — computeReflow is not guaranteed to be side-effect-free.
++ */
++export class LayoutDelegate {
++  /**
++   * @param {Track[]} children - live children BEFORE the new one is added
++   * @param {{ stagger: number }} context
++   * @returns {number} offset for the new child
++   */
++  computeSpawnOffset(children, context) {
++    throw new Error('LayoutDelegate.computeSpawnOffset not implemented');
++  }
++
++  /**
++   * @param {Track[]} children - live children INCLUDING removedChild (pre-splice)
++   * @param {Track} removedChild
++   * @param {{ stagger: number }} context
++   * @returns {{ child: Track, offset: number }[]} reflow targets, [] if none
++   */
++  computeReflow(children, removedChild, context) {
++    throw new Error('LayoutDelegate.computeReflow not implemented');
++  }
++}
+diff --git a/src/lib/StaticLayoutDelegate.js b/src/lib/StaticLayoutDelegate.js
+new file mode 100644
+index 0000000..cee09d2
+--- /dev/null
++++ b/src/lib/StaticLayoutDelegate.js
+@@ -0,0 +1,22 @@
++import { GaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
++
++/**
++ * Same spawn placement as GaplessLayoutDelegate (frontmost + stagger), but
++ * removals never trigger a reflow — survivors keep their currentOffset
++ * exactly as-is and the gap left by the removed child is never closed.
++ *
++ * Note: because computeSpawnOffset still anchors to frontmost currentOffset,
++ * and currentOffset values never decrease under this delegate, the parent's
++ * used span grows monotonically with total spawns over the session — it
++ * does not shrink back down as children are removed. This is correct for
++ * "items stay where they visually landed" use cases and wrong for
++ * long-running high-churn ones; see GaplessLayoutDelegate for the
++ * bounded-span alternative.
++ */
++export class StaticLayoutDelegate extends GaplessLayoutDelegate {
++  computeReflow(children, removedChild) {
++    return [];
++  }
++}
++
++export const defaultStaticLayoutDelegate = new StaticLayoutDelegate();
+diff --git a/src/lib/Track.js b/src/lib/Track.js
+index 48f22bc..9097ef0 100644
+--- a/src/lib/Track.js
++++ b/src/lib/Track.js
+@@ -1,5 +1,6 @@
+ import { composePatch } from '../usecases/ComposeTrackPatch.js';
+ import { eventBus } from './helpers.js';
++import { defaultGaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
+ 
+ function clamp01(val) {
+   return Math.max(0, Math.min(1, Number(val) || 0));
+@@ -34,6 +35,7 @@ export class Track {
+   #subscribers = new Set();
+   #currentOffset = 0;
+   #staggerOffset = 0;
++  #layoutDelegate;
+ 
+   /**
+    * @param {object} params
+@@ -42,19 +44,25 @@ export class Track {
+    * @param {object} params.proxyState
+    * @param {Array} params.plugins
+    * @param {object} params.resolvedTrack
++   * @param {import('./LayoutDelegate.js').LayoutDelegate} [params.layoutDelegate] - child-placement policy for addChild/removeChild. Defaults to gapless (frontmost + stagger, reflow-on-removal).
+    */
+-  constructor({ id, interpolationTimeline, proxyState, plugins, resolvedTrack }) {
++  constructor({ id, interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate }) {
+     this.#id = id;
+     this.#interpolationTimeline = interpolationTimeline;
+     this.#proxyState = proxyState;
+     this.#plugins = plugins;
+     this.#resolvedTrack = resolvedTrack;
++    this.#layoutDelegate = layoutDelegate ?? defaultGaplessLayoutDelegate;
+   }
+ 
+   get id() {
+     return this.#id;
+   }
+ 
++  get currentOffset() {
++    return this.#currentOffset;
++  }
++
+   get parent() {
+     return this.#parent;
+   }
+@@ -148,31 +156,6 @@ export class Track {
+   }
+ 
+   // --- Composition: "moving together" ---
+-  #computeSpawnOffset(stagger = 0) {
+-    if (this.#children.size === 0) return 0;
+-    let maxOffset = 0;
+-    for (const child of this.#children.values()) {
+-      const childOffset = child.#currentOffset ?? 0;
+-      if (childOffset > maxOffset) {
+-        maxOffset = childOffset;
+-      }
+-    }
+-    return maxOffset + stagger;
+-  }
+-
+-  #rankOf(child) {
+-    const childrenArr = Array.from(this.#children.values());
+-    return childrenArr.indexOf(child);
+-  }
+-
+-  #reflow() {
+-    let offset = 0;
+-    for (const child of this.#children.values()) {
+-      child.#currentOffset = offset;
+-      offset += child.#staggerOffset ?? 0;
+-    }
+-  }
+-
+   addChild(child, opts = {}) {
+     if (child.#parent) {
+       throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`);
+@@ -181,7 +164,8 @@ export class Track {
+     const stagger = opts.stagger ?? 0;
+     child.#staggerOffset = stagger;
+ 
+-    const spawnOffset = this.#computeSpawnOffset(stagger);
++    const siblingsBeforeAdd = Array.from(this.#children.values());
++    const spawnOffset = this.#layoutDelegate.computeSpawnOffset(siblingsBeforeAdd, { stagger });
+     child.#currentOffset = spawnOffset;
+ 
+     this.#children.set(child.id, child);
+@@ -194,13 +178,19 @@ export class Track {
+   removeChild(id) {
+     const child = this.#children.get(id);
+     if (!child) return;
+-    const rank = this.#rankOf(child);
++
++    // Pass siblings INCLUDING the removed child (pre-splice) — the delegate
++    // needs the removed child's own rank among its siblings to decide
++    // whether/how to reflow.
++    const siblingsBeforeRemove = Array.from(this.#children.values());
+     this.#children.delete(id);
+     child.#parent = null;
+ 
+-    if (rank > 0) {
+-      this.#reflow();
++    const targets = this.#layoutDelegate.computeReflow(siblingsBeforeRemove, child, {});
++    for (const target of targets) {
++      target.child.#currentOffset = target.offset;
+     }
++
+     eventBus.emit('child:removing', { id: child.id, parentId: this.#id });
+   }
+ 
+diff --git a/src/lib/__tests__/GaplessLayoutDelegate.test.js b/src/lib/__tests__/GaplessLayoutDelegate.test.js
+new file mode 100644
+index 0000000..2d7bd1c
+--- /dev/null
++++ b/src/lib/__tests__/GaplessLayoutDelegate.test.js
+@@ -0,0 +1,68 @@
++import { describe, it, expect } from 'vitest';
++import { GaplessLayoutDelegate } from '../GaplessLayoutDelegate.js';
++
++describe('GaplessLayoutDelegate', () => {
++  const delegate = new GaplessLayoutDelegate();
++
++  describe('computeSpawnOffset', () => {
++    it('returns 0 when there are no children', () => {
++      expect(delegate.computeSpawnOffset([], { stagger: 5 })).toBe(0);
++    });
++
++    it('returns frontmost child offset + stagger when there is one child', () => {
++      const children = [{ currentOffset: 10 }];
++      expect(delegate.computeSpawnOffset(children, { stagger: 5 })).toBe(15);
++    });
++
++    it('picks the maximum currentOffset among multiple children rather than last-inserted', () => {
++      const children = [
++        { currentOffset: 10 },
++        { currentOffset: 25 },
++        { currentOffset: 15 }
++      ];
++      expect(delegate.computeSpawnOffset(children, { stagger: 5 })).toBe(30);
++    });
++  });
++
++  describe('computeReflow', () => {
++    it('returns [] when removing the rank-0 (frontmost) child', () => {
++      const children = [
++        { currentOffset: 0 },
++        { currentOffset: 10 },
++        { currentOffset: 20 }
++      ];
++      const removed = children[0];
++      expect(delegate.computeReflow(children, removed)).toEqual([]);
++    });
++
++    it('returns correct cascade pairs in rank order when removing a mid-chain child', () => {
++      const child0 = { id: 'c0', currentOffset: 0 };
++      const child1 = { id: 'c1', currentOffset: 10 };
++      const child2 = { id: 'c2', currentOffset: 20 };
++      const child3 = { id: 'c3', currentOffset: 30 };
++
++      // Passed out of order to ensure the delegate's own sorting logic works
++      const children = [child2, child0, child3, child1];
++
++      // Sort order: child0 (0), child1 (10), child2 (20), child3 (30)
++      // Removing child1 (rank 1):
++      // - child2 should move to child1's currentOffset (10)
++      // - child3 should move to child2's original currentOffset (20)
++      const result = delegate.computeReflow(children, child1);
++
++      expect(result).toEqual([
++        { child: child2, offset: 10 },
++        { child: child3, offset: 20 }
++      ]);
++    });
++
++    it('returns [] when removedChild is not in the children array', () => {
++      const children = [
++        { currentOffset: 0 },
++        { currentOffset: 10 }
++      ];
++      const removed = { currentOffset: 5 };
++      expect(delegate.computeReflow(children, removed)).toEqual([]);
++    });
++  });
++});
+diff --git a/src/lib/__tests__/StaticLayoutDelegate.test.js b/src/lib/__tests__/StaticLayoutDelegate.test.js
+new file mode 100644
+index 0000000..eada739
+--- /dev/null
++++ b/src/lib/__tests__/StaticLayoutDelegate.test.js
+@@ -0,0 +1,30 @@
++import { describe, it, expect } from 'vitest';
++import { StaticLayoutDelegate } from '../StaticLayoutDelegate.js';
++
++describe('StaticLayoutDelegate', () => {
++  const delegate = new StaticLayoutDelegate();
++
++  describe('computeReflow', () => {
++    it('always returns [] even when removing a mid-chain child', () => {
++      const child0 = { currentOffset: 0 };
++      const child1 = { currentOffset: 10 };
++      const child2 = { currentOffset: 20 };
++      const children = [child0, child1, child2];
++
++      expect(delegate.computeReflow(children, child0)).toEqual([]); // rank 0
++      expect(delegate.computeReflow(children, child1)).toEqual([]); // mid-chain
++      expect(delegate.computeReflow(children, child2)).toEqual([]); // end of chain
++    });
++  });
++
++  describe('computeSpawnOffset', () => {
++    it('behaves identically to GaplessLayoutDelegate (inherits spawn offset calculation)', () => {
++      const children = [
++        { currentOffset: 10 },
++        { currentOffset: 25 }
++      ];
++      // Anchors to frontmost (25) + stagger (5) = 30
++      expect(delegate.computeSpawnOffset(children, { stagger: 5 })).toBe(30);
++    });
++  });
++});
+diff --git a/src/lib/__tests__/Track.test.js b/src/lib/__tests__/Track.test.js
+index 23c1719..837f384 100644
+--- a/src/lib/__tests__/Track.test.js
++++ b/src/lib/__tests__/Track.test.js
+@@ -1,8 +1,9 @@
+ import { describe, it, expect, vi } from 'vitest';
+ import { gsap } from 'gsap';
+ import { Track } from '../Track.js';
++import { StaticLayoutDelegate } from '../StaticLayoutDelegate.js';
+ 
+-function createDummyTrack(id = 'test-track') {
++function createDummyTrack(id = 'test-track', opts = {}) {
+   const proxy = { x: 0, y: 0 };
+   const tween = gsap.to(proxy, { x: 100, y: 200, duration: 1, ease: 'none', paused: true });
+   const plugins = [{
+@@ -17,6 +18,7 @@ function createDummyTrack(id = 'test-track') {
+     proxyState: proxy,
+     plugins,
+     resolvedTrack,
++    layoutDelegate: opts.layoutDelegate,
+   });
+ }
+ 
+@@ -83,4 +85,65 @@ describe('Track (v4 first-class playhead owner)', () => {
+ 
+     expect(() => parentB.addChild(child, { stagger: 0.1 })).toThrow(/already a child/);
+   });
++
++  describe('composition via LayoutDelegate', () => {
++    it('defaults to GaplessLayoutDelegate: placement is frontmost + stagger', () => {
++      const parent = createDummyTrack('parent');
++      const c0 = createDummyTrack('c0');
++      const c1 = createDummyTrack('c1');
++      const c2 = createDummyTrack('c2');
++
++      parent.addChild(c0, { stagger: 0.1 });
++      expect(c0.currentOffset).toBe(0); // no siblings yet — anchors to 0
++
++      parent.addChild(c1, { stagger: 0.1 });
++      expect(c1.currentOffset).toBe(0.1);
++
++      parent.addChild(c2, { stagger: 0.1 });
++      expect(c2.currentOffset).toBe(0.2);
++    });
++
++    it('defaults to GaplessLayoutDelegate: removing a mid-chain child cascades survivors, rank-0 removal does not', () => {
++      const parent = createDummyTrack('parent');
++      const c0 = createDummyTrack('c0');
++      const c1 = createDummyTrack('c1');
++      const c2 = createDummyTrack('c2');
++      parent.addChild(c0, { stagger: 0.1 }); // 0
++      parent.addChild(c1, { stagger: 0.1 }); // 0.1
++      parent.addChild(c2, { stagger: 0.1 }); // 0.2
++
++      // Removing rank-0 (c0) must not shift survivors.
++      parent.removeChild('c0');
++      expect(c1.currentOffset).toBe(0.1);
++      expect(c2.currentOffset).toBe(0.2);
++
++      // Removing an actual mid-chain child: fresh chain of 3, remove the middle one.
++      const parent2 = createDummyTrack('parent2');
++      const d0 = createDummyTrack('d0');
++      const d1 = createDummyTrack('d1');
++      const d2 = createDummyTrack('d2');
++      parent2.addChild(d0, { stagger: 0.1 }); // 0
++      parent2.addChild(d1, { stagger: 0.1 }); // 0.1
++      parent2.addChild(d2, { stagger: 0.1 }); // 0.2
++
++      parent2.removeChild('d1'); // rank 1, mid-chain — cascades d2 down to d1's old offset
++      expect(d0.currentOffset).toBe(0); // unaffected, before the removed rank
++      expect(d2.currentOffset).toBe(0.1);
++    });
++
++    it('honors an injected custom LayoutDelegate (StaticLayoutDelegate never reflows, even mid-chain)', () => {
++      const parent = createDummyTrack('static-parent', { layoutDelegate: new StaticLayoutDelegate() });
++      const c0 = createDummyTrack('sc0');
++      const c1 = createDummyTrack('sc1');
++      const c2 = createDummyTrack('sc2');
++      parent.addChild(c0, { stagger: 0.1 }); // 0
++      parent.addChild(c1, { stagger: 0.1 }); // 0.1
++      parent.addChild(c2, { stagger: 0.1 }); // 0.2
++
++      // Under GaplessLayoutDelegate this exact removal (rank 1, mid-chain)
++      // would cascade c2 down to 0.1 — Static must leave it untouched.
++      parent.removeChild('sc1');
++      expect(c2.currentOffset).toBe(0.2);
++    });
++  });
+ });
+diff --git a/src/lib/createTrack.js b/src/lib/createTrack.js
+index 26fce69..268d9f9 100644
+--- a/src/lib/createTrack.js
++++ b/src/lib/createTrack.js
+@@ -33,5 +33,6 @@ export async function createTrack(config, templates = []) {
+     proxyState: proxy,
+     plugins: resolvedPlugins,
+     resolvedTrack,
++    layoutDelegate: config.layoutDelegate,
+   });
+ }
+diff --git a/src/validators/rules/stagger-shape.js b/src/validators/rules/stagger-shape.js
+index 3147c81..165f752 100644
+--- a/src/validators/rules/stagger-shape.js
++++ b/src/validators/rules/stagger-shape.js
+@@ -18,10 +18,6 @@ export function staggerShapeRule(motion, context, path) {
+     return errors;
+   }
+ 
+-  if (motion.driver?.type === 'delegate') {
+-    return errors;
+-  }
+-
+   const stagger = motion.stagger;
+   if (stagger === undefined || stagger === null) {
+     return errors;

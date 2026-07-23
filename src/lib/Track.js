@@ -1,5 +1,6 @@
 import { composePatch } from '../usecases/ComposeTrackPatch.js';
 import { eventBus } from './helpers.js';
+import { defaultGaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
 
 function clamp01(val) {
   return Math.max(0, Math.min(1, Number(val) || 0));
@@ -27,13 +28,14 @@ export class Track {
   #resolvedTrack;
 
   #host = null;
-  #attachedTo = null;
-  #attachedChildren = new Set();
   #parent = null;
   #children = new Map();
   #subscribers = new Set();
   #currentOffset = 0;
   #staggerOffset = 0;
+  #layoutDelegate;
+  #observed = new Map();
+  #composing = false;
 
   /**
    * @param {object} params
@@ -42,17 +44,23 @@ export class Track {
    * @param {object} params.proxyState
    * @param {Array} params.plugins
    * @param {object} params.resolvedTrack
+   * @param {import('./LayoutDelegate.js').LayoutDelegate} [params.layoutDelegate] - child-placement policy for addChild/removeChild. Defaults to gapless (frontmost + stagger, reflow-on-removal).
    */
-  constructor({ id, interpolationTimeline, proxyState, plugins, resolvedTrack }) {
+  constructor({ id, interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate }) {
     this.#id = id;
     this.#interpolationTimeline = interpolationTimeline;
     this.#proxyState = proxyState;
     this.#plugins = plugins;
     this.#resolvedTrack = resolvedTrack;
+    this.#layoutDelegate = layoutDelegate ?? defaultGaplessLayoutDelegate;
   }
 
   get id() {
     return this.#id;
+  }
+
+  get currentOffset() {
+    return this.#currentOffset;
   }
 
   get parent() {
@@ -84,19 +92,71 @@ export class Track {
 
   compose(rawData) {
     const source = rawData ?? this.getSnapshot();
-    let patch = composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
-    for (const child of this.#attachedChildren) {
-      patch = mergePatches(patch, child.compose());
+
+    // Cycle back-edge: we are being composed while already mid-compose higher
+    // in the stack. Do NOT recurse into observed sources — return only this
+    // track's own local (plugin-only) patch. See observe-fk-design.md §2.
+    if (this.#composing) {
+      return composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
     }
-    return patch;
+
+    this.#composing = true;
+    try {
+      let patch = composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
+      // Fold each observed source in insertion order; each mapped patch applies
+      // LAST (last-wins), so it can override this track's own fields.
+      // NOTE: mapFn receives the source's COMPOSED patch, not its snapshot.
+      for (const [observedSource, mapFn] of this.#observed) {
+        if (!mapFn) continue;
+        const observedPatch = mapFn(observedSource.compose());
+        if (observedPatch) {
+          patch = mergePatches(patch, observedPatch);
+        }
+      }
+      return patch;
+    } finally {
+      this.#composing = false;
+    }
+  }
+
+  /**
+   * Multi-source FK / read-only cross-track observation. On every compose(),
+   * for each observed source, pulls source.compose() (its fully-resolved patch)
+   * and folds mapFn(composedPatch) into this track's own composed patch, applied
+   * LAST in insertion order (so it can override this track's own fields).
+   *
+   * Reads source.compose() — the RESOLVED world state, so FK chains accumulate.
+   * Cycles are made safe by the #composing re-entrancy guard in compose(), not
+   * by reading a raw snapshot. See observe-fk-design.md §2, §3.
+   *
+   * - setObserved(track, mapFn): add or REPLACE the observation of `track`.
+   * - setObserved(null): clear ALL observations.
+   * - removeObserved(track): drop one source.
+   *
+   * No lifecycle coupling, no ownership. If an observed source is destroyed, the
+   * CALLER — not Track — must removeObserved(source) (or setObserved(null))
+   * BEFORE destroying it. Track holds no reverse registry.
+   *
+   * @param {Track|null} track - source to observe, or null to clear all
+   * @param {(composedPatch: object) => (object|null|undefined)} [mapFn]
+   */
+  setObserved(track, mapFn) {
+    if (!track) {
+      this.#observed.clear();
+      return;
+    }
+    this.#observed.set(track, mapFn ?? null);
+  }
+
+  removeObserved(track) {
+    this.#observed.delete(track);
+  }
+
+  get observedSources() {
+    return Array.from(this.#observed.keys());
   }
 
   subscribe(cb) {
-    if (this.#attachedTo) {
-      throw new Error(
-        `Track "${this.#id}" is attached to "${this.#attachedTo.id}" — subscribe to the host instead.`
-      );
-    }
     this.#subscribers.add(cb);
     cb(this.getSnapshot());
     return () => {
@@ -127,52 +187,8 @@ export class Track {
     return this.#host !== null;
   }
 
-  // --- Cross-track merge: "living together" ---
-  attach(host) {
-    if (this.#attachedTo) {
-      throw new Error(`Track "${this.#id}" already attached to "${this.#attachedTo.id}"`);
-    }
-    this.#attachedTo = host;
-    host.#attachedChildren.add(this);
-  }
-
-  detach(host) {
-    if (this.#attachedTo === host) {
-      this.#attachedTo = null;
-      host.#attachedChildren.delete(this);
-    }
-  }
-
-  get isAttached() {
-    return this.#attachedTo !== null;
-  }
 
   // --- Composition: "moving together" ---
-  #computeSpawnOffset(stagger = 0) {
-    if (this.#children.size === 0) return 0;
-    let maxOffset = 0;
-    for (const child of this.#children.values()) {
-      const childOffset = child.#currentOffset ?? 0;
-      if (childOffset > maxOffset) {
-        maxOffset = childOffset;
-      }
-    }
-    return maxOffset + stagger;
-  }
-
-  #rankOf(child) {
-    const childrenArr = Array.from(this.#children.values());
-    return childrenArr.indexOf(child);
-  }
-
-  #reflow() {
-    let offset = 0;
-    for (const child of this.#children.values()) {
-      child.#currentOffset = offset;
-      offset += child.#staggerOffset ?? 0;
-    }
-  }
-
   addChild(child, opts = {}) {
     if (child.#parent) {
       throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`);
@@ -181,7 +197,8 @@ export class Track {
     const stagger = opts.stagger ?? 0;
     child.#staggerOffset = stagger;
 
-    const spawnOffset = this.#computeSpawnOffset(stagger);
+    const siblingsBeforeAdd = Array.from(this.#children.values());
+    const spawnOffset = this.#layoutDelegate.computeSpawnOffset(siblingsBeforeAdd, { stagger });
     child.#currentOffset = spawnOffset;
 
     this.#children.set(child.id, child);
@@ -194,18 +211,25 @@ export class Track {
   removeChild(id) {
     const child = this.#children.get(id);
     if (!child) return;
-    const rank = this.#rankOf(child);
+
+    // Pass siblings INCLUDING the removed child (pre-splice) — the delegate
+    // needs the removed child's own rank among its siblings to decide
+    // whether/how to reflow.
+    const siblingsBeforeRemove = Array.from(this.#children.values());
     this.#children.delete(id);
     child.#parent = null;
 
-    if (rank > 0) {
-      this.#reflow();
+    const targets = this.#layoutDelegate.computeReflow(siblingsBeforeRemove, child, {});
+    for (const target of targets) {
+      target.child.#currentOffset = target.offset;
     }
+
     eventBus.emit('child:removing', { id: child.id, parentId: this.#id });
   }
 
   destroy() {
     this.#subscribers.clear();
+    this.#observed.clear();
     try {
       this.#interpolationTimeline?.kill();
     } catch (e) {

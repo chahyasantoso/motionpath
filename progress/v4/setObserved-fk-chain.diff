@@ -1,0 +1,331 @@
+diff --git a/src/lib/Track.js b/src/lib/Track.js
+index 48f22bc..5b1a9fe 100644
+--- a/src/lib/Track.js
++++ b/src/lib/Track.js
+@@ -1,5 +1,6 @@
+ import { composePatch } from '../usecases/ComposeTrackPatch.js';
+ import { eventBus } from './helpers.js';
++import { defaultGaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
+ 
+ function clamp01(val) {
+   return Math.max(0, Math.min(1, Number(val) || 0));
+@@ -34,6 +35,9 @@ export class Track {
+   #subscribers = new Set();
+   #currentOffset = 0;
+   #staggerOffset = 0;
++  #layoutDelegate;
++  #observedSource = null;
++  #observedMapFn = null;
+ 
+   /**
+    * @param {object} params
+@@ -42,19 +46,25 @@ export class Track {
+    * @param {object} params.proxyState
+    * @param {Array} params.plugins
+    * @param {object} params.resolvedTrack
++   * @param {import('./LayoutDelegate.js').LayoutDelegate} [params.layoutDelegate] - child-placement policy for addChild/removeChild. Defaults to gapless (frontmost + stagger, reflow-on-removal).
+    */
+-  constructor({ id, interpolationTimeline, proxyState, plugins, resolvedTrack }) {
++  constructor({ id, interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate }) {
+     this.#id = id;
+     this.#interpolationTimeline = interpolationTimeline;
+     this.#proxyState = proxyState;
+     this.#plugins = plugins;
+     this.#resolvedTrack = resolvedTrack;
++    this.#layoutDelegate = layoutDelegate ?? defaultGaplessLayoutDelegate;
+   }
+ 
+   get id() {
+     return this.#id;
+   }
+ 
++  get currentOffset() {
++    return this.#currentOffset;
++  }
++
+   get parent() {
+     return this.#parent;
+   }
+@@ -88,9 +98,47 @@ export class Track {
+     for (const child of this.#attachedChildren) {
+       patch = mergePatches(patch, child.compose());
+     }
++    if (this.#observedSource && this.#observedMapFn) {
++      const observedPatch = this.#observedMapFn(this.#observedSource.getSnapshot());
++      if (observedPatch) {
++        patch = mergePatches(patch, observedPatch);
++      }
++    }
+     return patch;
+   }
+ 
++  /**
++   * FK-chaining / read-only cross-track observation: on every compose(),
++   * pulls a fresh getSnapshot() from `track` and folds the result of
++   * `mapFn(snapshot)` into this track's own composed patch (applied last,
++   * so it can override this track's own fields — e.g. x/y driven entirely
++   * by the observed source).
++   *
++   * Deliberately reads getSnapshot(), never observed.compose() — this is
++   * what makes mutual observation (A observes B, B observes A) safe from
++   * infinite recursion. Do not change this to call compose() on the
++   * observed source.
++   *
++   * No lifecycle coupling, no ownership, no single-observer guard — unlike
++   * attach()/addChild(), calling setObserved() again simply replaces the
++   * previous observation. Track does not track who observes it (that would
++   * require a reverse registry this relationship doesn't need). If the
++   * observed source is destroyed, the caller — not Track — is responsible
++   * for calling setObserved(null) on every observer, exactly as removeChild
++   * leaves physical disposal to the orchestration layer.
++   *
++   * @param {Track|null} track - source to observe, or null to stop observing
++   * @param {(snapshot: object) => (object|null|undefined)} [mapFn] - transforms the observed snapshot into a patch to fold in. Omitted/no track → observation is a no-op.
++   */
++  setObserved(track, mapFn) {
++    this.#observedSource = track ?? null;
++    this.#observedMapFn = track ? (mapFn ?? null) : null;
++  }
++
++  get observedSource() {
++    return this.#observedSource;
++  }
++
+   subscribe(cb) {
+     if (this.#attachedTo) {
+       throw new Error(
+@@ -148,31 +196,6 @@ export class Track {
+   }
+ 
+   // --- Composition: "moving together" ---
+-  #computeSpawnOffset(stagger = 0) {
+-    if (this.#children.size === 0) return 0;
+-    let maxOffset = 0;
+-    for (const child of this.#children.values()) {
+-      const childOffset = child.#currentOffset ?? 0;
+-      if (childOffset > maxOffset) {
+-        maxOffset = childOffset;
+-      }
+-    }
+-    return maxOffset + stagger;
+-  }
+-
+-  #rankOf(child) {
+-    const childrenArr = Array.from(this.#children.values());
+-    return childrenArr.indexOf(child);
+-  }
+-
+-  #reflow() {
+-    let offset = 0;
+-    for (const child of this.#children.values()) {
+-      child.#currentOffset = offset;
+-      offset += child.#staggerOffset ?? 0;
+-    }
+-  }
+-
+   addChild(child, opts = {}) {
+     if (child.#parent) {
+       throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`);
+@@ -181,7 +204,8 @@ export class Track {
+     const stagger = opts.stagger ?? 0;
+     child.#staggerOffset = stagger;
+ 
+-    const spawnOffset = this.#computeSpawnOffset(stagger);
++    const siblingsBeforeAdd = Array.from(this.#children.values());
++    const spawnOffset = this.#layoutDelegate.computeSpawnOffset(siblingsBeforeAdd, { stagger });
+     child.#currentOffset = spawnOffset;
+ 
+     this.#children.set(child.id, child);
+@@ -194,18 +218,26 @@ export class Track {
+   removeChild(id) {
+     const child = this.#children.get(id);
+     if (!child) return;
+-    const rank = this.#rankOf(child);
++
++    // Pass siblings INCLUDING the removed child (pre-splice) — the delegate
++    // needs the removed child's own rank among its siblings to decide
++    // whether/how to reflow.
++    const siblingsBeforeRemove = Array.from(this.#children.values());
+     this.#children.delete(id);
+     child.#parent = null;
+ 
+-    if (rank > 0) {
+-      this.#reflow();
++    const targets = this.#layoutDelegate.computeReflow(siblingsBeforeRemove, child, {});
++    for (const target of targets) {
++      target.child.#currentOffset = target.offset;
+     }
++
+     eventBus.emit('child:removing', { id: child.id, parentId: this.#id });
+   }
+ 
+   destroy() {
+     this.#subscribers.clear();
++    this.#observedSource = null;
++    this.#observedMapFn = null;
+     try {
+       this.#interpolationTimeline?.kill();
+     } catch (e) {
+diff --git a/src/lib/__tests__/Track.test.js b/src/lib/__tests__/Track.test.js
+index 23c1719..e186c54 100644
+--- a/src/lib/__tests__/Track.test.js
++++ b/src/lib/__tests__/Track.test.js
+@@ -1,8 +1,9 @@
+ import { describe, it, expect, vi } from 'vitest';
+ import { gsap } from 'gsap';
+ import { Track } from '../Track.js';
++import { StaticLayoutDelegate } from '../StaticLayoutDelegate.js';
+ 
+-function createDummyTrack(id = 'test-track') {
++function createDummyTrack(id = 'test-track', opts = {}) {
+   const proxy = { x: 0, y: 0 };
+   const tween = gsap.to(proxy, { x: 100, y: 200, duration: 1, ease: 'none', paused: true });
+   const plugins = [{
+@@ -17,6 +18,7 @@ function createDummyTrack(id = 'test-track') {
+     proxyState: proxy,
+     plugins,
+     resolvedTrack,
++    layoutDelegate: opts.layoutDelegate,
+   });
+ }
+ 
+@@ -83,4 +85,139 @@ describe('Track (v4 first-class playhead owner)', () => {
+ 
+     expect(() => parentB.addChild(child, { stagger: 0.1 })).toThrow(/already a child/);
+   });
++
++  describe('composition via LayoutDelegate', () => {
++    it('defaults to GaplessLayoutDelegate: placement is frontmost + stagger', () => {
++      const parent = createDummyTrack('parent');
++      const c0 = createDummyTrack('c0');
++      const c1 = createDummyTrack('c1');
++      const c2 = createDummyTrack('c2');
++
++      parent.addChild(c0, { stagger: 0.1 });
++      expect(c0.currentOffset).toBe(0); // no siblings yet — anchors to 0
++
++      parent.addChild(c1, { stagger: 0.1 });
++      expect(c1.currentOffset).toBe(0.1);
++
++      parent.addChild(c2, { stagger: 0.1 });
++      expect(c2.currentOffset).toBe(0.2);
++    });
++
++    it('defaults to GaplessLayoutDelegate: removing a mid-chain child cascades survivors, rank-0 removal does not', () => {
++      const parent = createDummyTrack('parent');
++      const c0 = createDummyTrack('c0');
++      const c1 = createDummyTrack('c1');
++      const c2 = createDummyTrack('c2');
++      parent.addChild(c0, { stagger: 0.1 }); // 0
++      parent.addChild(c1, { stagger: 0.1 }); // 0.1
++      parent.addChild(c2, { stagger: 0.1 }); // 0.2
++
++      // Removing rank-0 (c0) must not shift survivors.
++      parent.removeChild('c0');
++      expect(c1.currentOffset).toBe(0.1);
++      expect(c2.currentOffset).toBe(0.2);
++
++      // Removing an actual mid-chain child: fresh chain of 3, remove the middle one.
++      const parent2 = createDummyTrack('parent2');
++      const d0 = createDummyTrack('d0');
++      const d1 = createDummyTrack('d1');
++      const d2 = createDummyTrack('d2');
++      parent2.addChild(d0, { stagger: 0.1 }); // 0
++      parent2.addChild(d1, { stagger: 0.1 }); // 0.1
++      parent2.addChild(d2, { stagger: 0.1 }); // 0.2
++
++      parent2.removeChild('d1'); // rank 1, mid-chain — cascades d2 down to d1's old offset
++      expect(d0.currentOffset).toBe(0); // unaffected, before the removed rank
++      expect(d2.currentOffset).toBe(0.1);
++    });
++
++    it('honors an injected custom LayoutDelegate (StaticLayoutDelegate never reflows, even mid-chain)', () => {
++      const parent = createDummyTrack('static-parent', { layoutDelegate: new StaticLayoutDelegate() });
++      const c0 = createDummyTrack('sc0');
++      const c1 = createDummyTrack('sc1');
++      const c2 = createDummyTrack('sc2');
++      parent.addChild(c0, { stagger: 0.1 }); // 0
++      parent.addChild(c1, { stagger: 0.1 }); // 0.1
++      parent.addChild(c2, { stagger: 0.1 }); // 0.2
++
++      // Under GaplessLayoutDelegate this exact removal (rank 1, mid-chain)
++      // would cascade c2 down to 0.1 — Static must leave it untouched.
++      parent.removeChild('sc1');
++      expect(c2.currentOffset).toBe(0.2);
++    });
++  });
++
++  describe('setObserved (FK-chaining / read-only cross-track observation)', () => {
++    it('folds mapFn(observed.getSnapshot()) into compose() output', () => {
++      const source = createDummyTrack('source');
++      source.progress(0.5); // x:50, y:100
++
++      const follower = createDummyTrack('follower');
++      follower.setObserved(source, (snap) => ({ followedX: snap.x }));
++
++      const composed = follower.compose();
++      expect(composed.followedX).toBe(50);
++      // follower's own composed output is untouched aside from the folded field
++      expect(composed.transform).toBe('translate3d(0px, 0px, 0px)');
++    });
++
++    it('folded patch is applied last and can override the observer\'s own composed fields', () => {
++      const source = createDummyTrack('source2');
++      source.progress(1); // x:100, y:200
++
++      const follower = createDummyTrack('follower2');
++      follower.setObserved(source, (snap) => ({ transform: `translate3d(${snap.x}px, 0px, 0px)` }));
++
++      const composed = follower.compose();
++      // follower's own progress is 0 (transform would be translate3d(0px,0px,0px)),
++      // but the observed fold overrides it entirely.
++      expect(composed.transform).toBe('translate3d(100px, 0px, 0px)');
++    });
++
++    it('is read-only and cycle-safe: mutual observation does not recurse or hang', () => {
++      const a = createDummyTrack('cycle-a');
++      const b = createDummyTrack('cycle-b');
++      a.setObserved(b, (snap) => ({ fromB: snap.x }));
++      b.setObserved(a, (snap) => ({ fromA: snap.x }));
++
++      // Must resolve synchronously with no stack overflow — compose() reads
++      // getSnapshot(), never the observed source's own compose().
++      const composedA = a.compose();
++      const composedB = b.compose();
++      expect(composedA.fromB).toBe(0);
++      expect(composedB.fromA).toBe(0);
++    });
++
++    it('setObserved(track) again replaces the previous observation without throwing', () => {
++      const sourceOne = createDummyTrack('source-one');
++      const sourceTwo = createDummyTrack('source-two');
++      sourceTwo.progress(0.25); // x: 25
++
++      const follower = createDummyTrack('replacing-follower');
++      follower.setObserved(sourceOne, (snap) => ({ followedX: snap.x }));
++      expect(() => follower.setObserved(sourceTwo, (snap) => ({ followedX: snap.x }))).not.toThrow();
++
++      expect(follower.compose().followedX).toBe(25);
++      expect(follower.observedSource).toBe(sourceTwo);
++    });
++
++    it('setObserved(null) stops observation (orchestration layer\'s responsibility on source teardown)', () => {
++      const source = createDummyTrack('teardown-source');
++      const follower = createDummyTrack('teardown-follower');
++      follower.setObserved(source, (snap) => ({ followedX: snap.x }));
++      expect(follower.compose().followedX).toBe(0);
++
++      follower.setObserved(null);
++      expect(follower.observedSource).toBeNull();
++      expect(follower.compose().followedX).toBeUndefined();
++    });
++
++    it('omitting mapFn is a safe no-op fold, does not crash compose()', () => {
++      const source = createDummyTrack('no-mapfn-source');
++      const follower = createDummyTrack('no-mapfn-follower');
++      follower.setObserved(source);
++
++      expect(() => follower.compose()).not.toThrow();
++    });
++  });
+ });

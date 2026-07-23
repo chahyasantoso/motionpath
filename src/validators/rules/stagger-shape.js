@@ -18,10 +18,6 @@ export function staggerShapeRule(motion, context, path) {
     return errors;
   }
 
-  if (motion.driver?.type === 'delegate') {
-    return errors;
-  }
-
   const stagger = motion.stagger;
   if (stagger === undefined || stagger === null) {
     return errors;

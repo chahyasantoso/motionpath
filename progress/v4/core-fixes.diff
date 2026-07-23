@@ -1,0 +1,81 @@
+diff --git a/src/hooks/useMotionTimelinePlayback.js b/src/hooks/useMotionTimelinePlayback.js
+index 11b7e33..84eda19 100644
+--- a/src/hooks/useMotionTimelinePlayback.js
++++ b/src/hooks/useMotionTimelinePlayback.js
+@@ -1,7 +1,9 @@
+ import { useEffect } from 'react';
+ 
+ /**
+- * Ongoing play/pause control for a MotionInstance or Motion.
++ * Ongoing play/pause control for a Motion instance.
++ * Motion.play()/pause() delegate to trigger.play()/pause() internally —
++ * callers always go through this single surface.
+  *
+  * @param {object} instance
+  * @param {boolean} playing
+@@ -10,17 +12,9 @@ export default function useMotionTimelinePlayback(instance, playing) {
+   useEffect(() => {
+     if (!instance) return;
+     if (playing) {
+-      if (typeof instance.play === 'function') {
+-        instance.play();
+-      } else if (instance.trigger && typeof instance.trigger.play === 'function') {
+-        instance.trigger.play();
+-      }
++      instance.play?.();
+     } else {
+-      if (typeof instance.pause === 'function') {
+-        instance.pause();
+-      } else if (instance.trigger && typeof instance.trigger.pause === 'function') {
+-        instance.trigger.pause();
+-      }
++      instance.pause?.();
+     }
+   }, [instance, playing]);
+ }
+diff --git a/src/lib/Track.js b/src/lib/Track.js
+index 18d1af8..48f22bc 100644
+--- a/src/lib/Track.js
++++ b/src/lib/Track.js
+@@ -32,6 +32,8 @@ export class Track {
+   #parent = null;
+   #children = new Map();
+   #subscribers = new Set();
++  #currentOffset = 0;
++  #staggerOffset = 0;
+ 
+   /**
+    * @param {object} params
+@@ -150,7 +152,7 @@ export class Track {
+     if (this.#children.size === 0) return 0;
+     let maxOffset = 0;
+     for (const child of this.#children.values()) {
+-      const childOffset = child._currentOffset ?? 0;
++      const childOffset = child.#currentOffset ?? 0;
+       if (childOffset > maxOffset) {
+         maxOffset = childOffset;
+       }
+@@ -166,8 +168,8 @@ export class Track {
+   #reflow() {
+     let offset = 0;
+     for (const child of this.#children.values()) {
+-      child._currentOffset = offset;
+-      offset += child._staggerOffset ?? 0;
++      child.#currentOffset = offset;
++      offset += child.#staggerOffset ?? 0;
+     }
+   }
+ 
+@@ -177,10 +179,10 @@ export class Track {
+     }
+     child.#parent = this;
+     const stagger = opts.stagger ?? 0;
+-    child._staggerOffset = stagger;
++    child.#staggerOffset = stagger;
+ 
+     const spawnOffset = this.#computeSpawnOffset(stagger);
+-    child._currentOffset = spawnOffset;
++    child.#currentOffset = spawnOffset;
+ 
+     this.#children.set(child.id, child);
+     if (this.#host) {
