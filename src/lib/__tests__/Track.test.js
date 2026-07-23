@@ -217,5 +217,43 @@ describe('Track (v4 first-class playhead owner)', () => {
       follower.setObserved(source);
       expect(() => follower.compose()).not.toThrow();
     });
+
+    it('memoizes a diamond-shared source within a single compose() call', () => {
+      const proxy = { x: 0, y: 0 };
+      const tween = gsap.to(proxy, { x: 100, y: 200, duration: 1, ease: 'none', paused: true });
+      const pluginComposeSpy = vi.fn((raw) => ({
+        transform: `translate3d(${raw.x ?? 0}px, ${raw.y ?? 0}px, 0px)`,
+      }));
+      const d = new Track({
+        id: 'diamond-d',
+        interpolationTimeline: tween,
+        proxyState: proxy,
+        plugins: [{ keys: ['x', 'y'], compose: pluginComposeSpy }],
+        resolvedTrack: { id: 'diamond-d', keyframes: { x: {}, y: {} } },
+      });
+
+      // b and c both observe d (the diamond's shared ancestor).
+      const b = createDummyTrack('diamond-b');
+      const c = createDummyTrack('diamond-c');
+      b.setObserved(d, (composed) => ({ fromD: composed.transform }));
+      c.setObserved(d, (composed) => ({ fromD: composed.transform }));
+
+      // a observes both b and c, closing the diamond: a -> b -> d, a -> c -> d.
+      const a = createDummyTrack('diamond-a');
+      a.setObserved(b, (composed) => ({ fromB: composed.fromD }));
+      a.setObserved(c, (composed) => ({ fromC: composed.fromD }));
+
+      a.compose();
+
+      // d's own plugin work must run exactly once per root compose() call, even
+      // though d is reached via two different paths (b and c).
+      expect(pluginComposeSpy).toHaveBeenCalledTimes(1);
+
+      // A second, separate root call must recompute from scratch (no cross-call
+      // caching) — this is what distinguishes per-call scoping from a persistent
+      // cache and is what keeps it correct under scrubbing/seek.
+      a.compose();
+      expect(pluginComposeSpy).toHaveBeenCalledTimes(2);
+    });
   });
 });

@@ -20,6 +20,10 @@ export function mergePatches(patchA, patchB) {
   return merged;
 }
 
+// Per-call compose() sentinel: marks a track as "currently being resolved" within
+// one root compose() call's ctx Map. See Step 2 below / compose-per-call-scoping-design.md.
+const COMPOSING = Symbol('composing');
+
 export class Track {
   #id;
   #interpolationTimeline;
@@ -34,8 +38,7 @@ export class Track {
   #currentOffset = 0;
   #staggerOffset = 0;
   #layoutDelegate;
-  #observed = new Map();
-  #composing = false;
+  #observed = new Map(); // source Track -> mapFn (insertion order = fold order)
 
   /**
    * @param {object} params
@@ -90,33 +93,41 @@ export class Track {
     };
   }
 
-  compose(rawData) {
+  compose(rawData, ctx) {
+    ctx = ctx ?? new Map(); // fresh scope per external (root) call; never persists past it
+
     const source = rawData ?? this.getSnapshot();
 
-    // Cycle back-edge: we are being composed while already mid-compose higher
-    // in the stack. Do NOT recurse into observed sources — return only this
-    // track's own local (plugin-only) patch. See observe-fk-design.md §2.
-    if (this.#composing) {
+    const cached = ctx.get(this);
+
+    // Cycle back-edge: this track is already being resolved higher in the
+    // current call's recursion. Do NOT recurse into observed sources again —
+    // return only this track's own local (plugin-only) patch, same fallback
+    // as the original guard. See observe-fk-design.md §2.
+    if (cached === COMPOSING) {
       return composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
     }
 
-    this.#composing = true;
-    try {
-      let patch = composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
-      // Fold each observed source in insertion order; each mapped patch applies
-      // LAST (last-wins), so it can override this track's own fields.
-      // NOTE: mapFn receives the source's COMPOSED patch, not its snapshot.
-      for (const [observedSource, mapFn] of this.#observed) {
-        if (!mapFn) continue;
-        const observedPatch = mapFn(observedSource.compose());
-        if (observedPatch) {
-          patch = mergePatches(patch, observedPatch);
-        }
-      }
-      return patch;
-    } finally {
-      this.#composing = false;
+    // Diamond memo hit: this track was already fully resolved earlier in this
+    // SAME call (reached via a different path). Reuse it instead of recomputing.
+    if (cached !== undefined) {
+      return cached;
     }
+
+    ctx.set(this, COMPOSING);
+    let patch = composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
+    // Fold each observed source in insertion order; each mapped patch applies
+    // LAST (last-wins), so it can override this track's own fields.
+    // NOTE: mapFn receives the source's COMPOSED patch, not its snapshot.
+    for (const [observedSource, mapFn] of this.#observed) {
+      if (!mapFn) continue;
+      const observedPatch = mapFn(observedSource.compose(undefined, ctx)); // thread ctx down
+      if (observedPatch) {
+        patch = mergePatches(patch, observedPatch);
+      }
+    }
+    ctx.set(this, patch);
+    return patch;
   }
 
   /**
@@ -126,7 +137,8 @@ export class Track {
    * LAST in insertion order (so it can override this track's own fields).
    *
    * Reads source.compose() — the RESOLVED world state, so FK chains accumulate.
-   * Cycles are made safe by the #composing re-entrancy guard in compose(), not
+   * Cycles are made safe by the per-call ctx Map in compose() (COMPOSING sentinel +
+   * diamond memo), not
    * by reading a raw snapshot. See observe-fk-design.md §2, §3.
    *
    * - setObserved(track, mapFn): add or REPLACE the observation of `track`.
