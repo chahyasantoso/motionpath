@@ -6,7 +6,6 @@ import { perspectiveUsageRule } from './rules/perspective-usage.js';
 import { stopCountRule } from './rules/stop-count.js';
 import { pathXYExclusivityRule } from './rules/path-xy-exclusivity.js';
 import { pathShapeRule } from './rules/path-shape.js';
-import { timelineGroupRule } from './rules/timeline-group.js';
 import { elementUniquenessRule } from './rules/element-uniqueness.js';
 import { imageSequenceRule } from './rules/image-sequence.js';
 import { motionStructureRule } from './rules/motion-structure.js';
@@ -29,7 +28,6 @@ const trackRules = [
 ];
 
 const crossMotionRules = [
-  timelineGroupRule,
   elementUniquenessRule,
 ];
 

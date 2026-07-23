@@ -3,7 +3,6 @@ import { validateProject } from '../index.js';
 import { stopCountRule } from '../rules/stop-count.js';
 import { pathXYExclusivityRule } from '../rules/path-xy-exclusivity.js';
 import { pathShapeRule } from '../rules/path-shape.js';
-import { timelineGroupRule } from '../rules/timeline-group.js';
 import { elementUniquenessRule } from '../rules/element-uniqueness.js';
 import { triggerShapeRule } from '../rules/trigger-shape.js';
 import { easeCollisionRule } from '../rules/ease-collision.js';
@@ -15,19 +14,15 @@ describe('validateProject integration tests', () => {
   it('should return empty array for a fully valid minimal project', () => {
     const project = {
       projectId: 'hero-page',
-      schemaVersion: 2,
+      schemaVersion: 4,
       perspective: 1000,
       motions: [
         {
-          motionId: 'motion-1',
-          driver: {
-            type: 'timeline',
-            sectionId: 'scene-1',
-            trigger: {
-              type: 'time',
-              duration: 2,
-              repeat: -1
-            }
+          id: 'motion-1',
+          trigger: {
+            type: 'time',
+            duration: 2,
+            repeat: -1
           },
           tracks: [
             {
@@ -50,14 +45,11 @@ describe('validateProject integration tests', () => {
       schemaVersion: 'not-a-number', // rule: schema-version
       motions: [
         {
-          driver: {
-            type: 'timeline',
-            sectionId: 'scene-1',
-            trigger: {
-              type: 'scroll',
-              scrub: true,
-              repeat: -1 // rule: trigger-shape (repeat incompatible with scrub)
-            }
+          id: 'motion-1',
+          trigger: {
+            type: 'scroll',
+            scrub: true,
+            repeat: -1 // rule: trigger-shape (repeat incompatible with scrub)
           },
           stagger: -0.5, // rule: stagger-shape (negative stagger)
           tracks: [
@@ -86,41 +78,35 @@ describe('validateProject integration tests', () => {
     expect(ruleIds).toContain('path-shape');
     expect(ruleIds).toContain('path-xy-exclusivity');
 
-    // Make sure we didn't throw an exception and returned everything
     expect(errors.length).toBeGreaterThanOrEqual(5);
   });
 
   it('should defensively handle garbage/malformed inputs without throwing', () => {
-    // null
     expect(() => validateProject(null)).not.toThrow();
     expect(validateProject(null)[0].ruleId).toBe('schema-version');
 
-    // empty object
     expect(() => validateProject({})).not.toThrow();
     expect(validateProject({}).length).toBe(2);
 
-    const badMotions = { schemaVersion: 2, motions: 'not-an-array' };
+    const badMotions = { schemaVersion: 4, motions: 'not-an-array' };
     expect(() => validateProject(badMotions)).not.toThrow();
     const badMotionsErrors = validateProject(badMotions);
     expect(badMotionsErrors).toHaveLength(1);
     expect(badMotionsErrors[0].ruleId).toBe('invalid-shape');
-    expect(badMotionsErrors[0].severity).toBe('error');
     expect(badMotionsErrors[0].path).toBe('$.motions');
 
-    // motions is entirely absent
-    const missingMotions = { schemaVersion: 2 };
+    const missingMotions = { schemaVersion: 4 };
     expect(() => validateProject(missingMotions)).not.toThrow();
     const missingMotionsErrors = validateProject(missingMotions);
     expect(missingMotionsErrors).toHaveLength(1);
     expect(missingMotionsErrors[0].ruleId).toBe('invalid-shape');
-    expect(missingMotionsErrors[0].severity).toBe('error');
     expect(missingMotionsErrors[0].path).toBe('$.motions');
   });
 
   it('every rule function has the correct arity for its type', () => {
     const motionRules = [triggerShapeRule, easeCollisionRule, staggerShapeRule, perspectiveUsageRule];
     const trackRules = [stopCountRule, stopShapeRule, pathXYExclusivityRule, pathShapeRule];
-    const crossMotionRules = [timelineGroupRule, elementUniquenessRule];
+    const crossMotionRules = [elementUniquenessRule];
 
     motionRules.forEach(rule => expect(rule.length).toBe(3));   // (motion, context, path)
     trackRules.forEach(rule => expect(rule.length).toBe(4));    // (track, motion, context, path)
@@ -153,11 +139,11 @@ describe('validateProject integration tests', () => {
   it('should validate malformed stop shape during full project validation', () => {
     const project = {
       projectId: 'demo',
-      schemaVersion: 2,
+      schemaVersion: 4,
       motions: [
         {
-          motionId: 'motion-1',
-          driver: { type: 'manual' },
+          id: 'motion-1',
+          trigger: { type: 'manual' },
           tracks: [
             {
               id: 'el-1',

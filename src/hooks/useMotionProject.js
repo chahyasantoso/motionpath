@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { productionEngine } from '../engines/ProductionEngine.js';
+import { engine } from '../engines/Engine.js';
 
 /**
  * React Hook to load a complete MotionPath project once.
- * Replaces the entire previous state of the productionEngine upon mount.
+ * Replaces the entire previous state of the engine upon mount.
  * Destroys and cleans up engine resources on unmount.
  *
  * @param {Object} project - The complete project schema object
@@ -19,7 +19,7 @@ export default function useMotionProject(project) {
     let cancelled = false;
     setIsLoaded(false);
 
-    productionEngine
+    engine
       .loadProject(projectRef.current)
       .then(() => {
         if (!cancelled) setIsLoaded(true);
@@ -30,7 +30,7 @@ export default function useMotionProject(project) {
 
     return () => {
       cancelled = true;
-      productionEngine.destroy();
+      engine.destroy();
     };
   }, [project]); // eslint-disable-line react-hooks/exhaustive-deps
 

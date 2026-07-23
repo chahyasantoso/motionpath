@@ -3,7 +3,7 @@ import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import { buildMotionPath, convertToCubicPath } from '../../utils/pathUtils';
-import productionEngine from '../../engines/ProductionEngine.js';
+import { engine } from '../../engines/Engine.js';
 import { domRenderer } from '../../renderers/domRenderer.js';
 import './TowerDefensePage.css';
 
@@ -243,7 +243,7 @@ export default function TowerDefensePage() {
         const baseType = ENEMY_TYPES[typeKey];
 
         const laneId = `lane-${lane}-path`;
-        const enemyInstance = productionEngine.mountInstance(laneId);
+        const enemyInstance = engine.mountInstance(laneId);
 
         enemiesRef.current.push({
           id: nextEnemyIdRef.current++,
@@ -274,7 +274,7 @@ export default function TowerDefensePage() {
             enemy.instance = null;
           }
           enemy.deathProgress = 0;
-          enemy.deathInstance = productionEngine.mountInstance('enemy-death');
+          enemy.deathInstance = engine.mountInstance('enemy-death');
         }
 
         enemy.deathProgress += 0.05; // 20 frames to complete
@@ -366,7 +366,7 @@ export default function TowerDefensePage() {
 
       if (inRangeEnemy) {
         // Fire projectile
-        const projInstance = productionEngine.mountInstance('projectile-arc');
+        const projInstance = engine.mountInstance('projectile-arc');
         projectilesRef.current.push({
           id: nextProjIdRef.current++,
           towerId: tower.id,

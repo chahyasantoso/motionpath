@@ -2,20 +2,17 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useMotionInstance from '../useMotionInstance';
-import { productionEngine } from '../../engines/ProductionEngine.js';
+import { engine } from '../../engines/Engine.js';
 
-vi.mock('../../engines/ProductionEngine.js', () => {
+vi.mock('../../engines/Engine.js', () => {
   const mockInstance = {
     id: 'mock-inst',
     motionId: 'my-motion',
-    requiredTriggerIds: ['trigger1'],
     destroy: vi.fn()
   };
   return {
-    productionEngine: {
+    engine: {
       mountInstance: vi.fn(() => mockInstance),
-      registerTriggerRef: vi.fn(),
-      unregisterTriggerRef: vi.fn()
     }
   };
 });
@@ -41,19 +38,19 @@ describe('useMotionInstance', () => {
       }
     );
 
-    expect(productionEngine.mountInstance).toHaveBeenCalledTimes(1);
-    expect(productionEngine.mountInstance).toHaveBeenCalledWith('my-motion', initialConfig);
+    expect(engine.mountInstance).toHaveBeenCalledTimes(1);
+    expect(engine.mountInstance).toHaveBeenCalledWith('my-motion', initialConfig);
 
     // Rerender with a new config
     const newConfig = { speed: 2 };
     rerender({ motionId: 'my-motion', config: newConfig });
 
     // Should not call mountInstance again
-    expect(productionEngine.mountInstance).toHaveBeenCalledTimes(1);
+    expect(engine.mountInstance).toHaveBeenCalledTimes(1);
 
     // Unmount should destroy the instance
     unmount();
-    const inst = productionEngine.mountInstance.mock.results[0].value;
+    const inst = engine.mountInstance.mock.results[0].value;
     expect(inst.destroy).toHaveBeenCalledTimes(1);
   });
 

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { productionEngine } from '../engines/ProductionEngine.js';
+import { engine } from '../engines/Engine.js';
 
 /**
  * Registers a DOM ref as the resolution target for a trigger-anchor id
@@ -13,7 +13,7 @@ import { productionEngine } from '../engines/ProductionEngine.js';
 export default function useMotionTrigger(id, ref) {
   useEffect(() => {
     if (!id || !ref) return undefined;
-    productionEngine.registerTriggerRef(id, ref);
-    return () => productionEngine.unregisterTriggerRef(id, ref);
+    engine.registerTriggerRef(id, ref);
+    return () => engine.unregisterTriggerRef(id, ref);
   }, [id, ref]);
 }

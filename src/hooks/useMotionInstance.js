@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { productionEngine } from '../engines/ProductionEngine.js';
+import { engine } from '../engines/Engine.js';
 
 /**
  * React Hook to mount and manage a MotionInstance or v4 Motion/Track.
@@ -31,28 +31,9 @@ export default function useMotionInstance(motionId, config) {
   useEffect(() => {
     if (!motionId) return undefined;
     
-    const inst = productionEngine.mountInstance(motionId, initialConfigRef.current);
+    const inst = engine.mountInstance(motionId, initialConfigRef.current);
     if (!inst) return undefined;
     
-    // Attach declarative ref callback binders if requiredTriggerIds is defined
-    const triggers = {};
-    const requiredTriggerIds = inst.requiredTriggerIds ?? [];
-    requiredTriggerIds.forEach(id => {
-      let activeRef = null;
-      triggers[id] = (el) => {
-        if (el) {
-          activeRef = { current: el };
-          productionEngine.registerTriggerRef(id, activeRef);
-        } else {
-          if (activeRef) {
-            productionEngine.unregisterTriggerRef(id, activeRef);
-            activeRef = null;
-          }
-        }
-      };
-    });
-    inst.triggers = triggers;
-
     setInstance(inst);
 
     return () => {
