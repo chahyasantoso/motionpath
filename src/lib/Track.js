@@ -1,6 +1,6 @@
 import { composePatch } from '../usecases/ComposeTrackPatch.js';
-import { eventBus } from './helpers.js';
 import { defaultGaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
+import { eventBus } from './helpers.js';
 
 function clamp01(val) {
   return Math.max(0, Math.min(1, Number(val) || 0));
@@ -235,6 +235,7 @@ export class Track {
     this.#children.delete(id);
     child.#parent = null;
 
+    // why is this here??
     if (this.#host) {
       this.#host._unmountChild(child);
     }

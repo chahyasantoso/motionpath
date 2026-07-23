@@ -11,6 +11,7 @@ import { buildMotionPath } from '../../utils/pathUtils';
 import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../utils/projection3d';
 import { gsap } from 'gsap';
 import './DemoPage.css';
+
 // Prevent editor auto-cleanup from removing unused React import
 const _dummyReactRef = React;
 
@@ -19,8 +20,9 @@ const scrollScene = {
   id: 'hero-scrollytelling',
   trigger: {
     type: 'scroll',
+    trigger: 'hero-scroll-trigger',
+    pin: 'hero-stage-pin',
     scrub: 1,
-    pin: 'stage',
     start: 'top top',
     end: 'bottom bottom'
   },
@@ -86,8 +88,9 @@ const dynamicCarouselScene = {
   id: 'carousel-storytelling',
   trigger: {
     type: 'scroll',
+    trigger: 'carousel-scroll-trigger',
+    pin: 'carousel-stage-pin',
     scrub: 1.2,
-    pin: 'carousel-stage',
     start: 'top top',
     end: 'bottom bottom'
   },
@@ -125,8 +128,9 @@ const dynamicHelixScene = {
   id: 'helix-storytelling',
   trigger: {
     type: 'scroll',
+    trigger: 'helix-scroll-trigger',
+    pin: 'helix-stage-pin',
     scrub: 1.2,
-    pin: 'helix-stage',
     start: 'top top',
     end: 'bottom bottom'
   },
@@ -144,34 +148,6 @@ const dynamicHelixScene = {
   ]
 };
 
-const cardExitScene = {
-  id: 'card-exit',
-  trigger: {
-    type: 'time',
-    autoplay: false,
-    duration: 0.4
-  },
-  tracks: [
-    {
-      id: 'card-exit-track',
-      keyframes: {
-        scale: {
-          stops: [
-            { p: 0.0, v: 1.0 },
-            { p: 1.0, v: 0.0 }
-          ]
-        },
-        opacity: {
-          stops: [
-            { p: 0.0, v: 1.0 },
-            { p: 1.0, v: 0.0 }
-          ]
-        }
-      }
-    }
-  ]
-};
-
 const project = {
   schemaVersion: 2,
   projectId: 'demo-page',
@@ -179,8 +155,7 @@ const project = {
   motions: [
     scrollScene,
     dynamicCarouselScene,
-    dynamicHelixScene,
-    cardExitScene
+    dynamicHelixScene
   ]
 };
 
@@ -205,6 +180,7 @@ function Rocket({ instance, offset = 0 }) {
   return <div ref={ref} className="element rocket">🚀</div>;
 }
 
+// Cloud receives coordinate broadcasts from a MotionInstance and moves linearly
 function Cloud({ instance }) {
   const ref = useRef(null);
   
@@ -353,8 +329,8 @@ function ScrollDemo({ instance }) {
   const containerRef = useRef(null);
   const stageRef = useRef(null);
 
-  useMotionTrigger('hero-scrollytelling', containerRef);
-  useMotionTrigger('stage', stageRef);
+  useMotionTrigger('hero-scroll-trigger', containerRef);
+  useMotionTrigger('hero-stage-pin', stageRef);
 
   return (
     <section ref={containerRef} className="scroll-scene">
@@ -389,8 +365,8 @@ function CarouselDemo({ instance }) {
   const containerRef = useRef(null);
   const stageRef = useRef(null);
 
-  useMotionTrigger('carousel-storytelling', containerRef);
-  useMotionTrigger('carousel-stage', stageRef);
+  useMotionTrigger('carousel-scroll-trigger', containerRef);
+  useMotionTrigger('carousel-stage-pin', stageRef);
 
   const [cards, setCards] = React.useState(MOCK_CARDS);
   // cardId -> child Track (v4: one Track per card, added to parent track)
@@ -495,8 +471,8 @@ function HelixDemo({ instance }) {
   const containerRef = useRef(null);
   const stageRef = useRef(null);
 
-  useMotionTrigger('helix-storytelling', containerRef);
-  useMotionTrigger('helix-stage', stageRef);
+  useMotionTrigger('helix-scroll-trigger', containerRef);
+  useMotionTrigger('helix-stage-pin', stageRef);
 
   const { cx, cy, radius, height, tiltDeg } = HELIX_CONFIG;
   const tiltRad = (tiltDeg * Math.PI) / 180;

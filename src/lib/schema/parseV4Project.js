@@ -24,7 +24,11 @@ export async function parseV4Project(schema = {}, deps = {}) {
     }
 
     const delegate = factory(motionConfig.trigger);
-    const motion = new Motion({ id: motionConfig.id, triggerDelegate: delegate }, deps);
+    const motion = new Motion({
+      id: motionConfig.id,
+      triggerDelegate: delegate,
+      lazy: triggerType === 'scroll'
+    }, deps);
 
     const motionTracks = motionConfig.tracks || [];
     const stagger = typeof motionConfig.stagger === 'number' ? motionConfig.stagger : 0;

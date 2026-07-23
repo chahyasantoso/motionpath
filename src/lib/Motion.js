@@ -60,10 +60,12 @@ export class Motion {
   #initialTracks = [];
   #masterTimeline;
 
-  constructor({ id, triggerDelegate }, deps = {}) {
+  constructor({ id, triggerDelegate, lazy = false }, deps = {}) {
     this.id = id;
     this.trigger = triggerDelegate;
-    this.init(deps.resolveElement ?? (() => null));
+    if (!lazy) {
+      this.init(deps.resolveElement ?? (() => null));
+    }
   }
 
   init(resolveElement) {

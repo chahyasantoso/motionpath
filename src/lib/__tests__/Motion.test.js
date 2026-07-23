@@ -44,12 +44,11 @@ describe('Motion & TriggerDelegates (v4)', () => {
   it('should throw clear error when resolving unregistered trigger DOM element', async () => {
     const { ScrollTriggerDelegate } = await import('../TriggerDelegate.js');
     const delegate = new ScrollTriggerDelegate({ trigger: 'missing-el-id' });
+    const motion = new Motion({ id: 'scroll-motion', triggerDelegate: delegate, lazy: true });
 
     expect(() => {
-      new Motion({ id: 'scroll-motion', triggerDelegate: delegate }, {
-        resolveElement: () => {
-          throw new Error("MotionPath: trigger ref 'missing-el-id' is not registered.");
-        }
+      motion.init(() => {
+        throw new Error("MotionPath: trigger ref 'missing-el-id' is not registered.");
       });
     }).toThrow(/missing-el-id/);
   });
