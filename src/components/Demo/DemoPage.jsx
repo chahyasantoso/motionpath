@@ -16,17 +16,13 @@ const _dummyReactRef = React;
 
 // ─── Scene Data ────────────────────────────────────────────────
 const scrollScene = {
-  motionId: 'hero-scrollytelling',
-  driver: {
-    type: 'timeline',
-    sectionId: 'hero-scrollytelling',
-    trigger: {
-      type: 'scroll',
-      scrub: 1,
-      pin: 'stage',
-      start: 'top top',
-      end: 'bottom bottom'
-    }
+  id: 'hero-scrollytelling',
+  trigger: {
+    type: 'scroll',
+    scrub: 1,
+    pin: 'stage',
+    start: 'top top',
+    end: 'bottom bottom'
   },
   tracks: [
     {
@@ -87,17 +83,13 @@ const MOCK_CARDS = [
 ];
 
 const dynamicCarouselScene = {
-  motionId: 'carousel-storytelling',
-  driver: {
-    type: 'timeline',
-    sectionId: 'carousel-storytelling',
-    trigger: {
-      type: 'scroll',
-      scrub: 1.2,
-      pin: 'carousel-stage',
-      start: 'top top',
-      end: 'bottom bottom'
-    }
+  id: 'carousel-storytelling',
+  trigger: {
+    type: 'scroll',
+    scrub: 1.2,
+    pin: 'carousel-stage',
+    start: 'top top',
+    end: 'bottom bottom'
   },
   stagger: 0.1,
   staggerTransition: { duration: 0.4, ease: 'power3.out' },
@@ -121,7 +113,7 @@ const dynamicCarouselScene = {
             { p: 0.0, v: 0 },
             { p: 0.15, v: 1 },
             { p: 0.85, v: 1 },
-            { p: 1.0, v: 0 }
+            { p: 1.0,  v: 0 }
           ]
         }
       }
@@ -130,17 +122,13 @@ const dynamicCarouselScene = {
 };
 
 const dynamicHelixScene = {
-  motionId: 'helix-storytelling',
-  driver: {
-    type: 'timeline',
-    sectionId: 'helix-storytelling',
-    trigger: {
-      type: 'scroll',
-      scrub: 1.2,
-      pin: 'helix-stage',
-      start: 'top top',
-      end: 'bottom bottom'
-    }
+  id: 'helix-storytelling',
+  trigger: {
+    type: 'scroll',
+    scrub: 1.2,
+    pin: 'helix-stage',
+    start: 'top top',
+    end: 'bottom bottom'
   },
   stagger: 0.16,
   tracks: [
@@ -157,14 +145,11 @@ const dynamicHelixScene = {
 };
 
 const cardExitScene = {
-  motionId: 'card-exit',
-  driver: {
-    type: 'timeline',
-    trigger: {
-      type: 'time',
-      autoplay: false,
-      duration: 0.4
-    }
+  id: 'card-exit',
+  trigger: {
+    type: 'time',
+    autoplay: false,
+    duration: 0.4
   },
   tracks: [
     {

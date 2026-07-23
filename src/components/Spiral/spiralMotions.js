@@ -1,12 +1,9 @@
 export function createSpiralContainerScene({ spawnIntervalMs }) {
   return {
-    motionId: 'spiral-container',
+    id: 'spiral-container',
     stagger: spawnIntervalMs / 1000,
     staggerTransition: { duration: 0.55, ease: 'power2.out' },
-    driver: {
-      type: 'timeline',
-      trigger: { type: 'time', autoplay: true }
-    },
+    trigger: { type: 'time', autoplay: true },
     tracks: [{
       id: 'keepalive',
       duration: 1,
@@ -19,11 +16,8 @@ export function createSpiralContainerScene({ spawnIntervalMs }) {
 
 export function createSpiralBallScene({ spiralPathPoints, ballTravelSeconds, ballSize }) {
   return {
-    motionId: 'spiral-zuma',
-    driver: {
-      type: 'timeline',
-      trigger: { type: 'time', duration: ballTravelSeconds },
-    },
+    id: 'spiral-zuma',
+    trigger: { type: 'time', duration: ballTravelSeconds },
     tracks: [{
       id: 'ball-track',
       keyframes: {
@@ -52,11 +46,8 @@ export function createSpiralBallScene({ spiralPathPoints, ballTravelSeconds, bal
 
 export function createSpiralTransitionScene({ ballSize }) {
   return {
-    motionId: 'ball-exit',
-    driver: {
-      type: 'timeline',
-      trigger: { type: 'time', autoplay: false, duration: 0.35 },
-    },
+    id: 'ball-exit',
+    trigger: { type: 'time', autoplay: false, duration: 0.35 },
     tracks: [{
       id: 'ball-exit-track',
       keyframes: {
