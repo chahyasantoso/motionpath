@@ -3,6 +3,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { buildTrackTweenSync } from '../../usecases/BuildTrackTween.js';
 import { composePatch } from '../../usecases/ComposeTrackPatch.js';
 import { resolveTrack } from '../../usecases/ResolveTrack.js';
+import { defaultGaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
 
 export class MotionInstance {
   static #idCounter = 0;
@@ -22,6 +23,7 @@ export class MotionInstance {
   #scrollTrigger = null;
   #pendingRemovals = new Set(); // children mid-reflow, not yet detached from timeline
   #destroyed = false;
+  #parent = null; // public-read via getter, set only internally by addChild
 
   constructor(motionId, config, schemaMotion, context) {
     this.id = MotionInstance.#generateUniqueId();
@@ -38,6 +40,7 @@ export class MotionInstance {
     this.currentDelay = config.delay ?? undefined;
     this.delayTween = null;
     this.paddingCallback = null;
+    this.layoutDelegate = context.layoutDelegate ?? config.layoutDelegate ?? defaultGaplessLayoutDelegate;
 
     this.#deps = this.deps;
     this.#onSubscriberChange = context.onSubscriberChange;
@@ -299,19 +302,14 @@ export class MotionInstance {
       targetConfig = motionIdOrConfig;
     }
 
-    // Placement is derived from actual current sibling state, not a formula
-    // counted from a fixed origin — same principle removeChild's cascade
-    // already uses. A counter-based approach (tried in brief 15) fixes live
-    // count plateauing under churn, but goes stale the moment removeChild's
-    // cascade shifts the existing chain: the counter has no way to know that
-    // happened, so every removal-with-reflow before a spawn leaves a
-    // permanent extra stagger-width gap between the old chain and everything
-    // spawned after it. Anchoring to the real frontmost position is immune
-    // to both failure modes at once, and needs no reset bookkeeping — an
-    // empty children array naturally resolves to delay 0.
+    // Placement math is delegated to this.layoutDelegate (default:
+    // GaplessLayoutDelegate) rather than hardcoded here. See
+    // LayoutDelegate.js for the contract and why the "frontmost + stagger"
+    // reasoning below now lives in GaplessLayoutDelegate.computeSpawnDelay
+    // instead of inline.
     const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
-    const frontmostDelay = this.children.reduce((max, c) => Math.max(max, c.currentDelay ?? 0), -stagger);
-    const calculatedDelay = targetConfig.delay ?? (frontmostDelay + stagger);
+    const calculatedDelay = targetConfig.delay ??
+      this.layoutDelegate.computeSpawnDelay(this.children, { stagger, schemaMotion: this.schemaMotion });
 
     const child = this.#deps.mountInstance(targetMotionId, {
       ...targetConfig,
@@ -319,6 +317,7 @@ export class MotionInstance {
       parentId: this.id
     });
 
+    child.#parent = this;
     this.children.push(child);
 
     // Native GSAP Nesting
@@ -335,29 +334,18 @@ export class MotionInstance {
     const idx = this.children.indexOf(child);
     if (idx === -1 || this.#pendingRemovals.has(child)) return;
 
-    // Reflow must walk children in actual timeline-position order, not
-    // insertion order — a manually-delayed child can land anywhere relative
-    // to auto-placed siblings. Source of truth is currentDelay (the settled
-    // logical position), never timeline.startTime() live, which is actively
-    // animating during an in-flight reflow and would give unstable targets.
-    const ordered = [...this.children].sort((a, b) => (a.currentDelay ?? 0) - (b.currentDelay ?? 0));
-    const removedRank = ordered.indexOf(child);
+    // Delegate computes the reflow plan while `child` is still present in
+    // this.children (matches the contract: computeReflow receives the full
+    // live set INCLUDING the removed child, so it can determine rank). See
+    // LayoutDelegate.js for the contract and GaplessLayoutDelegate.js for
+    // the rank/ordering reasoning that used to live inline here.
+    const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
+    const targets = this.layoutDelegate.computeReflow(
+      this.children, child, { stagger, schemaMotion: this.schemaMotion }
+    );
 
     this.children.splice(idx, 1);
     this.#pendingRemovals.add(child);
-
-    // Cascade only when removing from the middle of the chain (rank > 0).
-    // Removing the frontmost child (rank 0) never creates a gap — it's the
-    // leading edge, and the next child naturally becomes the new leader.
-    // Cascading rank 0 removals shifts all survivors' startTimes earlier on
-    // the parent timeline, which can push children past completion and
-    // trigger an avalanche of instant completions during natural drain.
-    const targets = [];
-    if (removedRank > 0) {
-      for (let k = removedRank + 1; k < ordered.length; k++) {
-        targets.push({ child: ordered[k], delay: ordered[k - 1].currentDelay ?? 0 });
-      }
-    }
 
     this.#finishRemoval(child, targets);
   }
@@ -448,6 +436,8 @@ export class MotionInstance {
       child.destroy();
     });
     this.#pendingRemovals.clear();
+
+    this.#parent = null;
   }
 
   get requiredTriggerIds() {
@@ -464,5 +454,9 @@ export class MotionInstance {
 
   get isDestroyed() {
     return this.#destroyed;
+  }
+
+  get parent() {
+    return this.#parent;
   }
 }

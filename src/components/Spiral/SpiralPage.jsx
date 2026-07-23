@@ -21,7 +21,9 @@ export default function SpiralPage() {
   const isLoaded = useMotionProject(project);
   useSmoothScroll();
 
-  const containerInstance = useMotionInstance(isLoaded ? 'spiral-container' : null);
+  const containerInstance = useMotionInstance(isLoaded ? 'spiral-container' : null, {
+    //layoutDelegate: defaultStaticLayoutDelegate,
+  });
   const vm = useSpiralPageViewModel({ isLoaded, containerInstance });
 
   return (

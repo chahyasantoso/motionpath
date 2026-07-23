@@ -11,6 +11,15 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
   const spawnedCountRef = useRef(0);
   const rafIdRef = useRef(null);
 
+  // Child-change listener — fires whenever a ball is added or fully removed
+  useEffect(() => {
+    if (!containerInstance) return;
+    return containerInstance.onChildChange(() => {
+      const alive = containerInstance.children.length;
+      console.log('[wave] child change | alive balls:', alive, '| vms:', ballVmsRef.current.length);
+    });
+  }, [containerInstance]);
+
   const getBallVm = useCallback((ballId) => {
     return ballVmsRef.current.find(ball => ball.id === ballId) ?? null;
   }, []);
@@ -52,6 +61,10 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
 
       const latest = getBallVm(ballId);
       if (!latest) return;
+
+      const aliveAfter = containerInstance ? containerInstance.children.length - 1 : 0;
+      const willRespawn = spawnedCountRef.current >= 30 && aliveAfter === 0;
+      console.log(`[wave] remove ball #${ballId} | alive after: ${aliveAfter} | wave respawn: ${willRespawn}`);
 
       containerInstance?.removeChild(latest.baseInstance);
       removeBallVm(ballId);
@@ -98,6 +111,7 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
 
     const id = ++ballCounterRef.current;
     const color = BALL_COLORS[id % BALL_COLORS.length];
+    console.log(`[wave] spawn ball #${id} | spawned total: ${spawnedCountRef.current + 1} | alive: ${containerInstance.children.length}`);
 
     const vm = createBallVm({ id, color, baseInstance });
     vm.onClick = () => startExit(id);

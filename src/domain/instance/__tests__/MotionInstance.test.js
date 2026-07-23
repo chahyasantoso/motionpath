@@ -632,4 +632,60 @@ describe('MotionInstance Class', () => {
       expect(instance.isDestroyed).toBe(true);
     });
   });
+
+  describe('Parent reference and LayoutDelegate Integration', () => {
+    it('sets parent to null on a freshly constructed instance with no parent', () => {
+      const instance = createTestInstance('manual-motion', {}, manualSchema);
+      expect(instance.parent).toBeNull();
+    });
+
+    it('sets child.parent to parent instance after addChild()', () => {
+      const parent = createTestInstance('time-motion', {}, timelineSchema);
+      const child = parent.addChild('child-motion', {});
+      expect(child.parent).toBe(parent);
+    });
+
+    it('throws TypeError when attempting to write to parent getter from outside', () => {
+      const parent = createTestInstance('time-motion', {}, timelineSchema);
+      const child = parent.addChild('child-motion', {});
+      expect(() => {
+        child.parent = {};
+      }).toThrow(TypeError);
+    });
+
+    it('clears parent reference to null after instance is destroyed', () => {
+      const parent = createTestInstance('time-motion', {}, timelineSchema);
+      const child = parent.addChild('child-motion', {});
+      expect(child.parent).toBe(parent);
+      child.destroy();
+      expect(child.parent).toBeNull();
+    });
+
+    it('uses custom layoutDelegate passed in config or context', () => {
+      const customDelegate = {
+        computeSpawnDelay: vi.fn(() => 42),
+        computeReflow: vi.fn(() => [])
+      };
+      const parent = createTestInstance('time-motion', { layoutDelegate: customDelegate }, timelineSchema);
+      
+      const child = parent.addChild('child-motion', {});
+      
+      expect(customDelegate.computeSpawnDelay).toHaveBeenCalledTimes(1);
+      expect(customDelegate.computeSpawnDelay.mock.calls[0][0]).toBe(parent.children);
+      expect(customDelegate.computeSpawnDelay.mock.calls[0][1]).toEqual(
+        expect.objectContaining({ stagger: 0.1, schemaMotion: timelineSchema })
+      );
+      expect(child.currentDelay).toBe(42);
+
+      // Now remove the child to trigger computeReflow
+      parent.removeChild(child);
+
+      expect(customDelegate.computeReflow).toHaveBeenCalledTimes(1);
+      expect(customDelegate.computeReflow.mock.calls[0][0]).toBe(parent.children);
+      expect(customDelegate.computeReflow.mock.calls[0][1]).toBe(child);
+      expect(customDelegate.computeReflow.mock.calls[0][2]).toEqual(
+        expect.objectContaining({ stagger: 0.1, schemaMotion: timelineSchema })
+      );
+    });
+  });
 });

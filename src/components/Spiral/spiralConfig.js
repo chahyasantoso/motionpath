@@ -5,4 +5,4 @@ export const BALL_COLORS = [
   '#ff69b4', '#00ffaa', '#ff8c00', '#44aaff',
 ];
 export const BALL_SIZE = 50;
-export const BALL_SPEED = 120;
+export const BALL_SPEED = 480;

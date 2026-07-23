@@ -103,9 +103,9 @@ describe('useMotionSubscribers', () => {
       { instance: mockInstances[1], trackId: 'track-1' }
     ];
 
-    // mergeFn receives frames: [{ raw, patch }, ...] — reverse patch precedence (first wins)
-    const customMergeFn = vi.fn((frames) => {
-      return Object.assign({}, ...[...frames.map(f => f.patch)].reverse());
+    // mergeFn receives patches: [patch0, patch1] — reverse to make first win
+    const customMergeFn = vi.fn((patches) => {
+      return Object.assign({}, ...[...patches].reverse());
     });
 
     renderHook(() => useMotionSubscribers(sources, mockRef, customMergeFn));
@@ -117,31 +117,27 @@ describe('useMotionSubscribers', () => {
     expect(gsap.set).toHaveBeenLastCalledWith(mockRef.current, { opacity: 0.2 });
   });
 
-  it('should expose raw data to mergeFn even when default compose is used', () => {
+  it('should handle pathProgress boundary check in transformFn, not mergeFn', () => {
     const mockRef = { current: document.createElement('div') };
-    const rawReceived = [];
 
     mockInstances[0].compose.mockReturnValue({ x: 50 });
 
-    const sources = [{ instance: mockInstances[0], trackId: 'track-0' }];
-
-    // Custom mergeFn that reads frame.raw (e.g. pathProgress)
-    const mergeFn = (frames) => {
-      rawReceived.push(frames[0].raw);
-      const p = frames[0].raw?.pathProgress ?? 0;
+    // transformFn owns the boundary check — it has rawData, mergeFn does not
+    const transformFn = (rawData, compose) => {
+      const p = rawData?.pathProgress ?? 0;
       if (p <= 0 || p >= 1) return { display: 'none' };
-      return { ...frames[0].patch, display: 'flex' };
+      return { ...compose(rawData), display: 'flex' };
     };
 
-    renderHook(() => useMotionSubscribers(sources, mockRef, mergeFn));
+    const sources = [{ instance: mockInstances[0], trackId: 'track-0', transformFn }];
 
-    // Tick with pathProgress in the raw data
+    renderHook(() => useMotionSubscribers(sources, mockRef));
+
+    // In-bounds: transformFn calls compose and adds display:flex
     mockCallbacks['inst-0::track-0']({ pathProgress: 0.5 });
-
-    expect(rawReceived[0]).toEqual({ pathProgress: 0.5 });
     expect(gsap.set).toHaveBeenLastCalledWith(mockRef.current, { x: 50, display: 'flex' });
 
-    // Tick with out-of-bounds pathProgress
+    // Out-of-bounds: transformFn short-circuits, compose is never called
     mockCallbacks['inst-0::track-0']({ pathProgress: 0 });
     expect(gsap.set).toHaveBeenLastCalledWith(mockRef.current, { display: 'none' });
   });
