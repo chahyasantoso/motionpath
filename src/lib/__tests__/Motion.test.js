@@ -20,6 +20,7 @@ describe('Motion & TriggerDelegates (v4)', () => {
   it('should mount tracks and drive progress through master timeline seeking', () => {
     const delegate = new TimeTriggerDelegate({ duration: 2 });
     const motion = new Motion({ id: 'time-motion', triggerDelegate: delegate });
+    motion.init(() => null);
     const track = createDummyTrack('m-track');
 
     motion.mount(track);
@@ -32,6 +33,7 @@ describe('Motion & TriggerDelegates (v4)', () => {
   it('should support ManualTriggerDelegate without clock controls', () => {
     const delegate = new ManualTriggerDelegate();
     const motion = new Motion({ id: 'manual-motion', triggerDelegate: delegate });
+    motion.init(() => null);
     const track = createDummyTrack('manual-track');
 
     motion.mount(track);
@@ -44,12 +46,28 @@ describe('Motion & TriggerDelegates (v4)', () => {
   it('should throw clear error when resolving unregistered trigger DOM element', async () => {
     const { ScrollTriggerDelegate } = await import('../TriggerDelegate.js');
     const delegate = new ScrollTriggerDelegate({ trigger: 'missing-el-id' });
-    const motion = new Motion({ id: 'scroll-motion', triggerDelegate: delegate, lazy: true });
+    const motion = new Motion({ id: 'scroll-motion', triggerDelegate: delegate });
 
     expect(() => {
       motion.init(() => {
         throw new Error("MotionPath: trigger ref 'missing-el-id' is not registered.");
       });
     }).toThrow(/missing-el-id/);
+  });
+
+  it('should render a newly added child track at the current master timeline progress', () => {
+    const delegate = new ManualTriggerDelegate();
+    const motion = new Motion({ id: 'manual-motion', triggerDelegate: delegate });
+    motion.init(() => null);
+
+    const parentTrack = createDummyTrack('parent-track');
+    motion.mount(parentTrack);
+
+    motion.trigger.progress(0.5);
+
+    const childTrack = createDummyTrack('child-track');
+    parentTrack.addChild(childTrack, { stagger: 0 });
+
+    expect(childTrack.progress()).toBeCloseTo(0.5, 5);
   });
 });

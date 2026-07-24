@@ -1,5 +1,8 @@
 import { parseV4Project } from '../lib/schema/parseV4Project.js';
 import { TriggerRefRegistry } from '../lib/TriggerRefRegistry.js';
+import { triggerDelegateRegistry } from '../lib/TriggerDelegate.js';
+import { createTrack } from '../lib/createTrack.js';
+import { Motion } from '../lib/Motion.js';
 
 export class Engine {
   #triggerRefs = new TriggerRefRegistry();
@@ -17,17 +20,48 @@ export class Engine {
     if (!this.#v4Project) {
       throw new Error('mountInstance: project not loaded.');
     }
-    const motion = this.#v4Project.getMotion(motionId);
-    if (motion) {
-      motion.init((id) => this.resolveElement(id));
+
+    const existing = this.#instances.get(motionId);
+    if (existing) {
+      existing.destroy?.();
+      this.#instances.delete(motionId);
+    }
+
+    const motionConfig = this.#v4Project.getMotionConfig(motionId);
+    if (motionConfig) {
+      const triggerType = motionConfig.trigger?.type;
+      const factory = triggerDelegateRegistry.get(triggerType);
+      if (!factory) {
+        throw new Error(
+          `Unknown trigger type "${triggerType}" on motion "${motionId}".`
+        );
+      }
+
+      const delegate = factory(motionConfig.trigger);
+      const motion = new Motion(
+        { id: motionConfig.id, triggerDelegate: delegate },
+        { resolveElement: (id) => this.resolveElement(id) }
+      );
+
+      const stagger = typeof motionConfig.stagger === 'number' ? motionConfig.stagger : 0;
+      const motionTracks = motionConfig.tracks || [];
+      for (let i = 0; i < motionTracks.length; i++) {
+        const trackConfig = motionTracks[i];
+        const track = createTrack(trackConfig, this.#v4Project.templates);
+        motion.mount(track, i * stagger);
+      }
+
       this.#instances.set(motion.id, motion);
       return motion;
     }
-    const track = this.#v4Project.getTrack(motionId);
-    if (track) {
+
+    const trackConfig = this.#v4Project.getTrackConfig(motionId);
+    if (trackConfig) {
+      const track = createTrack(trackConfig, this.#v4Project.templates);
       this.#instances.set(track.id, track);
       return track;
     }
+
     throw new Error(`mountInstance: motion or track "${motionId}" not found in project.`);
   }
 
@@ -41,7 +75,12 @@ export class Engine {
 
   getTrack(trackId) {
     if (!this.#v4Project) return null;
-    return this.#v4Project.getTrack(trackId);
+    const mountedTrack = this.#instances.get(trackId);
+    if (mountedTrack) return mountedTrack;
+
+    const trackConfig = this.#v4Project.getTrackConfig(trackId);
+    if (!trackConfig) return null;
+    return createTrack(trackConfig, this.#v4Project.templates);
   }
 
   registerTriggerRef(id, ref) {

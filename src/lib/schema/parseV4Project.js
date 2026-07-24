@@ -1,5 +1,5 @@
-import { createTrack } from '../createTrack.js';
-import { Motion } from '../Motion.js';
+import { resolveTrack } from '../../usecases/ResolveTrack.js';
+import { resolvePluginForKey, ensureLoaded } from '../../domain/plugins.js';
 import { triggerDelegateRegistry } from '../TriggerDelegate.js';
 
 export async function parseV4Project(schema = {}, deps = {}) {
@@ -7,8 +7,23 @@ export async function parseV4Project(schema = {}, deps = {}) {
   const rawMotions = schema.motions || [];
   const rawTracks = schema.tracks || [];
 
-  const motionsMap = new Map();
-  const tracksMap = new Map();
+  const motionConfigsMap = new Map();
+  const trackConfigsMap = new Map();
+  const pluginsToLoad = new Set();
+
+  const collectTrackPlugins = (trackConfig) => {
+    const resolvedTrack = resolveTrack(trackConfig, templates);
+    if (!resolvedTrack) {
+      throw new Error(`parseV4Project: invalid or unresolved track configuration for track "${trackConfig?.id || 'unknown'}".`);
+    }
+    const keyframes = resolvedTrack.keyframes || {};
+    for (const key of Object.keys(keyframes)) {
+      const plugin = resolvePluginForKey(key);
+      if (plugin) {
+        pluginsToLoad.add(plugin);
+      }
+    }
+  };
 
   for (const motionConfig of rawMotions) {
     const triggerType = motionConfig.trigger?.type;
@@ -23,36 +38,30 @@ export async function parseV4Project(schema = {}, deps = {}) {
       );
     }
 
-    const delegate = factory(motionConfig.trigger);
-    const motion = new Motion({
-      id: motionConfig.id,
-      triggerDelegate: delegate,
-      lazy: triggerType === 'scroll'
-    }, deps);
-
+    motionConfigsMap.set(motionConfig.id, motionConfig);
     const motionTracks = motionConfig.tracks || [];
-    const stagger = typeof motionConfig.stagger === 'number' ? motionConfig.stagger : 0;
-    for (let i = 0; i < motionTracks.length; i++) {
-      const trackConfig = motionTracks[i];
-      const track = await createTrack(trackConfig, templates);
-      const position = i * stagger;
-      motion.mount(track, position);
-      tracksMap.set(track.id, track);
-    }
-
-    motionsMap.set(motion.id, motion);
+    motionTracks.forEach((trackConfig) => {
+      collectTrackPlugins(trackConfig);
+      trackConfigsMap.set(trackConfig.id, trackConfig);
+    });
   }
 
   for (const trackConfig of rawTracks) {
-    const track = await createTrack(trackConfig, templates);
-    tracksMap.set(track.id, track);
+    collectTrackPlugins(trackConfig);
+    trackConfigsMap.set(trackConfig.id, trackConfig);
+  }
+
+  for (const plugin of pluginsToLoad) {
+    await ensureLoaded(plugin);
   }
 
   return {
     templates,
-    motions: motionsMap,
-    tracks: tracksMap,
-    getMotion: (id) => motionsMap.get(id),
-    getTrack: (id) => tracksMap.get(id),
+    motionConfigs: motionConfigsMap,
+    trackConfigs: trackConfigsMap,
+    getMotionConfig: (id) => motionConfigsMap.get(id),
+    getTrackConfig: (id) => trackConfigsMap.get(id),
+    getMotion: (id) => motionConfigsMap.get(id),
+    getTrack: (id) => trackConfigsMap.get(id),
   };
 }

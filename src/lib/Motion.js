@@ -11,10 +11,16 @@ export class TrackGroup {
 
   mount(track, position) {
     track._mount(this);
-    const tween = gsap.to(track, { progress: 1, ease: 'none' });
+    const tween = gsap.to(track, {
+      progress: 1,
+      ease: 'none',
+      duration: track.duration || 0,
+      paused: false,
+    });
     this.#proxies.set(track.id, tween);
     this.#tracks.set(track.id, track);
     this.#masterTimeline.add(tween, position);
+    this.#masterTimeline.render(this.#masterTimeline.time(), true, true);
   }
 
   unmount(track) {
@@ -26,6 +32,7 @@ export class TrackGroup {
     }
     this.#tracks.delete(track.id);
     track._unmount();
+    this.#masterTimeline.render(this.#masterTimeline.time(), true, true);
   }
 
   getTrack(trackId) {
@@ -33,7 +40,7 @@ export class TrackGroup {
   }
 
   _mountChild(child, spawnOffset) {
-    this.mount(child, `>${spawnOffset}`);
+    this.mount(child, spawnOffset);
   }
 
   _unmountChild(child) {
@@ -60,12 +67,9 @@ export class Motion {
   #initialTracks = [];
   #masterTimeline;
 
-  constructor({ id, triggerDelegate, lazy = false }, deps = {}) {
+  constructor({ id, triggerDelegate }) {
     this.id = id;
     this.trigger = triggerDelegate;
-    if (!lazy) {
-      this.init(deps.resolveElement ?? (() => null));
-    }
   }
 
   init(resolveElement) {
@@ -78,14 +82,9 @@ export class Motion {
     for (const { track, position } of this.#initialTracks) {
       this.#group.mount(track, position);
     }
-    if (this.#masterTimeline.scrollTrigger) {
-      this.#masterTimeline.scrollTrigger.refresh();
-      this.#masterTimeline.scrollTrigger.update();
-    }
   }
 
   mount(track, position) {
-    // Keep track in initial tracks configuration if not already present
     if (!this.#initialTracks.some((t) => t.track.id === track.id)) {
       this.#initialTracks.push({ track, position });
     }

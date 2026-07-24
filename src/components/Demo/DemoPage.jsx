@@ -226,7 +226,7 @@ function CarouselCard({ track: cardTrack, cardData, onRemove }) {
   const handleClick = useCallback(() => {
     if (activeTrack !== cardTrack) return; // already exiting
 
-    createTrack({
+    const exitTrack = createTrack({
       id: `exit-${cardData.id}`,
       keyframes: {
         scale: {
@@ -243,17 +243,17 @@ function CarouselCard({ track: cardTrack, cardData, onRemove }) {
         }
       },
       duration: 0.4
-    }).then(exitTrack => {
-      setActiveTrack(exitTrack);
-      gsap.to(exitTrack, {
-        progress: 1,
-        duration: 0.4,
-        ease: 'none',
-        onComplete: () => {
-          exitTrack.destroy();
-          onRemove(cardData.id, cardTrack);
-        }
-      });
+    });
+
+    setActiveTrack(exitTrack);
+    gsap.to(exitTrack, {
+      progress: 1,
+      duration: 0.4,
+      ease: 'none',
+      onComplete: () => {
+        exitTrack.destroy();
+        onRemove(cardData.id, cardTrack);
+      }
     });
   }, [activeTrack, cardTrack, cardData.id, onRemove]);
 
@@ -381,7 +381,7 @@ function CarouselDemo({ instance }) {
     }
   }, [instance]);
 
-  // Create a child Track per card (async), add to parent via Track.addChild
+  // Create a child Track per card and add to parent via Track.addChild
   useEffect(() => {
     const parentTrack = parentTrackRef.current;
     if (!parentTrack) return;
@@ -390,27 +390,14 @@ function CarouselDemo({ instance }) {
     const missingCards = cards.filter(c => !map.has(c.id));
     if (missingCards.length === 0) return;
 
-    let cancelled = false;
     const trackCfg = dynamicCarouselScene.tracks[0];
-    Promise.all(
-      missingCards.map(card =>
-        createTrack({ id: `carousel-child-${card.id}`, keyframes: trackCfg.keyframes })
-          .then(track => ({ cardId: card.id, track }))
-      )
-    ).then(results => {
-      if (cancelled) return;
-      for (const { cardId, track } of results) {
-        if (!map.has(cardId)) {
-          parentTrack.addChild(track, { stagger: dynamicCarouselScene.stagger });
-          map.set(cardId, track);
-        }
-      }
-      setTrackVersion(v => v + 1);
-    });
-
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, instance, trackVersion === 0 ? instance : null]);
+    for (const card of missingCards) {
+      const track = createTrack({ id: `carousel-child-${card.id}`, keyframes: trackCfg.keyframes });
+      parentTrack.addChild(track, { stagger: dynamicCarouselScene.stagger });
+      map.set(card.id, track);
+    }
+    setTrackVersion(v => v + 1);
+  }, [cards, instance]);
 
   const handleRemoveCard = useCallback((cardId, childTrack) => {
     const parentTrack = parentTrackRef.current;
@@ -492,21 +479,14 @@ function HelixDemo({ instance }) {
     const parentTrack = instance.getTrack('helix-card-track');
     if (!parentTrack) return;
 
-    let cancelled = false;
     const helixCards = MOCK_CARDS.slice(0, 6);
     const trackCfg = dynamicHelixScene.tracks[0];
-    Promise.all(
-      helixCards.map((_, i) =>
-        createTrack({ id: `helix-child-${i}`, keyframes: trackCfg.keyframes })
-      )
-    ).then(tracks => {
-      if (cancelled) return;
-      childTracksRef.current = tracks;
-      tracks.forEach(track => parentTrack.addChild(track, { stagger: dynamicHelixScene.stagger }));
-      setHelixTracksReady(true);
-    });
-
-    return () => { cancelled = true; };
+    const tracks = helixCards.map((_, i) =>
+      createTrack({ id: `helix-child-${i}`, keyframes: trackCfg.keyframes })
+    );
+    childTracksRef.current = tracks;
+    tracks.forEach(track => parentTrack.addChild(track, { stagger: dynamicHelixScene.stagger }));
+    setHelixTracksReady(true);
   }, [instance]);
 
   return (

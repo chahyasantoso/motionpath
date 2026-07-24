@@ -70,6 +70,10 @@ export class Track {
     return this.#parent;
   }
 
+  get duration() {
+    return this.#interpolationTimeline?.duration() ?? 0;
+  }
+
   /**
    * Primary playhead accessor.
    * - No args: returns current progress (0..1).

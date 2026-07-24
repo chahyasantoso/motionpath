@@ -65,7 +65,7 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     if (!current) return;
     if (current.status === 'exiting') return;
 
-    createTrack({
+    const exitTrack = createTrack({
       id: `exit-${ballId}`,
       keyframes: {
         scale:   { stops: [{ p: 0, v: 1 }, { p: 0.35, v: 1.7 }, { p: 1, v: 0 }] },
@@ -78,31 +78,30 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
         }
       },
       duration: 0.35
-    }).then(exitTrack => {
-      updateBallVm(ballId, {
-        activeTrack: exitTrack,
-        status: 'exiting',
-        isClickable: false,
-      });
+    });
+    updateBallVm(ballId, {
+      activeTrack: exitTrack,
+      status: 'exiting',
+      isClickable: false,
+    });
 
-      gsap.to(exitTrack, {
-        progress: 1,
-        duration: 0.35,
-        ease: 'none',
-        onComplete: () => {
-          exitTrack.destroy();
-          const latest = getBallVm(ballId);
-          if (!latest) return;
+    gsap.to(exitTrack, {
+      progress: 1,
+      duration: 0.35,
+      ease: 'none',
+      onComplete: () => {
+        exitTrack.destroy();
+        const latest = getBallVm(ballId);
+        if (!latest) return;
 
-          const parentTrack = containerInstance?.getTrack('keepalive');
-          const aliveAfter = parentTrack ? parentTrack.children.length - 1 : 0;
-          const willRespawn = spawnedCountRef.current >= 30 && aliveAfter === 0;
-          console.log(`[wave] remove ball #${ballId} | alive after: ${aliveAfter} | wave respawn: ${willRespawn}`);
+        const parentTrack = containerInstance?.getTrack('keepalive');
+        const aliveAfter = parentTrack ? parentTrack.children.length - 1 : 0;
+        const willRespawn = spawnedCountRef.current >= 30 && aliveAfter === 0;
+        console.log(`[wave] remove ball #${ballId} | alive after: ${aliveAfter} | wave respawn: ${willRespawn}`);
 
-          parentTrack?.removeChild(latest.baseTrack.id);
-          removeBallVm(ballId);
-        }
-      });
+        parentTrack?.removeChild(latest.baseTrack.id);
+        removeBallVm(ballId);
+      }
     });
   }, [containerInstance, getBallVm, removeBallVm, updateBallVm]);
 
@@ -110,7 +109,7 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     const current = getBallVm(ballId);
     if (!current) return;
 
-    createTrack({
+    const entranceTrack = createTrack({
       id: `entrance-${ballId}`,
       keyframes: {
         scale:   { stops: [{ p: 0, v: 1 }, { p: 0.35, v: 1.7 }, { p: 1, v: 1 }] },
@@ -123,29 +122,28 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
         }
       },
       duration: 0.35
-    }).then(entranceTrack => {
-      updateBallVm(ballId, {
-        activeTrack: entranceTrack,
-        status: 'spawning',
-        isClickable: false,
-      });
+    });
+    updateBallVm(ballId, {
+      activeTrack: entranceTrack,
+      status: 'spawning',
+      isClickable: false,
+    });
 
-      gsap.to(entranceTrack, {
-        progress: 1,
-        duration: 0.35,
-        ease: 'none',
-        onComplete: () => {
-          entranceTrack.destroy();
-          const latest = getBallVm(ballId);
-          if (!latest) return;
+    gsap.to(entranceTrack, {
+      progress: 1,
+      duration: 0.35,
+      ease: 'none',
+      onComplete: () => {
+        entranceTrack.destroy();
+        const latest = getBallVm(ballId);
+        if (!latest) return;
 
-          updateBallVm(ballId, {
-            activeTrack: latest.baseTrack,
-            status: 'active',
-            isClickable: true,
-          });
-        }
-      });
+        updateBallVm(ballId, {
+          activeTrack: latest.baseTrack,
+          status: 'active',
+          isClickable: true,
+        });
+      }
     });
   }, [getBallVm, updateBallVm]);
 
@@ -157,7 +155,7 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     const id = ++ballCounterRef.current;
     const color = BALL_COLORS[id % BALL_COLORS.length];
 
-    createTrack({
+    const baseTrack = createTrack({
       id: `ball-track-${id}`,
       keyframes: {
         path: {
@@ -180,28 +178,27 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
         }
       },
       duration: BALL_TRAVEL_SECONDS
-    }).then(baseTrack => {
-      console.log(`[wave] spawn ball #${id} | spawned total: ${spawnedCountRef.current + 1} | alive: ${parentTrack.children.length + 1}`);
+    });
+    console.log(`[wave] spawn ball #${id} | spawned total: ${spawnedCountRef.current + 1} | alive: ${parentTrack.children.length + 1}`);
 
-      const vm = createBallVm({ id, color, baseTrack });
-      vm.onClick = () => startExit(id);
+    const vm = createBallVm({ id, color, baseTrack });
+    vm.onClick = () => startExit(id);
 
-      // Sync ref mirror synchronously so startEntrance can find it immediately
-      ballVmsRef.current = [...ballVmsRef.current, vm];
-      setBallVms(ballVmsRef.current);
+    // Sync ref mirror synchronously so startEntrance can find it immediately
+    ballVmsRef.current = [...ballVmsRef.current, vm];
+    setBallVms(ballVmsRef.current);
 
-      parentTrack.addChild(baseTrack, { stagger: SPAWN_INTERVAL_MS / 1000 });
-      startEntrance(id);
+    parentTrack.addChild(baseTrack, { stagger: SPAWN_INTERVAL_MS / 1000 });
+    startEntrance(id);
 
-      const unsub = baseTrack.subscribe((snapshot) => {
-        if (snapshot.progress >= 1) {
-          unsub();
-          const current = getBallVm(id);
-          if (current && current.status === 'active') {
-            startExit(id);
-          }
+    const unsub = baseTrack.subscribe((snapshot) => {
+      if (snapshot.progress >= 1) {
+        unsub();
+        const current = getBallVm(id);
+        if (current && current.status === 'active') {
+          startExit(id);
         }
-      });
+      }
     });
   }, [containerInstance, startEntrance, startExit, getBallVm]);
 

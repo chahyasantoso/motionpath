@@ -40,8 +40,8 @@ describe('parseV4Project', () => {
     expect(track).toBeDefined();
     expect(bareTrack).toBeDefined();
 
-    expect(track.isMounted).toBe(true);
-    expect(bareTrack.isMounted).toBe(false);
+    expect(track.id).toBe('hero-bg');
+    expect(bareTrack.id).toBe('bare-track');
   });
 
   it('should support custom trigger delegates registered via registerTriggerDelegate', async () => {
