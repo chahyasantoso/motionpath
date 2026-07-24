@@ -1,0 +1,27 @@
+--- a/src/engines/Engine.js
++++ b/src/engines/Engine.js
+@@ -38,10 +38,7 @@ export class Engine {
+       }
+ 
+       const delegate = factory(motionConfig.trigger);
+-      const motion = new Motion(
+-        { id: motionConfig.id, triggerDelegate: delegate },
+-        { resolveElement: (id) => this.resolveElement(id) }
+-      );
++      const motion = new Motion({ id: motionConfig.id, triggerDelegate: delegate });
+ 
+       const stagger = typeof motionConfig.stagger === 'number' ? motionConfig.stagger : 0;
+       const motionTracks = motionConfig.tracks || [];
+@@ -51,6 +48,12 @@ export class Engine {
+         motion.mount(track, i * stagger);
+       }
+ 
++      // Lazy instancing step 2: init() builds the GSAP timeline + ScrollTrigger
++      // and flushes all queued #initialTracks into the live group.
++      // Must be called AFTER mount() so tracks are in #initialTracks,
++      // and AFTER useMotionTrigger() has registered DOM refs so resolveElement works.
++      motion.init((id) => this.resolveElement(id));
++
+       this.#instances.set(motion.id, motion);
+       return motion;
+     }
