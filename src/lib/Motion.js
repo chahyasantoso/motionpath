@@ -4,9 +4,11 @@ export class TrackGroup {
   #masterTimeline;
   #proxies = new Map();
   #tracks = new Map();
+  #staggerTransition;
 
-  constructor(masterTimeline) {
+  constructor(masterTimeline, staggerTransition = {}) {
     this.#masterTimeline = masterTimeline;
+    this.#staggerTransition = staggerTransition;
   }
 
   mount(track, position) {
@@ -39,6 +41,52 @@ export class TrackGroup {
     return this.#tracks.get(trackId);
   }
 
+  // Repositions an ALREADY-mounted child's tween on the master timeline
+  // (e.g. after a sibling removal triggers a reflow). Does not create a new
+  // tween or re-run track._mount().
+  //
+  // transition = { duration, ease } from the motion's schema-level
+  // staggerTransition config. Zero/omitted duration: instant reposition
+  // (gsap.timeline.add() on an already-mounted tween just moves it) plus a
+  // forced re-render. Nonzero duration: animate the tween's own startTime
+  // property toward newPosition — mirrors v3's
+  // `gsap.to(child.timeline, { startTime: delay, duration, ease })` pattern,
+  // adapted to v4's plain-Tween shape (startTime() is a getter/setter on
+  // GSAP's Animation base class, so it works the same on a Tween as it did
+  // on v3's nested child Timeline). Each tick force-renders the master so
+  // the sibling visibly slides rather than snapping.
+  // transition is TrackGroup's own staggerTransition (from the motion's
+  // schema config, passed in at construction). Zero/omitted duration:
+  // instant reposition (gsap.timeline.add() on an already-mounted tween just
+  // moves it) plus a forced re-render. Nonzero duration: animate the tween's
+  // own startTime property toward newPosition — mirrors v3's
+  // `gsap.to(child.timeline, { startTime: delay, duration, ease })` pattern,
+  // adapted to v4's plain-Tween shape (startTime() is a getter/setter on
+  // GSAP's Animation base class, so it works the same on a Tween as it did
+  // on v3's nested child Timeline). Each tick force-renders the master so
+  // the sibling visibly slides rather than snapping.
+  _reflowChild(track, newPosition) {
+    const tween = this.#proxies.get(track.id);
+    if (!tween) return;
+
+    const duration = this.#staggerTransition.duration ?? 0;
+    if (duration <= 0) {
+      this.#masterTimeline.add(tween, newPosition);
+      this.#masterTimeline.render(this.#masterTimeline.time(), true, true);
+      return;
+    }
+
+    const ease = this.#staggerTransition.ease ?? 'power2.out';
+    gsap.to(tween, {
+      startTime: newPosition,
+      duration,
+      ease,
+      onUpdate: () => {
+        this.#masterTimeline.render(this.#masterTimeline.time(), true, true);
+      },
+    });
+  }
+
   _mountChild(child, spawnOffset) {
     this.mount(child, spawnOffset);
   }
@@ -66,10 +114,12 @@ export class Motion {
   #active = false;
   #initialTracks = [];
   #masterTimeline;
+  #staggerTransition;
 
-  constructor({ id, triggerDelegate }) {
+  constructor({ id, triggerDelegate, staggerTransition }) {
     this.id = id;
     this.trigger = triggerDelegate;
+    this.#staggerTransition = staggerTransition ?? {};
   }
 
   init(resolveElement) {
@@ -78,7 +128,7 @@ export class Motion {
     }
     this.#active = true;
     this.#masterTimeline = this.trigger.build(resolveElement);
-    this.#group = new TrackGroup(this.#masterTimeline);
+    this.#group = new TrackGroup(this.#masterTimeline, this.#staggerTransition);
     for (const { track, position } of this.#initialTracks) {
       this.#group.mount(track, position);
     }
@@ -110,6 +160,12 @@ export class Motion {
     }
     const found = this.#initialTracks.find((t) => t.track.id === trackId);
     return found ? found.track : null;
+  }
+
+  _reflowChild(child, newPosition) {
+    if (this.#active) {
+      this.#group._reflowChild(child, newPosition);
+    }
   }
 
   _mountChild(child, spawnOffset) {

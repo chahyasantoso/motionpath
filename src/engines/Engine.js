@@ -38,7 +38,11 @@ export class Engine {
       }
 
       const delegate = factory(motionConfig.trigger);
-      const motion = new Motion({ id: motionConfig.id, triggerDelegate: delegate });
+      const motion = new Motion({
+        id: motionConfig.id,
+        triggerDelegate: delegate,
+        staggerTransition: motionConfig.staggerTransition,
+      });
 
       const stagger = typeof motionConfig.stagger === 'number' ? motionConfig.stagger : 0;
       const motionTracks = motionConfig.tracks || [];

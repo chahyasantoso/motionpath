@@ -239,7 +239,7 @@ export class Track {
     this.#children.delete(id);
     child.#parent = null;
 
-    // why is this here??
+    // Take the removed child's own tween off the master timeline.
     if (this.#host) {
       this.#host._unmountChild(child);
     }
@@ -247,6 +247,12 @@ export class Track {
     const targets = this.#layoutDelegate.computeReflow(siblingsBeforeRemove, child, {});
     for (const target of targets) {
       target.child.#currentOffset = target.offset;
+      // Reposition each reflowed sibling's ALREADY-mounted tween on the master
+      // timeline to its new offset — updating #currentOffset alone is just
+      // bookkeeping for future spawn placement, it has no visual effect on its own.
+      if (this.#host) {
+        this.#host._reflowChild(target.child, target.offset);
+      }
     }
 
     eventBus.emit('child:removing', { id: child.id, parentId: this.#id });
