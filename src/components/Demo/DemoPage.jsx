@@ -372,19 +372,16 @@ function CarouselDemo({ instance }) {
   // cardId -> child Track (v4: one Track per card, added to parent track)
   const childTracksMapRef = useRef(new Map());
   const parentTrackRef = useRef(null);
-  const [trackVersion, setTrackVersion] = React.useState(0);
-
-  // Get the parent carousel track once the motion is mounted
+  // Single effect: resolve parent track and create missing child tracks together.
+  // Previously split across two effects which caused a ref-read race — the second
+  // effect read parentTrackRef.current before the first effect had written it,
+  // so initial cards got no tracks. Collapsed into one effect so instance.getTrack()
+  // is called directly, guaranteed in the same flush.
   useEffect(() => {
-    if (instance) {
-      parentTrackRef.current = instance.getTrack('carousel-card-track');
-    }
-  }, [instance]);
-
-  // Create a child Track per card and add to parent via Track.addChild
-  useEffect(() => {
-    const parentTrack = parentTrackRef.current;
+    if (!instance) return;
+    const parentTrack = instance.getTrack('carousel-card-track');
     if (!parentTrack) return;
+    parentTrackRef.current = parentTrack;
 
     const map = childTracksMapRef.current;
     const missingCards = cards.filter(c => !map.has(c.id));
@@ -396,7 +393,6 @@ function CarouselDemo({ instance }) {
       parentTrack.addChild(track, { stagger: dynamicCarouselScene.stagger });
       map.set(card.id, track);
     }
-    setTrackVersion(v => v + 1);
   }, [cards, instance]);
 
   const handleRemoveCard = useCallback((cardId, childTrack) => {

@@ -78,6 +78,7 @@ export function buildTrackTween(trackId, keyframes, duration, trackConfig) {
     keyframes: sharedKeyframes,
     ...sharedTweenVars,
     duration: duration,
+    paused: true,
   });
 
   return { proxy, tween, resolvedPlugins };
