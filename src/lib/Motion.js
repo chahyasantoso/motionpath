@@ -82,6 +82,10 @@ export class Motion {
     for (const { track, position } of this.#initialTracks) {
       this.#group.mount(track, position);
     }
+    // Force master timeline to span exactly [0, 1] so that progress-fraction
+    // positions (stagger offsets from GaplessLayoutDelegate) map correctly to
+    // timeline percentages — mirrors v3's tl.addLabel('end', 1) pattern.
+    this.#masterTimeline.addLabel('end', 1);
   }
 
   mount(track, position) {
