@@ -122,12 +122,12 @@ export class Motion {
     this.#staggerTransition = staggerTransition ?? {};
   }
 
-  init(resolveElement) {
+  init() {
     if (this.#active) {
       this.destroy();
     }
     this.#active = true;
-    this.#masterTimeline = this.trigger.build(resolveElement);
+    this.#masterTimeline = this.trigger.build();
     this.#group = new TrackGroup(this.#masterTimeline, this.#staggerTransition);
     for (const { track, position } of this.#initialTracks) {
       this.#group.mount(track, position);
@@ -160,24 +160,6 @@ export class Motion {
     }
     const found = this.#initialTracks.find((t) => t.track.id === trackId);
     return found ? found.track : null;
-  }
-
-  _reflowChild(child, newPosition) {
-    if (this.#active) {
-      this.#group._reflowChild(child, newPosition);
-    }
-  }
-
-  _mountChild(child, spawnOffset) {
-    if (this.#active) {
-      this.#group._mountChild(child, spawnOffset);
-    }
-  }
-
-  _unmountChild(child) {
-    if (this.#active) {
-      this.#group._unmountChild(child);
-    }
   }
 
   play() {

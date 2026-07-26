@@ -232,4 +232,34 @@ describe('useMotionSubscribers', () => {
     expect(fn2).toHaveBeenCalled();
     expect(gsap.set).toHaveBeenLastCalledWith(mockRef.current, { scale: 2 });
   });
+
+  it('should not resubscribe when anchor changes but should apply the latest anchor.offset on ticks', () => {
+    const mockRef = { current: document.createElement('div') };
+    mockInstances[0].compose.mockReturnValue({ x: 100, y: 50 });
+
+    const { rerender } = renderHook(
+      ({ anchor }) => useMotionSubscribers([
+        { instance: mockInstances[0], trackId: 'track-0', anchor }
+      ], mockRef),
+      {
+        initialProps: { anchor: { offset: { x: 10, y: 0 } } }
+      }
+    );
+
+    expect(mockInstances[0].subscribe).toHaveBeenCalledTimes(1);
+
+    // First tick uses the initial anchor offset: x = 100 + 10.
+    mockCallbacks['inst-0::track-0']({});
+    expect(gsap.set).toHaveBeenLastCalledWith(mockRef.current, { x: 110, y: 50 });
+
+    // Change ONLY the anchor (same instance/trackId, so no signature change).
+    rerender({ anchor: { offset: { x: -25, y: 5 } } });
+
+    // Must NOT resubscribe — anchor is not part of the sources signature.
+    expect(mockInstances[0].subscribe).toHaveBeenCalledTimes(1);
+
+    // Next tick must reflect the NEW anchor offset, not the stale one: x = 100 - 25.
+    mockCallbacks['inst-0::track-0']({});
+    expect(gsap.set).toHaveBeenLastCalledWith(mockRef.current, { x: 75, y: 55 });
+  });
 });

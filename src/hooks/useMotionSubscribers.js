@@ -10,7 +10,7 @@ function sourcesSignature(sources) {
   }).join('|');
 }
 
-function subscribeToSource(source, getTransformFn, onPatch) {
+function subscribeToSource(source, getTransformFn, getAnchor, onPatch) {
   let targetTrack = source.track;
 
   if (!targetTrack && source.instance && source.trackId) {
@@ -26,7 +26,7 @@ function subscribeToSource(source, getTransformFn, onPatch) {
       const basePatch = typeof transformFn === 'function'
         ? transformFn(raw, (data) => targetTrack.compose(data))
         : targetTrack.compose(raw);
-      const patch = applyAnchor(basePatch, source.anchor);
+      const patch = applyAnchor(basePatch, getAnchor());
       onPatch(patch);
     });
   }
@@ -41,7 +41,7 @@ function subscribeToSource(source, getTransformFn, onPatch) {
       const basePatch = typeof transformFn === 'function'
         ? transformFn(rawData, composeFn)
         : composeFn(rawData);
-      const patch = applyAnchor(basePatch, source.anchor);
+      const patch = applyAnchor(basePatch, getAnchor());
       onPatch(patch);
     });
   }
@@ -56,6 +56,13 @@ function subscribeToSource(source, getTransformFn, onPatch) {
 export default function useMotionSubscribers(sources, ref, mergeFn) {
   const transformFnsRef = useRef([]);
   transformFnsRef.current = sources.map(s => s.transformFn);
+
+  // Mirror anchors live, same as transformFn — so an anchor (e.g. an animated
+  // anchor.offset pivot/hinge) can change WITHOUT a resubscription. anchor is
+  // deliberately NOT part of sourcesSignature; reading it live is what keeps a
+  // dynamic anchor.offset from being silently frozen on the stable source.
+  const anchorsRef = useRef([]);
+  anchorsRef.current = sources.map(s => s.anchor);
 
   const mergeFnRef = useRef(mergeFn);
   mergeFnRef.current = mergeFn;
@@ -84,6 +91,7 @@ export default function useMotionSubscribers(sources, ref, mergeFn) {
       subscribeToSource(
         source,
         () => transformFnsRef.current[i],
+        () => anchorsRef.current[i],
         (patch) => {
           latestPatches[i] = patch;
           applyMerged();

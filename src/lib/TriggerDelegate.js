@@ -42,11 +42,10 @@ export class ScrollTriggerDelegate {
     this.#config = config;
   }
 
-  build(resolveElement) {
-    const triggerRef = this.#config.trigger ?? this.#config.startTrigger ?? this.#config.sectionId;
-    const triggerEl = typeof triggerRef === 'string' ? resolveElement(triggerRef) : triggerRef;
-    const pinEl = typeof this.#config.pin === 'string' ? resolveElement(this.#config.pin) : this.#config.pin;
-    const endTriggerEl = typeof this.#config.endTrigger === 'string' ? resolveElement(this.#config.endTrigger) : this.#config.endTrigger;
+  build() {
+    const triggerEl = this.#config.trigger;
+    const pinEl = this.#config.pin === true ? triggerEl : this.#config.pin;
+    const endTriggerEl = this.#config.endTrigger;
 
     const scrollTriggerObj = {
       start: this.#config.start,

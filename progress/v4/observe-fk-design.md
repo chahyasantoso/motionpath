@@ -249,24 +249,37 @@ hand.setObserved(forearm,      asParent);
   *before* `composePatch` runs (or a frame-scoped field the next `compose()` reads). That's a real
   structural change to `compose()`, not just a new plugin — hence "future work with its own brief."
 
-### The anchor connection (why Option 2 wants offset anchors)
+### The anchor connection
 
 Today `anchor` is `{xPercent, yPercent}` — a **self-relative** visual centering applied at the
 render layer, *after* `compose()` (`applyAnchor` in `helpers.js`). It cannot propagate through
 folds because it lives post-compose.
 
-Two upgrades, kept separate on purpose:
+There are two distinct offset ideas here. They live at **different layers**, do **different
+geometry**, and must **not share the `anchor.offset` field** — overloading one field with a
+render-space meaning and a parent-space meaning double-applies the offset for any joint that uses
+both. Decision: **(a) is the anchor feature; (b) is not.**
 
-- **(a) Local pixel-offset anchor → pivot/hinge.** Lets rotation happen around a displaced point
-  (a hinge, a pendulum pivot, an off-center grip). Useful *today*, at the render layer, with zero
-  FK dependency. Safe to ship independently.
-- **(b) Parent-frame offset anchor → the FK bone vector.** In `composeWorld`, `local.x = boneLength`
-  *is* an attachment offset in the parent's frame. If `anchor.offset` carried it, a joint could
-  **declare** its attachment (`forearm.anchor = { offset: { x: 80, y: 0 } }`) and FK wiring goes
-  fully declarative — one generic `asParent` fold reads `.anchor`. But this only works once the
-  offset lives **inside `compose()`** (so it accumulates up-chain), which is exactly the reorder
-  Option 2 needs. So **(b) lands with Option 2, not before** — doing it earlier strands the offset
-  at the render layer where it can't propagate.
+- **(a) Local pixel-offset anchor → pivot/hinge. SHIP NOW, on `anchor.offset`.**
+  A render-layer nudge: `finalX = composedX + offset.x`, applied once, post-compose, in the
+  element's own screen space (`applyAnchor`). Lets rotation happen around a displaced point — a
+  hinge, a pendulum pivot, a clock hand, an off-center grip. Zero FK dependency, no `compose()`
+  reorder needed. This is the *only* meaning `anchor.offset` carries. Implemented in the
+  FK-plugin brief, Step 5.
+
+- **(b) Declarative bone rest-offset → the FK bone vector. DEFER, and NOT on `anchor.offset`.**
+  In `composeWorld`, `local.x = boneLength` already *is* the attachment offset in the parent's
+  frame — `fkPlugin` consumes it today as an animatable `boneLength` key. So (b) is not a new
+  capability; it only buys *ergonomics for fixed-length bones*: letting a joint declare a static
+  rest offset instead of writing a 1-stop `boneLength` keyframe. That value is small and
+  conditional (needs Option 2's reorder shipped, needs non-animating bone length, needs you to
+  actually want it declarative).
+
+  When/if (b) is built, give it its **own field in the plugin's domain** (e.g. a `restOffset`
+  the `fkPlugin` reads, or just keep using `boneLength`) — **never** `anchor.offset`. That keeps
+  the render-layer field (a) and the compose-layer field (b) from ever colliding, and it means
+  (b) doesn't depend on the anchor system at all: it degenerates to "make `boneLength` optionally
+  static," a much smaller change than routing it through `anchor`.
 
 ---
 

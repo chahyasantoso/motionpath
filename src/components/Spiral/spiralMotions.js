@@ -46,7 +46,7 @@ export function createSpiralBallScene({ spiralPathPoints, ballTravelSeconds, bal
 
 export function createSpiralTransitionScene({ ballSize }) {
   return {
-    id: 'ball-exit',
+    id: 'ball-exit', //should change this to ball-transitions
     trigger: { type: 'time', autoplay: false, duration: 0.35 },
     tracks: [{
       id: 'ball-exit-track',

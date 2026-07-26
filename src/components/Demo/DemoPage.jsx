@@ -1,15 +1,14 @@
+import { gsap } from 'gsap';
 import React, { useCallback, useEffect, useRef } from 'react';
-import { engine } from '../../engines/Engine.js';
-import { createTrack } from '../../lib/createTrack.js';
 import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
-import useMotionSubscribers from '../../hooks/useMotionSubscribers';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
+import useMotionSubscribers from '../../hooks/useMotionSubscribers';
 import useMotionTrigger from '../../hooks/useMotionTrigger';
 import useSmoothScroll from '../../hooks/useSmoothScroll';
+import { createTrack } from '../../lib/createTrack.js';
 import { buildMotionPath } from '../../utils/pathUtils';
 import { project3DTo2D, projectPathNodes3DTo2D, shapeGenerators } from '../../utils/projection3d';
-import { gsap } from 'gsap';
 import './DemoPage.css';
 
 // Prevent editor auto-cleanup from removing unused React import
@@ -193,14 +192,49 @@ function Cloud({ instance }) {
   return <div ref={ref} className="element cloud">☁️</div>;
 }
 
+// Owns one child Track's full lifecycle: creates it on mount (once parentTrack
+// is available), tears it down on unmount. Lives in an effect, never in render
+// — addChild/removeChild mutate the master timeline and are not safe to call
+// from a render body, even idempotently (see design discussion: React may call
+// a render function speculatively and discard the result without committing,
+// which an external GSAP mutation can't be rolled back from).
+//
+// Called once per <CarouselCard>/<HelixCard> instance, unconditionally — never
+// in a loop — so each card's own hook-call-order stays consistent across its
+// own renders, satisfying the Rules of Hooks. React's own key-based list
+// reconciliation is what handles "is this card new / is this card gone," the
+// same way useMotionInstance already relies on effect mount/cleanup per page
+// section; this is that same pattern applied per list item.
+function useChildTrack(parentTrack, trackId, keyframes, stagger) {
+  const [track, setTrack] = React.useState(null);
+
+  useEffect(() => {
+    if (!parentTrack) return undefined;
+
+    const childTrack = createTrack({ id: trackId, keyframes });
+    parentTrack.addChild(childTrack, { stagger });
+    setTrack(childTrack);
+
+    return () => {
+      parentTrack.removeChild(trackId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parentTrack, trackId]);
+
+  return track;
+}
+
 // CarouselCard receives its own child Track (v4: Track.addChild per card)
-function CarouselCard({ track: cardTrack, cardData, onRemove }) {
+function CarouselCard({ parentTrack, cardData, trackCfg, stagger, onRemove }) {
   const ref = useRef(null);
-  const [activeTrack, setActiveTrack] = React.useState(cardTrack);
+  const cardTrackId = `carousel-child-${cardData.id}`;
+  const cardTrack = useChildTrack(parentTrack, cardTrackId, trackCfg.keyframes, stagger);
+  const [exitTrack, setExitTrack] = React.useState(null);
+  const activeTrack = exitTrack ?? cardTrack;
 
   const transform = useCallback((rawData, composeFn) => {
     // Exit track: basic compose, no carousel logic
-    if (activeTrack !== cardTrack) {
+    if (exitTrack) {
       return composeFn(rawData);
     }
 
@@ -219,14 +253,14 @@ function CarouselCard({ track: cardTrack, cardData, onRemove }) {
       scale,
       rotateY: targetTilt * -0.6,
     };
-  }, [activeTrack, cardTrack]);
+  }, [exitTrack]);
 
-  useMotionSubscribers([{ track: activeTrack, transformFn: transform }], ref);
+  useMotionSubscribers(activeTrack ? [{ track: activeTrack, transformFn: transform }] : [], ref);
 
   const handleClick = useCallback(() => {
-    if (activeTrack !== cardTrack) return; // already exiting
+    if (exitTrack || !cardTrack) return; // already exiting, or not ready yet
 
-    const exitTrack = createTrack({
+    const newExitTrack = createTrack({
       id: `exit-${cardData.id}`,
       keyframes: {
         scale: {
@@ -245,17 +279,22 @@ function CarouselCard({ track: cardTrack, cardData, onRemove }) {
       duration: 0.4
     });
 
-    setActiveTrack(exitTrack);
-    gsap.to(exitTrack, {
+    setExitTrack(newExitTrack);
+    gsap.to(newExitTrack, {
       progress: 1,
       duration: 0.4,
       ease: 'none',
       onComplete: () => {
-        exitTrack.destroy();
-        onRemove(cardData.id, cardTrack);
+        newExitTrack.destroy();
+        // Parent only needs to drop this card from state now — removeChild for
+        // cardTrack itself fires from useChildTrack's own cleanup, triggered by
+        // this component unmounting as a result of that state change.
+        onRemove(cardData.id);
       }
     });
-  }, [activeTrack, cardTrack, cardData.id, onRemove]);
+  }, [exitTrack, cardTrack, cardData.id, onRemove]);
+
+  if (!cardTrack) return null;
 
   return (
     <div ref={ref} className="element carousel-card" onClick={handleClick} style={{ cursor: 'pointer' }}>
@@ -268,8 +307,9 @@ function CarouselCard({ track: cardTrack, cardData, onRemove }) {
 }
 
 // HelixCard receives its own child Track (v4: Track.addChild per card)
-function HelixCard({ track, cardData }) {
+function HelixCard({ parentTrack, cardData, trackCfg, stagger, trackId }) {
   const ref = useRef(null);
+  const track = useChildTrack(parentTrack, trackId, trackCfg.keyframes, stagger);
 
   const transform = useCallback((rawData, composeFn) => {
     const cardProgress = rawData.pathProgress ?? 0;
@@ -312,7 +352,9 @@ function HelixCard({ track, cardData }) {
     };
   }, []);
 
-  useMotionSubscribers([{ track, transformFn: transform }], ref);
+  useMotionSubscribers(track ? [{ track, transformFn: transform }] : [], ref);
+
+  if (!track) return null;
 
   return (
     <div ref={ref} className="element helix-card">
@@ -369,38 +411,15 @@ function CarouselDemo({ instance }) {
   useMotionTrigger('carousel-stage-pin', stageRef);
 
   const [cards, setCards] = React.useState(MOCK_CARDS);
-  // cardId -> child Track (v4: one Track per card, added to parent track)
-  const childTracksMapRef = useRef(new Map());
-  const parentTrackRef = useRef(null);
-  // Single effect: resolve parent track and create missing child tracks together.
-  // Previously split across two effects which caused a ref-read race — the second
-  // effect read parentTrackRef.current before the first effect had written it,
-  // so initial cards got no tracks. Collapsed into one effect so instance.getTrack()
-  // is called directly, guaranteed in the same flush.
-  useEffect(() => {
-    if (!instance) return;
-    const parentTrack = instance.getTrack('carousel-card-track');
-    if (!parentTrack) return;
-    parentTrackRef.current = parentTrack;
+  // Motion.getTrack is a pure read (no mounting/side effects) — safe to call
+  // directly in render, unlike addChild/removeChild. Each CarouselCard owns
+  // its own child track's lifecycle via useChildTrack; this component no
+  // longer needs to track "which cards have a track yet" itself at all —
+  // React's own key-based reconciliation on `cards` already is that check.
+  const parentTrack = instance?.getTrack('carousel-card-track') ?? null;
+  const trackCfg = dynamicCarouselScene.tracks[0];
 
-    const map = childTracksMapRef.current;
-    const missingCards = cards.filter(c => !map.has(c.id));
-    if (missingCards.length === 0) return;
-
-    const trackCfg = dynamicCarouselScene.tracks[0];
-    for (const card of missingCards) {
-      const track = createTrack({ id: `carousel-child-${card.id}`, keyframes: trackCfg.keyframes });
-      parentTrack.addChild(track, { stagger: dynamicCarouselScene.stagger });
-      map.set(card.id, track);
-    }
-  }, [cards, instance]);
-
-  const handleRemoveCard = useCallback((cardId, childTrack) => {
-    const parentTrack = parentTrackRef.current;
-    if (parentTrack && childTrack) {
-      parentTrack.removeChild(childTrack.id);
-    }
-    childTracksMapRef.current.delete(cardId);
+  const handleRemoveCard = useCallback((cardId) => {
     setCards(prev => prev.filter(c => c.id !== cardId));
   }, []);
 
@@ -421,18 +440,16 @@ function CarouselDemo({ instance }) {
         <p>Dynamic mock cards flowing smoothly on a single Bezier S-curve track with engine-level stagger. (Click any card to trigger schema-defined exit animation!)</p>
       </div>
       <div ref={stageRef} className="carousel-stage">
-        {cards.map(card => {
-          const childTrack = childTracksMapRef.current.get(card.id);
-          if (!childTrack) return null;
-          return (
-            <CarouselCard
-              key={card.id}
-              track={childTrack}
-              cardData={card}
-              onRemove={handleRemoveCard}
-            />
-          );
-        })}
+        {cards.map(card => (
+          <CarouselCard
+            key={card.id}
+            parentTrack={parentTrack}
+            cardData={card}
+            trackCfg={trackCfg}
+            stagger={dynamicCarouselScene.stagger}
+            onRemove={handleRemoveCard}
+          />
+        ))}
         <svg className="path-guide" width="100%" height="100%">
           <path
             d={buildMotionPath(dynamicCarouselScene.tracks[0].keyframes.path.points)}
@@ -466,24 +483,13 @@ function HelixDemo({ instance }) {
     cx, cy, tiltDeg, true
   );
 
-  // v4: one child Track per card, added to the parent helix track
-  const childTracksRef = useRef([]);
-  const [helixTracksReady, setHelixTracksReady] = React.useState(false);
-
-  useEffect(() => {
-    if (!instance) return;
-    const parentTrack = instance.getTrack('helix-card-track');
-    if (!parentTrack) return;
-
-    const helixCards = MOCK_CARDS.slice(0, 6);
-    const trackCfg = dynamicHelixScene.tracks[0];
-    const tracks = helixCards.map((_, i) =>
-      createTrack({ id: `helix-child-${i}`, keyframes: trackCfg.keyframes })
-    );
-    childTracksRef.current = tracks;
-    tracks.forEach(track => parentTrack.addChild(track, { stagger: dynamicHelixScene.stagger }));
-    setHelixTracksReady(true);
-  }, [instance]);
+  // Motion.getTrack is a pure read — safe directly in render. Each HelixCard
+  // owns its own child track's lifecycle via useChildTrack; no need to wait
+  // for "all tracks ready" before rendering any card — each becomes active
+  // independently as soon as its own effect creates its track.
+  const parentTrack = instance?.getTrack('helix-card-track') ?? null;
+  const trackCfg = dynamicHelixScene.tracks[0];
+  const helixCards = MOCK_CARDS.slice(0, 6);
 
   return (
     <section ref={containerRef} className="helix-scene">
@@ -519,17 +525,16 @@ function HelixDemo({ instance }) {
             stroke="rgba(255, 255, 255, 0.015)" strokeWidth="1" strokeDasharray="8 6" />
         </svg>
 
-        {helixTracksReady && MOCK_CARDS.slice(0, 6).map((card, i) => {
-          const childTrack = childTracksRef.current[i];
-          if (!childTrack) return null;
-          return (
-            <HelixCard
-              key={card.id}
-              track={childTrack}
-              cardData={card}
-            />
-          );
-        })}
+        {helixCards.map((card, i) => (
+          <HelixCard
+            key={card.id}
+            parentTrack={parentTrack}
+            cardData={card}
+            trackCfg={trackCfg}
+            stagger={dynamicHelixScene.stagger}
+            trackId={`helix-child-${i}`}
+          />
+        ))}
       </div>
     </section>
   );
