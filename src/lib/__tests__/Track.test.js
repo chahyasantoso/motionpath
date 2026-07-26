@@ -73,6 +73,36 @@ describe('Track (v4 first-class playhead owner)', () => {
     expect(() => parentB.addChild(child, { stagger: 0.1 })).toThrow(/already a child/);
   });
 
+  it('should throw when addChild is called with a NEW object sharing an existing child id', () => {
+    const parent = createDummyTrack('parent');
+    const childA = createDummyTrack('duplicate-id');
+    const childB = createDummyTrack('duplicate-id'); // different object, same id
+
+    parent.addChild(childA, { stagger: 0.1 });
+
+    expect(() => parent.addChild(childB, { stagger: 0.1 })).toThrow(/already has a child with id/);
+    // The original child must still be the one registered — no silent overwrite.
+    expect(parent.getChild('duplicate-id')).toBe(childA);
+  });
+
+  it('getChild should be a pure read: null for unknown id, correct object for a real child, unaffected by repeated calls', () => {
+    const parent = createDummyTrack('parent');
+    const child = createDummyTrack('child-1');
+
+    expect(parent.getChild('child-1')).toBeNull();
+
+    parent.addChild(child, { stagger: 0 });
+    expect(parent.getChild('child-1')).toBe(child);
+    // Calling it again must not mutate anything (no spawn offset recompute, etc).
+    const offsetAfterFirstRead = child.currentOffset;
+    parent.getChild('child-1');
+    parent.getChild('child-1');
+    expect(child.currentOffset).toBe(offsetAfterFirstRead);
+
+    parent.removeChild('child-1');
+    expect(parent.getChild('child-1')).toBeNull();
+  });
+
   describe('composition via LayoutDelegate', () => {
     it('defaults to GaplessLayoutDelegate: placement is frontmost + stagger', () => {
       const parent = createDummyTrack('parent');
@@ -254,6 +284,49 @@ describe('Track (v4 first-class playhead owner)', () => {
       // cache and is what keeps it correct under scrubbing/seek.
       a.compose();
       expect(pluginComposeSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('setObserved role:input (FK plugin pre-fold)', () => {
+    it('injects parentWorld into rawData before plugins run', () => {
+      const parent = createDummyTrack('fk-parent');
+      parent.progress(0.5);
+
+      const child = createDummyTrack('fk-child');
+      child.setObserved(
+        parent,
+        (pw) => ({ parentWorld: { x: pw.x ?? 0, y: pw.y ?? 0, rotation: pw.rotation ?? 0 } }),
+        { role: 'input' }
+      );
+
+      expect(() => child.compose()).not.toThrow();
+    });
+
+    it('role:output (default) still applies after plugins — existing behavior unchanged', () => {
+      const source = createDummyTrack('role-output-source');
+      source.progress(1);
+      const follower = createDummyTrack('role-output-follower');
+      follower.setObserved(source, (pw) => ({ transform: pw.transform }));
+      expect(follower.compose().transform).toBe('translate3d(100px, 200px, 0px)');
+    });
+
+    it('input fold runs before output fold within the same compose() call', () => {
+      const inputSource = createDummyTrack('order-input-source');
+      inputSource.progress(0.5);
+      const outputSource = createDummyTrack('order-output-source');
+      outputSource.progress(0.5);
+
+      const joint = createDummyTrack('order-joint');
+      const inputSpy = vi.fn((pw) => ({ parentWorld: pw }));
+      const outputSpy = vi.fn((pw) => ({ tag: 'output' }));
+
+      joint.setObserved(inputSource, inputSpy, { role: 'input' });
+      joint.setObserved(outputSource, outputSpy, { role: 'output' });
+
+      joint.compose();
+
+      expect(inputSpy).toHaveBeenCalled();
+      expect(outputSpy).toHaveBeenCalled();
     });
   });
 });

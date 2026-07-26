@@ -1,9 +1,8 @@
-export function createBallVm({ id, color, baseTrack }) {
+export function createBallVm({ id, color, ballTrack }) {
   return {
     id,
     color,
-    baseTrack,
-    activeTrack: baseTrack,
+    ballTrack,
     status: 'active',
     isClickable: true,
     onClick: () => {},

@@ -38,7 +38,7 @@ export class Track {
   #currentOffset = 0;
   #staggerOffset = 0;
   #layoutDelegate;
-  #observed = new Map(); // source Track -> mapFn (insertion order = fold order)
+  #observed = new Map(); // source Track -> { mapFn, role: 'input'|'output' }
 
   /**
    * @param {object} params
@@ -100,8 +100,6 @@ export class Track {
   compose(rawData, ctx) {
     ctx = ctx ?? new Map(); // fresh scope per external (root) call; never persists past it
 
-    const source = rawData ?? this.getSnapshot();
-
     const cached = ctx.get(this);
 
     // Cycle back-edge: this track is already being resolved higher in the
@@ -109,7 +107,7 @@ export class Track {
     // return only this track's own local (plugin-only) patch, same fallback
     // as the original guard. See observe-fk-design.md §2.
     if (cached === COMPOSING) {
-      return composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
+      return composePatch(this.#plugins, rawData ?? this.getSnapshot(), this.#resolvedTrack, `track "${this.#id}"`);
     }
 
     // Diamond memo hit: this track was already fully resolved earlier in this
@@ -119,17 +117,27 @@ export class Track {
     }
 
     ctx.set(this, COMPOSING);
+
+    // --- PRE-FOLD: inject 'input' observations into rawData before plugins run ---
+    let source = rawData ?? this.getSnapshot();
+    for (const [observedSource, { mapFn, role }] of this.#observed) {
+      if (role !== 'input' || !mapFn) continue;
+      const contribution = mapFn(observedSource.compose(undefined, ctx));
+      if (contribution) source = { ...source, ...contribution };
+    }
+
+    // --- PLUGINS ---
     let patch = composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
-    // Fold each observed source in insertion order; each mapped patch applies
-    // LAST (last-wins), so it can override this track's own fields.
-    // NOTE: mapFn receives the source's COMPOSED patch, not its snapshot.
-    for (const [observedSource, mapFn] of this.#observed) {
-      if (!mapFn) continue;
-      const observedPatch = mapFn(observedSource.compose(undefined, ctx)); // thread ctx down
+
+    // --- POST-FOLD: apply 'output' observations after plugins (last-wins override) ---
+    for (const [observedSource, { mapFn, role }] of this.#observed) {
+      if (role !== 'output' || !mapFn) continue;
+      const observedPatch = mapFn(observedSource.compose(undefined, ctx));
       if (observedPatch) {
         patch = mergePatches(patch, observedPatch);
       }
     }
+
     ctx.set(this, patch);
     return patch;
   }
@@ -137,15 +145,13 @@ export class Track {
   /**
    * Multi-source FK / read-only cross-track observation. On every compose(),
    * for each observed source, pulls source.compose() (its fully-resolved patch)
-   * and folds mapFn(composedPatch) into this track's own composed patch, applied
-   * LAST in insertion order (so it can override this track's own fields).
+   * and folds mapFn(composedPatch) into this track's own composed patch.
    *
    * Reads source.compose() — the RESOLVED world state, so FK chains accumulate.
    * Cycles are made safe by the per-call ctx Map in compose() (COMPOSING sentinel +
-   * diamond memo), not
-   * by reading a raw snapshot. See observe-fk-design.md §2, §3.
+   * diamond memo), not by reading a raw snapshot. See observe-fk-design.md §2, §3.
    *
-   * - setObserved(track, mapFn): add or REPLACE the observation of `track`.
+   * - setObserved(track, mapFn, opts): add or REPLACE the observation of `track`.
    * - setObserved(null): clear ALL observations.
    * - removeObserved(track): drop one source.
    *
@@ -155,13 +161,16 @@ export class Track {
    *
    * @param {Track|null} track - source to observe, or null to clear all
    * @param {(composedPatch: object) => (object|null|undefined)} [mapFn]
+   * @param {{ role?: 'input'|'output' }} [opts]
+   *   role 'output' (default): fold applied AFTER plugins (current behavior, overrides own fields).
+   *   role 'input':  fold applied BEFORE plugins (injects fields into rawData for plugin consumption).
    */
-  setObserved(track, mapFn) {
+  setObserved(track, mapFn, opts = {}) {
     if (!track) {
       this.#observed.clear();
       return;
     }
-    this.#observed.set(track, mapFn ?? null);
+    this.#observed.set(track, { mapFn: mapFn ?? null, role: opts.role ?? 'output' });
   }
 
   removeObserved(track) {
@@ -204,14 +213,34 @@ export class Track {
   }
 
 
-  get children() {
-    return Array.from(this.#children.values());
+  // No consumer in the codebase needs the full child array — every current
+  // caller (useSpiralWaveController.js) only reads .length. childCount is
+  // O(1) and allocation-free; the old `children` getter allocated a new
+  // array via Array.from() on every call just to be discarded a moment
+  // later, and handed back the SAME live Track objects sitting in
+  // #children, not copies — an encapsulation leak with no driving need.
+  get childCount() {
+    return this.#children.size;
+  }
+
+  // Pure read, zero side effects — safe to call from render, unlike addChild.
+  // Single source of truth: reads the SAME #children Map addChild/removeChild
+  // maintain, so callers don't need to keep a parallel lookup structure.
+  getChild(id) {
+    return this.#children.get(id) ?? null;
   }
 
   // --- Composition: "moving together" ---
   addChild(child, opts = {}) {
     if (child.#parent) {
       throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`);
+    }
+    if (this.#children.has(child.id)) {
+      throw new Error(
+        `Track "${this.#id}" already has a child with id "${child.id}". ` +
+        `addChild does not overwrite existing children — check for it first ` +
+        `with getChild(id), or ensure ids are unique per spawn.`
+      );
     }
     child.#parent = this;
     const stagger = opts.stagger ?? 0;

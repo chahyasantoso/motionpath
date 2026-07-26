@@ -2,10 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { engine } from '../../engines/Engine.js';
 import { createTrack } from '../../lib/createTrack.js';
 import { createBallVm } from './createBallVm.js';
-import { BALL_COLORS, BALL_SIZE } from './spiralConfig.js';
+import { BALL_COLORS } from './spiralConfig.js';
 import {
   MIN_SPAWN_PROGRESS,
-  spiralPathPoints,
   BALL_TRAVEL_SECONDS,
   SPAWN_INTERVAL_MS
 } from './spiralPath.js';
@@ -27,12 +26,12 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
 
     const onSpawn = (payload) => {
       if (payload.parentId !== parentTrack.id) return;
-      const alive = parentTrack.children.length;
+      const alive = parentTrack.childCount;
       console.log('[wave] child change | alive balls:', alive, '| vms:', ballVmsRef.current.length);
     };
     const onRemove = (payload) => {
       if (payload.parentId !== parentTrack.id) return;
-      const alive = parentTrack.children.length;
+      const alive = parentTrack.childCount;
       console.log('[wave] child change | alive balls:', alive, '| vms:', ballVmsRef.current.length);
     };
 
@@ -65,25 +64,26 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     if (!current) return;
     if (current.status === 'exiting') return;
 
-    const exitTrack = createTrack({
-      id: `exit-${ballId}`,
-      keyframes: {
-        scale:   { stops: [{ p: 0, v: 1 }, { p: 0.35, v: 1.7 }, { p: 1, v: 0 }] },
-        opacity: { stops: [{ p: 0, v: 1 }, { p: 0.5,  v: 0.9 }, { p: 1, v: 0 }] },
-        '--ball-size': {
-          stops: [
-            { p: 0, v: `${BALL_SIZE}px` },
-            { p: 1, v: `${BALL_SIZE}px` }
-          ]
-        }
-      },
-      duration: 0.35
-    });
-    updateBallVm(ballId, {
-      activeTrack: exitTrack,
-      status: 'exiting',
-      isClickable: false,
-    });
+    // Stamp an independent exit overlay from the loaded schema
+    // (createSpiralTransitionScene → 'ball-exit-track'). Definition lives in
+    // spiralMotions.js; only the id is made unique per ball. See
+    // feature-swarm-design.md §"Part A′: Track-direct swarm".
+    const exitConfig = engine.getTrackConfig('ball-exit-track');
+    if (!exitConfig) return;
+    const exitTrack = createTrack(
+      { ...exitConfig, id: `exit-${ballId}`, duration: 0.35 },
+      engine.templates
+    );
+
+    // Clear ALL observations first so a still-active entrance overlay (fast click
+    // during entrance) is hard-replaced immediately — exit is the sole overlay.
+    current.ballTrack.setObserved(null);
+    current.ballTrack.setObserved(
+      exitTrack,
+      (patch) => ({ scale: patch.scale, opacity: patch.opacity })
+    );
+
+    updateBallVm(ballId, { status: 'exiting', isClickable: false });
 
     gsap.to(exitTrack, {
       progress: 1,
@@ -95,11 +95,11 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
         if (!latest) return;
 
         const parentTrack = containerInstance?.getTrack('keepalive');
-        const aliveAfter = parentTrack ? parentTrack.children.length - 1 : 0;
+        const aliveAfter = parentTrack ? parentTrack.childCount - 1 : 0;
         const willRespawn = spawnedCountRef.current >= 30 && aliveAfter === 0;
         console.log(`[wave] remove ball #${ballId} | alive after: ${aliveAfter} | wave respawn: ${willRespawn}`);
 
-        parentTrack?.removeChild(latest.baseTrack.id);
+        parentTrack?.removeChild(latest.ballTrack.id);
         removeBallVm(ballId);
       }
     });
@@ -109,40 +109,45 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     const current = getBallVm(ballId);
     if (!current) return;
 
-    const entranceTrack = createTrack({
-      id: `entrance-${ballId}`,
-      keyframes: {
-        scale:   { stops: [{ p: 0, v: 1 }, { p: 0.35, v: 1.7 }, { p: 1, v: 1 }] },
-        opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
-        '--ball-size': {
-          stops: [
-            { p: 0, v: `${BALL_SIZE}px` },
-            { p: 1, v: `${BALL_SIZE}px` }
-          ]
-        }
-      },
-      duration: 0.35
-    });
-    updateBallVm(ballId, {
-      activeTrack: entranceTrack,
-      status: 'spawning',
-      isClickable: false,
-    });
+    // Stamp an independent entrance overlay from the loaded schema
+    // (createSpiralTransitionScene → 'ball-entrance-track').
+    const entranceConfig = engine.getTrackConfig('ball-entrance-track');
+    if (!entranceConfig) return;
+    const entranceTrack = createTrack(
+      { ...entranceConfig, id: `entrance-${ballId}`, duration: 0.35 },
+      engine.templates
+    );
+
+    // Fold entrance scale/opacity into the ball Track's compose output.
+    current.ballTrack.setObserved(
+      entranceTrack,
+      (patch) => ({ scale: patch.scale, opacity: patch.opacity })
+    );
+
+    updateBallVm(ballId, { status: 'spawning', isClickable: false });
 
     gsap.to(entranceTrack, {
       progress: 1,
       duration: 0.35,
       ease: 'none',
       onComplete: () => {
-        entranceTrack.destroy();
         const latest = getBallVm(ballId);
         if (!latest) return;
 
-        updateBallVm(ballId, {
-          activeTrack: latest.baseTrack,
-          status: 'active',
-          isClickable: true,
-        });
+        // Guard: a fast click during entrance may have already started the exit
+        // (status 'exiting'), which cleared observations and folded the exit overlay.
+        // In that case the entrance is stale — clean up its track but do NOT
+        // touch observations (exit owns them now) and do NOT flip status back to active.
+        if (latest.status !== 'spawning') {
+          entranceTrack.destroy();
+          return;
+        }
+
+        // MUST clear before destroy — ball Track survives, entranceTrack does not.
+        latest.ballTrack.removeObserved(entranceTrack);
+        entranceTrack.destroy();
+
+        updateBallVm(ballId, { status: 'active', isClickable: true });
       }
     });
   }, [getBallVm, updateBallVm]);
@@ -155,43 +160,27 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     const id = ++ballCounterRef.current;
     const color = BALL_COLORS[id % BALL_COLORS.length];
 
-    const baseTrack = createTrack({
-      id: `ball-track-${id}`,
-      keyframes: {
-        path: {
-          points: spiralPathPoints,
-          stops: [{ p: 0, v: 0 }, { p: 1, v: 1, ease: 'none' }],
-        },
-        opacity: {
-          stops: [
-            { p: 0.0, v: 0 },
-            { p: 0.05, v: 1 },
-            { p: 0.88, v: 1 },
-            { p: 1.0,  v: 0 },
-          ],
-        },
-        '--ball-size': {
-          stops: [
-            { p: 0, v: `${BALL_SIZE}px` },
-            { p: 1, v: `${BALL_SIZE}px` }
-          ]
-        }
-      },
-      duration: BALL_TRAVEL_SECONDS
-    });
-    console.log(`[wave] spawn ball #${id} | spawned total: ${spawnedCountRef.current + 1} | alive: ${parentTrack.children.length + 1}`);
+    // Stamp an independent ball track from the loaded schema
+    // (createSpiralBallScene → 'ball-track'). One definition, unique id per ball.
+    const ballConfig = engine.getTrackConfig('ball-track');
+    if (!ballConfig) return;
+    const ballTrack = createTrack(
+      { ...ballConfig, id: `ball-track-${id}`, duration: BALL_TRAVEL_SECONDS },
+      engine.templates
+    );
+    console.log(`[wave] spawn ball #${id} | spawned total: ${spawnedCountRef.current + 1} | alive: ${parentTrack.childCount + 1}`);
 
-    const vm = createBallVm({ id, color, baseTrack });
+    const vm = createBallVm({ id, color, ballTrack });
     vm.onClick = () => startExit(id);
 
     // Sync ref mirror synchronously so startEntrance can find it immediately
     ballVmsRef.current = [...ballVmsRef.current, vm];
     setBallVms(ballVmsRef.current);
 
-    parentTrack.addChild(baseTrack, { stagger: SPAWN_INTERVAL_MS / 1000 });
+    parentTrack.addChild(ballTrack, { stagger: SPAWN_INTERVAL_MS / 1000 });
     startEntrance(id);
 
-    const unsub = baseTrack.subscribe((snapshot) => {
+    const unsub = ballTrack.subscribe((snapshot) => {
       if (snapshot.progress >= 1) {
         unsub();
         const current = getBallVm(id);
@@ -211,13 +200,13 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     const tick = () => {
       if (spawnedCountRef.current < 30) {
         const lastBall = ballVmsRef.current[ballVmsRef.current.length - 1] ?? null;
-        const lastTrack = lastBall?.baseTrack ?? null;
+        const lastTrack = lastBall?.ballTrack ?? null;
 
         if (!lastTrack || lastTrack.progress() >= MIN_SPAWN_PROGRESS) {
           spawnBall();
           spawnedCountRef.current += 1;
         }
-      } else if (parentTrack.children.length === 0) {
+      } else if (parentTrack.childCount === 0) {
         spawnedCountRef.current = 0;
         containerInstance.trigger.seek(0);
         containerInstance.trigger.play();

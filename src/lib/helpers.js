@@ -51,10 +51,17 @@ export function switchToTrack(el, fromTrack, unsubscribeFrom, toTrack, vars = {}
 }
 
 /**
-  * Merges xPercent / yPercent into composed patch if anchor is defined.
-  * Omitted anchor stays a strict no-op returning the original patch reference.
-  */
+ * Merges xPercent / yPercent and optional pixel offset into composed patch.
+ * anchor.offset: { x, y } — pixel displacement applied via x/y (additive on top of compose output).
+ * Omitted anchor stays a strict no-op.
+ */
 export function applyAnchor(patch, anchor) {
   if (!anchor) return patch;
-  return { ...patch, ...anchor };
+  const result = { ...patch, ...anchor };
+  if (anchor.offset) {
+    result.x = (patch.x ?? 0) + (anchor.offset.x ?? 0);
+    result.y = (patch.y ?? 0) + (anchor.offset.y ?? 0);
+    delete result.offset; // offset is internal; never pass to gsap.set
+  }
+  return result;
 }

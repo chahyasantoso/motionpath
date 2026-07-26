@@ -4,6 +4,7 @@ import { filterGroupPlugin } from './plugins/filterProperty.js';
 import { pathPlugin } from './plugins/pathPlugin.js';
 import { cssVarPlugin } from './plugins/cssVarProperty.js';
 import { imageSequencePlugin } from './plugins/imageSequenceProperty.js';
+import { fkPlugin } from './plugins/fkPlugin.js';
 
 const simpleKeys = [
   'x', 'y', 'z',
@@ -22,7 +23,7 @@ const simplePlugins = Object.fromEntries(simpleKeys.map(k => [k, createSimplePro
 const colorPlugins = Object.fromEntries(colorKeys.map(k => [k, createColorPropertyPlugin(k)]));
 
 // Individual exports for legacy references (if any exist)
-export { pathPlugin, cssVarPlugin, imageSequencePlugin };
+export { pathPlugin, cssVarPlugin, imageSequencePlugin, fkPlugin };
 
 function createUnsupportedLazyPlugin(featureName, key) {
   return {
@@ -54,6 +55,7 @@ export const ALL_PLUGINS = [
   pathPlugin,
   cssVarPlugin,
   imageSequencePlugin,
+  fkPlugin,
   splitTextPlugin,
   morphSvgPlugin,
   drawSvgPlugin,
