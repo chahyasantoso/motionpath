@@ -1,0 +1,59 @@
+diff --git a/src/components/PasarMalam/PasarMalamPage.jsx b/src/components/PasarMalam/PasarMalamPage.jsx
+index ce22474..ce5aaad 100644
+--- a/src/components/PasarMalam/PasarMalamPage.jsx
++++ b/src/components/PasarMalam/PasarMalamPage.jsx
+@@ -1,10 +1,10 @@
+ import { gsap } from 'gsap';
+ import { useCallback, useRef, useState } from 'react';
+ import useMotionProject from '../../hooks/useMotionProject';
+-import useMotionInstance from '../../hooks/useMotionInstance';
+ import useMotionSubscriber from '../../hooks/useMotionSubscriber';
+ import useMotionTimelinePlayback from '../../hooks/useMotionTimelinePlayback';
+-import useMotionTrigger from '../../hooks/useMotionTrigger';
++import useScrollMotion from '../../hooks/useScrollMotion';
++import useTimeMotion from '../../hooks/useTimeMotion';
+ import useSmoothScroll from '../../hooks/useSmoothScroll';
+ import './PasarMalamPage.css';
+ 
+@@ -19,10 +19,9 @@ const pasarMalamScene = {
+   trigger: {
+     type: 'scroll',
+     scrub: 0.5,
+-    pin: 'pm-stage',
++    pin: 'pin',
+     start: 'top top',
+-    end: 'bottom bottom',
+-    trigger: 'pasar-malam-storytelling'
++    end: 'bottom bottom'
+   },
+   tracks: [
+     {
+@@ -360,15 +359,9 @@ export default function PasarMalamPage() {
+   const [bouncing, setBouncing] = useState(false);
+   const bouncingRef = useRef(false);
+ 
+-  const storytellingRef = useRef(null);
+-  const stageRef = useRef(null);
+-
+-  useMotionTrigger('pasar-malam-storytelling', storytellingRef);
+-  useMotionTrigger('pm-stage', stageRef);
+-
+   const isLoaded = useMotionProject(pmProject);
+-  const storytellingInstance = useMotionInstance(isLoaded ? 'pasar-malam-storytelling' : null);
+-  const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce' : null, BOUNCE_CONFIG);
++  const { refs, instance: storytellingInstance } = useScrollMotion(isLoaded ? pasarMalamScene : null);
++  const { instance: bounceInstance } = useTimeMotion(isLoaded ? 'lantern-bounce' : null, BOUNCE_CONFIG);
+ 
+   useMotionTimelinePlayback(bounceInstance, bouncing);
+   useSmoothScroll();
+@@ -386,8 +379,8 @@ export default function PasarMalamPage() {
+   return (
+     <div className="pm-container">
+       {/* Scroll storytelling stage */}
+-      <section ref={storytellingRef} className="pm-hero-section">
+-        <div ref={stageRef} className="pm-stage">
++      <section ref={refs.trigger} className="pm-hero-section">
++        <div ref={refs.pin} className="pm-stage">
+           <BackgroundSequence instance={storytellingInstance} />
+           <div className="pm-overlay" />
+           

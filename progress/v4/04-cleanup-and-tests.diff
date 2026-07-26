@@ -1,0 +1,230 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index a8bc390..c9e1188 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -2,10 +2,16 @@ import { Route, Routes } from 'react-router-dom';
+ import './App.css';
+ import HubPage from './components/Hub/HubPage';
+ import DemoPage from './components/Demo/DemoPage';
+-import BurstPage from './components/Burst/BurstPage';
++// BurstPage: pending future migration to v4 (stale schemaVersion:2 / `driver`
++// shape, confirmed non-functional under the v4 engine regardless). Its import
++// of the now-deleted useMotionTrigger hook would fail the production build,
++// not just that page at runtime — commented out here rather than deleted,
++// so the file itself is untouched and ready for its own migration pass.
++// import BurstPage from './components/Burst/BurstPage';
+ import MotorcyclePage from './components/Motorcycle/MotorcyclePage';
+ import PasarMalamPage from './components/PasarMalam/PasarMalamPage';
+-import PasarMalamObserverPage from './components/PasarMalam/PasarMalamObserverPage';
++// PasarMalamObserverPage: same reason as BurstPage above.
++// import PasarMalamObserverPage from './components/PasarMalam/PasarMalamObserverPage';
+ import RefreshSpikePage from './components/Spikes/RefreshSpikePage';
+ import StaggerSpikePage from './components/Spikes/StaggerSpikePage';
+ import TowerDefensePage from './components/TowerDefense/TowerDefensePage';
+@@ -19,10 +25,10 @@ export default function App() {
+       <Routes>
+         <Route path="/" element={<HubPage />} />
+         <Route path="/hooks-demo" element={<DemoPage />} />
+-        <Route path="/burst" element={<BurstPage />} />
++        {/* <Route path="/burst" element={<BurstPage />} /> */}
+         <Route path="/moto" element={<MotorcyclePage />} />
+         <Route path="/pasarmalam" element={<PasarMalamPage />} />
+-        <Route path="/pasarmalam-observer" element={<PasarMalamObserverPage />} />
++        {/* <Route path="/pasarmalam-observer" element={<PasarMalamObserverPage />} /> */}
+         <Route path="/spike-refresh" element={<RefreshSpikePage />} />
+         <Route path="/spike-stagger" element={<StaggerSpikePage />} />
+         <Route path="/tower-defense" element={<TowerDefensePage />} />
+diff --git a/src/engines/__tests__/Engine.test.js b/src/engines/__tests__/Engine.test.js
+index a584e26..933ad2f 100644
+--- a/src/engines/__tests__/Engine.test.js
++++ b/src/engines/__tests__/Engine.test.js
+@@ -101,3 +101,61 @@ describe('Engine.getTrackConfig (Track-direct swarm — feature-swarm-design §P
+     expect(Array.isArray(engine.templates)).toBe(true);
+   });
+ });
++
++describe('Engine.mountInstance / mountWithDelegate — concurrent instance identity (Part A)', () => {
++  it('mountInstance called twice for the SAME motionId does not destroy the first instance', async () => {
++    const engine = new Engine();
++    await engine.loadProject(project);
++
++    const first = engine.mountInstance('swarm-motion');
++    const second = engine.mountInstance('swarm-motion');
++
++    // Two genuinely distinct, independently-alive objects — not one
++    // singleton being torn down and rebuilt under the caller's feet.
++    expect(first).not.toBe(second);
++    expect(first.id).not.toBe(second.id);
++
++    // Both must still be independently usable — this is the actual
++    // regression: previously, mounting the second would call
++    // `first.destroy()` internally, killing its tracks/timeline.
++    expect(() => first.trigger.seek(0.5)).not.toThrow();
++    expect(() => second.trigger.seek(0.5)).not.toThrow();
++    expect(first.getTrack('swarm-track')).not.toBeNull();
++    expect(second.getTrack('swarm-track')).not.toBeNull();
++  });
++
++  it('mountWithDelegate called twice for the SAME motionId with different pre-built delegates keeps both alive', async () => {
++    const { TimeTriggerDelegate } = await import('../../lib/TriggerDelegate.js');
++    const engine = new Engine();
++    await engine.loadProject(project);
++
++    const delegateA = new TimeTriggerDelegate({ duration: 1 });
++    const delegateB = new TimeTriggerDelegate({ duration: 1 });
++
++    const motionA = engine.mountWithDelegate('swarm-motion', delegateA);
++    const motionB = engine.mountWithDelegate('swarm-motion', delegateB);
++
++    expect(motionA).not.toBe(motionB);
++    expect(motionA.id).not.toBe(motionB.id);
++
++    motionA.trigger.seek(0.25);
++    motionB.trigger.seek(0.75);
++
++    // Each instance's own track must reflect ITS OWN seek, not the other's —
++    // proof they're genuinely independent, not aliases of one shared Motion.
++    expect(motionA.getTrack('swarm-track').progress()).toBeCloseTo(0.25, 5);
++    expect(motionB.getTrack('swarm-track').progress()).toBeCloseTo(0.75, 5);
++  });
++
++  it('motion.motionId records the schema id for reference, while .id stays a unique instance id', async () => {
++    const engine = new Engine();
++    await engine.loadProject(project);
++
++    const a = engine.mountInstance('swarm-motion');
++    const b = engine.mountInstance('swarm-motion');
++
++    expect(a.motionId).toBe('swarm-motion');
++    expect(b.motionId).toBe('swarm-motion');
++    expect(a.id).not.toBe(b.id);
++  });
++});
+diff --git a/src/hooks/useMotionTrigger.js b/src/hooks/useMotionTrigger.js
+deleted file mode 100644
+index 74d75de..0000000
+--- a/src/hooks/useMotionTrigger.js
++++ /dev/null
+@@ -1,19 +0,0 @@
+-import { useEffect } from 'react';
+-import { engine } from '../engines/Engine.js';
+-
+-/**
+- * Registers a DOM ref as the resolution target for a trigger-anchor id
+- * (used by `trigger` / `startTrigger` / `pin` / `endTrigger` in motion
+- * schemas). Replaces the old `data-motion-id` attribute + querySelector
+- * lookup — this is a push registration instead of a DOM query.
+- *
+- * @param {string} id - matches the id string used in trigger/startTrigger/pin/endTrigger
+- * @param {React.RefObject} ref
+- */
+-export default function useMotionTrigger(id, ref) {
+-  useEffect(() => {
+-    if (!id || !ref) return undefined;
+-    engine.registerTriggerRef(id, ref);
+-    return () => engine.unregisterTriggerRef(id, ref);
+-  }, [id, ref]);
+-}
+diff --git a/src/lib/TriggerRefRegistry.js b/src/lib/TriggerRefRegistry.js
+deleted file mode 100644
+index 7153cc9..0000000
+--- a/src/lib/TriggerRefRegistry.js
++++ /dev/null
+@@ -1,24 +0,0 @@
+-export class TriggerRefRegistry {
+-  #refs = new Map();
+-
+-  register(id, ref) {
+-    this.#refs.set(id, ref);
+-  }
+-
+-  unregister(id, ref) {
+-    if (ref === undefined || this.#refs.get(id) === ref) {
+-      this.#refs.delete(id);
+-    }
+-  }
+-
+-  resolveElement = (id) => {
+-    const ref = this.#refs.get(id);
+-    const element = ref && typeof ref === 'object' && 'current' in ref ? ref.current : ref;
+-    if (!element) {
+-      throw new Error(
+-        `MotionPath: trigger ref '${id}' is not registered. Mount useMotionTrigger('${id}', ref) before this project's motions are built.`
+-      );
+-    }
+-    return element;
+-  };
+-}
+diff --git a/src/lib/__tests__/Motion.test.js b/src/lib/__tests__/Motion.test.js
+index c7e721d..70c5859 100644
+--- a/src/lib/__tests__/Motion.test.js
++++ b/src/lib/__tests__/Motion.test.js
+@@ -20,7 +20,7 @@ describe('Motion & TriggerDelegates (v4)', () => {
+   it('should mount tracks and drive progress through master timeline seeking', () => {
+     const delegate = new TimeTriggerDelegate({ duration: 2 });
+     const motion = new Motion({ id: 'time-motion', triggerDelegate: delegate });
+-    motion.init(() => null);
++    motion.init();
+     const track = createDummyTrack('m-track');
+ 
+     motion.mount(track);
+@@ -33,7 +33,7 @@ describe('Motion & TriggerDelegates (v4)', () => {
+   it('should support ManualTriggerDelegate without clock controls', () => {
+     const delegate = new ManualTriggerDelegate();
+     const motion = new Motion({ id: 'manual-motion', triggerDelegate: delegate });
+-    motion.init(() => null);
++    motion.init();
+     const track = createDummyTrack('manual-track');
+ 
+     motion.mount(track);
+@@ -43,22 +43,10 @@ describe('Motion & TriggerDelegates (v4)', () => {
+     expect(track.progress()).toBe(0.75);
+   });
+ 
+-  it('should throw clear error when resolving unregistered trigger DOM element', async () => {
+-    const { ScrollTriggerDelegate } = await import('../TriggerDelegate.js');
+-    const delegate = new ScrollTriggerDelegate({ trigger: 'missing-el-id' });
+-    const motion = new Motion({ id: 'scroll-motion', triggerDelegate: delegate });
+-
+-    expect(() => {
+-      motion.init(() => {
+-        throw new Error("MotionPath: trigger ref 'missing-el-id' is not registered.");
+-      });
+-    }).toThrow(/missing-el-id/);
+-  });
+-
+   it('should render a newly added child track at the current master timeline progress', () => {
+     const delegate = new ManualTriggerDelegate();
+     const motion = new Motion({ id: 'manual-motion', triggerDelegate: delegate });
+-    motion.init(() => null);
++    motion.init();
+ 
+     const parentTrack = createDummyTrack('parent-track');
+     motion.mount(parentTrack);
+@@ -74,7 +62,7 @@ describe('Motion & TriggerDelegates (v4)', () => {
+   it('should reposition a sibling\'s mounted tween on removal-triggered reflow, not just update bookkeeping', () => {
+     const delegate = new ManualTriggerDelegate();
+     const motion = new Motion({ id: 'manual-motion', triggerDelegate: delegate });
+-    motion.init(() => null);
++    motion.init();
+ 
+     const parentTrack = createDummyTrack('parent-track');
+     motion.mount(parentTrack);
+@@ -110,7 +98,7 @@ describe('Motion & TriggerDelegates (v4)', () => {
+   it('should snap (not animate) reflow when staggerTransition is absent, matching v3\'s duration:0 short-circuit', () => {
+     const delegate = new ManualTriggerDelegate();
+     const motion = new Motion({ id: 'manual-motion', triggerDelegate: delegate }); // no staggerTransition
+-    motion.init(() => null);
++    motion.init();
+ 
+     const toSpy = vi.spyOn(gsap, 'to');
+     const parentTrack = createDummyTrack('parent-track');
+@@ -142,7 +130,7 @@ describe('Motion & TriggerDelegates (v4)', () => {
+       triggerDelegate: delegate,
+       staggerTransition: { duration: 0.3, ease: 'power3.out' },
+     });
+-    motion.init(() => null);
++    motion.init();
+ 
+     const parentTrack = createDummyTrack('parent-track');
+     motion.mount(parentTrack);

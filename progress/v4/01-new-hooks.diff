@@ -1,0 +1,108 @@
+diff --git a/src/hooks/useManualMotion.js b/src/hooks/useManualMotion.js
+new file mode 100644
+index 0000000..8a58a39
+--- /dev/null
++++ b/src/hooks/useManualMotion.js
+@@ -0,0 +1,18 @@
++import { useCallback } from 'react';
++import useMotionInstance from './useMotionInstance.js';
++
++/**
++ * Mounts a manual-trigger motion (no autonomous clock — caller drives
++ * progress directly, e.g. a RAF game loop or an imperative scrub control).
++ *
++ * @param {string|null} motionId
++ * @param {Object} [config]
++ * @returns {{ instance: Object|null, seek: (p: number) => void }}
++ */
++export default function useManualMotion(motionId, config) {
++  const instance = useMotionInstance(motionId, config);
++  const seek = useCallback((p) => {
++    instance?.trigger?.progress(p);
++  }, [instance]);
++  return { instance, seek };
++}
+diff --git a/src/hooks/useScrollMotion.js b/src/hooks/useScrollMotion.js
+new file mode 100644
+index 0000000..d8d64ac
+--- /dev/null
++++ b/src/hooks/useScrollMotion.js
+@@ -0,0 +1,55 @@
++import { useEffect, useRef, useState } from 'react';
++import { engine } from '../engines/Engine.js';
++import { ScrollTriggerDelegate } from '../lib/TriggerDelegate.js';
++
++/**
++ * Mounts a scroll-triggered motion using component-local DOM refs instead of
++ * the old string-id + TriggerRefRegistry indirection. Every call builds its
++ * own delegate from its own refs, so multiple concurrent instances of the
++ * same schema motion never collide on a shared id namespace — there IS no
++ * shared namespace.
++ *
++ * @param {Object|null} schema - the motion's schema object (e.g. scrollScene),
++ *   or null to defer mounting (lazy-instancing gate, same convention as
++ *   useMotionInstance's `motionId ? id : null` pattern).
++ * @returns {{ refs: { trigger: RefObject, pin?: RefObject, endTrigger?: RefObject }, instance: Object|null }}
++ */
++export default function useScrollMotion(schema) {
++  // Refs created unconditionally, every render, regardless of `schema` —
++  // Rules of Hooks: the set of refs this hook allocates can't depend on a
++  // value that might change across renders.
++  const triggerRef = useRef(null);
++  const pinRef = useRef(null);
++  const endTriggerRef = useRef(null);
++  const [instance, setInstance] = useState(null);
++
++  const config = schema?.trigger;
++
++  useEffect(() => {
++    if (!schema?.id || !config || !triggerRef.current) return undefined;
++
++    const delegate = new ScrollTriggerDelegate({
++      ...config,
++      trigger: triggerRef.current,
++      pin: config.pin === 'pin' ? pinRef.current : config.pin, // 'pin' role-string -> separate element; `true`/falsy pass through
++      endTrigger: config.endTrigger ? endTriggerRef.current : undefined,
++    });
++
++    const motion = engine.mountWithDelegate(schema.id, delegate);
++    setInstance(motion);
++
++    return () => {
++      motion.destroy();
++      setInstance(null);
++    };
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [schema?.id]);
++
++  const refs = {
++    trigger: triggerRef,
++    pin: config?.pin === 'pin' ? pinRef : undefined,
++    endTrigger: config?.endTrigger ? endTriggerRef : undefined,
++  };
++
++  return { refs, instance };
++}
+diff --git a/src/hooks/useTimeMotion.js b/src/hooks/useTimeMotion.js
+new file mode 100644
+index 0000000..d439178
+--- /dev/null
++++ b/src/hooks/useTimeMotion.js
+@@ -0,0 +1,17 @@
++import useMotionInstance from './useMotionInstance.js';
++
++/**
++ * Mounts a time-triggered motion. TimeTriggerDelegate needs no DOM refs at
++ * all, so this is a thin wrapper around useMotionInstance — it exists mainly
++ * so call sites read consistently alongside useScrollMotion/useManualMotion,
++ * without a future reader having to already know time motions happen to need
++ * no refs.
++ *
++ * @param {string|null} motionId
++ * @param {Object} [config]
++ * @returns {{ instance: Object|null }}
++ */
++export default function useTimeMotion(motionId, config) {
++  const instance = useMotionInstance(motionId, config);
++  return { instance };
++}

@@ -101,3 +101,61 @@ describe('Engine.getTrackConfig (Track-direct swarm — feature-swarm-design §P
     expect(Array.isArray(engine.templates)).toBe(true);
   });
 });
+
+describe('Engine.mountInstance / mountWithDelegate — concurrent instance identity (Part A)', () => {
+  it('mountInstance called twice for the SAME motionId does not destroy the first instance', async () => {
+    const engine = new Engine();
+    await engine.loadProject(project);
+
+    const first = engine.mountInstance('swarm-motion');
+    const second = engine.mountInstance('swarm-motion');
+
+    // Two genuinely distinct, independently-alive objects — not one
+    // singleton being torn down and rebuilt under the caller's feet.
+    expect(first).not.toBe(second);
+    expect(first.id).not.toBe(second.id);
+
+    // Both must still be independently usable — this is the actual
+    // regression: previously, mounting the second would call
+    // `first.destroy()` internally, killing its tracks/timeline.
+    expect(() => first.trigger.seek(0.5)).not.toThrow();
+    expect(() => second.trigger.seek(0.5)).not.toThrow();
+    expect(first.getTrack('swarm-track')).not.toBeNull();
+    expect(second.getTrack('swarm-track')).not.toBeNull();
+  });
+
+  it('mountWithDelegate called twice for the SAME motionId with different pre-built delegates keeps both alive', async () => {
+    const { TimeTriggerDelegate } = await import('../../lib/TriggerDelegate.js');
+    const engine = new Engine();
+    await engine.loadProject(project);
+
+    const delegateA = new TimeTriggerDelegate({ duration: 1 });
+    const delegateB = new TimeTriggerDelegate({ duration: 1 });
+
+    const motionA = engine.mountWithDelegate('swarm-motion', delegateA);
+    const motionB = engine.mountWithDelegate('swarm-motion', delegateB);
+
+    expect(motionA).not.toBe(motionB);
+    expect(motionA.id).not.toBe(motionB.id);
+
+    motionA.trigger.seek(0.25);
+    motionB.trigger.seek(0.75);
+
+    // Each instance's own track must reflect ITS OWN seek, not the other's —
+    // proof they're genuinely independent, not aliases of one shared Motion.
+    expect(motionA.getTrack('swarm-track').progress()).toBeCloseTo(0.25, 5);
+    expect(motionB.getTrack('swarm-track').progress()).toBeCloseTo(0.75, 5);
+  });
+
+  it('motion.motionId records the schema id for reference, while .id stays a unique instance id', async () => {
+    const engine = new Engine();
+    await engine.loadProject(project);
+
+    const a = engine.mountInstance('swarm-motion');
+    const b = engine.mountInstance('swarm-motion');
+
+    expect(a.motionId).toBe('swarm-motion');
+    expect(b.motionId).toBe('swarm-motion');
+    expect(a.id).not.toBe(b.id);
+  });
+});

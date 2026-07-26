@@ -1,10 +1,9 @@
 import { gsap } from 'gsap';
 import React, { useCallback, useEffect, useRef } from 'react';
-import useMotionInstance from '../../hooks/useMotionInstance';
 import useMotionProject from '../../hooks/useMotionProject';
 import useMotionSubscriber from '../../hooks/useMotionSubscriber';
 import useMotionSubscribers from '../../hooks/useMotionSubscribers';
-import useMotionTrigger from '../../hooks/useMotionTrigger';
+import useScrollMotion from '../../hooks/useScrollMotion';
 import useSmoothScroll from '../../hooks/useSmoothScroll';
 import { createTrack } from '../../lib/createTrack.js';
 import { buildMotionPath } from '../../utils/pathUtils';
@@ -19,8 +18,7 @@ const scrollScene = {
   id: 'hero-scrollytelling',
   trigger: {
     type: 'scroll',
-    trigger: 'hero-scroll-trigger',
-    pin: 'hero-stage-pin',
+    pin: 'pin',
     scrub: 1,
     start: 'top top',
     end: 'bottom bottom'
@@ -87,8 +85,7 @@ const dynamicCarouselScene = {
   id: 'carousel-storytelling',
   trigger: {
     type: 'scroll',
-    trigger: 'carousel-scroll-trigger',
-    pin: 'carousel-stage-pin',
+    pin: 'pin',
     scrub: 1.2,
     start: 'top top',
     end: 'bottom bottom'
@@ -127,8 +124,7 @@ const dynamicHelixScene = {
   id: 'helix-storytelling',
   trigger: {
     type: 'scroll',
-    trigger: 'helix-scroll-trigger',
-    pin: 'helix-stage-pin',
+    pin: 'pin',
     scrub: 1.2,
     start: 'top top',
     end: 'bottom bottom'
@@ -367,21 +363,17 @@ function HelixCard({ parentTrack, cardData, trackCfg, stagger, trackId }) {
 
 // ─── Demo Scenes Container Wrappers ────────────────────────────
 
-function ScrollDemo({ instance }) {
-  const containerRef = useRef(null);
-  const stageRef = useRef(null);
-
-  useMotionTrigger('hero-scroll-trigger', containerRef);
-  useMotionTrigger('hero-stage-pin', stageRef);
+function ScrollDemo({ isLoaded }) {
+  const { refs, instance } = useScrollMotion(isLoaded ? scrollScene : null);
 
   return (
-    <section ref={containerRef} className="scroll-scene">
+    <section ref={refs.trigger} className="scroll-scene">
       <div className="scene-label">
         <h2>Continuous Path Animation (Scroll-Scrub)</h2>
         <p>A rocket following a 2D bezier path curve. The clouds move linearly on their own independent track.</p>
       </div>
 
-      <div ref={stageRef} className="stage">
+      <div ref={refs.pin} className="stage">
         <svg className="path-guide" width="100%" height="100%">
           {scrollScene.tracks.map(el => (
             <path
@@ -403,12 +395,8 @@ function ScrollDemo({ instance }) {
   );
 }
 
-function CarouselDemo({ instance }) {
-  const containerRef = useRef(null);
-  const stageRef = useRef(null);
-
-  useMotionTrigger('carousel-scroll-trigger', containerRef);
-  useMotionTrigger('carousel-stage-pin', stageRef);
+function CarouselDemo({ isLoaded }) {
+  const { refs, instance } = useScrollMotion(isLoaded ? dynamicCarouselScene : null);
 
   const [cards, setCards] = React.useState(MOCK_CARDS);
   // Motion.getTrack is a pure read (no mounting/side effects) — safe to call
@@ -434,12 +422,12 @@ function CarouselDemo({ instance }) {
   }, [cards]);
 
   return (
-    <section ref={containerRef} className="carousel-scene">
+    <section ref={refs.trigger} className="carousel-scene">
       <div className="scene-label">
         <h2>Unlimited Carousel Scene (Scroll Stagger)</h2>
         <p>Dynamic mock cards flowing smoothly on a single Bezier S-curve track with engine-level stagger. (Click any card to trigger schema-defined exit animation!)</p>
       </div>
-      <div ref={stageRef} className="carousel-stage">
+      <div ref={refs.pin} className="carousel-stage">
         {cards.map(card => (
           <CarouselCard
             key={card.id}
@@ -467,12 +455,8 @@ function CarouselDemo({ instance }) {
   );
 }
 
-function HelixDemo({ instance }) {
-  const containerRef = useRef(null);
-  const stageRef = useRef(null);
-
-  useMotionTrigger('helix-scroll-trigger', containerRef);
-  useMotionTrigger('helix-stage-pin', stageRef);
+function HelixDemo({ isLoaded }) {
+  const { refs, instance } = useScrollMotion(isLoaded ? dynamicHelixScene : null);
 
   const { cx, cy, radius, height, tiltDeg } = HELIX_CONFIG;
   const tiltRad = (tiltDeg * Math.PI) / 180;
@@ -492,13 +476,13 @@ function HelixDemo({ instance }) {
   const helixCards = MOCK_CARDS.slice(0, 6);
 
   return (
-    <section ref={containerRef} className="helix-scene">
+    <section ref={refs.trigger} className="helix-scene">
       <div className="scene-label">
         <h2>3D Helix Card Flow (Scroll Stagger)</h2>
         <p>Content cards flowing down a vertical spring, rotating 3D tangent to the cylinder surface</p>
       </div>
 
-      <div ref={stageRef} className="helix-stage">
+      <div ref={refs.pin} className="helix-stage">
         <svg className="path-guide" width="100%" height="100%">
           <defs>
             <linearGradient id="helix-path-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -544,11 +528,6 @@ export default function DemoPage() {
   const isLoaded = useMotionProject(project);
   useSmoothScroll();
 
-  // Mount instances explicitly using the new useMotionInstance hook once project has loaded
-  const scrollInstance = useMotionInstance(isLoaded ? 'hero-scrollytelling' : null);
-  const carouselInstance = useMotionInstance(isLoaded ? 'carousel-storytelling' : null);
-  const helixInstance = useMotionInstance(isLoaded ? 'helix-storytelling' : null);
-
   return (
     <div className="app">
       <header className="header">
@@ -556,15 +535,15 @@ export default function DemoPage() {
         <p className="subtitle">Zero Re-render • GSAP Pub/Sub • Direct DOM</p>
       </header>
 
-      <ScrollDemo instance={scrollInstance} />
+      <ScrollDemo isLoaded={isLoaded} />
 
       <div className="spacer" />
 
-      <CarouselDemo instance={carouselInstance} />
+      <CarouselDemo isLoaded={isLoaded} />
 
       <div className="spacer" />
 
-      <HelixDemo instance={helixInstance} />
+      <HelixDemo isLoaded={isLoaded} />
 
       <footer className="footer">
         <p>Scroll back up to replay the scroll scene</p>
