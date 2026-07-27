@@ -7,7 +7,6 @@ on:
     branches: [v4, main]
   workflow_dispatch:
 
-# A newer push to the same branch/PR cancels the older, still-running job.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -37,3 +36,6 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Check published declarations
+        run: npm run typecheck
