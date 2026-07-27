@@ -1,31 +1,25 @@
 import { createAnimationPlugin } from '../createAnimationPlugin.js';
+import { toPercentKey } from '../../usecases/toPercentKey.js';
 
-/**
- * Factory for color property plugins (backgroundColor, color, borderColor, etc.)
- * Handles color animation using GSAP's built-in color interpolation.
- *
- * @param {string} propKey - The color property key this plugin handles
- * @returns {Object} Plugin object
- */
 export function createColorPropertyPlugin(propKey) {
   return createAnimationPlugin({
     keys: [propKey],
-    lazy: false,
+    stage: 'base',
+    priority: 10,
+    outputs: { [propKey]: { merge: 'replace' } },
     contribute(key, stops) {
       const percentPatch = {};
-      stops.forEach(stop => {
-        const pctKey = `${stop.p * 100}%`;
+      stops.forEach((stop) => {
+        const pctKey = toPercentKey(stop.p);
         percentPatch[pctKey] = { [key]: stop.v };
-        if (stop.ease) {
-          percentPatch[pctKey].ease = stop.ease;
-        }
+        if (stop.ease) percentPatch[pctKey].ease = stop.ease;
       });
       return { percentPatch, tweenVars: {} };
     },
-    compose(rawData, elementCfg) {
+    compose(rawData) {
       const patch = {};
       if (rawData[propKey] !== undefined) patch[propKey] = rawData[propKey];
       return patch;
-    }
+    },
   });
 }
