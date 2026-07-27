@@ -24,6 +24,9 @@ export class AutonomousTimelineControls {
     this.#timeline.eventCallback("onComplete", cb);
   }
 }
+export function isScrubbedScrollConfig(config = {}) {
+  return config.scrub === true || typeof config.scrub === "number";
+}
 export class ScrollTriggerDelegate {
   #config;
   #controls;
@@ -32,19 +35,34 @@ export class ScrollTriggerDelegate {
     this.#config = config;
   }
   build() {
-    const trigger = this.#config.trigger;
+    const c = this.#config;
+    const trigger = c.trigger;
     const scrollTrigger = {
-      start: this.#config.start,
-      end: this.#config.end,
-      scrub: this.#config.scrub,
-      pin: this.#config.pin === true ? trigger : this.#config.pin,
-      pinSpacing: this.#config.pinSpacing,
-      toggleActions: this.#config.toggleActions,
+      start: c.start,
+      end: c.end,
+      scrub: c.scrub,
+      pin: c.pin === true ? trigger : c.pin,
+      pinSpacing: c.pinSpacing,
+      toggleActions: c.toggleActions,
     };
     if (trigger) scrollTrigger.trigger = trigger;
-    if (this.#config.endTrigger)
-      scrollTrigger.endTrigger = this.#config.endTrigger;
-    this.#timeline = gsap.timeline({ scrollTrigger });
+    if (c.endTrigger) scrollTrigger.endTrigger = c.endTrigger;
+
+    const vars = { scrollTrigger };
+    // A scrubbed timeline's playhead IS the scroll position, so repeat/yoyo/
+    // repeatDelay/delay are meaningless there and trigger-shape rejects them
+    // outright. On a non-scrub (toggleActions) scroll motion they are legal
+    // authored fields -- previously they were accepted by the validator and
+    // then silently dropped here, which is the one thing the system guide
+    // says a trigger must never do. Apply them.
+    if (!isScrubbedScrollConfig(c)) {
+      vars.repeat = c.repeat ?? 0;
+      vars.yoyo = !!c.yoyo;
+      vars.repeatDelay = c.repeatDelay ?? 0;
+      if (typeof c.delay === "number") vars.delay = c.delay;
+    }
+
+    this.#timeline = gsap.timeline(vars);
     this.#controls = new AutonomousTimelineControls(this.#timeline);
     return this.#timeline;
   }
@@ -158,3 +176,7 @@ export const triggerDelegateRegistry = createTriggerDelegateRegistry();
 export function registerTriggerDelegate(type, factory) {
   triggerDelegateRegistry.set(type, factory);
 }
+
+// Keep ScrollTrigger imported and registered for consumers that build a
+// ScrollTriggerDelegate directly.
+gsap.registerPlugin(ScrollTrigger);
