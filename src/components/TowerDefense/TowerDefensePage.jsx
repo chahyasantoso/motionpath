@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { buildMotionPath } from '../../utils/pathUtils.js';
 import useMotionProject from '../../hooks/useMotionProject.js';
 import useMotionInstance from '../../hooks/useMotionInstance.js';
@@ -7,23 +7,19 @@ import { useTowerDefenseController } from './useTowerDefenseController.js';
 import { towerDefenseProject, LANE_1_POINTS, LANE_2_POINTS } from './towerDefenseMotions.js';
 import './TowerDefensePage.css';
 
-const STAGE_WIDTH = 900;
-const STAGE_HEIGHT = 500;
-
+const STAGE_WIDTH = 900; const STAGE_HEIGHT = 500;
 function TowerRing({ instance, color }) {
   const ref = useRef(null);
-  if (instance) {
+  useEffect(() => {
+    if (!instance) return undefined;
     const track = instance.getTrack('tower-pulse-ring');
-    track?.subscribe((raw) => domRenderer(ref.current, track.compose(raw)));
-  }
+    if (!track) return undefined;
+    return track.subscribe((raw) => domRenderer(ref.current, track.compose(raw)));
+  }, [instance]);
   return <div ref={ref} className="tower-pulse-ring" style={{ borderColor: color, boxShadow: `0 0 12px ${color}` }} />;
 }
-
 export default function TowerDefensePage() {
-  const isLoaded = useMotionProject(towerDefenseProject);
-  const pulseInstance = useMotionInstance(isLoaded ? 'tower-pulse-motion' : null);
-  const enemyElsRef = useRef(new Map()); const projElsRef = useRef(new Map());
-  const game = useTowerDefenseController(isLoaded, enemyElsRef, projElsRef);
+  const isLoaded = useMotionProject(towerDefenseProject); const pulseInstance = useMotionInstance(isLoaded ? 'tower-pulse-motion' : null); const enemyElsRef = useRef(new Map()); const projElsRef = useRef(new Map()); const game = useTowerDefenseController(isLoaded, enemyElsRef, projElsRef);
   return <div className="td-page"><div className="td-container"><header className="td-hud"><div className="hud-metric"><span className="hud-label">Score</span><span className="hud-val">{game.score}</span></div><div className="hud-metric"><span className="hud-label">Wave</span><span className="hud-val">{game.wave} / 5</span></div><div className="hud-metric"><span className="hud-label">Lives</span><span className="hud-val lives-val">{game.lives}</span></div></header><main className="td-playfield">
     {game.gameState === 'idle' && <div className="td-overlay"><h2>Wave {game.wave + 1} Ready</h2><p>Pre-placed energy towers are online. Click Start to begin the assault.</p><button className="td-btn" onClick={game.startWave}>Start Wave</button></div>}
     {game.gameState === 'gameover' && <div className="td-overlay lose-overlay"><h2 className="text-red">System Offline</h2><p>The defense shield failed. Score achieved: <strong>{game.score}</strong></p><button className="td-btn btn-red" onClick={game.reset}>Restart Game</button></div>}
