@@ -1,93 +1,49 @@
 import { createAnimationPlugin } from '../createAnimationPlugin.js';
+import { toPercentKey } from '../../usecases/toPercentKey.js';
 
 const imageSequenceWarmCache = new Map();
 
-/**
- * Preload helper: caches loading state by the stringified frame list.
- * Safe for server/test environments without window.Image.
- *
- * @param {string[]} frames
- * @returns {Promise<void>}
- */
 export function warmFrames(frames) {
-  if (typeof Image === 'undefined' || typeof window === 'undefined') {
-    return Promise.resolve();
-  }
+  if (typeof Image === 'undefined' || typeof window === 'undefined') return Promise.resolve();
   const key = frames.join('\n');
-  if (imageSequenceWarmCache.has(key)) {
-    return imageSequenceWarmCache.get(key);
-  }
-
-  const promise = Promise.all(
-    frames.map(
-      (src) =>
-        new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          img.src = src;
-        })
-    )
-  ).then(() => undefined);
-
+  if (imageSequenceWarmCache.has(key)) return imageSequenceWarmCache.get(key);
+  const promise = Promise.all(frames.map((src) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+    img.src = src;
+  }))).then(() => undefined);
   imageSequenceWarmCache.set(key, promise);
   return promise;
 }
 
-// Reset cache helper for testing purposes
-export function _resetPreloadCache() {
-  imageSequenceWarmCache.clear();
-}
+export function _resetPreloadCache() { imageSequenceWarmCache.clear(); }
 
-/**
- * Image sequence plugin - handles frame-by-frame animation.
- * Animates through an array of image URLs based on normalized index.
- *
- * @returns {Object} Plugin object
- */
 export function createImageSequencePlugin() {
   return createAnimationPlugin({
     keys: ['imageSequence', 'imageSequenceIndex'],
-    lazy: false,
+    stage: 'media',
+    priority: 30,
+    outputs: { backgroundImage: { merge: 'replace' } },
     contribute(propKey, stops, elementCfg) {
       const config = elementCfg?.keyframes?.imageSequence;
-      if (!config) {
-        return { percentPatch: {}, tweenVars: {} };
-      }
-
-      if (Array.isArray(config.frames)) {
-        warmFrames(config.frames);
-      }
-
+      if (!config) return { percentPatch: {}, tweenVars: {} };
+      if (Array.isArray(config.frames)) warmFrames(config.frames);
       const percentPatch = {};
       stops.forEach((stop) => {
-        const pctKey = `${stop.p * 100}%`;
+        const pctKey = toPercentKey(stop.p);
         percentPatch[pctKey] = { imageSequenceIndex: Number(stop.v) };
-        if (stop.ease) {
-          percentPatch[pctKey].ease = stop.ease;
-        }
+        if (stop.ease) percentPatch[pctKey].ease = stop.ease;
       });
-
       return { percentPatch, tweenVars: {} };
     },
     compose(rawData, elementCfg) {
-      const config = elementCfg?.keyframes?.imageSequence;
-      if (!config || !Array.isArray(config.frames) || config.frames.length === 0) {
-        return {};
-      }
-
+      const frames = elementCfg?.keyframes?.imageSequence?.frames;
       const rawIndex = rawData.imageSequenceIndex;
-      if (rawIndex === undefined || rawIndex === null) {
-        return {};
-      }
-
-      const frames = config.frames;
+      if (!Array.isArray(frames) || !frames.length || rawIndex == null) return {};
       const idx = Math.max(0, Math.min(frames.length - 1, Math.round(rawIndex)));
-
-      return {
-        backgroundImage: `url(${frames[idx]})`
-      };
-    }
+      return { backgroundImage: `url(${frames[idx]})` };
+    },
   });
 }
 

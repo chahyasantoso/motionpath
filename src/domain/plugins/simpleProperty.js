@@ -1,31 +1,25 @@
 import { createAnimationPlugin } from '../createAnimationPlugin.js';
+import { toPercentKey } from '../../usecases/toPercentKey.js';
 
-/**
- * Factory for simple CSS property plugins (x, y, opacity, scale, rotation, etc.)
- * Each key gets its own plugin instance via this factory.
- *
- * @param {string} propKey - The CSS property key this plugin handles
- * @returns {Object} Plugin object
- */
 export function createSimplePropertyPlugin(propKey) {
   return createAnimationPlugin({
     keys: [propKey],
-    lazy: false,
+    stage: 'base',
+    priority: 10,
+    outputs: { [propKey]: { merge: 'replace' } },
     contribute(key, stops) {
       const percentPatch = {};
-      stops.forEach(stop => {
-        const pctKey = `${stop.p * 100}%`;
+      stops.forEach((stop) => {
+        const pctKey = toPercentKey(stop.p);
         percentPatch[pctKey] = { [key]: stop.v };
-        if (stop.ease) {
-          percentPatch[pctKey].ease = stop.ease;
-        }
+        if (stop.ease) percentPatch[pctKey].ease = stop.ease;
       });
       return { percentPatch, tweenVars: {} };
     },
-    compose(rawData, elementCfg) {
+    compose(rawData) {
       const patch = {};
       if (rawData[propKey] !== undefined) patch[propKey] = rawData[propKey];
       return patch;
-    }
+    },
   });
 }

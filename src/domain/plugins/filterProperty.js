@@ -1,37 +1,30 @@
 import { createAnimationPlugin } from '../createAnimationPlugin.js';
+import { toPercentKey } from '../../usecases/toPercentKey.js';
 
 const filterKeys = ['blur', 'brightness', 'contrast', 'saturate'];
 
-/**
- * Filter group plugin - handles multiple CSS filter properties.
- * Combines blur, brightness, contrast, saturate into a single filter string.
- *
- * @returns {Object} Plugin object
- */
 export function createFilterGroupPlugin() {
   return createAnimationPlugin({
     keys: filterKeys,
-    lazy: false,
+    stage: 'filter',
+    priority: 20,
+    outputs: { filter: { merge: 'shallow' } },
     contribute(key, stops) {
       const percentPatch = {};
-      stops.forEach(stop => {
-        const pctKey = `${stop.p * 100}%`;
+      stops.forEach((stop) => {
+        const pctKey = toPercentKey(stop.p);
         percentPatch[pctKey] = { [key]: stop.v };
-        if (stop.ease) {
-          percentPatch[pctKey].ease = stop.ease;
-        }
+        if (stop.ease) percentPatch[pctKey].ease = stop.ease;
       });
       return { percentPatch, tweenVars: {} };
     },
-    compose(rawData, elementCfg) {
+    compose(rawData) {
       const filterValues = {};
       for (const key of filterKeys) {
-        if (rawData[key] !== undefined) {
-          filterValues[key] = rawData[key];
-        }
+        if (rawData[key] !== undefined) filterValues[key] = rawData[key];
       }
       return Object.keys(filterValues).length ? { filter: filterValues } : {};
-    }
+    },
   });
 }
 
