@@ -4,15 +4,16 @@ import { Overlay } from '../Overlay.js';
 
 describe('orchestration lifecycle contracts', () => {
   it('Spawner stops scheduling after destroy and never spawns again', () => {
-    const clock = { add: vi.fn(), remove: vi.fn(), subscribe: vi.fn(() => () => {}) };
+    const unsubscribe = vi.fn();
+    const clock = { subscribe: vi.fn(() => unsubscribe) };
     const factory = vi.fn();
     const spawner = new Spawner({ clock, interval: 0, maxAlive: 2, waveSize: 2, factory });
     spawner.start();
-    expect(clock.add).toHaveBeenCalledTimes(1);
+    expect(clock.subscribe).toHaveBeenCalledTimes(1);
     spawner.destroy();
-    expect(clock.remove).toHaveBeenCalledTimes(1);
-    expect(() => spawner.start()).not.toThrow();
-    expect(clock.add).toHaveBeenCalledTimes(1);
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(() => spawner.start()).toThrow('Spawner is destroyed.');
+    expect(clock.subscribe).toHaveBeenCalledTimes(1);
     expect(factory).not.toHaveBeenCalled();
   });
 
