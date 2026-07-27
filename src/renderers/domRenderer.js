@@ -7,7 +7,8 @@ function isInternalKey(key) { return key.startsWith('_') || frameworkKeys.has(ke
 function normalizePatch(patch) {
   const normalized = { ...patch };
   for (const [key, serialize] of getOutputSerializers()) {
-    if (normalized[key] !== undefined && typeof serialize === 'function') normalized[key] = serialize(normalized[key]);
+    const value = normalized[key];
+    if (value !== null && typeof value === 'object' && typeof serialize === 'function') normalized[key] = serialize(value);
   }
   for (const key of Object.keys(normalized)) if (isInternalKey(key)) delete normalized[key];
   return normalized;
