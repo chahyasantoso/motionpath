@@ -27,13 +27,14 @@ export class TrackGroup {
 }
 
 export class Motion {
-  id; trigger;
+  id;
+  #triggerDelegate;
   #group; #active = false; #initialTracks = []; #masterTimeline; #staggerTransition;
-  constructor({ id, triggerDelegate, staggerTransition }) { this.id = id; this.trigger = triggerDelegate; this.#staggerTransition = staggerTransition ?? {}; }
+  constructor({ id, triggerDelegate, staggerTransition }) { this.id = id; this.#triggerDelegate = triggerDelegate; this.#staggerTransition = staggerTransition ?? {}; }
   init() {
     if (this.#active) this.destroy();
     this.#active = true;
-    this.#masterTimeline = this.trigger.build();
+    this.#masterTimeline = this.#triggerDelegate.build();
     this.#group = new TrackGroup(this.#masterTimeline, this.#staggerTransition);
     for (const { track, position } of this.#initialTracks) this.#group.mount(track, position);
     // Timeline duration is derived from real child placement. `stagger` is seconds.
@@ -41,14 +42,14 @@ export class Motion {
   mount(track, position) { if (!this.#initialTracks.some((t) => t.track.id === track.id)) this.#initialTracks.push({ track, position }); if (this.#active) this.#group.mount(track, position); }
   unmount(track) { this.#initialTracks = this.#initialTracks.filter((t) => t.track.id !== track.id); if (this.#active) this.#group.unmount(track); }
   getTrack(trackId) { if (this.#active) return this.#group.getTrack(trackId); const found = this.#initialTracks.find((t) => t.track.id === trackId); return found ? found.track : null; }
-  play() { this.trigger.play(); }
-  pause() { this.trigger.pause(); }
-  seek(p) { this.trigger.seek(p); }
-  reverse() { this.trigger.reverse(); }
-  onComplete(cb) { this.trigger.onComplete(cb); }
+  play() { this.#triggerDelegate.play(); }
+  pause() { this.#triggerDelegate.pause(); }
+  seek(p) { this.#triggerDelegate.seek(p); }
+  reverse() { this.#triggerDelegate.reverse(); }
+  onComplete(cb) { this.#triggerDelegate.onComplete(cb); }
   destroy() {
     if (!this.#active) return;
     if (this.#group) { this.#group.destroy(); this.#group = null; }
-    this.trigger.destroy(); this.#masterTimeline = null; this.#active = false;
+    this.#triggerDelegate.destroy(); this.#masterTimeline = null; this.#active = false;
   }
 }
