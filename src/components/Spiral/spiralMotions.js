@@ -6,6 +6,9 @@ export function createSpiralContainerScene({ spawnIntervalMs }) {
     trigger: { type: "time", autoplay: true },
     tracks: [
       {
+        // Runtime host for dynamically spawned balls. It is intentionally
+        // invisible; Track.addChild needs a mounted parent timeline so the
+        // Motion owns and schedules each child.
         id: "keepalive",
         duration: 1,
         keyframes: {
@@ -61,64 +64,60 @@ export function createSpiralBallScene({
   };
 }
 
-export function createSpiralTransitionScene({ ballSize }) {
-  return {
-    id: "ball-exit",
-    trigger: { type: "time", autoplay: false },
-    tracks: [
-      {
-        id: "ball-exit-track",
-        duration: 0.35,
-        keyframes: {
-          scale: {
-            stops: [
-              { p: 0, v: 1 },
-              { p: 0.35, v: 1.7 },
-              { p: 1, v: 0 },
-            ],
-          },
-          opacity: {
-            stops: [
-              { p: 0, v: 1 },
-              { p: 0.5, v: 0.9 },
-              { p: 1, v: 0 },
-            ],
-          },
-          "--ball-size": {
-            stops: [
-              { p: 0, v: `${ballSize}px` },
-              { p: 1, v: `${ballSize}px` },
-            ],
-          },
+export function createSpiralTransitionTracks({ ballSize }) {
+  return [
+    {
+      id: "ball-exit-track",
+      duration: 0.35,
+      keyframes: {
+        scale: {
+          stops: [
+            { p: 0, v: 1 },
+            { p: 0.35, v: 1.7 },
+            { p: 1, v: 0 },
+          ],
+        },
+        opacity: {
+          stops: [
+            { p: 0, v: 1 },
+            { p: 0.5, v: 0.9 },
+            { p: 1, v: 0 },
+          ],
+        },
+        "--ball-size": {
+          stops: [
+            { p: 0, v: `${ballSize}px` },
+            { p: 1, v: `${ballSize}px` },
+          ],
         },
       },
-      {
-        id: "ball-entrance-track",
-        duration: 0.35,
-        keyframes: {
-          scale: {
-            stops: [
-              { p: 0, v: 1 },
-              { p: 0.35, v: 1.7 },
-              { p: 1, v: 1 },
-            ],
-          },
-          opacity: {
-            stops: [
-              { p: 0, v: 0 },
-              { p: 1, v: 1 },
-            ],
-          },
-          "--ball-size": {
-            stops: [
-              { p: 0, v: `${ballSize}px` },
-              { p: 1, v: `${ballSize}px` },
-            ],
-          },
+    },
+    {
+      id: "ball-entrance-track",
+      duration: 0.35,
+      keyframes: {
+        scale: {
+          stops: [
+            { p: 0, v: 1 },
+            { p: 0.35, v: 1.7 },
+            { p: 1, v: 1 },
+          ],
+        },
+        opacity: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: 1 },
+          ],
+        },
+        "--ball-size": {
+          stops: [
+            { p: 0, v: `${ballSize}px` },
+            { p: 1, v: `${ballSize}px` },
+          ],
         },
       },
-    ],
-  };
+    },
+  ];
 }
 
 export function createSpiralProject({
@@ -134,7 +133,7 @@ export function createSpiralProject({
     motions: [
       createSpiralContainerScene({ spawnIntervalMs }),
       createSpiralBallScene({ spiralPathPoints, ballTravelSeconds, ballSize }),
-      createSpiralTransitionScene({ ballSize }),
     ],
+    tracks: createSpiralTransitionTracks({ ballSize }),
   };
 }

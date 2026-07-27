@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { engine } from "../engines/Engine.js";
 
 /**
@@ -6,33 +6,20 @@ import { engine } from "../engines/Engine.js";
  * Automatically unmounts the instance THROUGH the engine when the component
  * unmounts, so the engine's instance registry stays accurate (R-04).
  *
- * NOTE: The `config` parameter is mount-time-only. Changing `config` after the
- * component has mounted does not trigger a remount or update the running instance.
+ * Trigger behavior belongs in the v4 project schema. Scroll motions that need
+ * component-owned DOM refs use useScrollMotion; this hook only mounts a
+ * project-owned Motion or Track by id.
  *
  * @param {string} motionId
- * @param {Object} [config]
  * @returns {Object|null}
  */
-export default function useMotionInstance(motionId, config) {
+export default function useMotionInstance(motionId) {
   const [instance, setInstance] = useState(null);
-  const initialConfigRef = useRef(config);
-  const warnedConfigChangeRef = useRef(false);
-
-  if (
-    import.meta.env?.DEV &&
-    !warnedConfigChangeRef.current &&
-    initialConfigRef.current !== config
-  ) {
-    warnedConfigChangeRef.current = true;
-    console.warn(
-      "[useMotionInstance] config is mount-time-only. Changing config after mount has no effect.",
-    );
-  }
 
   useEffect(() => {
     if (!motionId) return undefined;
 
-    const inst = engine.mountInstance(motionId, initialConfigRef.current);
+    const inst = engine.mountInstance(motionId);
     if (!inst) return undefined;
 
     setInstance(inst);
