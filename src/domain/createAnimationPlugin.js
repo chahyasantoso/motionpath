@@ -1,16 +1,19 @@
 /**
  * Functional plugin factory.
  *
- * `priority` controls deterministic composition order. Lower values compose
- * first. `outputs` declares render keys emitted by compose(), allowing the
- * compiler to reject ambiguous overlaps instead of relying on JSON key order.
+ * `priority` controls deterministic composition order. `outputs` declares
+ * render keys emitted by compose(), while `internalKeys` identifies proxy
+ * state that must never reach a renderer. `prepare` is an optional async
+ * preflight hook run by parseV4Project before the project is returned.
  */
 export function createAnimationPlugin({
   keys = [],
   lazy = false,
   claimsKey,
+  claimsWildcard = false,
   contribute,
   compose,
+  prepare,
   stage = 'default',
   priority = 0,
   outputs = {},
@@ -19,6 +22,7 @@ export function createAnimationPlugin({
   return {
     keys,
     lazy,
+    claimsWildcard,
     stage,
     priority,
     outputs,
@@ -26,5 +30,6 @@ export function createAnimationPlugin({
     claimsKey: claimsKey || ((key) => keys.includes(key)),
     contribute: contribute || (() => ({ percentPatch: {}, tweenVars: {} })),
     compose: compose || (() => ({})),
+    ...(typeof prepare === 'function' ? { prepare } : {}),
   };
 }
