@@ -3,7 +3,7 @@ import { Engine } from '../Engine.js';
 import { createTrack } from '../../lib/createTrack.js';
 
 const project = {
-  schemaVersion: 2,
+  schemaVersion: 4,
   projectId: 'engine-test',
   motions: [
     {
