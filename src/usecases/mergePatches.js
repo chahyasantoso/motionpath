@@ -1,0 +1,10 @@
+export function mergePatches(patchA, patchB) {
+  if (!patchA) return patchB || {};
+  if (!patchB) return patchA || {};
+  const merged = { ...patchA };
+  for (const [key, value] of Object.entries(patchB)) {
+    if (value && typeof value === 'object' && !Array.isArray(value) && merged[key] && typeof merged[key] === 'object' && !Array.isArray(merged[key])) merged[key] = { ...merged[key], ...value };
+    else merged[key] = value;
+  }
+  return merged;
+}
