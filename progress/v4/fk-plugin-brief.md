@@ -84,8 +84,8 @@ Run `npx vitest run`. Must still pass (no tests for this file yet — that's fin
 New file. Exact content:
 
 ```js
-import { createAnimationPlugin } from '../createAnimationPlugin.js';
-import { composeWorld } from '../../lib/fkMath.js';
+import { createAnimationPlugin } from "../createAnimationPlugin.js";
+import { composeWorld } from "../../lib/fkMath.js";
 
 /**
  * FK plugin — forward-kinematic joint accumulation.
@@ -101,13 +101,13 @@ import { composeWorld } from '../../lib/fkMath.js';
  * boneLength becomes its world x, rotation stays 0.
  */
 export const fkPlugin = createAnimationPlugin({
-  keys: ['boneLength'],
+  keys: ["boneLength"],
   lazy: false,
   claimsKey(k) {
-    return k === 'boneLength' || k === 'parentWorld';
+    return k === "boneLength" || k === "parentWorld";
   },
   contribute(propKey, stops) {
-    if (propKey !== 'boneLength') return { percentPatch: {}, tweenVars: {} };
+    if (propKey !== "boneLength") return { percentPatch: {}, tweenVars: {} };
     const percentPatch = {};
     stops.forEach((s) => {
       percentPatch[`${s.p * 100}%`] = { boneLength: s.v };
@@ -137,7 +137,7 @@ Add the import and include it in `ALL_PLUGINS`. Minimal diff:
 
 ```js
 // add after existing imports:
-import { fkPlugin } from './plugins/fkPlugin.js';
+import { fkPlugin } from "./plugins/fkPlugin.js";
 
 // add to ALL_PLUGINS array (before the unsupported lazy plugins):
 export const ALL_PLUGINS = [
@@ -147,11 +147,11 @@ export const ALL_PLUGINS = [
   pathPlugin,
   cssVarPlugin,
   imageSequencePlugin,
-  fkPlugin,           // ← add this line
+  fkPlugin, // ← add this line
   splitTextPlugin,
   morphSvgPlugin,
   drawSvgPlugin,
-  scrambleTextPlugin
+  scrambleTextPlugin,
 ];
 ```
 
@@ -279,18 +279,20 @@ Run `npx vitest run`. Must still pass.
 Add a new describe block in `src/lib/__tests__/Track.test.js` (do NOT remove any existing tests):
 
 ```js
-describe('setObserved role:input (FK plugin pre-fold)', () => {
-  it('injects parentWorld into rawData before plugins run', () => {
+describe("setObserved role:input (FK plugin pre-fold)", () => {
+  it("injects parentWorld into rawData before plugins run", () => {
     // parent: a plain track at progress 0.5 → x:50, y:100
-    const parent = createDummyTrack('fk-parent');
+    const parent = createDummyTrack("fk-parent");
     parent.progress(0.5);
 
     // child: observes parent with role:'input', mapFn injects parentWorld
-    const child = createDummyTrack('fk-child');
+    const child = createDummyTrack("fk-child");
     child.setObserved(
       parent,
-      (pw) => ({ parentWorld: { x: pw.x ?? 0, y: pw.y ?? 0, rotation: pw.rotation ?? 0 } }),
-      { role: 'input' }
+      (pw) => ({
+        parentWorld: { x: pw.x ?? 0, y: pw.y ?? 0, rotation: pw.rotation ?? 0 },
+      }),
+      { role: "input" },
     );
 
     // The child's own plugin (test dummy) receives rawData with parentWorld injected.
@@ -299,26 +301,26 @@ describe('setObserved role:input (FK plugin pre-fold)', () => {
     expect(() => child.compose()).not.toThrow();
   });
 
-  it('role:output (default) still applies after plugins — existing behavior unchanged', () => {
-    const source = createDummyTrack('role-output-source');
+  it("role:output (default) still applies after plugins — existing behavior unchanged", () => {
+    const source = createDummyTrack("role-output-source");
     source.progress(1);
-    const follower = createDummyTrack('role-output-follower');
+    const follower = createDummyTrack("role-output-follower");
     // default role is 'output' — fold overrides follower's own transform
     follower.setObserved(source, (pw) => ({ transform: pw.transform }));
-    expect(follower.compose().transform).toBe('translate3d(100px, 200px, 0px)');
+    expect(follower.compose().transform).toBe("translate3d(100px, 200px, 0px)");
   });
 
-  it('input fold runs before output fold within the same compose() call', () => {
+  it("input fold runs before output fold within the same compose() call", () => {
     // source provides parentWorld via input fold
-    const source = createDummyTrack('order-source');
+    const source = createDummyTrack("order-source");
     source.progress(0.5);
 
-    const joint = createDummyTrack('order-joint');
+    const joint = createDummyTrack("order-joint");
     const inputSpy = vi.fn((pw) => ({ parentWorld: pw }));
-    const outputSpy = vi.fn((pw) => ({ tag: 'output' }));
+    const outputSpy = vi.fn((pw) => ({ tag: "output" }));
 
-    joint.setObserved(source, inputSpy, { role: 'input' });
-    joint.setObserved(source, outputSpy, { role: 'output' });
+    joint.setObserved(source, inputSpy, { role: "input" });
+    joint.setObserved(source, outputSpy, { role: "output" });
 
     joint.compose();
 
@@ -332,16 +334,20 @@ describe('setObserved role:input (FK plugin pre-fold)', () => {
 Add a test for `applyAnchor` offset in `src/lib/__tests__/applyAnchor.test.js` (or create it if absent):
 
 ```js
-it('applies pixel offset additively on top of patch x/y', () => {
-  const patch = { x: 50, y: 100, transform: 'translate3d(50px, 100px, 0px)' };
-  const result = applyAnchor(patch, { xPercent: -50, yPercent: -50, offset: { x: 10, y: -5 } });
+it("applies pixel offset additively on top of patch x/y", () => {
+  const patch = { x: 50, y: 100, transform: "translate3d(50px, 100px, 0px)" };
+  const result = applyAnchor(patch, {
+    xPercent: -50,
+    yPercent: -50,
+    offset: { x: 10, y: -5 },
+  });
   expect(result.x).toBe(60);
   expect(result.y).toBe(95);
   expect(result.xPercent).toBe(-50);
   expect(result.offset).toBeUndefined(); // must not leak to gsap.set
 });
 
-it('omitting offset leaves x/y untouched', () => {
+it("omitting offset leaves x/y untouched", () => {
   const patch = { x: 50, y: 100 };
   const result = applyAnchor(patch, { xPercent: -50, yPercent: -50 });
   expect(result.x).toBe(50);
@@ -370,9 +376,9 @@ const asParent = (pw) => ({
 // forearm observes upperArm via input fold
 // hand observes forearm via input fold
 
-upperArm.setObserved(shoulder, asParent, { role: 'input' });
-forearm.setObserved(upperArm,  asParent, { role: 'input' });
-hand.setObserved(forearm,      asParent, { role: 'input' });
+upperArm.setObserved(shoulder, asParent, { role: "input" });
+forearm.setObserved(upperArm, asParent, { role: "input" });
+hand.setObserved(forearm, asParent, { role: "input" });
 
 // hand.compose() should return { x: ~240, y: 0, rotation: 0 } for a straight arm
 // (3 × boneLength=80, no rotation).

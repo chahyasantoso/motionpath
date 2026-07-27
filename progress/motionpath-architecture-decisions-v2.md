@@ -1,6 +1,6 @@
 # MotionPath — Engine Architecture Decisions (v2)
 
-Companion to `motionpath-schema-v2-full.md` (the *what*). This is the *why*.
+Companion to `motionpath-schema-v2-full.md` (the _what_). This is the _why_.
 Mirrors v1's `Engine_Architecture_Decisions.md` structurally, but every claim
 here is re-derived from `v2` source (`v2` @ `bcbc46f`), not carried over from
 the v1 doc by assumption — several things genuinely changed shape, not just
@@ -12,8 +12,8 @@ vocabulary.
 
 v1 had one motion shape (`scenario`) with one lifecycle: schema → eager build
 → real GSAP timeline → triggered by scroll or time → subscribed/composed to
-the DOM. That lifecycle is correct for anything the *page* owns the timing
-of. It's structurally wrong for anything an *external system* owns the
+the DOM. That lifecycle is correct for anything the _page_ owns the timing
+of. It's structurally wrong for anything an _external system_ owns the
 timing of — a game loop deciding an enemy's progress every frame, a headless
 caller resolving a frame of animation with no DOM at all.
 
@@ -28,7 +28,7 @@ v2 introduces `driver.type`, exactly two values:
   resolved on demand via `resolveMotion(motionId, progress, overrides?)`,
   returns a plain numeric patch the caller applies however it wants.
 
-This is a real fork in *lifecycle*, not a config toggle — which is why it's
+This is a real fork in _lifecycle_, not a config toggle — which is why it's
 modeled as two driver types with mutually exclusive field sets (enforced by
 `motion-structure.js`: `trigger`/`sectionId`/`timelineId`/`primary`/`stagger`
 are all build-time errors on `delegate`), rather than one motion shape with
@@ -85,7 +85,7 @@ delegate motion's resolution needs no knowledge of ScrollTrigger, no
 knowledge of `timelineId` grouping, no knowledge of anything
 `buildProject`'s eager pipeline computes for `timeline`-driver motions.
 Coupling it to `buildResult` would mean every delegate resolution silently
-depends on the *entire* project having been successfully eager-built first —
+depends on the _entire_ project having been successfully eager-built first —
 true today, but an unnecessary dependency for a code path whose entire
 purpose is being usable independently, per-entity, per-frame, potentially at
 high call volume.
@@ -136,7 +136,7 @@ independently triggerable. A `resolveTemplateFrame()`-style API resolving
 templates directly, bypassing `motion`, was considered (see §3.2) and
 rejected for the same reason: it would create a second, divergent way to get
 animation data out of the engine, alongside `resolveMotion`. Templates exist
-to be *referenced* (`track.use`), never resolved on their own.
+to be _referenced_ (`track.use`), never resolved on their own.
 
 ### 4.1 Why the Track+Template Merge Is Whole-Key Replacement, Not Deep Merge
 
@@ -161,7 +161,7 @@ consolidation, "Brief 10"). Each property still tweens independently through
 the normal keyframes mechanism — the consolidation is only in `compose()`,
 which merges whichever subset is present into one `{ filter: {...} }` object.
 The reason for one plugin rather than four: CSS's `filter` property is a
-single string built from *all* active filter functions together
+single string built from _all_ active filter functions together
 (`"blur(4px) brightness(1.1)"`), so composing them independently and trying
 to merge four separate string fragments after the fact is strictly harder
 than owning the merge in one place from the start. This is the general
@@ -220,7 +220,7 @@ present in `rawData` but outside the track's build-time-resolved set.
 `resolveMotion` has no equivalent. This is a real difference in what each
 caller needs, not leftover drift: the DOM path supports `useMotionSubscriber`'s
 `transformFn` argument, which lets a caller mutate raw data (e.g. inject a
-key, clamp a value) *after* the track was built — the fallback scan is what
+key, clamp a value) _after_ the track was built — the fallback scan is what
 lets `compose()` still route an unexpected key to the right plugin when that
 happens. `resolveMotion`'s `rawData` always comes straight from its own
 tween's proxy, with no equivalent injection point, so the set of keys it

@@ -28,28 +28,37 @@ the engines actually set. Do not touch `ProductionEngine.js` or
 on that side; `MotionInstance.js` is the one that drifted.
 
 ### If you have NOT yet applied the `#ownsTrigger()` extraction (Change 5 of
+
 `brief-motioninstance-reflow-addendum.md`), do this first, as plain WRONG/CORRECT:
 
 **WRONG:**
+
 ```js
-      const shouldPlay = !config.parentId && !config._groupMember && (config.autoplay ?? true);
+const shouldPlay =
+  !config.parentId && !config._groupMember && (config.autoplay ?? true);
 ```
+
 ```js
       if (!config.parentId && !config._groupMember) {
 ```
 
 **CORRECT:**
+
 ```js
-      const shouldPlay = !config.parentId && !config._suppressDriver && (config.autoplay ?? true);
+const shouldPlay =
+  !config.parentId && !config._suppressDriver && (config.autoplay ?? true);
 ```
+
 ```js
       if (!config.parentId && !config._suppressDriver) {
 ```
 
 ### If you HAVE already applied that addendum's `#ownsTrigger()` extraction,
+
 fix it there instead — same rename, one place:
 
 **WRONG:**
+
 ```js
   #ownsTrigger(config) {
     return !config.parentId && !config._groupMember;
@@ -57,6 +66,7 @@ fix it there instead — same rename, one place:
 ```
 
 **CORRECT:**
+
 ```js
   #ownsTrigger(config) {
     return !config.parentId && !config._suppressDriver;
@@ -82,6 +92,7 @@ privately, and forwarded into every `mountInstance` call's context.
 through at all.
 
 **WRONG (current, `src/engines/BaseEngine.js`):**
+
 ```js
   #resolveElement;
 
@@ -101,6 +112,7 @@ through at all.
 ```
 
 **CORRECT:**
+
 ```js
   #resolveElement;
   #reflowSiblings;
@@ -129,28 +141,30 @@ already falls back to its internal default when `context.reflowSiblings` is
 duplicate that fallback at this layer too.
 
 **WRONG (current, `mountInstance` method, same file):**
+
 ```js
-    const instance = createMotionInstance(motionId, effectiveConfig, {
-      project: this._project,
-      resolveElement: this.#resolveElement,
-      mountInstance: (childMotionId, childConfig) => {
-        return this.mountInstance(childMotionId, childConfig);
-      },
-      onSubscriberChange
-    });
+const instance = createMotionInstance(motionId, effectiveConfig, {
+  project: this._project,
+  resolveElement: this.#resolveElement,
+  mountInstance: (childMotionId, childConfig) => {
+    return this.mountInstance(childMotionId, childConfig);
+  },
+  onSubscriberChange,
+});
 ```
 
 **CORRECT:**
+
 ```js
-    const instance = createMotionInstance(motionId, effectiveConfig, {
-      project: this._project,
-      resolveElement: this.#resolveElement,
-      mountInstance: (childMotionId, childConfig) => {
-        return this.mountInstance(childMotionId, childConfig);
-      },
-      onSubscriberChange,
-      reflowSiblings: this.#reflowSiblings
-    });
+const instance = createMotionInstance(motionId, effectiveConfig, {
+  project: this._project,
+  resolveElement: this.#resolveElement,
+  mountInstance: (childMotionId, childConfig) => {
+    return this.mountInstance(childMotionId, childConfig);
+  },
+  onSubscriberChange,
+  reflowSiblings: this.#reflowSiblings,
+});
 ```
 
 ## Non-goals
@@ -175,17 +189,17 @@ block, using the same `createTestInstance(motionId, config, schemaMotion)`
 pattern already used by every other test in that block:
 
 ```js
-it('does NOT create its own ScrollTrigger when config._suppressDriver is set (timelineId group member)', () => {
+it("does NOT create its own ScrollTrigger when config._suppressDriver is set (timelineId group member)", () => {
   const scrollSchema = {
-    motionId: 'scroll-motion',
+    motionId: "scroll-motion",
     driver: {
-      type: 'gsap-scroll',
-      trigger: { trigger: '#el', scrub: true }
+      type: "gsap-scroll",
+      trigger: { trigger: "#el", scrub: true },
     },
-    tracks: []
+    tracks: [],
   };
 
-  createTestInstance('scroll-motion', { _suppressDriver: true }, scrollSchema);
+  createTestInstance("scroll-motion", { _suppressDriver: true }, scrollSchema);
   expect(ScrollTrigger.create).not.toHaveBeenCalled();
 });
 ```
@@ -193,7 +207,7 @@ it('does NOT create its own ScrollTrigger when config._suppressDriver is set (ti
 This is the exact config shape `ProductionEngine._configForMount` and
 `EditorEngine._configForMount` actually produce for a non-primary group
 member (`{ ...config, _suppressDriver: true }`) — it directly exercises the
-bug this brief fixes. If you run this test against the file *before* Bug 1's
+bug this brief fixes. If you run this test against the file _before_ Bug 1's
 fix, it should fail (proving the test is real, not vacuous); after the fix,
 it should pass. Confirm both, don't just add it and check the final state.
 

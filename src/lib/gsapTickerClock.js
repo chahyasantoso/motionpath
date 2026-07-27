@@ -1,4 +1,4 @@
-import { gsap } from 'gsap';
+import { gsap } from "gsap";
 
 /** Adapter that gives orchestration code one shared GSAP-owned clock. */
 export const gsapTickerClock = {

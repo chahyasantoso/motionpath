@@ -29,7 +29,12 @@
 .spiral-scene {
   position: relative;
   height: 100vh;
-  background: radial-gradient(ellipse at 50% 40%, #0d0025 0%, #030310 55%, #010108 100%);
+  background: radial-gradient(
+    ellipse at 50% 40%,
+    #0d0025 0%,
+    #030310 55%,
+    #010108 100%
+  );
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -52,23 +57,27 @@
   position: absolute;
   /* Glossy sphere: inner highlight + solid ball color */
   background:
-    radial-gradient(circle at 38% 32%, rgba(255, 255, 255, 0.55) 0%, transparent 55%),
+    radial-gradient(
+      circle at 38% 32%,
+      rgba(255, 255, 255, 0.55) 0%,
+      transparent 55%
+    ),
     radial-gradient(circle at 62% 68%, rgba(0, 0, 0, 0.25) 0%, transparent 55%),
     var(--ball-color, #7c5cff);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3);
   cursor: pointer;
   pointer-events: auto;
   top: 0;
   left: 0;
   transform-origin: center center;
-  transition: box-shadow 0.15s ease, filter 0.15s ease;
+  transition:
+    box-shadow 0.15s ease,
+    filter 0.15s ease;
   will-change: transform, opacity;
 }
 
 .spiral-ball:hover {
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4);
   filter: brightness(1.25);
 }
 

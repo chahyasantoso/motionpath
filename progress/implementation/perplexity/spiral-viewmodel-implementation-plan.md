@@ -29,14 +29,14 @@ This works, but it spreads responsibility across too many places.
 
 The refactor should end in this shape [cite:4]:
 
-| Layer | Responsibility |
-|---|---|
-| `spiralConfig.js` / `spiralPath.js` | Pure config and path math |
-| `spiralMotions.js` | Motion schema creation |
-| `useSpiralWaveController.js` | Ball lifecycle, wave spawning, entrance/exit transitions, removal |
-| `useSpiralPageViewModel.js` | Small page-facing adapter returning renderable view data |
-| `SpiralPage.jsx` | Presentational page only |
-| `SpiralBall.jsx` | Bind one `BallVm` to DOM with `useMotionSubscriber` |
+| Layer                               | Responsibility                                                    |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| `spiralConfig.js` / `spiralPath.js` | Pure config and path math                                         |
+| `spiralMotions.js`                  | Motion schema creation                                            |
+| `useSpiralWaveController.js`        | Ball lifecycle, wave spawning, entrance/exit transitions, removal |
+| `useSpiralPageViewModel.js`         | Small page-facing adapter returning renderable view data          |
+| `SpiralPage.jsx`                    | Presentational page only                                          |
+| `SpiralBall.jsx`                    | Bind one `BallVm` to DOM with `useMotionSubscriber`               |
 
 The page should no longer manage ball ids, instance maps, or child removal directly [cite:4].
 
@@ -83,9 +83,9 @@ type BallVm = {
 
   baseInstance: MotionInstance;
   activeInstance: MotionInstance;
-  activeTrackId: 'ball-track' | 'ball-entrance-track' | 'ball-exit-track';
+  activeTrackId: "ball-track" | "ball-entrance-track" | "ball-exit-track";
 
-  status: 'spawning' | 'active' | 'exiting';
+  status: "spawning" | "active" | "exiting";
   isClickable: boolean;
 
   onClick: () => void;
@@ -119,11 +119,26 @@ Create:
 ### `spiralConfig.js`
 
 ```ts
-export const SPIRAL_CONFIG = { cx: 640, cy: 360, outerR: 340, innerR: 32, turns: 3.5 };
+export const SPIRAL_CONFIG = {
+  cx: 640,
+  cy: 360,
+  outerR: 340,
+  innerR: 32,
+  turns: 3.5,
+};
 export const BALL_COLORS = [
-  '#ff6bca', '#7c5cff', '#00e5ff', '#ffb347',
-  '#69ff47', '#ff4747', '#ffd700', '#b0ff47',
-  '#ff69b4', '#00ffaa', '#ff8c00', '#44aaff',
+  "#ff6bca",
+  "#7c5cff",
+  "#00e5ff",
+  "#ffb347",
+  "#69ff47",
+  "#ff4747",
+  "#ffd700",
+  "#b0ff47",
+  "#ff69b4",
+  "#00ffaa",
+  "#ff8c00",
+  "#44aaff",
 ];
 export const BALL_SIZE = 50;
 export const BALL_SPEED = 120;
@@ -166,7 +181,7 @@ export function createSpiralProject({
 }) {
   return {
     schemaVersion: 2,
-    projectId: 'spiral-zuma-page',
+    projectId: "spiral-zuma-page",
     perspective: 1200,
     motions: [
       createSpiralContainerScene({ spawnIntervalMs }),
@@ -192,8 +207,8 @@ export function createBallVm({ id, color, baseInstance }) {
     color,
     baseInstance,
     activeInstance: baseInstance,
-    activeTrackId: 'ball-track',
-    status: 'active',
+    activeTrackId: "ball-track",
+    status: "active",
     isClickable: true,
     onClick: () => {},
   };
@@ -246,15 +261,17 @@ Add small helpers:
 
 ```ts
 function getBallVm(ballId) {
-  return ballVmsRef.current.find(ball => ball.id === ballId) ?? null;
+  return ballVmsRef.current.find((ball) => ball.id === ballId) ?? null;
 }
 
 function updateBallVm(ballId, patch) {
-  setBallVms(prev => prev.map(ball => ball.id === ballId ? { ...ball, ...patch } : ball));
+  setBallVms((prev) =>
+    prev.map((ball) => (ball.id === ballId ? { ...ball, ...patch } : ball)),
+  );
 }
 
 function removeBallVm(ballId) {
-  setBallVms(prev => prev.filter(ball => ball.id !== ballId));
+  setBallVms((prev) => prev.filter((ball) => ball.id !== ballId));
 }
 ```
 
@@ -281,7 +298,7 @@ Suggested pseudocode:
 function spawnBall() {
   if (!containerInstance) return;
 
-  const baseInstance = containerInstance.addChild('spiral-zuma');
+  const baseInstance = containerInstance.addChild("spiral-zuma");
   if (!baseInstance) return;
 
   const id = ++ballCounterRef.current;
@@ -290,13 +307,13 @@ function spawnBall() {
   const vm = createBallVm({ id, color, baseInstance });
   vm.onClick = () => startExit(id);
 
-  setBallVms(prev => [...prev, vm]);
+  setBallVms((prev) => [...prev, vm]);
   startEntrance(id);
 
   baseInstance.onComplete(() => {
     const current = getBallVm(id);
     if (!current) return;
-    if (current.status !== 'active') return;
+    if (current.status !== "active") return;
     startExit(id);
   });
 }
@@ -334,13 +351,13 @@ function startEntrance(ballId) {
   const current = getBallVm(ballId);
   if (!current) return;
 
-  const entranceInstance = productionEngine.mountInstance('ball-exit');
+  const entranceInstance = productionEngine.mountInstance("ball-exit");
   if (!entranceInstance) return;
 
   updateBallVm(ballId, {
     activeInstance: entranceInstance,
-    activeTrackId: 'ball-entrance-track',
-    status: 'spawning',
+    activeTrackId: "ball-entrance-track",
+    status: "spawning",
     isClickable: false,
   });
 
@@ -353,8 +370,8 @@ function startEntrance(ballId) {
 
     updateBallVm(ballId, {
       activeInstance: latest.baseInstance,
-      activeTrackId: 'ball-track',
-      status: 'active',
+      activeTrackId: "ball-track",
+      status: "active",
       isClickable: true,
     });
   });
@@ -390,9 +407,9 @@ Suggested pseudocode:
 function startExit(ballId) {
   const current = getBallVm(ballId);
   if (!current) return;
-  if (current.status === 'exiting') return;
+  if (current.status === "exiting") return;
 
-  const exitInstance = productionEngine.mountInstance('ball-exit');
+  const exitInstance = productionEngine.mountInstance("ball-exit");
   if (!exitInstance) {
     containerInstance?.removeChild(current.baseInstance);
     removeBallVm(ballId);
@@ -401,8 +418,8 @@ function startExit(ballId) {
 
   updateBallVm(ballId, {
     activeInstance: exitInstance,
-    activeTrackId: 'ball-exit-track',
-    status: 'exiting',
+    activeTrackId: "ball-exit-track",
+    status: "exiting",
     isClickable: false,
   });
 
@@ -447,35 +464,45 @@ The component should:
 Suggested implementation shape:
 
 ```jsx
-import { useCallback, useRef } from 'react';
-import useMotionSubscriber from '../../hooks/useMotionSubscriber';
+import { useCallback, useRef } from "react";
+import useMotionSubscriber from "../../hooks/useMotionSubscriber";
 
 export default function SpiralBall({ vm }) {
   const ref = useRef(null);
 
-  const transform = useCallback((rawData, composeFn) => {
-    if (vm.activeTrackId === 'ball-exit-track' || vm.activeTrackId === 'ball-entrance-track') {
-      const currentParentSnapshot = vm.baseInstance.getCurrentSnapshot('ball-track');
-      if (!currentParentSnapshot) return composeFn(rawData);
+  const transform = useCallback(
+    (rawData, composeFn) => {
+      if (
+        vm.activeTrackId === "ball-exit-track" ||
+        vm.activeTrackId === "ball-entrance-track"
+      ) {
+        const currentParentSnapshot =
+          vm.baseInstance.getCurrentSnapshot("ball-track");
+        if (!currentParentSnapshot) return composeFn(rawData);
 
-      const parentComposed = vm.baseInstance.compose('ball-track', currentParentSnapshot);
-      const transitionData = composeFn(rawData);
+        const parentComposed = vm.baseInstance.compose(
+          "ball-track",
+          currentParentSnapshot,
+        );
+        const transitionData = composeFn(rawData);
 
-      return {
-        ...parentComposed,
-        ...transitionData,
-        display: 'flex',
-      };
-    }
+        return {
+          ...parentComposed,
+          ...transitionData,
+          display: "flex",
+        };
+      }
 
-    const p = rawData.pathProgress ?? 0;
-    if (p <= 0 || p >= 1) {
-      return { display: 'none', opacity: 0 };
-    }
+      const p = rawData.pathProgress ?? 0;
+      if (p <= 0 || p >= 1) {
+        return { display: "none", opacity: 0 };
+      }
 
-    const composed = composeFn(rawData);
-    return { ...composed, display: 'flex' };
-  }, [vm]);
+      const composed = composeFn(rawData);
+      return { ...composed, display: "flex" };
+    },
+    [vm],
+  );
 
   useMotionSubscriber(vm.activeInstance, vm.activeTrackId, ref, transform);
 
@@ -484,7 +511,7 @@ export default function SpiralBall({ vm }) {
       ref={ref}
       className="element spiral-ball"
       onClick={vm.isClickable ? vm.onClick : undefined}
-      style={{ '--ball-color': vm.color }}
+      style={{ "--ball-color": vm.color }}
     />
   );
 }
@@ -598,10 +625,14 @@ useEffect(() => {
 
   const tick = () => {
     if (spawnedCountRef.current < 30) {
-      const lastBall = ballVmsRef.current[ballVmsRef.current.length - 1] ?? null;
+      const lastBall =
+        ballVmsRef.current[ballVmsRef.current.length - 1] ?? null;
       const lastInstance = lastBall?.baseInstance ?? null;
 
-      if (!lastInstance || lastInstance.timeline.progress() >= MIN_SPAWN_PROGRESS) {
+      if (
+        !lastInstance ||
+        lastInstance.timeline.progress() >= MIN_SPAWN_PROGRESS
+      ) {
         spawnBall();
         spawnedCountRef.current += 1;
       }

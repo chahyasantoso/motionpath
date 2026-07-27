@@ -13,7 +13,7 @@
 ```js
 // src/engines/EditorEngine.js
 for (const trackId of inst.tracksMap.keys()) {
-  this.#trackIndex.set(trackId, inst);   // no motionId in the key
+  this.#trackIndex.set(trackId, inst); // no motionId in the key
 }
 ```
 
@@ -58,23 +58,23 @@ export function elementUniquenessRule(motions, context) {
   }
 
   motions.forEach((motion, motionIndex) => {
-    if (!motion || typeof motion !== 'object') return;
+    if (!motion || typeof motion !== "object") return;
     const tracks = motion.tracks;
     if (!Array.isArray(tracks)) return;
 
     const seenIds = new Set();
 
     tracks.forEach((track, trackIndex) => {
-      if (!track || typeof track !== 'object') return;
+      if (!track || typeof track !== "object") return;
       const { id } = track;
-      if (id !== undefined && id !== null && id !== '') {
+      if (id !== undefined && id !== null && id !== "") {
         const tid = String(id);
         if (seenIds.has(tid)) {
           errors.push({
             ruleId: "element-uniqueness",
             severity: "error",
             message: `Duplicate track ID '${tid}' found within the same motion (motion index: ${motionIndex}).`,
-            path: `motions[${motionIndex}].tracks[${trackIndex}].id`
+            path: `motions[${motionIndex}].tracks[${trackIndex}].id`,
           });
         } else {
           seenIds.add(tid);
@@ -123,24 +123,25 @@ export function elementUniquenessRule(motions, context) {
   const seenIds = new Map(); // trackId -> { motionIndex, trackIndex }
 
   motions.forEach((motion, motionIndex) => {
-    if (!motion || typeof motion !== 'object') return;
+    if (!motion || typeof motion !== "object") return;
     const tracks = motion.tracks;
     if (!Array.isArray(tracks)) return;
 
     tracks.forEach((track, trackIndex) => {
-      if (!track || typeof track !== 'object') return;
+      if (!track || typeof track !== "object") return;
       const { id } = track;
-      if (id !== undefined && id !== null && id !== '') {
+      if (id !== undefined && id !== null && id !== "") {
         const tid = String(id);
         const first = seenIds.get(tid);
         if (first) {
           errors.push({
             ruleId: "element-uniqueness",
             severity: "error",
-            message: `Duplicate track ID '${tid}' found in motions[${motionIndex}].tracks[${trackIndex}] ` +
+            message:
+              `Duplicate track ID '${tid}' found in motions[${motionIndex}].tracks[${trackIndex}] ` +
               `(already used in motions[${first.motionIndex}].tracks[${first.trackIndex}]). ` +
               `Track IDs must be unique project-wide, not just within a motion.`,
-            path: `motions[${motionIndex}].tracks[${trackIndex}].id`
+            path: `motions[${motionIndex}].tracks[${trackIndex}].id`,
           });
         } else {
           seenIds.set(tid, { motionIndex, trackIndex });
@@ -159,65 +160,65 @@ The existing test `'should pass when the same track ID is used across different 
 
 ```js
 // src/validators/rules/__tests__/element-uniqueness.test.js
-import { describe, it, expect } from 'vitest';
-import { elementUniquenessRule } from '../element-uniqueness.js';
+import { describe, it, expect } from "vitest";
+import { elementUniquenessRule } from "../element-uniqueness.js";
 
-describe('element-uniqueness rule', () => {
-  it('should pass when track IDs are unique across the whole project', () => {
+describe("element-uniqueness rule", () => {
+  it("should pass when track IDs are unique across the whole project", () => {
     const motions = [
       {
-        tracks: [{ id: 'el-1' }, { id: 'el-2' }]
+        tracks: [{ id: "el-1" }, { id: "el-2" }],
       },
       {
-        tracks: [{ id: 'el-3' }]
-      }
+        tracks: [{ id: "el-3" }],
+      },
     ];
     const errors = elementUniquenessRule(motions);
     expect(errors).toHaveLength(0);
   });
 
-  it('should error when a track ID is duplicated within the same motion', () => {
+  it("should error when a track ID is duplicated within the same motion", () => {
     const motions = [
       {
-        tracks: [{ id: 'el-1' }, { id: 'el-1' }]
-      }
+        tracks: [{ id: "el-1" }, { id: "el-1" }],
+      },
     ];
     const errors = elementUniquenessRule(motions);
     expect(errors).toHaveLength(1);
-    expect(errors[0].ruleId).toBe('element-uniqueness');
-    expect(errors[0].severity).toBe('error');
-    expect(errors[0].path).toBe('motions[0].tracks[1].id');
+    expect(errors[0].ruleId).toBe("element-uniqueness");
+    expect(errors[0].severity).toBe("error");
+    expect(errors[0].path).toBe("motions[0].tracks[1].id");
     expect(errors[0].message).toContain("Duplicate track ID 'el-1'");
   });
 
-  it('should error when the same track ID is used across different motions', () => {
+  it("should error when the same track ID is used across different motions", () => {
     const motions = [
       {
-        tracks: [{ id: 'el-1' }]
+        tracks: [{ id: "el-1" }],
       },
       {
-        tracks: [{ id: 'el-1' }]
-      }
+        tracks: [{ id: "el-1" }],
+      },
     ];
     const errors = elementUniquenessRule(motions);
     expect(errors).toHaveLength(1);
-    expect(errors[0].ruleId).toBe('element-uniqueness');
-    expect(errors[0].severity).toBe('error');
-    expect(errors[0].path).toBe('motions[1].tracks[0].id');
+    expect(errors[0].ruleId).toBe("element-uniqueness");
+    expect(errors[0].severity).toBe("error");
+    expect(errors[0].path).toBe("motions[1].tracks[0].id");
     expect(errors[0].message).toContain("Duplicate track ID 'el-1'");
-    expect(errors[0].message).toContain('motions[0].tracks[0]');
+    expect(errors[0].message).toContain("motions[0].tracks[0]");
   });
 
-  it('should report each duplicate independently when the same ID repeats 3+ times', () => {
+  it("should report each duplicate independently when the same ID repeats 3+ times", () => {
     const motions = [
-      { tracks: [{ id: 'el-1' }] },
-      { tracks: [{ id: 'el-1' }] },
-      { tracks: [{ id: 'el-1' }] }
+      { tracks: [{ id: "el-1" }] },
+      { tracks: [{ id: "el-1" }] },
+      { tracks: [{ id: "el-1" }] },
     ];
     const errors = elementUniquenessRule(motions);
     expect(errors).toHaveLength(2);
-    expect(errors[0].path).toBe('motions[1].tracks[0].id');
-    expect(errors[1].path).toBe('motions[2].tracks[0].id');
+    expect(errors[0].path).toBe("motions[1].tracks[0].id");
+    expect(errors[1].path).toBe("motions[2].tracks[0].id");
   });
 });
 ```
@@ -247,5 +248,6 @@ npx vitest run
 ```
 
 **Do not accept "tests pass" alone as proof.** Also manually confirm by reading the diff that:
+
 - No other file was touched (this is a two-file change: the rule + its test).
 - `EditorEngine.js` was NOT modified (this fix belongs entirely in the validator).

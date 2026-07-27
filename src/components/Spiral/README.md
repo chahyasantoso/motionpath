@@ -5,6 +5,7 @@ An endless Zuma-style wave-spawner demo showcasing parent-child timeline nesting
 ---
 
 ## 📖 Table of Contents
+
 1. [Architecture & Flow](#-architecture--flow)
 2. [Uniform Path Geometry](#-uniform-path-geometry)
 3. [Linear Speed Progression](#-linear-speed-progression)
@@ -19,15 +20,15 @@ An endless Zuma-style wave-spawner demo showcasing parent-child timeline nesting
 
 The Zuma Spiral uses a **ViewModel-driven architecture** (MVVM/Controller pattern) to cleanly decouple the motion engine's lifecycle, the game logic, and React presentational rendering:
 
-| Layer | Responsibility | File |
-|---|---|---|
-| **Config & Constants** | Static properties (dimensions, colors, speeds) | [spiralConfig.js](file:///d:/dev/motionpath/src/components/Spiral/spiralConfig.js) |
-| **Path Geometry** | Archimedean spiral generation and uniform segment spacing math | [spiralPath.js](file:///d:/dev/motionpath/src/components/Spiral/spiralPath.js) |
-| **Motion Schemas** | Factory schemas for parent timelines, path followers, and transitions | [spiralMotions.js](file:///d:/dev/motionpath/src/components/Spiral/spiralMotions.js) |
-| **Controller Hook** | Synchronous queue management, wave loops, and transition lifecycles | [useSpiralWaveController.js](file:///d:/dev/motionpath/src/components/Spiral/useSpiralWaveController.js) |
-| **ViewModel Adapter** | Page-facing data coordinator | [useSpiralPageViewModel.js](file:///d:/dev/motionpath/src/components/Spiral/useSpiralPageViewModel.js) |
-| **View Page** | Presentational wrapper holding SVG structures and static scene details | [SpiralPage.jsx](file:///d:/dev/motionpath/src/components/Spiral/SpiralPage.jsx) |
-| **View Entity** | Motion subscriber bound to the VM's active instance and track | [SpiralBall.jsx](file:///d:/dev/motionpath/src/components/Spiral/SpiralBall.jsx) |
+| Layer                  | Responsibility                                                         | File                                                                                                     |
+| ---------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Config & Constants** | Static properties (dimensions, colors, speeds)                         | [spiralConfig.js](file:///d:/dev/motionpath/src/components/Spiral/spiralConfig.js)                       |
+| **Path Geometry**      | Archimedean spiral generation and uniform segment spacing math         | [spiralPath.js](file:///d:/dev/motionpath/src/components/Spiral/spiralPath.js)                           |
+| **Motion Schemas**     | Factory schemas for parent timelines, path followers, and transitions  | [spiralMotions.js](file:///d:/dev/motionpath/src/components/Spiral/spiralMotions.js)                     |
+| **Controller Hook**    | Synchronous queue management, wave loops, and transition lifecycles    | [useSpiralWaveController.js](file:///d:/dev/motionpath/src/components/Spiral/useSpiralWaveController.js) |
+| **ViewModel Adapter**  | Page-facing data coordinator                                           | [useSpiralPageViewModel.js](file:///d:/dev/motionpath/src/components/Spiral/useSpiralPageViewModel.js)   |
+| **View Page**          | Presentational wrapper holding SVG structures and static scene details | [SpiralPage.jsx](file:///d:/dev/motionpath/src/components/Spiral/SpiralPage.jsx)                         |
+| **View Entity**        | Motion subscriber bound to the VM's active instance and track          | [SpiralBall.jsx](file:///d:/dev/motionpath/src/components/Spiral/SpiralBall.jsx)                         |
 
 ### Spawning & Transition Flow
 
@@ -36,11 +37,11 @@ graph TD
     Page[SpiralPage.jsx] -->|Renders| BallView[SpiralBall.jsx]
     Page -->|Reads| VM[useSpiralPageViewModel]
     VM -->|Drives| Controller[useSpiralWaveController]
-    
+
     Controller -->|Manages| BallVmList[ballVms Ref & State]
     Controller -->|Mounts/Plays| TransitionInstance[Transition Instance: ball-exit]
     Controller -->|Appends/Removes| BaseInstance[Container Child Instance: spiral-zuma]
-    
+
     BallView -->|useMotionSubscriber| MotionEngine[Motion Engine]
 ```
 
@@ -59,6 +60,7 @@ $$r(\theta) = R_{\text{outer}} - k \theta$$
 By default, generating coordinates at linear angular steps ($\Delta \theta$) causes points to cluster tightly near the center and stretch wide at the outer edge, making constant-speed propagation impossible.
 
 To fix this:
+
 1. A high-resolution raw spiral of $2,000$ points is generated.
 2. The cumulative physical distance (arc length) is measured segment-by-segment.
 3. The path is re-sampled to create exactly $200$ uniform segments where the distance between any two adjacent coordinates is a constant step size of $\approx 20.5\text{px}$.
@@ -89,13 +91,15 @@ This allows us to accurately infer the progress checks (`MIN_SPAWN_PROGRESS`) an
 The spawner runs on a native browser `requestAnimationFrame` paint loop, clean of React state renders.
 
 ### 1. Spawning (The Spawner)
-* **Goal**: Launch balls in a tight, touching chain from the outer tip of the spiral.
-* **Logic**: Only spawns if the count of balls launched in the current wave is less than $30$. Spawns a new ball if no preceding ball exists, or if the last launched ball has progressed past the center-to-center spacing threshold:
+
+- **Goal**: Launch balls in a tight, touching chain from the outer tip of the spiral.
+- **Logic**: Only spawns if the count of balls launched in the current wave is less than $30$. Spawns a new ball if no preceding ball exists, or if the last launched ball has progressed past the center-to-center spacing threshold:
   $$\text{MIN\_SPAWN\_PROGRESS} = \frac{\text{BALL\_SIZE}}{\text{totalPathLength}}$$
 
 ### 2. Event-Driven Unspawning (The Garbage Collector)
-* **Goal**: Safely clean up and destroy entities that enter the black hole or get clicked.
-* **Mechanism**: On-complete events are fully reliable due to the engine's correct playhead sync and predecessor-anchored spawn placement (which avoids cascade reflow drift). When a ball finishes its path, its event-driven `onComplete` callback fires immediately, triggering `startExit(id)` which mounts the exit transition instance, updates the subscriber, removes the base instance from the container using `containerInstance.removeChild(latest.baseInstance)`, and removes the VM from state.
+
+- **Goal**: Safely clean up and destroy entities that enter the black hole or get clicked.
+- **Mechanism**: On-complete events are fully reliable due to the engine's correct playhead sync and predecessor-anchored spawn placement (which avoids cascade reflow drift). When a ball finishes its path, its event-driven `onComplete` callback fires immediately, triggering `startExit(id)` which mounts the exit transition instance, updates the subscriber, removes the base instance from the container using `containerInstance.removeChild(latest.baseInstance)`, and removes the VM from state.
 
 ---
 
@@ -104,17 +108,17 @@ The spawner runs on a native browser `requestAnimationFrame` paint loop, clean o
 Wave resets are evaluated directly inside the controller's spawner tick loop when spawning completes:
 
 ```javascript
-      if (spawnedCountRef.current < 30) {
-        // Spawning logic...
-      } else if (containerInstance.children.length === 0) {
-        spawnedCountRef.current = 0;
-        containerInstance.timeline.play(0);
-      }
+if (spawnedCountRef.current < 30) {
+  // Spawning logic...
+} else if (containerInstance.children.length === 0) {
+  spawnedCountRef.current = 0;
+  containerInstance.timeline.play(0);
+}
 ```
 
-* When all balls are cleared (popped by clicks or swallowed by the black hole), `children.length` becomes `0`.
-* The tick loop detects this, resets `spawnedCountRef.current` to `0`, and forces the parent timeline back to time `0` using `.play(0)`.
-* Replaying from `0` is critical because GSAP completes and pauses the parent timeline at the end of a wave; calling `.play(0)` resumes the playhead so that the next wave's balls play correctly from the outer edge.
+- When all balls are cleared (popped by clicks or swallowed by the black hole), `children.length` becomes `0`.
+- The tick loop detects this, resets `spawnedCountRef.current` to `0`, and forces the parent timeline back to time `0` using `.play(0)`.
+- Replaying from `0` is critical because GSAP completes and pauses the parent timeline at the end of a wave; calling `.play(0)` resumes the playhead so that the next wave's balls play correctly from the outer edge.
 
 ---
 
@@ -138,6 +142,7 @@ The engine's native `cssVarPlugin` automatically captures this variable, compose
 ## 🔗 Multi-Source Subscription & Composition
 
 During entrance and exit transitions, a ball follower requires inputs from **two independent timelines**:
+
 1. The **base timeline** (`ball-track`) providing the latest $x$, $y$, and $rotation$ coordinates along the spiral.
 2. The **transition timeline** (`ball-entrance-track` or `ball-exit-track`) providing scale, opacity, and custom offset animations.
 
@@ -153,7 +158,7 @@ graph TD
     subgraph Hook [useMotionSubscribers Coordination]
         Sub1["subscribeToTrack 1<br>(evaluates path coordinates)"]
         Sub2["subscribeToTrack 2<br>(evaluates entrance/exit scaling)"]
-        
+
         Frame1["Frame 0<br>raw: { pathProgress }<br>patch: { transform }"]
         Frame2["Frame 1<br>raw: {}<br>patch: { scale, opacity }"]
     end
@@ -176,7 +181,9 @@ graph TD
 ```
 
 ### The Frame-Object Contract
+
 To prevent raw coordinate metadata (e.g. `pathProgress`) from leaking into final DOM patches (which violates boundaries and can cause visual bugs), the hook operates on **Frames** rather than flat patches:
+
 ```javascript
 // Each frame yield contains:
 {
@@ -186,6 +193,7 @@ To prevent raw coordinate metadata (e.g. `pathProgress`) from leaking into final
 ```
 
 ### The Merge Logic
+
 The consumer's custom `mergeFn` receives an array of these frame objects and dynamically decides how to combine them:
 
 ```javascript
@@ -197,15 +205,15 @@ const mergeFn = useCallback((frames) => {
 
   // 1. Single Source: Normal path travel (checks boundary on raw data)
   if (!transition && (p <= 0 || p >= 1)) {
-    return { display: 'none', opacity: 0 };
+    return { display: "none", opacity: 0 };
   }
 
   // 2. Dual Source: Spawning/Exiting (forces display flex, merges base path + transition offsets)
   if (transition) {
-    return { ...base.patch, ...transition.patch, display: 'flex' };
+    return { ...base.patch, ...transition.patch, display: "flex" };
   }
 
-  return { ...base.patch, display: 'flex' };
+  return { ...base.patch, display: "flex" };
 }, []);
 ```
 

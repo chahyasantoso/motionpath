@@ -15,7 +15,7 @@ Implements §2 and §3 of `Renderer_Architecture_Decisions.md`. This is the only
 - No particle system / instancing work.
 - No change to `subscribe()` — it already broadcasts raw proxy values, untouched by this brief.
 - No change to any plugin other than the filter plugin (`filterProperty.js`) and, conditionally, the color plugin — see step 2 below.
-- No change to `compose()`'s two-arg signature (`compose(data, elementCfg)`) — only its *filter-related output shape* changes.
+- No change to `compose()`'s two-arg signature (`compose(data, elementCfg)`) — only its _filter-related output shape_ changes.
 
 ## Files touched
 
@@ -30,6 +30,7 @@ Implements §2 and §3 of `Renderer_Architecture_Decisions.md`. This is the only
 Find the current `compose()` implementation for the filter plugin. It currently merges whichever of `blur`/`brightness`/`contrast`/`saturate` are present into one `filter` CSS string.
 
 **WRONG (current behavior — must be removed):**
+
 ```js
 compose(data, elementCfg) {
   const parts = [];
@@ -42,6 +43,7 @@ compose(data, elementCfg) {
 ```
 
 **CORRECT (new behavior — numeric passthrough, grouped but not stringified):**
+
 ```js
 compose(data, elementCfg) {
   const filterValues = {};
@@ -53,7 +55,7 @@ compose(data, elementCfg) {
 }
 ```
 
-Note the shape change: `compose()` still returns a `filter` key (this is fine — it's still "this element has filter-related composed output"), but the *value* is now `{ blur: 4, brightness: 1.1 }`, an object, not a string. This keeps the "many raw proxy fields → one grouped output key" derivation logic exactly where it was — only the final stringify step is gone.
+Note the shape change: `compose()` still returns a `filter` key (this is fine — it's still "this element has filter-related composed output"), but the _value_ is now `{ blur: 4, brightness: 1.1 }`, an object, not a string. This keeps the "many raw proxy fields → one grouped output key" derivation logic exactly where it was — only the final stringify step is gone.
 
 **Update existing tests** for this plugin's `compose()` to assert the new object shape, not a string match. Any test currently doing something like `expect(result.filter).toBe('blur(4px) brightness(1.1)')` must become `expect(result.filter).toEqual({ blur: 4, brightness: 1.1 })`.
 
@@ -66,6 +68,7 @@ Unlike filter, color properties (`backgroundColor`, `color`, `borderColor`) may 
 ## Step 3 — New file: `src/lib/renderers/domRenderer.js`
 
 This is the DOM-specific renderer function. It takes the (now numeric) composed patch and:
+
 - Converts `filter` (if present, and if it's an object) into the CSS `filter` string.
 - Passes every other key through unchanged.
 - Calls `gsap.set()`.
@@ -75,17 +78,21 @@ This is the DOM-specific renderer function. It takes the (now numeric) composed 
 
 function serializeFilter(filterValues) {
   const parts = [];
-  if (filterValues.blur !== undefined) parts.push(`blur(${filterValues.blur}px)`);
-  if (filterValues.brightness !== undefined) parts.push(`brightness(${filterValues.brightness})`);
-  if (filterValues.contrast !== undefined) parts.push(`contrast(${filterValues.contrast})`);
-  if (filterValues.saturate !== undefined) parts.push(`saturate(${filterValues.saturate})`);
-  return parts.join(' ');
+  if (filterValues.blur !== undefined)
+    parts.push(`blur(${filterValues.blur}px)`);
+  if (filterValues.brightness !== undefined)
+    parts.push(`brightness(${filterValues.brightness})`);
+  if (filterValues.contrast !== undefined)
+    parts.push(`contrast(${filterValues.contrast})`);
+  if (filterValues.saturate !== undefined)
+    parts.push(`saturate(${filterValues.saturate})`);
+  return parts.join(" ");
 }
 
 export function domRenderer(target, patch) {
   const domPatch = { ...patch };
 
-  if (domPatch.filter && typeof domPatch.filter === 'object') {
+  if (domPatch.filter && typeof domPatch.filter === "object") {
     domPatch.filter = serializeFilter(domPatch.filter);
   }
 
@@ -100,11 +107,13 @@ Keep this file small and dependency-free beyond GSAP itself. Do not add a render
 ## Step 4 — `useMotionSubscriber.js`: call `domRenderer` instead of inline `gsap.set()`
 
 Find wherever this hook currently does something like:
+
 ```js
 gsap.set(ref.current, composedPatch);
 ```
 
 Replace with:
+
 ```js
 domRenderer(ref.current, composedPatch);
 ```
@@ -123,7 +132,7 @@ Run these after Gemini reports completion — do not trust the written summary, 
 4. `grep -rn "domRenderer" src/hooks/useMotionSubscriber.js` → at least one hit (the import + the call).
 5. `ls src/lib/renderers/domRenderer.js` → file exists.
 6. Run full test suite — all existing tests pass, plus new `domRenderer.test.js` tests pass, plus updated `filterProperty` compose tests pass with the new object-shape assertions (not string assertions).
-7. `grep -rn "filter:" src/plugins/filterProperty.js` → confirm the returned key is still named `filter` (shape of the *value* changed, not the key name) — this avoids an unnecessary breaking rename for any other code that might read `data.filter`.
+7. `grep -rn "filter:" src/plugins/filterProperty.js` → confirm the returned key is still named `filter` (shape of the _value_ changed, not the key name) — this avoids an unnecessary breaking rename for any other code that might read `data.filter`.
 8. Confirm colorProperty.js is either (a) untouched, with a one-line note back to Chahya confirming it was investigated and needs no change, or (b) flagged with the specific transformation found — not silently modified.
 
 ## What "done" looks like

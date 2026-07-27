@@ -11,24 +11,24 @@
 export function stopCountRule(track, motion, context, path) {
   const errors = [];
 
-  if (!track || typeof track !== 'object') {
+  if (!track || typeof track !== "object") {
     return errors;
   }
 
   const keyframes = track.keyframes;
-  if (!keyframes || typeof keyframes !== 'object') {
+  if (!keyframes || typeof keyframes !== "object") {
     return errors;
   }
 
   Object.entries(keyframes).forEach(([propKey, value]) => {
-    if (!value || typeof value !== 'object') return;
+    if (!value || typeof value !== "object") return;
     const stops = value.stops;
     if (!Array.isArray(stops) || stops.length < 2) {
       errors.push({
         ruleId: "stop-count",
         severity: "error",
-        message: `Property '${propKey}' on track '${track.id || 'unknown'}' must have at least 2 stops, but got ${Array.isArray(stops) ? stops.length : 0}.`,
-        path: `${path}.keyframes.${propKey}`
+        message: `Property '${propKey}' on track '${track.id || "unknown"}' must have at least 2 stops, but got ${Array.isArray(stops) ? stops.length : 0}.`,
+        path: `${path}.keyframes.${propKey}`,
       });
     }
   });

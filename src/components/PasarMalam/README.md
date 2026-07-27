@@ -36,8 +36,10 @@ These are served from `/public/sequence/` and driven by the engine's `imageSeque
 The browser only fetches images on demand. Without preloading, the first scroll into the sequence would visibly stutter as frames load. To force all 192 frames into GPU memory before the user starts scrolling, all frames are rendered into a **hidden `<div>`**:
 
 ```jsx
-<div style={{ display: 'none' }}>
-  {IMAGE_SEQUENCE_FRAMES.map(src => <img key={src} src={src} alt="" />)}
+<div style={{ display: "none" }}>
+  {IMAGE_SEQUENCE_FRAMES.map((src) => (
+    <img key={src} src={src} alt="" />
+  ))}
 </div>
 ```
 
@@ -46,6 +48,7 @@ This keeps the images decoded in browser memory and eliminates first-scroll flic
 ### Sticky Pinned Stage
 
 The layout uses a two-section structure:
+
 - **Section 1** (`pm-hero-section`): very tall (600vh). Contains the pinned stage. ScrollTrigger pins `pm-stage` at `top top` and scrubs animations from its entrance to its exit.
 - **Section 2** (`pm-scroll-indicator-section`): a regular-flow section that appears below when the user scrolls past the storytelling sequence.
 
@@ -87,8 +90,8 @@ All elements are registered in `pasarMalamScene` and driven by a single scroll t
 **Type**: Image sequence (192 WebP frames)  
 **Role**: The cinematic full-screen background.
 
-| Property | Keyframes |
-|---|---|
+| Property        | Keyframes                                                   |
+| --------------- | ----------------------------------------------------------- |
 | `imageSequence` | `p:0 → frame 0`, `p:1 → frame 191` (linear, `ease: 'none'`) |
 
 The frame index is always rounded to the nearest integer and clamped to `[0, 191]` by the plugin. The `ease: 'none'` ensures playback speed matches scroll speed exactly — no acceleration or deceleration on the frame scrub.
@@ -100,12 +103,12 @@ The frame index is always rounded to the nearest integer and clamped to `[0, 191
 **Component**: `HeroTitle`  
 **Role**: The large "Pasar Malam / The Night Awakens" heading. Uses a custom `transform` callback to add a 3D `rotateX` tilt proportional to its vertical offset.
 
-| Property | Entry (`p: 0→0.25`) | Hold (`p: 0.25→0.75`) | Exit (`p: 0.75→1`) |
-|---|---|---|---|
-| `opacity` | `0 → 1` (`power2.out`) | `1` | `1 → 0` (`power2.in`) |
-| `y` | `120px → 0` (`power2.out`) | `0` | `0 → -120px` (`power2.in`) |
-| `scaleX/Y` | `1.25 → 1` (`power2.out`) | `1` | `1 → 0.8` (`power2.in`) |
-| `rotateX` *(custom)* | derived from `rawData.y * 0.15` | `0` | derived from exit `y` |
+| Property             | Entry (`p: 0→0.25`)             | Hold (`p: 0.25→0.75`) | Exit (`p: 0.75→1`)         |
+| -------------------- | ------------------------------- | --------------------- | -------------------------- |
+| `opacity`            | `0 → 1` (`power2.out`)          | `1`                   | `1 → 0` (`power2.in`)      |
+| `y`                  | `120px → 0` (`power2.out`)      | `0`                   | `0 → -120px` (`power2.in`) |
+| `scaleX/Y`           | `1.25 → 1` (`power2.out`)       | `1`                   | `1 → 0.8` (`power2.in`)    |
+| `rotateX` _(custom)_ | derived from `rawData.y * 0.15` | `0`                   | derived from exit `y`      |
 
 The `rotateX` is calculated in the custom callback — not a keyframe stop — because it's a **derived** value: `y * 0.15`. As the card rises into position, it tilts forward in 3D space and then flattens to `0°`. On exit, it tilts back as it recedes upward.
 
@@ -117,11 +120,11 @@ The `rotateX` is calculated in the custom callback — not a keyframe stop — b
 **Content**: "Street Flavors / Nostalgic Tastes"  
 **Role**: Flies in from the left side with a slight lean/rotation.
 
-| Property | Entry | Hold | Exit |
-|---|---|---|---|
-| `x` | `-100vw → 0` at `p:0.35` (`back.out(1.2)`) | `0` | `0 → -100vw` at `p:1` (`power2.in`) |
-| `rotation` | `-8° → 0°` at `p:0.35` (`back.out(1.2)`) | `0°` | `0° → -8°` at `p:1` (`power2.in`) |
-| `opacity` | `0 → 1` at `p:0.3` (`power2.out`) | `1` | `1 → 0` at `p:1` (`power2.in`) |
+| Property   | Entry                                      | Hold | Exit                                |
+| ---------- | ------------------------------------------ | ---- | ----------------------------------- |
+| `x`        | `-100vw → 0` at `p:0.35` (`back.out(1.2)`) | `0`  | `0 → -100vw` at `p:1` (`power2.in`) |
+| `rotation` | `-8° → 0°` at `p:0.35` (`back.out(1.2)`)   | `0°` | `0° → -8°` at `p:1` (`power2.in`)   |
+| `opacity`  | `0 → 1` at `p:0.3` (`power2.out`)          | `1`  | `1 → 0` at `p:1` (`power2.in`)      |
 
 The `back.out(1.2)` ease on both `x` and `rotation` gives the card a slight overshoot as it settles — it slides past center, bounces back, and snaps into place. The rotation lean reinforces the physicality of the motion: the card "tilts into the wind" as it flies in.
 
@@ -135,11 +138,11 @@ Viewport units (`-100vw`) are used for `x` instead of pixels so the card starts 
 **Content**: "Night Vibes / Carnival Thrills"  
 **Role**: Flies in from the right side, slightly delayed relative to `card-left`.
 
-| Property | Entry | Hold | Exit |
-|---|---|---|---|
-| `x` | `100vw → 0` at `p:0.42` (`back.out(1.2)`) | `0` | `0 → 100vw` at `p:1` (`power2.in`) |
-| `rotation` | `8° → 0°` at `p:0.42` (`back.out(1.2)`) | `0°` | `0° → 8°` at `p:1` (`power2.in`) |
-| `opacity` | `0 → 1` at `p:0.37` (`power2.out`) | `1` | `1 → 0` at `p:1` (`power2.in`) |
+| Property   | Entry                                     | Hold | Exit                               |
+| ---------- | ----------------------------------------- | ---- | ---------------------------------- |
+| `x`        | `100vw → 0` at `p:0.42` (`back.out(1.2)`) | `0`  | `0 → 100vw` at `p:1` (`power2.in`) |
+| `rotation` | `8° → 0°` at `p:0.42` (`back.out(1.2)`)   | `0°` | `0° → 8°` at `p:1` (`power2.in`)   |
+| `opacity`  | `0 → 1` at `p:0.37` (`power2.out`)        | `1`  | `1 → 0` at `p:1` (`power2.in`)     |
 
 Intentionally delayed by `Δp ≈ 0.07` relative to `card-left`. The staggered arrival makes the two cards feel like they're responding to separate cues rather than triggering simultaneously, which is more visually interesting.
 
@@ -151,15 +154,16 @@ Intentionally delayed by `Δp ≈ 0.07` relative to `card-left`. The staggered a
 **Content**: Live stall count (0→192+) and visitor count (0→10,000), plus a neon "Open" tag.  
 **Role**: Rises from below. Uses a custom `transform` callback to drive DOM counter text directly via `rawData.progress`.
 
-| Property | Entry | Hold | Exit |
-|---|---|---|---|
-| `y` | `160px → 0` at `p:0.3` (`power2.out`) | `0` | `0 → 160px` at `p:1` (`power2.in`) |
-| `opacity` | `0 → 1` at `p:0.25` (`power2.out`) | `1` | `1 → 0` at `p:1` (`power2.in`) |
-| `--neon-opacity` *(CSS var)* | `1` | flicker at `p:0.29`, `p:0.49`, `p:0.79` | `1` |
+| Property                     | Entry                                 | Hold                                    | Exit                               |
+| ---------------------------- | ------------------------------------- | --------------------------------------- | ---------------------------------- |
+| `y`                          | `160px → 0` at `p:0.3` (`power2.out`) | `0`                                     | `0 → 160px` at `p:1` (`power2.in`) |
+| `opacity`                    | `0 → 1` at `p:0.25` (`power2.out`)    | `1`                                     | `1 → 0` at `p:1` (`power2.in`)     |
+| `--neon-opacity` _(CSS var)_ | `1`                                   | flicker at `p:0.29`, `p:0.49`, `p:0.79` | `1`                                |
 
 **Counter logic** (custom callback):
+
 ```javascript
-const easeOut = gsap.parseEase('power2.out'); // parsed once at module scope
+const easeOut = gsap.parseEase("power2.out"); // parsed once at module scope
 
 // Stalls: resolves to 192 by p = 0.55
 const t = easeOut(Math.min(1, p / 0.55));

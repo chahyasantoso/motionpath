@@ -4,10 +4,10 @@
  * @returns {string} SVG Path string (e.g. "M 0 0 Q 150 -50 300 150 L 800 400")
  */
 export function buildMotionPath(pathNodes) {
-  if (!pathNodes || pathNodes.length === 0) return '';
-  
+  if (!pathNodes || pathNodes.length === 0) return "";
+
   let path = `M ${pathNodes[0].x} ${pathNodes[0].y}`;
-  
+
   for (let i = 1; i < pathNodes.length; i++) {
     const node = pathNodes[i];
     if (node.ctrlX !== undefined && node.ctrlY !== undefined) {
@@ -16,10 +16,9 @@ export function buildMotionPath(pathNodes) {
       path += ` L ${node.x} ${node.y}`;
     }
   }
-  
+
   return path;
 }
-
 
 /**
  * Converts an already-cubic Bezier path (3n+1 format from convertToCubicPath)
@@ -29,7 +28,7 @@ export function buildMotionPath(pathNodes) {
  * @returns {string} SVG Path string with C commands
  */
 export function buildCubicMotionPath(cubicPath) {
-  if (!cubicPath || cubicPath.length < 4) return '';
+  if (!cubicPath || cubicPath.length < 4) return "";
   // First point is always an anchor
   let path = `M ${cubicPath[0].x} ${cubicPath[0].y}`;
   // Every subsequent segment is: cp1, cp2, anchor (groups of 3)
@@ -55,7 +54,7 @@ export function buildCubicMotionPath(cubicPath) {
 export function convertToCubicPath(pathNodes) {
   if (!pathNodes || pathNodes.length === 0) return [];
 
-  const nodes = pathNodes.map(node => ({
+  const nodes = pathNodes.map((node) => ({
     x: node.x,
     y: node.y,
     z: node.z !== undefined ? node.z : 0,
@@ -76,7 +75,8 @@ export function convertToCubicPath(pathNodes) {
 
     if (isCurved) {
       // Quadratic→Cubic elevation: CP1 = P0 + 2/3 * (Q - P0), CP2 = P1 + 2/3 * (Q - P1)
-      const ctrlZ = curr.ctrlZ !== undefined ? curr.ctrlZ : (prev.z + curr.z) / 2;
+      const ctrlZ =
+        curr.ctrlZ !== undefined ? curr.ctrlZ : (prev.z + curr.z) / 2;
       cp1 = {
         x: prev.x + (2 / 3) * (curr.ctrlX - prev.x),
         y: prev.y + (2 / 3) * (curr.ctrlY - prev.y),
@@ -130,7 +130,12 @@ export function getPointOnCubicPath(cubicPath, progress) {
   const segments = Math.floor((cubicPath.length - 1) / 3);
   if (segments <= 0) {
     const pStart = cubicPath[0];
-    return { x: pStart.x, y: pStart.y, z: pStart.z !== undefined ? pStart.z : 0, rotation: 0 };
+    return {
+      x: pStart.x,
+      y: pStart.y,
+      z: pStart.z !== undefined ? pStart.z : 0,
+      rotation: 0,
+    };
   }
 
   // Determine segment index and local progress t
@@ -138,7 +143,7 @@ export function getPointOnCubicPath(cubicPath, progress) {
   if (segmentIndex >= segments) {
     segmentIndex = segments - 1;
   }
-  const t = (p * segments) - segmentIndex;
+  const t = p * segments - segmentIndex;
 
   const startIndex = segmentIndex * 3;
   const p0 = cubicPath[startIndex];
@@ -156,18 +161,24 @@ export function getPointOnCubicPath(cubicPath, progress) {
   // B(t) = (1-t)^3 * P0 + 3(1-t)^2 * t * P1 + 3(1-t) * t^2 * P2 + t^3 * P3
   const x = mt3 * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t3 * p3.x;
   const y = mt3 * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t3 * p3.y;
-  
+
   const z0 = p0.z !== undefined ? p0.z : 0;
   const z1 = p1.z !== undefined ? p1.z : 0;
   const z2 = p2.z !== undefined ? p2.z : 0;
   const z3 = p3.z !== undefined ? p3.z : 0;
-  
+
   const z = mt3 * z0 + 3 * mt2 * t * z1 + 3 * mt * t2 * z2 + t3 * z3;
 
   // Calculate derivative tangent vector: B'(t) = 3(1-t)^2(P1-P0) + 6(1-t)t(P2-P1) + 3t^2(P3-P2)
-  const dx = 3 * mt2 * (p1.x - p0.x) + 6 * mt * t * (p2.x - p1.x) + 3 * t2 * (p3.x - p2.x);
-  const dy = 3 * mt2 * (p1.y - p0.y) + 6 * mt * t * (p2.y - p1.y) + 3 * t2 * (p3.y - p2.y);
-  
+  const dx =
+    3 * mt2 * (p1.x - p0.x) +
+    6 * mt * t * (p2.x - p1.x) +
+    3 * t2 * (p3.x - p2.x);
+  const dy =
+    3 * mt2 * (p1.y - p0.y) +
+    6 * mt * t * (p2.y - p1.y) +
+    3 * t2 * (p3.y - p2.y);
+
   const rotation = Math.atan2(dy, dx) * (180 / Math.PI);
 
   return { x, y, z, rotation };
@@ -209,7 +220,7 @@ export function getPointOnPath(pathEl, progress, offset = 0) {
 /**
  * Splits a quadratic Bezier curve at parameter t into two quadratic curves
  * using de Casteljau's algorithm.
- * 
+ *
  * @param {Object} p0 Start point {x, y, z?}
  * @param {Object} q Control point {x, y, z?} (representing ctrlX, ctrlY, ctrlZ)
  * @param {Object} p2 End point {x, y, z?}
@@ -218,7 +229,8 @@ export function getPointOnPath(pathEl, progress, offset = 0) {
  */
 export function splitQuadraticBezier(p0, q, p2, t) {
   const z0 = p0.z !== undefined ? p0.z : 0;
-  const zQ = q.z !== undefined ? q.z : (z0 + (p2.z !== undefined ? p2.z : 0)) / 2;
+  const zQ =
+    q.z !== undefined ? q.z : (z0 + (p2.z !== undefined ? p2.z : 0)) / 2;
   const z2 = p2.z !== undefined ? p2.z : 0;
 
   // C_L = (1 - t)*P0 + t*Q
@@ -248,7 +260,7 @@ export function splitQuadraticBezier(p0, q, p2, t) {
 /**
  * Finds the parameter t on a straight line or quadratic Bezier segment
  * that minimizes the distance to a given target coordinate (mouseX, mouseY).
- * 
+ *
  * @param {Object} p0 Start point {x, y}
  * @param {Object} p2 End point {x, y}
  * @param {number} mouseX Target X coordinate
@@ -295,4 +307,3 @@ export function findClosestPointOnSegment(p0, p2, mouseX, mouseY, q) {
     distance: Math.sqrt(minDistanceSq),
   };
 }
-

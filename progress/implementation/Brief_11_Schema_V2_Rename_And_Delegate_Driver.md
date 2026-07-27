@@ -15,6 +15,7 @@ grep -rn "scenario" src/ | wc -l
 grep -rn "sceneId" src/ | wc -l
 grep -rn "elements\[" src/ | wc -l
 ```
+
 Record these counts. They are the "before" baseline — every one of these call sites must be accounted for (renamed or deliberately left, e.g. in old test fixtures being deleted) by the end of this brief.
 
 ---
@@ -66,6 +67,7 @@ Rename touches every existing file that mentions the old vocabulary. New capabil
   "keyframes": { "...": "same shape as v1 element keyframes" }
 }
 ```
+
 - `templateId` unique globally.
 - Allowed fields: `duration`, `transformOrigin`, `keyframes` only.
 - Forbidden fields: `driver`, `timelineId`, `primary`, `trigger`, any trigger-adjacent field. Build-time error if present.
@@ -79,14 +81,17 @@ Rename touches every existing file that mentions the old vocabulary. New capabil
   "driver": {
     "type": "timeline",
     "sectionId": "heroSection",
-    "trigger": { "type": "scroll", "scrub": true, "start": "top top", "end": "+=1200" },
+    "trigger": {
+      "type": "scroll",
+      "scrub": true,
+      "start": "top top",
+      "end": "+=1200"
+    },
     "timelineId": "heroIntro-master",
     "primary": true
   },
   "stagger": 0.15,
-  "tracks": [
-    { "id": "title", "use": "clip.fadeUp" }
-  ]
+  "tracks": [{ "id": "title", "use": "clip.fadeUp" }]
 }
 ```
 
@@ -109,6 +114,7 @@ Rename touches every existing file that mentions the old vocabulary. New capabil
 ### `driver`
 
 **Timeline** (all v1 trigger/timelineId/primary rules apply unchanged, just nested; `sectionId` now lives here — was v1's `sceneId`):
+
 ```json
 {
   "type": "timeline",
@@ -118,16 +124,21 @@ Rename touches every existing file that mentions the old vocabulary. New capabil
   "primary": true
 }
 ```
+
 `sectionId` is optional, same meaning as v1's `sceneId`: default trigger anchor when `trigger` doesn't declare its own `startTrigger`/`endTrigger`, and the grouping key for the cross-motion track-uniqueness rule (§5). Only valid inside `driver.type: "timeline"` — it has no meaning without a trigger to anchor.
 
 **Delegate**:
+
 ```json
 { "type": "delegate" }
 ```
+
 or, with optional documentation-only metadata:
+
 ```json
 { "type": "delegate", "source": "game.enemy.progress" }
 ```
+
 `source` is never read by the engine. It exists purely so a human or an LLM authoring the schema can record intent.
 
 ### `track`
@@ -135,14 +146,19 @@ or, with optional documentation-only metadata:
 ```json
 { "id": "movement", "use": "path.enemy.basic" }
 ```
+
 or inline (no template):
+
 ```json
 { "id": "title", "keyframes": { "...": "..." } }
 ```
+
 or `use` + local override:
+
 ```json
 { "id": "bossAura", "use": "clip.pulse", "keyframes": { "scaleX": { "stops": [...] } } }
 ```
+
 - `track.id` unique **project-wide** — across every motion, regardless of `driver.type`. This matches v1's actual locked behavior (element-uniqueness was reworked project-wide in Session 4, not per-`sceneId` — the per-`sceneId` wording in the old architecture doc is the known stale docstring, not the real rule). Not scoped to parent motion.
 - Merge rule when `use` + local `keyframes` both present: **override at the property-key level, whole-array replacement** — not a per-stop deep-merge. If local `keyframes.scaleX` is present, it fully replaces the template's `scaleX.stops`; any property key not present locally falls through from the template untouched. Same rule for `duration`/`transformOrigin`: local value wins outright if present, otherwise inherit template's.
 
@@ -214,7 +230,7 @@ function validateTrackUniqueness(project) {
     for (const track of motion.tracks) {
       if (seen.has(track.id)) {
         throw new SchemaError(
-          `Track id "${track.id}" is used in both motion "${seen.get(track.id)}" and "${motion.motionId}" — track ids must be unique project-wide`
+          `Track id "${track.id}" is used in both motion "${seen.get(track.id)}" and "${motion.motionId}" — track ids must be unique project-wide`,
         );
       }
       seen.set(track.id, motion.motionId);
@@ -235,7 +251,8 @@ function validateTrackUniqueness(project) {
     // to per-motion scoping here, which is even weaker than the already-wrong sectionId scoping
     const seen = bySection.get(key) ?? new Set();
     for (const track of motion.tracks) {
-      if (seen.has(track.id)) throw new SchemaError(`duplicate track id within ${key}`);
+      if (seen.has(track.id))
+        throw new SchemaError(`duplicate track id within ${key}`);
       seen.add(track.id);
     }
     bySection.set(key, seen);
@@ -249,16 +266,30 @@ function validateTrackUniqueness(project) {
 // CORRECT — stagger forbidden on delegate, checked once in the consolidated validator
 function validateMotion(motion) {
   if (motion.driver.type === "delegate" && motion.stagger !== undefined) {
-    throw new SchemaError(`Motion "${motion.motionId}": stagger is not valid on driver.type "delegate"`);
+    throw new SchemaError(
+      `Motion "${motion.motionId}": stagger is not valid on driver.type "delegate"`,
+    );
   }
-  if (motion.driver.type === "delegate" && motion.driver.trigger !== undefined) {
-    throw new SchemaError(`Motion "${motion.motionId}": trigger is not valid on driver.type "delegate"`);
+  if (
+    motion.driver.type === "delegate" &&
+    motion.driver.trigger !== undefined
+  ) {
+    throw new SchemaError(
+      `Motion "${motion.motionId}": trigger is not valid on driver.type "delegate"`,
+    );
   }
-  if (motion.driver.type === "delegate" && motion.driver.sectionId !== undefined) {
-    throw new SchemaError(`Motion "${motion.motionId}": sectionId is not valid on driver.type "delegate"`);
+  if (
+    motion.driver.type === "delegate" &&
+    motion.driver.sectionId !== undefined
+  ) {
+    throw new SchemaError(
+      `Motion "${motion.motionId}": sectionId is not valid on driver.type "delegate"`,
+    );
   }
   if (motion.tracks.length < 1) {
-    throw new SchemaError(`Motion "${motion.motionId}": tracks must have at least 1 entry`);
+    throw new SchemaError(
+      `Motion "${motion.motionId}": tracks must have at least 1 entry`,
+    );
   }
 }
 ```
@@ -297,11 +328,15 @@ function validateMotion(motion) {
 ```ts
 interface MotionEngine {
   loadProject(schema): Promise<void>;
-  mountTimeline(motionId: string): void;                                   // driver.type === "timeline" only
-  resolveMotion(motionId: string, progress: number, overrides?: object): Record<string, DOMPatch>;  // driver.type === "delegate" only
-  subscribe(trackId, callback): UnsubscribeFn;   // renamed from elementId
-  compose(trackId, data): DOMPatch;              // renamed from elementId
-  destroySection(sectionId): void;               // renamed from destroyScene(sceneId)
+  mountTimeline(motionId: string): void; // driver.type === "timeline" only
+  resolveMotion(
+    motionId: string,
+    progress: number,
+    overrides?: object,
+  ): Record<string, DOMPatch>; // driver.type === "delegate" only
+  subscribe(trackId, callback): UnsubscribeFn; // renamed from elementId
+  compose(trackId, data): DOMPatch; // renamed from elementId
+  destroySection(sectionId): void; // renamed from destroyScene(sceneId)
   destroy(): void;
 }
 ```
@@ -314,18 +349,18 @@ interface MotionEngine {
 
 ## 7. Rename Map (mechanical — apply exactly, no judgment calls)
 
-| Old | New |
-|---|---|
-| `scenario` (schema key, var names, file/test names) | `motion` |
-| `scenarioId` (if referenced anywhere as a distinct field) | `motionId` |
-| `elements[]` (schema key) | `tracks[]` |
-| `element.id` | `track.id` |
-| `elementId` (function params, e.g. `subscribe(elementId, ...)`) | `trackId` |
-| `validateScenario()` | `validateMotion()` |
-| `element-uniqueness.js` (rule file) | keep filename, update internal logic to read `motion.tracks` instead of `scenario.elements`, update the docstring (this closes out the outstanding Session 4 docstring fix-note as a side effect — confirm old stale docstring language doesn't survive) |
-| `_elementPlugins: Map<elementId, Plugin[]>` | `_trackPlugins: Map<trackId, Plugin[]>` |
-| `sceneId` (schema key, `destroyScene` param, internal var names) | `sectionId` — **also relocate**: moves from motion-level to inside `driver` (only valid under `driver.type: "timeline"`), see §3 |
-| `destroyScene(sceneId)` | `destroySection(sectionId)` |
+| Old                                                              | New                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scenario` (schema key, var names, file/test names)              | `motion`                                                                                                                                                                                                                                                 |
+| `scenarioId` (if referenced anywhere as a distinct field)        | `motionId`                                                                                                                                                                                                                                               |
+| `elements[]` (schema key)                                        | `tracks[]`                                                                                                                                                                                                                                               |
+| `element.id`                                                     | `track.id`                                                                                                                                                                                                                                               |
+| `elementId` (function params, e.g. `subscribe(elementId, ...)`)  | `trackId`                                                                                                                                                                                                                                                |
+| `validateScenario()`                                             | `validateMotion()`                                                                                                                                                                                                                                       |
+| `element-uniqueness.js` (rule file)                              | keep filename, update internal logic to read `motion.tracks` instead of `scenario.elements`, update the docstring (this closes out the outstanding Session 4 docstring fix-note as a side effect — confirm old stale docstring language doesn't survive) |
+| `_elementPlugins: Map<elementId, Plugin[]>`                      | `_trackPlugins: Map<trackId, Plugin[]>`                                                                                                                                                                                                                  |
+| `sceneId` (schema key, `destroyScene` param, internal var names) | `sectionId` — **also relocate**: moves from motion-level to inside `driver` (only valid under `driver.type: "timeline"`), see §3                                                                                                                         |
+| `destroyScene(sceneId)`                                          | `destroySection(sectionId)`                                                                                                                                                                                                                              |
 
 Do **not** rename `timelineId`, `primary`, `trigger`, `stops`, `keyframes`, `path`, or any of the locked property names (`x`/`y`/`z`/`rotation*`/`scale*`/`skew*`/`opacity`/`blur`/`brightness`/`contrast`/`saturate`/`backgroundColor`/`color`/`borderColor`/`--*`). Those are unaffected by this brief.
 

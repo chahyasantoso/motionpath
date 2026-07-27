@@ -41,7 +41,7 @@ export function createDeferredCall() {
       return () => {
         entry.cancelled = true;
         if (entry.cleanup) entry.cleanup();
-        pending = pending.filter(e => e !== entry);
+        pending = pending.filter((e) => e !== entry);
       };
     },
   };

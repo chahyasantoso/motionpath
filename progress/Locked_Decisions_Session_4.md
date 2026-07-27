@@ -85,7 +85,7 @@ Add a range check: for every stop in `keyframes.imageSequence.stops`, `stop.v` m
 
 ### Scope (smallest file set)
 
-- `src/validators/rules/image-sequence.js` only. No changes to `imageSequenceProperty.js`'s runtime clamping behavior — clamping stays as a defensive runtime fallback, it just should no longer be the *only* signal an author gets.
+- `src/validators/rules/image-sequence.js` only. No changes to `imageSequenceProperty.js`'s runtime clamping behavior — clamping stays as a defensive runtime fallback, it just should no longer be the _only_ signal an author gets.
 - `src/validators/rules/__tests__/image-sequence.test.js` — add the new range-check cases.
 
 ### Verification checklist

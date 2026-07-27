@@ -100,6 +100,7 @@ Replace the WHOLE method with:
 ```
 
 **Important details you must not change:**
+
 - The back-edge branch returns `composePatch(...)` on `source` — the SAME first argument used in
   the main path. Do not return `{}` or `getSnapshot()` raw.
 - The `finally` is mandatory. If `mapFn` throws, the flag MUST still reset.
@@ -291,90 +292,96 @@ receives `source.compose()` (the composed patch). Replace the ENTIRE
 `describe('setObserved (FK-chaining / read-only cross-track observation)', ...)` block with:
 
 ```js
-  describe('setObserved (multi-source FK / read-only cross-track observation)', () => {
-    it('folds mapFn(observed.compose()) into compose() output', () => {
-      const source = createDummyTrack('source');
-      source.progress(0.5); // composed: translate3d(50px, 100px, 0px)
+describe("setObserved (multi-source FK / read-only cross-track observation)", () => {
+  it("folds mapFn(observed.compose()) into compose() output", () => {
+    const source = createDummyTrack("source");
+    source.progress(0.5); // composed: translate3d(50px, 100px, 0px)
 
-      const follower = createDummyTrack('follower');
-      follower.setObserved(source, (composed) => ({ observedTransform: composed.transform }));
+    const follower = createDummyTrack("follower");
+    follower.setObserved(source, (composed) => ({
+      observedTransform: composed.transform,
+    }));
 
-      const out = follower.compose();
-      expect(out.observedTransform).toBe('translate3d(50px, 100px, 0px)');
-      // follower's own composed transform is still present (fold is additive)
-      expect(out.transform).toBe('translate3d(0px, 0px, 0px)');
-    });
-
-    it('folded patch is applied last and can override the observer\'s own fields', () => {
-      const source = createDummyTrack('source2');
-      source.progress(1); // composed: translate3d(100px, 200px, 0px)
-
-      const follower = createDummyTrack('follower2');
-      follower.setObserved(source, (composed) => ({ transform: composed.transform }));
-
-      // follower's own progress is 0, but the fold overrides transform entirely.
-      expect(follower.compose().transform).toBe('translate3d(100px, 200px, 0px)');
-    });
-
-    it('is cycle-safe: mutual observation resolves synchronously without stack overflow', () => {
-      const a = createDummyTrack('cycle-a');
-      const b = createDummyTrack('cycle-b');
-      a.setObserved(b, (composed) => ({ fromB: composed.transform }));
-      b.setObserved(a, (composed) => ({ fromA: composed.transform }));
-
-      // Must not throw / hang. The back-edge returns the plugin-only patch.
-      expect(() => a.compose()).not.toThrow();
-      expect(() => b.compose()).not.toThrow();
-      const outA = a.compose();
-      expect(outA.fromB).toBe('translate3d(0px, 0px, 0px)');
-    });
-
-    it('holds multiple sources and folds them in insertion order (last wins)', () => {
-      const s1 = createDummyTrack('s1');
-      const s2 = createDummyTrack('s2');
-      s1.progress(0.5); // 50/100
-      s2.progress(1);   // 100/200
-
-      const follower = createDummyTrack('multi-follower');
-      follower.setObserved(s1, () => ({ tag: 's1' }));
-      follower.setObserved(s2, () => ({ tag: 's2' }));
-
-      // s2 folded after s1, last-wins.
-      expect(follower.compose().tag).toBe('s2');
-      expect(follower.observedSources).toHaveLength(2);
-    });
-
-    it('setObserved(track) again replaces that source\'s mapFn without throwing', () => {
-      const source = createDummyTrack('replace-source');
-      const follower = createDummyTrack('replace-follower');
-      follower.setObserved(source, () => ({ tag: 'first' }));
-      expect(() => follower.setObserved(source, () => ({ tag: 'second' }))).not.toThrow();
-      expect(follower.compose().tag).toBe('second');
-      expect(follower.observedSources).toHaveLength(1); // replaced, not duplicated
-    });
-
-    it('removeObserved(track) drops one source; setObserved(null) clears all', () => {
-      const s1 = createDummyTrack('rm1');
-      const s2 = createDummyTrack('rm2');
-      const follower = createDummyTrack('rm-follower');
-      follower.setObserved(s1, () => ({ a: 1 }));
-      follower.setObserved(s2, () => ({ b: 2 }));
-
-      follower.removeObserved(s1);
-      expect(follower.observedSources).toEqual([s2]);
-
-      follower.setObserved(null);
-      expect(follower.observedSources).toHaveLength(0);
-      expect(follower.compose().b).toBeUndefined();
-    });
-
-    it('omitting mapFn is a safe no-op fold, does not crash compose()', () => {
-      const source = createDummyTrack('no-mapfn-source');
-      const follower = createDummyTrack('no-mapfn-follower');
-      follower.setObserved(source);
-      expect(() => follower.compose()).not.toThrow();
-    });
+    const out = follower.compose();
+    expect(out.observedTransform).toBe("translate3d(50px, 100px, 0px)");
+    // follower's own composed transform is still present (fold is additive)
+    expect(out.transform).toBe("translate3d(0px, 0px, 0px)");
   });
+
+  it("folded patch is applied last and can override the observer's own fields", () => {
+    const source = createDummyTrack("source2");
+    source.progress(1); // composed: translate3d(100px, 200px, 0px)
+
+    const follower = createDummyTrack("follower2");
+    follower.setObserved(source, (composed) => ({
+      transform: composed.transform,
+    }));
+
+    // follower's own progress is 0, but the fold overrides transform entirely.
+    expect(follower.compose().transform).toBe("translate3d(100px, 200px, 0px)");
+  });
+
+  it("is cycle-safe: mutual observation resolves synchronously without stack overflow", () => {
+    const a = createDummyTrack("cycle-a");
+    const b = createDummyTrack("cycle-b");
+    a.setObserved(b, (composed) => ({ fromB: composed.transform }));
+    b.setObserved(a, (composed) => ({ fromA: composed.transform }));
+
+    // Must not throw / hang. The back-edge returns the plugin-only patch.
+    expect(() => a.compose()).not.toThrow();
+    expect(() => b.compose()).not.toThrow();
+    const outA = a.compose();
+    expect(outA.fromB).toBe("translate3d(0px, 0px, 0px)");
+  });
+
+  it("holds multiple sources and folds them in insertion order (last wins)", () => {
+    const s1 = createDummyTrack("s1");
+    const s2 = createDummyTrack("s2");
+    s1.progress(0.5); // 50/100
+    s2.progress(1); // 100/200
+
+    const follower = createDummyTrack("multi-follower");
+    follower.setObserved(s1, () => ({ tag: "s1" }));
+    follower.setObserved(s2, () => ({ tag: "s2" }));
+
+    // s2 folded after s1, last-wins.
+    expect(follower.compose().tag).toBe("s2");
+    expect(follower.observedSources).toHaveLength(2);
+  });
+
+  it("setObserved(track) again replaces that source's mapFn without throwing", () => {
+    const source = createDummyTrack("replace-source");
+    const follower = createDummyTrack("replace-follower");
+    follower.setObserved(source, () => ({ tag: "first" }));
+    expect(() =>
+      follower.setObserved(source, () => ({ tag: "second" })),
+    ).not.toThrow();
+    expect(follower.compose().tag).toBe("second");
+    expect(follower.observedSources).toHaveLength(1); // replaced, not duplicated
+  });
+
+  it("removeObserved(track) drops one source; setObserved(null) clears all", () => {
+    const s1 = createDummyTrack("rm1");
+    const s2 = createDummyTrack("rm2");
+    const follower = createDummyTrack("rm-follower");
+    follower.setObserved(s1, () => ({ a: 1 }));
+    follower.setObserved(s2, () => ({ b: 2 }));
+
+    follower.removeObserved(s1);
+    expect(follower.observedSources).toEqual([s2]);
+
+    follower.setObserved(null);
+    expect(follower.observedSources).toHaveLength(0);
+    expect(follower.compose().b).toBeUndefined();
+  });
+
+  it("omitting mapFn is a safe no-op fold, does not crash compose()", () => {
+    const source = createDummyTrack("no-mapfn-source");
+    const follower = createDummyTrack("no-mapfn-follower");
+    follower.setObserved(source);
+    expect(() => follower.compose()).not.toThrow();
+  });
+});
 ```
 
 ### 5c. Add an fkMath test
@@ -382,26 +389,35 @@ receives `source.compose()` (the composed patch). Replace the ENTIRE
 **New file:** `src/lib/__tests__/fkMath.test.js`
 
 ```js
-import { describe, it, expect } from 'vitest';
-import { composeWorld } from '../fkMath.js';
+import { describe, it, expect } from "vitest";
+import { composeWorld } from "../fkMath.js";
 
-describe('composeWorld', () => {
-  it('translates in the parent frame when parent has no rotation', () => {
-    const out = composeWorld({ x: 10, y: 5, rotation: 0 }, { x: 80, y: 0, rotation: 0 });
+describe("composeWorld", () => {
+  it("translates in the parent frame when parent has no rotation", () => {
+    const out = composeWorld(
+      { x: 10, y: 5, rotation: 0 },
+      { x: 80, y: 0, rotation: 0 },
+    );
     expect(out.x).toBeCloseTo(90);
     expect(out.y).toBeCloseTo(5);
     expect(out.rotation).toBe(0);
   });
 
-  it('rotates the local offset into a rotated parent frame', () => {
+  it("rotates the local offset into a rotated parent frame", () => {
     // parent rotated 90deg: local +x maps to +y
-    const out = composeWorld({ x: 0, y: 0, rotation: 90 }, { x: 80, y: 0, rotation: 0 });
+    const out = composeWorld(
+      { x: 0, y: 0, rotation: 90 },
+      { x: 80, y: 0, rotation: 0 },
+    );
     expect(out.x).toBeCloseTo(0);
     expect(out.y).toBeCloseTo(80);
   });
 
-  it('accumulates rotation additively', () => {
-    const out = composeWorld({ x: 0, y: 0, rotation: 30 }, { x: 0, y: 0, rotation: 15 });
+  it("accumulates rotation additively", () => {
+    const out = composeWorld(
+      { x: 0, y: 0, rotation: 30 },
+      { x: 0, y: 0, rotation: 15 },
+    );
     expect(out.rotation).toBe(45);
   });
 });

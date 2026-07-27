@@ -1,4 +1,5 @@
 # MotionPath v4 — Phase 1 Implementation Brief
+
 **"Stop the bleeding" — R-01, R-02, R-03, R-04, R-05, R-21, R-26**
 
 Target: branch `v4`. Implementer: Gemini Flash. Verifier: Claude, fresh clone + grep + `npx vitest run`.
@@ -57,67 +58,109 @@ Create `src/__tests__/integration.test.js`. Four tests, real `Engine`, real
 for `test.environment`).
 
 ```js
-import { describe, it, expect, beforeEach } from 'vitest';
-import { gsap } from 'gsap';
-import { Engine } from '../engines/Engine.js';
+import { describe, it, expect, beforeEach } from "vitest";
+import { gsap } from "gsap";
+import { Engine } from "../engines/Engine.js";
 
-describe('integration: Engine -> Motion -> Track -> compose', () => {
+describe("integration: Engine -> Motion -> Track -> compose", () => {
   let engine;
-  beforeEach(() => { engine = new Engine(); });
+  beforeEach(() => {
+    engine = new Engine();
+  });
 
-  it('loads a project, mounts a time motion, and advances real GSAP time', async () => {
+  it("loads a project, mounts a time motion, and advances real GSAP time", async () => {
     await engine.loadProject({
       schemaVersion: 4,
-      motions: [{
-        id: 'test-motion',
-        trigger: { type: 'time', repeat: 0 },
-        tracks: [{
-          id: 'track-a',
-          duration: 1,
-          keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } }
-        }]
-      }]
+      motions: [
+        {
+          id: "test-motion",
+          trigger: { type: "time", repeat: 0 },
+          tracks: [
+            {
+              id: "track-a",
+              duration: 1,
+              keyframes: {
+                opacity: {
+                  stops: [
+                    { p: 0, v: 0 },
+                    { p: 1, v: 1 },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      ],
     });
-    const motion = engine.mountInstance('test-motion');
-    const track = motion.getTrack('track-a');
+    const motion = engine.mountInstance("test-motion");
+    const track = motion.getTrack("track-a");
     expect(track).toBeTruthy();
 
     // advance real GSAP ticker-driven time, not a mocked clock
-    await new Promise(r => setTimeout(r, 550));
+    await new Promise((r) => setTimeout(r, 550));
     const patch = track.compose(track.getSnapshot());
     expect(patch.opacity).toBeGreaterThan(0);
     expect(patch.opacity).toBeLessThan(1);
   });
 
-  it('rejects a schema using motionId instead of id (R-02 regression)', async () => {
-    await expect(engine.loadProject({
-      schemaVersion: 4,
-      motions: [{ motionId: 'bad', trigger: { type: 'time' }, tracks: [{ id: 't', keyframes: {} }] }]
-    })).rejects.toThrow();
+  it("rejects a schema using motionId instead of id (R-02 regression)", async () => {
+    await expect(
+      engine.loadProject({
+        schemaVersion: 4,
+        motions: [
+          {
+            motionId: "bad",
+            trigger: { type: "time" },
+            tracks: [{ id: "t", keyframes: {} }],
+          },
+        ],
+      }),
+    ).rejects.toThrow();
   });
 
-  it('honors autoplay:false on a time trigger (R-03 regression)', async () => {
+  it("honors autoplay:false on a time trigger (R-03 regression)", async () => {
     await engine.loadProject({
       schemaVersion: 4,
-      motions: [{
-        id: 'paused-motion',
-        trigger: { type: 'time', autoplay: false },
-        tracks: [{ id: 't', duration: 1, keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }]
-      }]
+      motions: [
+        {
+          id: "paused-motion",
+          trigger: { type: "time", autoplay: false },
+          tracks: [
+            {
+              id: "t",
+              duration: 1,
+              keyframes: {
+                opacity: {
+                  stops: [
+                    { p: 0, v: 0 },
+                    { p: 1, v: 1 },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      ],
     });
-    const motion = engine.mountInstance('paused-motion');
-    await new Promise(r => setTimeout(r, 200));
-    const track = motion.getTrack('t');
+    const motion = engine.mountInstance("paused-motion");
+    await new Promise((r) => setTimeout(r, 200));
+    const track = motion.getTrack("t");
     const patch = track.compose(track.getSnapshot());
     expect(patch.opacity).toBe(0); // did not advance — was paused
   });
 
-  it('unmount removes the instance so destroy() does not double-destroy (R-04 regression)', async () => {
+  it("unmount removes the instance so destroy() does not double-destroy (R-04 regression)", async () => {
     await engine.loadProject({
       schemaVersion: 4,
-      motions: [{ id: 'm', trigger: { type: 'manual' }, tracks: [{ id: 't', keyframes: {} }] }]
+      motions: [
+        {
+          id: "m",
+          trigger: { type: "manual" },
+          tracks: [{ id: "t", keyframes: {} }],
+        },
+      ],
     });
-    const motion = engine.mountInstance('m');
+    const motion = engine.mountInstance("m");
     motion.destroy();
     engine.unmount(motion);
     expect(() => engine.destroy()).not.toThrow();
@@ -168,6 +211,7 @@ async loadProject(schema, { validate = true } = {}) {
 ```
 
 **Non-goals:**
+
 - Do not change `validateProject`'s own rule logic in this step — that's R-02's job,
   separately.
 - Do not remove the `{ validate: false }` escape hatch — it exists for hot-path
@@ -186,6 +230,7 @@ R-22, explicitly deferred to Phase 5. Just fix the data:
 ```bash
 grep -rln "schemaVersion: 2" src/components
 ```
+
 For each match, change `schemaVersion: 2` → `schemaVersion: 4`. Confirmed list as of
 Step 0: `TowerDefensePage.jsx`, `BurstPage.jsx`, `DemoPage.jsx`, `MotorcyclePage.jsx`,
 `spiralMotions.js`, `PasarMalamObserverPage.jsx`. Do not touch `PasarMalamPage.jsx`
@@ -204,38 +249,60 @@ information the architect needs to see, not something to make disappear.
 
 ```js
 // WRONG (current):
-const { id, motionId, driver, trigger, stagger, tracks, timelineId, primary, lifecycle, playback } = motion;
+const {
+  id,
+  motionId,
+  driver,
+  trigger,
+  stagger,
+  tracks,
+  timelineId,
+  primary,
+  lifecycle,
+  playback,
+} = motion;
 const effectiveId = id ?? motionId;
 
-if (typeof effectiveId !== 'string' || effectiveId === '') {
+if (typeof effectiveId !== "string" || effectiveId === "") {
   errors.push({
-    ruleId: 'motion-structure',
-    severity: 'error',
-    message: 'motionId is required and must be a non-empty string.',
-    path: `${motionPath}.${id !== undefined ? 'id' : 'motionId'}`
+    ruleId: "motion-structure",
+    severity: "error",
+    message: "motionId is required and must be a non-empty string.",
+    path: `${motionPath}.${id !== undefined ? "id" : "motionId"}`,
   });
 }
 ```
 
 ```js
 // CORRECT:
-const { id, motionId, driver, trigger, stagger, tracks, timelineId, primary, lifecycle, playback } = motion;
+const {
+  id,
+  motionId,
+  driver,
+  trigger,
+  stagger,
+  tracks,
+  timelineId,
+  primary,
+  lifecycle,
+  playback,
+} = motion;
 
 if (motionId !== undefined) {
   errors.push({
-    ruleId: 'motion-structure',
-    severity: 'error',
+    ruleId: "motion-structure",
+    severity: "error",
     message: '"motionId" is a v2/v3 field, not valid in v4 — use "id".',
-    path: `${motionPath}.motionId`
+    path: `${motionPath}.motionId`,
   });
 }
 
-if (typeof id !== 'string' || id === '') {
+if (typeof id !== "string" || id === "") {
   errors.push({
-    ruleId: 'motion-structure',
-    severity: 'error',
-    message: 'id is required and must be a non-empty string.',
-    path: `${motionPath}.id`
+    ruleId: "motion-structure",
+    severity: "error",
+    message: "id is required and must be a non-empty string.",
+    path: `${motionPath}.id`,
   });
 }
 ```
@@ -294,12 +361,13 @@ honoring it silently.
 ```js
 // ADD, inside the `if (type === 'time')` region — this rule currently has no
 // type === 'time' branch at all; add one:
-if (type === 'time' && trigger.duration !== undefined) {
+if (type === "time" && trigger.duration !== undefined) {
   errors.push({
-    ruleId: 'trigger-shape',
-    severity: 'error',
-    message: 'trigger.duration has no effect on time triggers — set duration on individual tracks instead.',
-    path: `${triggerPath}.duration`
+    ruleId: "trigger-shape",
+    severity: "error",
+    message:
+      "trigger.duration has no effect on time triggers — set duration on individual tracks instead.",
+    path: `${triggerPath}.duration`,
   });
 }
 ```
@@ -319,6 +387,7 @@ trigger: { type: 'time', duration: ballTravelSeconds },
 ...
 trigger: { type: 'time', autoplay: false, duration: 0.35 },
 ```
+
 ```js
 // CORRECT — drop duration, keep everything else:
 trigger: { type: 'time' },
@@ -361,16 +430,18 @@ as a bigger problem than the current code actually has; `adopt()` + `unmount()` 
 the real gap (stamped tracks unreachable, destroyed instances never pruned).
 
 **Non-goal:** do not change what `destroy()` does to already-correctly-destroyed
-instances — the fix is that callers now *tell* the Engine when they're done (via
+instances — the fix is that callers now _tell_ the Engine when they're done (via
 `unmount`), not that `destroy()` grows defensive double-destroy guards. Calling
 `unmount()` is the caller's responsibility going forward; don't paper over a missed
 `unmount()` call with silent idempotency in `destroy()` itself.
 
 **Hook call sites to update** (add `engine.unmount(instance)` alongside every existing
 `instance.destroy()` in cleanup/unmount code):
+
 ```bash
 grep -rln "\.destroy()" src/hooks src/components --include=*.js --include=*.jsx | grep -v __tests__
 ```
+
 Check each result. Where the destroyed thing came from `engine.mountInstance(...)` or
 `engine.mountWithDelegate(...)`, add `engine.unmount(...)` right after `.destroy()`.
 Where it came from `createTrack(...)` directly (bypassing the Engine, e.g. Spiral's

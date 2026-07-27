@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useEffect } from "react";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 /**
  * Localized hook to scale a trigger element's height proportionally
@@ -13,7 +13,7 @@ export default function useDynamicHeight(instance, triggerRef) {
     if (!instance || !triggerRef.current) return undefined;
 
     const element = triggerRef.current;
-    
+
     // Store original style to restore on cleanup
     const originalHeight = element.style.height;
 
@@ -21,7 +21,7 @@ export default function useDynamicHeight(instance, triggerRef) {
     const initialHeight = element.offsetHeight;
     const viewportHeight = window.innerHeight;
     const initialDuration = instance.timeline.duration() || 1.0;
-    
+
     const initialScrollRange = initialHeight - viewportHeight;
     // Fallback if the trigger wrapper starts at <= viewport height
     const baseScrollRange = initialScrollRange > 0 ? initialScrollRange : 1000;
@@ -29,7 +29,7 @@ export default function useDynamicHeight(instance, triggerRef) {
 
     const updateHeight = () => {
       const currentDuration = instance.timeline.duration();
-      const newHeight = (currentDuration * pixelsPerSecond) + viewportHeight;
+      const newHeight = currentDuration * pixelsPerSecond + viewportHeight;
       element.style.height = `${newHeight}px`;
     };
 
@@ -46,7 +46,7 @@ export default function useDynamicHeight(instance, triggerRef) {
       if (originalHeight) {
         element.style.height = originalHeight;
       } else {
-        element.style.removeProperty('height');
+        element.style.removeProperty("height");
       }
       ScrollTrigger.refresh();
     };

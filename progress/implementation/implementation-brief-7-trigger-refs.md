@@ -12,7 +12,7 @@ dependency, and the DOM connection happens entirely via
 component renders that element. That path is already fully DOM-decoupled and
 requires no changes.
 
-This brief replaces the *trigger-ref* resolution mechanism only. It does not
+This brief replaces the _trigger-ref_ resolution mechanism only. It does not
 touch tween/timeline construction, which stays exactly as eager and
 schema-driven as it is today.
 
@@ -46,8 +46,8 @@ schema-driven as it is today.
 Symmetric to `useMotionSubscriber` in shape and lifecycle:
 
 ```js
-import { useEffect } from 'react';
-import { productionEngine } from '../lib/ProductionEngine';
+import { useEffect } from "react";
+import { productionEngine } from "../lib/ProductionEngine";
 
 /**
  * Registers a DOM ref as the resolution target for a trigger-anchor id

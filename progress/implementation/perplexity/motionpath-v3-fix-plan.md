@@ -47,8 +47,8 @@ Update `src/hooks/useMotionInstance.js`:
 ### Suggested implementation
 
 ```js
-import { useEffect, useRef, useState } from 'react';
-import { productionEngine } from '../engines/ProductionEngine.js';
+import { useEffect, useRef, useState } from "react";
+import { productionEngine } from "../engines/ProductionEngine.js";
 
 export default function useMotionInstance(motionId, config) {
   const [instance, setInstance] = useState(null);
@@ -62,17 +62,20 @@ export default function useMotionInstance(motionId, config) {
   ) {
     warnedConfigChangeRef.current = true;
     console.warn(
-      '[useMotionInstance] config is mount-time-only. Changing config after mount has no effect.'
+      "[useMotionInstance] config is mount-time-only. Changing config after mount has no effect.",
     );
   }
 
   useEffect(() => {
     if (!motionId) return undefined;
 
-    const inst = productionEngine.mountInstance(motionId, initialConfigRef.current);
+    const inst = productionEngine.mountInstance(
+      motionId,
+      initialConfigRef.current,
+    );
 
     const triggers = {};
-    inst.requiredTriggerIds.forEach(id => {
+    inst.requiredTriggerIds.forEach((id) => {
       let activeRef = null;
       triggers[id] = (el) => {
         if (el) {
@@ -133,7 +136,8 @@ In `BaseEngine.mountInstance`, replace the monkey-patched block with a callback 
 const instance = createMotionInstance(motionId, effectiveConfig, {
   project: this._project,
   resolveElement: this.#resolveElement,
-  mountInstance: (childMotionId, childConfig) => this.mountInstance(childMotionId, childConfig),
+  mountInstance: (childMotionId, childConfig) =>
+    this.mountInstance(childMotionId, childConfig),
   onSubscriberChange,
   onDestroy: (destroyedInstance) => {
     this._instances.delete(destroyedInstance.id);
@@ -143,7 +147,7 @@ const instance = createMotionInstance(motionId, effectiveConfig, {
       if (controller) {
         const isEmpty = controller.removeMember(
           destroyedInstance.id,
-          destroyedInstance.motionId
+          destroyedInstance.motionId,
         );
         if (isEmpty) {
           controller.destroy();
@@ -151,7 +155,7 @@ const instance = createMotionInstance(motionId, effectiveConfig, {
         }
       }
     }
-  }
+  },
 });
 ```
 
@@ -188,11 +192,11 @@ Refactor `attachDriver` in `src/engines/TimelineGroupController.js`:
 const driver = schemaMotion.driver || {};
 const trigger = driver.trigger || {};
 
-if (driver.type !== 'timeline') {
+if (driver.type !== "timeline") {
   return;
 }
 
-if (trigger.type === 'scroll') {
+if (trigger.type === "scroll") {
   // scroll trigger mode
 } else {
   // regular timeline mode
@@ -229,12 +233,16 @@ function createUnsupportedLazyPlugin(featureName, key) {
     },
     load() {
       return Promise.reject(
-        new Error(`[MotionPath] Plugin '${featureName}' for key '${key}' is not implemented.`)
+        new Error(
+          `[MotionPath] Plugin '${featureName}' for key '${key}' is not implemented.`,
+        ),
       );
     },
     contribute() {
-      throw new Error(`[MotionPath] Plugin '${featureName}' for key '${key}' is not implemented.`);
-    }
+      throw new Error(
+        `[MotionPath] Plugin '${featureName}' for key '${key}' is not implemented.`,
+      );
+    },
   };
 }
 ```
@@ -242,10 +250,19 @@ function createUnsupportedLazyPlugin(featureName, key) {
 Then define:
 
 ```js
-export const splitTextPlugin = createUnsupportedLazyPlugin('splitText', 'splitText');
-export const morphSvgPlugin = createUnsupportedLazyPlugin('morphSVG', 'morphSVG');
-export const drawSvgPlugin = createUnsupportedLazyPlugin('drawSVG', 'drawSVG');
-export const scrambleTextPlugin = createUnsupportedLazyPlugin('scrambleText', 'scrambleText');
+export const splitTextPlugin = createUnsupportedLazyPlugin(
+  "splitText",
+  "splitText",
+);
+export const morphSvgPlugin = createUnsupportedLazyPlugin(
+  "morphSVG",
+  "morphSVG",
+);
+export const drawSvgPlugin = createUnsupportedLazyPlugin("drawSVG", "drawSVG");
+export const scrambleTextPlugin = createUnsupportedLazyPlugin(
+  "scrambleText",
+  "scrambleText",
+);
 ```
 
 ### Target behavior
@@ -289,8 +306,10 @@ function resolve(project, motionId, progress, overrides = {}) {
   }
 
   const driverType = originalMotion.driver?.type;
-  if (driverType !== 'delegate' && driverType !== 'manual') {
-    throw new Error(`resolveMotion: motion with id "${motionId}" is not a delegate or manual motion.`);
+  if (driverType !== "delegate" && driverType !== "manual") {
+    throw new Error(
+      `resolveMotion: motion with id "${motionId}" is not a delegate or manual motion.`,
+    );
   }
 
   const templates = project.templates;

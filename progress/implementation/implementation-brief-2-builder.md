@@ -13,6 +13,7 @@
 This spec is being implemented by a fast/cheap model. Fast models reliably produce code that **runs without crashing but silently does the wrong thing** — merging when it should deep-merge, overwriting when it should throw, flattening a nested structure "for simplicity." That is a worse outcome than a crash, because it looks done and isn't.
 
 Rules for this implementation, non-negotiable:
+
 - **Follow the algorithms in §4–§6 exactly, step by step, in the stated order.** Do not restructure them into what seems like a cleaner equivalent. If a step says "deep-merge at each percent key," implement a deep merge — not `Object.assign` at the top level, not a flatten-then-assign.
 - **Every "must throw" in this document means throw a real Error, synchronously, at build time** — not a `console.warn`, not a silently-skipped element, not a returned `null`.
 - **Do not add functionality not listed here.** If something seems missing (e.g. "should this also validate X"), it is either handled in Brief 1 or intentionally deferred — see §7. Do not add it.
@@ -48,41 +49,41 @@ interface TriggerConfig {
 }
 
 interface ScenarioBuild {
-  scenarioIndex: number;             // index into schema.scenarios, stable key
+  scenarioIndex: number; // index into schema.scenarios, stable key
   sceneId: string;
   triggerType: "scroll-scrub" | "scroll-observer" | "time";
-  triggerConfig: TriggerConfig;      // raw, unmodified, for the engine to wire later
-  timeline: gsap.core.Timeline;      // paused: true, fully built, contains every element's tween
+  triggerConfig: TriggerConfig; // raw, unmodified, for the engine to wire later
+  timeline: gsap.core.Timeline; // paused: true, fully built, contains every element's tween
   timelineId?: string;
-  isPrimary: boolean;                // false if no timelineId
+  isPrimary: boolean; // false if no timelineId
 }
 
 interface TimelineGroupBuild {
   timelineId: string;
   triggerType: "scroll-scrub" | "time"; // never "scroll-observer" — enforced by Brief 1, not re-checked here
-  masterTimeline: gsap.core.Timeline;   // paused: true, contains nested child scenario timelines
+  masterTimeline: gsap.core.Timeline; // paused: true, contains nested child scenario timelines
   primaryScenarioIndex: number;
 }
 
 interface ElementBuild {
-  proxy: Record<string, unknown>;   // GSAP's actual tween target. Engine's subscribe() reads from this every tick.
-  domNode: Element;                 // resolved via deps.resolveElement — stored purely for the engine's later
-                                     // compose()/gsap.set() write-back. This module never reads from or writes
-                                     // to domNode at all now [REMOVED — see note: was also used for
-                                     // getNaturalValue() during direction resolution; that call site is gone].
+  proxy: Record<string, unknown>; // GSAP's actual tween target. Engine's subscribe() reads from this every tick.
+  domNode: Element; // resolved via deps.resolveElement — stored purely for the engine's later
+  // compose()/gsap.set() write-back. This module never reads from or writes
+  // to domNode at all now [REMOVED — see note: was also used for
+  // getNaturalValue() during direction resolution; that call site is gone].
 }
 
 interface BuildResult {
-  elementPlugins: Map<string, Plugin[]>;      // elementId -> resolved plugins, for the engine's later compose() calls
-  elements: Map<string, ElementBuild>;        // elementId -> { proxy, domNode }, for the engine's subscribe()/compose()
-  scenarios: ScenarioBuild[];                 // one entry per schema scenario, same order as input
+  elementPlugins: Map<string, Plugin[]>; // elementId -> resolved plugins, for the engine's later compose() calls
+  elements: Map<string, ElementBuild>; // elementId -> { proxy, domNode }, for the engine's subscribe()/compose()
+  scenarios: ScenarioBuild[]; // one entry per schema scenario, same order as input
   timelineGroups: Map<string, TimelineGroupBuild>;
 }
 
 function buildProject(
   schema: ValidatedProjectSchema,
-  deps: BuildDependencies
-): Promise<BuildResult>
+  deps: BuildDependencies,
+): Promise<BuildResult>;
 ```
 
 - Async because lazy plugins (§3) may need dynamic import.
@@ -95,14 +96,17 @@ function buildProject(
 
 ```ts
 interface Plugin {
-  keys: string[];                 // keyframe property names this plugin owns, e.g. ["x","y","z"]
-  lazy?: boolean;                 // true only for splitText/morphSVG/drawSVG/scrambleText
-  load?: () => Promise<void>;     // required if lazy is true; must be idempotent (see below)
+  keys: string[]; // keyframe property names this plugin owns, e.g. ["x","y","z"]
+  lazy?: boolean; // true only for splitText/morphSVG/drawSVG/scrambleText
+  load?: () => Promise<void>; // required if lazy is true; must be idempotent (see below)
   contribute(
     propertyKey: string,
     stops: Array<{ p: number; v: number | string; ease?: string }>,
-    elementCfg: unknown
-  ): { percentPatch: Record<string, Record<string, unknown>>; tweenVars?: Record<string, unknown> };
+    elementCfg: unknown,
+  ): {
+    percentPatch: Record<string, Record<string, unknown>>;
+    tweenVars?: Record<string, unknown>;
+  };
   // compose() also exists on Plugin but is NEVER called by this module — it belongs
   // to the engine layer. Do not call it. Do not implement it here if it's missing;
   // that's a different module's responsibility.
@@ -129,7 +133,10 @@ function ensureLoaded(plugin: Plugin): Promise<void> {
 // causing plugin.load() to fire twice. Do not implement it this way.
 let loaded = false;
 async function ensureLoaded(plugin) {
-  if (!loaded) { await plugin.load(); loaded = true; } // two concurrent calls both pass the `if`
+  if (!loaded) {
+    await plugin.load();
+    loaded = true;
+  } // two concurrent calls both pass the `if`
 }
 ```
 
@@ -177,7 +184,7 @@ for (const key of Object.keys(tweenVars ?? {})) {
   if (key in sharedTweenVars && sharedTweenVars[key] !== tweenVars[key]) {
     throw new Error(
       `tweenVars collision on element "${elementCfg.id}": key "${key}" ` +
-      `contributed twice with different values (plugin authoring bug, not a schema error).`
+        `contributed twice with different values (plugin authoring bug, not a schema error).`,
     );
   }
   sharedTweenVars[key] = tweenVars[key];
@@ -192,14 +199,22 @@ This check belongs in the builder, not Brief 1's validator — it depends on plu
 
 ```ts
 // CORRECT — GSAP writes into the plain object; nothing touches the real DOM here
-gsap.to(proxy, { keyframes: sharedKeyframes, ...sharedTweenVars, paused: true });
+gsap.to(proxy, {
+  keyframes: sharedKeyframes,
+  ...sharedTweenVars,
+  paused: true,
+});
 ```
 
 ```ts
 // WRONG — works for x/opacity in a quick manual test, then silently breaks the moment
 // a synthetic property (blur, __pathProgress) is used, since those have no CSS equivalent
 // to write to on a real element. Also breaks the broadcast/compose split entirely.
-gsap.to(domNode, { keyframes: sharedKeyframes, ...sharedTweenVars, paused: true });
+gsap.to(domNode, {
+  keyframes: sharedKeyframes,
+  ...sharedTweenVars,
+  paused: true,
+});
 ```
 
 **One call per element, regardless of how many properties it animates** — this is a hard invariant, not a suggestion. Store the resulting tween association implicitly via `proxy` itself — the engine layer reads current values directly off `proxy` on each tick (that mechanism lives outside this module; this module's only job is making sure `proxy` is the thing GSAP is actually updating).
@@ -253,9 +268,9 @@ Do not implement any of the following in this module. Each is either another mod
 - **[REMOVED — see note]** `resolveDirection` test suite deleted — the function no longer exists.
 - Merge pipeline (§5) — test with a **mock plugin registry** (fake `contribute()` implementations returning controlled `percentPatch`/`tweenVars`), not real GSAP plugins. Required cases:
   - Two properties contributing to different percent keys → both present in final `sharedKeyframes`, independently.
-  - Two properties contributing to the *same* percent key, different props (e.g. one contributes `x`, another `opacity`, both at `"50%"`) → both present in the merged object at that key (proves deep-merge, not overwrite).
+  - Two properties contributing to the _same_ percent key, different props (e.g. one contributes `x`, another `opacity`, both at `"50%"`) → both present in the merged object at that key (proves deep-merge, not overwrite).
   - Two properties contributing conflicting `tweenVars` values for the same key → throws.
-  - Two properties contributing the *same* `tweenVars` key with the *same* value → no throw (not every collision is a conflict).
+  - Two properties contributing the _same_ `tweenVars` key with the _same_ value → no throw (not every collision is a conflict).
 - Lazy plugin loading — mock a `load()` that resolves after a delay; fire two concurrent `ensureLoaded()` calls for the same plugin; assert `load()` was called exactly once.
 - Scenario/group construction (§6) — assert stagger offsets are applied at the correct positions; assert grouped scenarios nest in declaration order under one master; assert `primaryScenarioIndex` is correctly recorded.
 - One end-to-end test: a small valid 2-scenario project (one grouped pair) → `buildProject` resolves without throwing, returns a `BuildResult` with the expected shape, and every returned timeline has `paused: true`.
@@ -277,8 +292,11 @@ Do not implement any of the following in this module. Each is either another mod
 **Fix — apply once, when constructing each scenario's timeline in §6, before it's added to any group:**
 
 ```js
-if ((scenario.trigger.type === "time" || (scenario.trigger.type === "scroll" && !scenario.trigger.scrub))
-    && typeof scenario.trigger.delay === "number") {
+if (
+  (scenario.trigger.type === "time" ||
+    (scenario.trigger.type === "scroll" && !scenario.trigger.scrub)) &&
+  typeof scenario.trigger.delay === "number"
+) {
   scenarioTimeline.delay(scenario.trigger.delay);
 }
 ```

@@ -13,17 +13,17 @@
 export function stopShapeRule(track, motion, context, path) {
   const errors = [];
 
-  if (!track || typeof track !== 'object') {
+  if (!track || typeof track !== "object") {
     return errors;
   }
 
   const keyframes = track.keyframes;
-  if (!keyframes || typeof keyframes !== 'object') {
+  if (!keyframes || typeof keyframes !== "object") {
     return errors;
   }
 
   Object.entries(keyframes).forEach(([propKey, value]) => {
-    if (!value || typeof value !== 'object') return;
+    if (!value || typeof value !== "object") return;
     const stops = value.stops;
     if (!Array.isArray(stops)) return;
 
@@ -32,12 +32,12 @@ export function stopShapeRule(track, motion, context, path) {
     stops.forEach((stop, idx) => {
       const stopPath = `${propPath}.stops[${idx}]`;
 
-      if (!stop || typeof stop !== 'object' || Array.isArray(stop)) {
+      if (!stop || typeof stop !== "object" || Array.isArray(stop)) {
         errors.push({
           ruleId: "stop-shape",
           severity: "error",
-          message: `Stop at index ${idx} for property '${propKey}' on track '${track.id || 'unknown'}' must be a plain object. Got: ${JSON.stringify(stop)}.`,
-          path: stopPath
+          message: `Stop at index ${idx} for property '${propKey}' on track '${track.id || "unknown"}' must be a plain object. Got: ${JSON.stringify(stop)}.`,
+          path: stopPath,
         });
         return;
       }
@@ -48,15 +48,15 @@ export function stopShapeRule(track, motion, context, path) {
         errors.push({
           ruleId: "stop-shape",
           severity: "error",
-          message: `Stop at index ${idx} for property '${propKey}' on track '${track.id || 'unknown'}' is missing required property 'p'.`,
-          path: `${stopPath}.p`
+          message: `Stop at index ${idx} for property '${propKey}' on track '${track.id || "unknown"}' is missing required property 'p'.`,
+          path: `${stopPath}.p`,
         });
-      } else if (typeof p !== 'number' || p < 0 || p > 1) {
+      } else if (typeof p !== "number" || p < 0 || p > 1) {
         errors.push({
           ruleId: "stop-shape",
           severity: "error",
-          message: `Stop at index ${idx} for property '${propKey}' on track '${track.id || 'unknown'}' must have 'p' as a number between 0 and 1. Got: ${JSON.stringify(p)}.`,
-          path: `${stopPath}.p`
+          message: `Stop at index ${idx} for property '${propKey}' on track '${track.id || "unknown"}' must have 'p' as a number between 0 and 1. Got: ${JSON.stringify(p)}.`,
+          path: `${stopPath}.p`,
         });
       }
 
@@ -64,8 +64,8 @@ export function stopShapeRule(track, motion, context, path) {
         errors.push({
           ruleId: "stop-shape",
           severity: "error",
-          message: `Stop at index ${idx} for property '${propKey}' on track '${track.id || 'unknown'}' must have a defined 'v' value. Got: ${JSON.stringify(v)}.`,
-          path: `${stopPath}.v`
+          message: `Stop at index ${idx} for property '${propKey}' on track '${track.id || "unknown"}' must have a defined 'v' value. Got: ${JSON.stringify(v)}.`,
+          path: `${stopPath}.v`,
         });
       }
     });

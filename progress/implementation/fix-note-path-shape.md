@@ -46,7 +46,7 @@ export function pathShapeRule(element, scenario, context, path) {
   points.forEach((pt, i) => {
     const ptPath = `${pointsPath}[${i}]`;
 
-    if (typeof pt?.x !== 'number' || typeof pt?.y !== 'number') {
+    if (typeof pt?.x !== "number" || typeof pt?.y !== "number") {
       errors.push({
         ruleId: "path-shape",
         severity: "error",
@@ -70,7 +70,8 @@ export function pathShapeRule(element, scenario, context, path) {
       errors.push({
         ruleId: "path-shape",
         severity: "warning",
-        message: "ctrlX/ctrlY on the first path point have no effect (no preceding segment to curve).",
+        message:
+          "ctrlX/ctrlY on the first path point have no effect (no preceding segment to curve).",
         path: ptPath,
       });
     }
@@ -87,46 +88,106 @@ export function pathShapeRule(element, scenario, context, path) {
 The old cubic-chain test cases (`points.length` divisible-by-3-plus-1 checks) are for a shape this rule no longer validates — delete them. Replace with:
 
 ```js
-it('errors when fewer than 2 points are given', () => {
+it("errors when fewer than 2 points are given", () => {
   const element = { keyframes: { path: { points: [{ x: 0, y: 0 }] } } };
-  const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
-  expect(errors.some(e => e.severity === 'error')).toBe(true);
+  const errors = pathShapeRule(
+    element,
+    {},
+    { schema: {} },
+    "scenarios[0].elements[0]",
+  );
+  expect(errors.some((e) => e.severity === "error")).toBe(true);
 });
 
-it('accepts the minimum valid path (2 plain waypoints)', () => {
-  const element = { keyframes: { path: { points: [{ x: 0, y: 0 }, { x: 10, y: 10 }] } } };
-  const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
+it("accepts the minimum valid path (2 plain waypoints)", () => {
+  const element = {
+    keyframes: {
+      path: {
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 10 },
+        ],
+      },
+    },
+  };
+  const errors = pathShapeRule(
+    element,
+    {},
+    { schema: {} },
+    "scenarios[0].elements[0]",
+  );
   expect(errors.length).toBe(0);
 });
 
-it('errors when only one of ctrlX/ctrlY is provided', () => {
-  const element = { keyframes: { path: { points: [
-    { x: 0, y: 0 }, { x: 10, y: 10, ctrlX: 5 },
-  ] } } };
-  const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
-  expect(errors.some(e => e.severity === 'error')).toBe(true);
+it("errors when only one of ctrlX/ctrlY is provided", () => {
+  const element = {
+    keyframes: {
+      path: {
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 10, ctrlX: 5 },
+        ],
+      },
+    },
+  };
+  const errors = pathShapeRule(
+    element,
+    {},
+    { schema: {} },
+    "scenarios[0].elements[0]",
+  );
+  expect(errors.some((e) => e.severity === "error")).toBe(true);
 });
 
-it('warns when ctrlX/ctrlY are given on the first point', () => {
-  const element = { keyframes: { path: { points: [
-    { x: 0, y: 0, ctrlX: 1, ctrlY: 1 }, { x: 10, y: 10 },
-  ] } } };
-  const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
-  expect(errors.some(e => e.severity === 'warning')).toBe(true);
-  expect(errors.some(e => e.severity === 'error')).toBe(false);
+it("warns when ctrlX/ctrlY are given on the first point", () => {
+  const element = {
+    keyframes: {
+      path: {
+        points: [
+          { x: 0, y: 0, ctrlX: 1, ctrlY: 1 },
+          { x: 10, y: 10 },
+        ],
+      },
+    },
+  };
+  const errors = pathShapeRule(
+    element,
+    {},
+    { schema: {} },
+    "scenarios[0].elements[0]",
+  );
+  expect(errors.some((e) => e.severity === "warning")).toBe(true);
+  expect(errors.some((e) => e.severity === "error")).toBe(false);
 });
 
-it('errors on non-numeric x/y', () => {
-  const element = { keyframes: { path: { points: [
-    { x: 'a', y: 0 }, { x: 1, y: 1 },
-  ] } } };
-  const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
-  expect(errors.some(e => e.severity === 'error')).toBe(true);
+it("errors on non-numeric x/y", () => {
+  const element = {
+    keyframes: {
+      path: {
+        points: [
+          { x: "a", y: 0 },
+          { x: 1, y: 1 },
+        ],
+      },
+    },
+  };
+  const errors = pathShapeRule(
+    element,
+    {},
+    { schema: {} },
+    "scenarios[0].elements[0]",
+  );
+  expect(errors.some((e) => e.severity === "error")).toBe(true);
 });
 
-it('returns no errors when path is absent', () => {
+it("returns no errors when path is absent", () => {
   const element = { keyframes: { x: { stops: [{ p: 0, v: 0 }] } } };
-  const errors = pathShapeRule(element, {}, { schema: {} }, 'scenarios[0].elements[0]');
+  const errors = pathShapeRule(
+    element,
+    {},
+    { schema: {} },
+    "scenarios[0].elements[0]",
+  );
   expect(errors.length).toBe(0);
 });
 ```

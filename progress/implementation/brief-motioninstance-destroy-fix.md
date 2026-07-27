@@ -1,14 +1,17 @@
 # Brief: Fix `MotionInstance.destroy()` subscriber-unregister ordering bug
 
 ## File
+
 `src/domain/instance/MotionInstance.js`
 
 ## Locked decision
+
 The `destroy()` method must capture whether the instance had any subscribers
 **before** `tracksMap` is cleared, and use that captured value — not
 `tracksMap.size` — to decide whether to fire `onSubscriberChange(this, false)`.
 
 ## The bug
+
 In the current code, `tracksMap.clear()` runs before the `tracksMap.size > 0`
 check, so the check is always `false` post-clear. As a result,
 `onSubscriberChange(this, false)` never fires from `destroy()`. Any instance
@@ -18,6 +21,7 @@ in the ticker loop forever (dead-weight `broadcast()` calls every frame), and
 if it was the last active instance, `gsap.ticker` never stops.
 
 ## Non-goals (do not touch)
+
 - Do not change `subscribe()`/its own `onSubscriberChange` calls (lines
   ~194–232) — those are correct and out of scope.
 - Do not change `children.forEach(child => child.destroy())` recursion logic.
@@ -27,6 +31,7 @@ if it was the last active instance, `gsap.ticker` never stops.
   contained in `MotionInstance.js`.
 
 ## WRONG (current code, `destroy()` method)
+
 ```js
 destroy() {
   if (this.#scrollTrigger) {
@@ -53,6 +58,7 @@ destroy() {
 ```
 
 ## CORRECT (fixed code)
+
 ```js
 destroy() {
   const hadActiveSubscribers = Array.from(this.#subscribers.values())
@@ -91,16 +97,20 @@ have subscribers," it was "does this instance have tracks at all." Use
 
 1. **Ordering grep** — confirm the subscriber check no longer reads
    `tracksMap` and is computed before any kill/clear call:
+
    ```
    grep -n "hadActiveSubscribers\|tracksMap.clear\|onSubscriberChange(this, false)" src/domain/instance/MotionInstance.js
    ```
+
    Expected: `hadActiveSubscribers` line number < `tracksMap.clear()` line
    number < `onSubscriberChange(this, false)` line number.
 
 2. **Old buggy pattern must be gone**:
+
    ```
    grep -n "tracksMap.size > 0" src/domain/instance/MotionInstance.js
    ```
+
    Expected: no match.
 
 3. **Behavioral test — must be added to

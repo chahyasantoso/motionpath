@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import useMotionSubscribers from '../../hooks/useMotionSubscribers';
+import { useRef } from "react";
+import useMotionSubscribers from "../../hooks/useMotionSubscribers";
 
 export default function SpiralBall({ vm }) {
   const ref = useRef(null);
@@ -8,9 +8,9 @@ export default function SpiralBall({ vm }) {
     track: vm.ballTrack,
     transformFn: (rawData, compose) => {
       const p = rawData?.pathProgress ?? 0;
-      if (p <= 0 || p >= 1) return { display: 'none', opacity: 0 };
-      return { ...compose(rawData), display: 'flex' };
-    }
+      if (p <= 0 || p >= 1) return { display: "none", opacity: 0 };
+      return { ...compose(rawData), display: "flex" };
+    },
   };
 
   useMotionSubscribers([source], ref);
@@ -20,7 +20,7 @@ export default function SpiralBall({ vm }) {
       ref={ref}
       className="element spiral-ball"
       onClick={vm.isClickable ? vm.onClick : undefined}
-      style={{ '--ball-color': vm.color }}
+      style={{ "--ball-color": vm.color }}
     />
   );
 }

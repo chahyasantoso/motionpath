@@ -28,12 +28,13 @@ A `time` scenario with `repeat: -1, yoyo: true` is the right tool for phase 2. B
 
 ### Motivating Use Case 2: Idle Animations on Scroll Stop
 
-Consider a card that animates onto the screen based on scroll position. However, when the user stops scrolling (lets go of the mouse/wheel), the card should start a gentle idle float animation. 
+Consider a card that animates onto the screen based on scroll position. However, when the user stops scrolling (lets go of the mouse/wheel), the card should start a gentle idle float animation.
 
 1. While **scrolling**: The card position is locked strictly to scroll-scrub progress.
 2. While **idle (stopped)**: The card runs a time-looped float timeline.
 
 Since "scroll stopping" is a dynamic event based on scroll velocity and time delays, it cannot be modeled as a static ScrollTrigger viewport boundary in the JSON schema. It requires:
+
 - Dynamic scroll event debounce or velocity measurement at runtime.
 - Communicating this dynamic state to the engine (e.g. `useMotionProject(project, { 'card-idle-tl': !scrolling })`).
 
@@ -57,13 +58,13 @@ This scenario demonstrates why runtime engine-level play/pause state control is 
 { "type": "time", "repeat": -1, "yoyo": true, "paused": true }
 ```
 
-**Rejected** — the schema describes *what* to animate, not *when* to start. Play state is a runtime/application concern, not an animation definition concern. Adding `paused` to the schema would pollute the schema with control flow logic that belongs in the React layer.
+**Rejected** — the schema describes _what_ to animate, not _when_ to start. Play state is a runtime/application concern, not an animation definition concern. Adding `paused` to the schema would pollute the schema with control flow logic that belongs in the React layer.
 
 ### Option B: Return the engine handle from `useMotionProject`
 
 ```javascript
 const engine = useMotionProject(pmProject);
-engine.playTimer('lantern-bounce-tl');
+engine.playTimer("lantern-bounce-tl");
 ```
 
 **Partially useful** — gives components access to `playTimer/pauseTimer`. But it's still imperative: the caller has to manage when to call them and the state is invisible to React. Not rejected entirely — could be added later for advanced use cases.
@@ -72,10 +73,11 @@ engine.playTimer('lantern-bounce-tl');
 
 ```javascript
 const [bouncing, setBouncing] = useState(false);
-useMotionProject(pmProject, { 'lantern-bounce-tl': bouncing });
+useMotionProject(pmProject, { "lantern-bounce-tl": bouncing });
 ```
 
 React state is the source of truth. When `bouncing` changes, a `useEffect` inside `useMotionProject` fires and calls `playTimer`/`pauseTimer`. This is:
+
 - **Declarative**: the intention is expressed as state, not as an imperative call.
 - **React-idiomatic**: state is visible to DevTools, testable with `renderHook`, and batched correctly.
 - **Decoupled**: the component never imports or calls engine methods directly.
@@ -91,8 +93,8 @@ React state is the source of truth. When `bouncing` changes, a `useEffect` insid
 ```javascript
 productionEngine.loadProject(schema, {
   playStates: {
-    'lantern-bounce-tl': false  // false = build but do NOT call .play()
-  }
+    "lantern-bounce-tl": false, // false = build but do NOT call .play()
+  },
 });
 ```
 
@@ -154,7 +156,7 @@ export default function PasarMalamPage() {
 
   // playStates: false → bounce scenario starts paused
   // When bouncing flips to true → Effect 2 fires → engine.playTimer('lantern-bounce-tl')
-  useMotionProject(pmProject, { 'lantern-bounce-tl': bouncing });
+  useMotionProject(pmProject, { "lantern-bounce-tl": bouncing });
 
   // Threshold gate: reads scroll progress from lantern-1's subscriber
   const lanternProgressRef = useRef(null);
@@ -167,7 +169,7 @@ export default function PasarMalamPage() {
     return {}; // pure progress observer — no style patch
   }, []);
 
-  useMotionSubscriber('lantern-1', lanternProgressRef, onScrollProgress);
+  useMotionSubscriber("lantern-1", lanternProgressRef, onScrollProgress);
   // ...
 }
 ```
@@ -176,15 +178,45 @@ export default function PasarMalamPage() {
 
 ```javascript
 const lanternBounceScene = {
-  sceneId: 'lantern-bounce',
-  timelineId: 'lantern-bounce-tl',  // addressable id for playStates
+  sceneId: "lantern-bounce",
+  timelineId: "lantern-bounce-tl", // addressable id for playStates
   primary: true,
-  trigger: { type: 'time', repeat: -1, yoyo: true },
+  trigger: { type: "time", repeat: -1, yoyo: true },
   elements: [
-    { id: 'lantern-1', keyframes: { y: { stops: [{ p:0, v:0 }, { p:1, v:-18, ease:'power1.inOut' }] } } },
-    { id: 'lantern-2', keyframes: { y: { stops: [{ p:0, v:0 }, { p:1, v:-12, ease:'power1.inOut' }] } } },
-    { id: 'lantern-3', keyframes: { y: { stops: [{ p:0, v:0 }, { p:1, v:-20, ease:'power1.inOut' }] } } }
-  ]
+    {
+      id: "lantern-1",
+      keyframes: {
+        y: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: -18, ease: "power1.inOut" },
+          ],
+        },
+      },
+    },
+    {
+      id: "lantern-2",
+      keyframes: {
+        y: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: -12, ease: "power1.inOut" },
+          ],
+        },
+      },
+    },
+    {
+      id: "lantern-3",
+      keyframes: {
+        y: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: -20, ease: "power1.inOut" },
+          ],
+        },
+      },
+    },
+  ],
 };
 ```
 
@@ -208,21 +240,22 @@ The `playStatesKey` serialisation sorts entries before joining, so `{ a: true, b
 
 ### GSAP Nesting Gotcha (Paused Child Timelines)
 
-At build time, the builder creates all scenario timelines as `paused: true` to prevent automatic playback. However, when these timelines are grouped under a `timelineId` inside a `masterTimeline`, GSAP maintains the child's `paused` state individually. 
+At build time, the builder creates all scenario timelines as `paused: true` to prevent automatic playback. However, when these timelines are grouped under a `timelineId` inside a `masterTimeline`, GSAP maintains the child's `paused` state individually.
 
 If a child timeline remains `paused`, calling `.play()` on its parent `masterTimeline` has no effect on the child. To resolve this, during the wiring stage in `ProductionEngine.js`, we programmatically unpause child timelines inside time-based groups so they can respond to the parent's playhead:
+
 ```javascript
-group.masterTimeline.getChildren().forEach(child => child.paused(false));
+group.masterTimeline.getChildren().forEach((child) => child.paused(false));
 ```
 
 ---
 
 ## 6. Files Changed
 
-| File | Change |
-|---|---|
-| [ProductionEngine.js](file:///d:/dev/motionpath/src/lib/ProductionEngine.js) | `loadProject(schema, options)` — respects `options.playStates` for time scenarios |
-| [useMotionProject.js](file:///d:/dev/motionpath/src/hooks/useMotionProject.js) | Accepts `playStates` second arg; two independent effects |
-| [ProductionEngine.test.js](file:///d:/dev/motionpath/src/lib/__tests__/ProductionEngine.test.js) | 2 new tests: auto-play default, paused-on-load |
-| [useMotionProject.test.js](file:///d:/dev/motionpath/src/hooks/__tests__/useMotionProject.test.js) | 4 new tests: initial forwarding, play, pause, project-change isolation |
-| [PasarMalamPage.jsx](file:///d:/dev/motionpath/src/components/PasarMalam/PasarMalamPage.jsx) | `lanternBounceScene` + `useState` wiring + `onScrollProgress` threshold gate |
+| File                                                                                               | Change                                                                            |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [ProductionEngine.js](file:///d:/dev/motionpath/src/lib/ProductionEngine.js)                       | `loadProject(schema, options)` — respects `options.playStates` for time scenarios |
+| [useMotionProject.js](file:///d:/dev/motionpath/src/hooks/useMotionProject.js)                     | Accepts `playStates` second arg; two independent effects                          |
+| [ProductionEngine.test.js](file:///d:/dev/motionpath/src/lib/__tests__/ProductionEngine.test.js)   | 2 new tests: auto-play default, paused-on-load                                    |
+| [useMotionProject.test.js](file:///d:/dev/motionpath/src/hooks/__tests__/useMotionProject.test.js) | 4 new tests: initial forwarding, play, pause, project-change isolation            |
+| [PasarMalamPage.jsx](file:///d:/dev/motionpath/src/components/PasarMalam/PasarMalamPage.jsx)       | `lanternBounceScene` + `useState` wiring + `onScrollProgress` threshold gate      |

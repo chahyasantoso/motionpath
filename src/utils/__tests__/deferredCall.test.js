@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createDeferredCall } from '../deferredCall.js';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createDeferredCall } from "../deferredCall.js";
 
-describe('deferredCall', () => {
+describe("deferredCall", () => {
   let mockCore;
   let mockCleanup;
 
@@ -11,7 +11,7 @@ describe('deferredCall', () => {
     mockCore = {};
   });
 
-  it('buffers calls before setCore, and flushes on setCore', () => {
+  it("buffers calls before setCore, and flushes on setCore", () => {
     const deferred = createDeferredCall();
     const run1 = vi.fn(() => mockCleanup);
     const run2 = vi.fn();
@@ -33,7 +33,7 @@ describe('deferredCall', () => {
     expect(mockCleanup).toHaveBeenCalledTimes(1);
   });
 
-  it('delegates immediately if core is already set', () => {
+  it("delegates immediately if core is already set", () => {
     const deferred = createDeferredCall();
     deferred.setCore(mockCore);
 
@@ -43,7 +43,7 @@ describe('deferredCall', () => {
     expect(run).toHaveBeenCalledWith(mockCore);
   });
 
-  it('skips cancelled entries during flush', () => {
+  it("skips cancelled entries during flush", () => {
     const deferred = createDeferredCall();
     const run1 = vi.fn();
     const run2 = vi.fn();
@@ -59,7 +59,7 @@ describe('deferredCall', () => {
     expect(run2).toHaveBeenCalledWith(mockCore);
   });
 
-  it('cancelling after flush calls real cleanup', () => {
+  it("cancelling after flush calls real cleanup", () => {
     const deferred = createDeferredCall();
     const run = vi.fn(() => mockCleanup);
     const cancel = deferred.call(run);
@@ -70,7 +70,7 @@ describe('deferredCall', () => {
     expect(mockCleanup).toHaveBeenCalledTimes(1);
   });
 
-  it('clearCore() clears pending — entry does NOT flush after clearCore() → setCore()', () => {
+  it("clearCore() clears pending — entry does NOT flush after clearCore() → setCore()", () => {
     const deferred = createDeferredCall();
     const run = vi.fn();
     deferred.call(run);

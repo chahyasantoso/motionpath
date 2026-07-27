@@ -19,7 +19,7 @@ Design doc + Phase 1 implementation brief. Supersedes `driver`/`timelineId`/`pri
 ```ts
 class Track {
   readonly id: string;
-  progress(p?: Progress): Progress | void;   // the ONLY write path, GSAP-accessor-shaped
+  progress(p?: Progress): Progress | void; // the ONLY write path, GSAP-accessor-shaped
   subscribe(cb: (patch: DOMPatch) => void): UnsubscribeFn;
   addChild(child: Track, opts: { stagger: number }): void;
   removeChild(id: string): void;
@@ -29,12 +29,19 @@ class Track {
 class Motion {
   readonly id: string;
   constructor(config: { id: string; trigger: TriggerConfig });
-  mount(track: Track, position?: gsap.Position): void;   // gsap.to(track, {progress:1, ...}); masterTimeline.add(tween, position)
+  mount(track: Track, position?: gsap.Position): void; // gsap.to(track, {progress:1, ...}); masterTimeline.add(tween, position)
   unmount(track: Track): void;
-  play(): void; pause(): void; seek(p: Progress): void; reverse(): void;
+  play(): void;
+  pause(): void;
+  seek(p: Progress): void;
+  reverse(): void;
 }
 
-function autoPlay(track: Track, durationSeconds: number, vars?: gsap.TweenVars): gsap.core.Tween;
+function autoPlay(
+  track: Track,
+  durationSeconds: number,
+  vars?: gsap.TweenVars,
+): gsap.core.Tween;
 // gsap.to(track, { progress: 1, duration: durationSeconds, ...vars })
 // Runtime-only. Never appears in schema.
 ```
@@ -43,9 +50,13 @@ function autoPlay(track: Track, durationSeconds: number, vars?: gsap.TweenVars):
 
 ```json
 {
-  "templates": [ /* unchanged from v2/v3: reusable keyframe fragments, referenced via track.use */ ],
-  "motions": [ /* zero or more — only needed when a trigger is involved */ ],
-  "tracks": [ /* zero or more — bare, manually/externally driven tracks with NO trigger */ ]
+  "templates": [
+    /* unchanged from v2/v3: reusable keyframe fragments, referenced via track.use */
+  ],
+  "motions": [/* zero or more — only needed when a trigger is involved */],
+  "tracks": [
+    /* zero or more — bare, manually/externally driven tracks with NO trigger */
+  ]
 }
 ```
 
@@ -68,8 +79,24 @@ Old v3 way needed two motions glued by `timelineId` + exactly one `primary:true`
         "end": "+=2000"
       },
       "tracks": [
-        { "id": "cone",      "keyframes": { "y": [{ "p": 0, "v": 0 }, { "p": 1, "v": -40 }] } },
-        { "id": "scoop1",    "keyframes": { "y": [{ "p": 0, "v": 0 }, { "p": 1, "v": -80 }] } },
+        {
+          "id": "cone",
+          "keyframes": {
+            "y": [
+              { "p": 0, "v": 0 },
+              { "p": 1, "v": -40 }
+            ]
+          }
+        },
+        {
+          "id": "scoop1",
+          "keyframes": {
+            "y": [
+              { "p": 0, "v": 0 },
+              { "p": 1, "v": -80 }
+            ]
+          }
+        },
         { "id": "sprinkles", "use": "sparkle-template" }
       ]
     }
@@ -93,7 +120,15 @@ No `primary`, no `timelineId`, no same-type validator needed — every track und
         "yoyo": true
       },
       "tracks": [
-        { "id": "toastPopup", "keyframes": { "y": [{ "p": 0, "v": 100 }, { "p": 1, "v": 0 }] } }
+        {
+          "id": "toastPopup",
+          "keyframes": {
+            "y": [
+              { "p": 0, "v": 100 },
+              { "p": 1, "v": 0 }
+            ]
+          }
+        }
       ]
     }
   ]
@@ -116,9 +151,10 @@ No `Motion` at all. Track declared bare, resolved by whoever owns progress:
 ```
 
 Runtime (game loop, per frame, per entity):
+
 ```js
-const lane1 = engine.getTrack('enemy-lane-1');
-lane1.progress(enemy.progress);   // direct call — no resolveMotion(), no driver check
+const lane1 = engine.getTrack("enemy-lane-1");
+lane1.progress(enemy.progress); // direct call — no resolveMotion(), no driver check
 ```
 
 `stagger`/`trigger`/`timelineId`/`primary`/`sectionId` are simply **not fields that exist** for a bare track — there's no validator carve-out needed because there's no schema slot to misuse in the first place. That whole class of build-time error from v2/v3's `motion-structure.js` disappears because the invalid state is now unrepresentable, not just rejected.
@@ -127,8 +163,8 @@ lane1.progress(enemy.progress);   // direct call — no resolveMotion(), no driv
 
 ```js
 // No schema field for this. Runtime only:
-const track = engine.getTrack('idle-shimmer');
-autoPlay(track, 2.0, { repeat: -1, yoyo: true, ease: 'sine.inOut' });
+const track = engine.getTrack("idle-shimmer");
+autoPlay(track, 2.0, { repeat: -1, yoyo: true, ease: "sine.inOut" });
 ```
 
 If someone asks "how do I make this loop forever with no trigger" — this is the answer, not a schema flag.
@@ -140,6 +176,7 @@ If someone asks "how do I make this loop forever with no trigger" — this is th
 **Scope: prove the model on the lowest-risk demo first.** Do NOT touch Tower Defense or Spiral in this phase — separate briefs, sequenced after this one is verified.
 
 ### Non-goals (explicit — do not do these)
+
 - Do not delete `driver`/`timelineId`/`primary` validator code yet if other demos still reference it — Phase 1 adds the new `Track`/`Motion` classes and migrates PasarMalam only. Old code paths for other demos stay as-is until their own phase.
 - Do not touch `MotionInstance`, `addChild`/`removeChild`, or anything in the Spiral/Zuma demo.
 - Do not touch `resolveMotion.js` or the Tower Defense demo.
@@ -149,14 +186,21 @@ If someone asks "how do I make this loop forever with no trigger" — this is th
 ### Locked implementation details
 
 **WRONG (proxy pattern — do not implement this):**
+
 ```js
-const proxy = gsap.to({ p: 0 }, {
-  p: 1,
-  onUpdate: function() { track.setProgress(this.targets()[0].p); }
-});
+const proxy = gsap.to(
+  { p: 0 },
+  {
+    p: 1,
+    onUpdate: function () {
+      track.setProgress(this.targets()[0].p);
+    },
+  },
+);
 ```
 
 **CORRECT (accessor pattern):**
+
 ```js
 class Track {
   progress(p) {
@@ -171,21 +215,30 @@ this.#masterTimeline.add(tween, position);
 ```
 
 **WRONG (two write paths):**
+
 ```js
 class Track {
-  setProgress(p) { /* ... */ }
-  getProgress() { /* ... */ }
+  setProgress(p) {
+    /* ... */
+  }
+  getProgress() {
+    /* ... */
+  }
 }
 ```
 
 **CORRECT (one accessor):**
+
 ```js
 class Track {
-  progress(p) { /* get if undefined, set+recompose otherwise — the ONLY entry point */ }
+  progress(p) {
+    /* get if undefined, set+recompose otherwise — the ONLY entry point */
+  }
 }
 ```
 
 ### Files to create/modify
+
 - New: `src/lib/Track.js` — the class from §2, using `#progress` private field + `progress(p?)` accessor.
 - New: `src/lib/Motion.js` — the class from §2. `mount()`/`unmount()` build/kill the accessor tween and add/remove it from an internal `gsap.timeline()`.
 - New: `src/lib/schema/parseV4Project.js` — parses `{templates, motions, tracks}` top-level shape into `Track`/`Motion` instances. Reuse existing `templateResolver.js` and plugin-resolution code from v3 unchanged — only the top-level shape and Track/Motion classes are new.
@@ -193,6 +246,7 @@ class Track {
 - Do not modify: `TimelineGroupController`, `resolveMotion.js`, `MotionInstance.js` — leave these fully intact for now, other demos still depend on them.
 
 ### Verification checklist (grep + behavioral, on a fresh clone — self-report not accepted)
+
 1. `grep -rn "onUpdate" src/lib/Motion.js` → zero matches. Confirms accessor pattern, not proxy.
 2. `grep -rn "setProgress\|getProgress" src/lib/Track.js` → zero matches. Confirms single accessor method only.
 3. `grep -rn "timelineId\|primary" src/lib/schema/parseV4Project.js` → zero matches. Confirms new parser has no knowledge of the deleted grouping fields.
@@ -202,5 +256,6 @@ class Track {
 7. Manual: PasarMalam demo scroll behavior visually unchanged from current `v3` branch.
 
 ### Next briefs (not in this one — for your own tracking)
+
 - **Phase 2 — Tower Defense migration to bare `tracks[]` + direct `progress()` calls.** Priority check: confirm whether `Track` instances are long-lived per game entity (caching win is then structural/free) or re-resolved per call (caching bug re-appears) — write the behavioral spy test for this **before** declaring the migration done, not after.
 - **Phase 3 — Spiral/Zuma composition move to `Track.addChild`/`removeChild`.** Treat as re-derivation, not porting: re-verify all three invariants (frontmost-child spawn placement, eager synchronous reflow write, rank-0 cascade skip) against the new class with live async GSAP reproduction scripts, same discipline as the original bug hunt.

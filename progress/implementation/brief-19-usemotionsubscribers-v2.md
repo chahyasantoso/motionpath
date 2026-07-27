@@ -9,9 +9,14 @@ Supersedes the previous draft of this brief. That draft extracted a shared `moti
 - `useMotionSubscribers(sources, ref, mergeFn?)` is the only real implementation. `sources` is `Array<{ instance, trackId, transformFn? }>`.
 - `useMotionSubscriber(instance, trackId, ref, transformFn)` becomes exactly this, in full:
   ```js
-  import useMotionSubscribers from './useMotionSubscribers.js';
+  import useMotionSubscribers from "./useMotionSubscribers.js";
 
-  export default function useMotionSubscriber(instance, trackId, ref, transformFn) {
+  export default function useMotionSubscriber(
+    instance,
+    trackId,
+    ref,
+    transformFn,
+  ) {
     useMotionSubscribers([{ instance, trackId, transformFn }], ref);
   }
   ```
@@ -33,11 +38,13 @@ Supersedes the previous draft of this brief. That draft extracted a shared `moti
 ## File 1 (new) — `src/hooks/useMotionSubscribers.js`
 
 ```js
-import { useEffect, useRef } from 'react';
-import { domRenderer } from '../renderers/domRenderer.js';
+import { useEffect, useRef } from "react";
+import { domRenderer } from "../renderers/domRenderer.js";
 
 function sourcesSignature(sources) {
-  return sources.map(s => `${s.instance?.id ?? ''}::${s.trackId ?? ''}`).join('|');
+  return sources
+    .map((s) => `${s.instance?.id ?? ""}::${s.trackId ?? ""}`)
+    .join("|");
 }
 
 function subscribeToTrack(instance, trackId, getTransformFn, onPatch) {
@@ -47,7 +54,10 @@ function subscribeToTrack(instance, trackId, getTransformFn, onPatch) {
 
   return instance.subscribe(trackId, (rawData) => {
     const transformFn = getTransformFn();
-    const patch = typeof transformFn === 'function' ? transformFn(rawData, compose) : compose(rawData);
+    const patch =
+      typeof transformFn === "function"
+        ? transformFn(rawData, compose)
+        : compose(rawData);
     onPatch(patch);
   });
 }
@@ -67,7 +77,7 @@ function subscribeToTrack(instance, trackId, getTransformFn, onPatch) {
  */
 export default function useMotionSubscribers(sources, ref, mergeFn) {
   const transformFnsRef = useRef([]);
-  transformFnsRef.current = sources.map(s => s.transformFn);
+  transformFnsRef.current = sources.map((s) => s.transformFn);
 
   const mergeFnRef = useRef(mergeFn);
   mergeFnRef.current = mergeFn;
@@ -88,7 +98,8 @@ export default function useMotionSubscribers(sources, ref, mergeFn) {
 
     const applyMerged = () => {
       if (!ref.current) return;
-      const merge = mergeFnRef.current ?? ((patches) => Object.assign({}, ...patches));
+      const merge =
+        mergeFnRef.current ?? ((patches) => Object.assign({}, ...patches));
       domRenderer(ref.current, merge(latestPatches));
     };
 
@@ -100,8 +111,8 @@ export default function useMotionSubscribers(sources, ref, mergeFn) {
         (patch) => {
           latestPatches[i] = patch;
           applyMerged();
-        }
-      )
+        },
+      ),
     );
 
     return () => unsubscribes.forEach((fn) => fn());
@@ -118,7 +129,7 @@ New test file `src/hooks/__tests__/useMotionSubscribers.test.js`:
 3. **Custom `mergeFn`:** pass a `mergeFn` reversing precedence; assert its return value is exactly what `domRenderer` receives.
 4. **Stability — critical test:** rerender the hook twice with a **new array literal** each time, same `instance.id`/`trackId` pairs in the same order. Spy on `instance.subscribe`; assert it was called exactly once per instance across both renders — no resubscription.
 5. **Resubscription when it should happen:** rerender with a source's `trackId` actually changed. Assert the old unsubscribe function was called and `instance.subscribe` was called again with the new `trackId`.
-6. **`transformFn` identity changes don't cause resubscription, but the latest one is used:** rerender twice with the same `instance`/`trackId` but a brand-new inline `transformFn` each time. Assert `instance.subscribe` was still only called once (per point 4), and assert the *second* render's `transformFn` is the one actually invoked on the next tick.
+6. **`transformFn` identity changes don't cause resubscription, but the latest one is used:** rerender twice with the same `instance`/`trackId` but a brand-new inline `transformFn` each time. Assert `instance.subscribe` was still only called once (per point 4), and assert the _second_ render's `transformFn` is the one actually invoked on the next tick.
 
 ---
 
@@ -127,7 +138,7 @@ New test file `src/hooks/__tests__/useMotionSubscribers.test.js`:
 **WRONG is the current file** (already in the codebase — diff against it, don't paste it here). **CORRECT — full replacement:**
 
 ```js
-import useMotionSubscribers from './useMotionSubscribers.js';
+import useMotionSubscribers from "./useMotionSubscribers.js";
 
 /**
  * Smart Subscriber Hook — Listens to coordinate broadcasts from a MotionInstance
@@ -143,12 +154,18 @@ import useMotionSubscribers from './useMotionSubscribers.js';
  * @param {Function} [transformFn] - Optional transform function. Receives data (rawData)
  *   and compose function (rawData => patch) and must return an object of CSS properties for domRenderer.
  */
-export default function useMotionSubscriber(instance, trackId, ref, transformFn) {
+export default function useMotionSubscriber(
+  instance,
+  trackId,
+  ref,
+  transformFn,
+) {
   useMotionSubscribers([{ instance, trackId, transformFn }], ref);
 }
 ```
 
 ### Verification for File 2
+
 - Run the existing `useMotionSubscriber.test.js` **unmodified**. Every test must still pass. If any test needs a change to pass, this wrapper changed observable behavior — stop and report, do not edit the test to make it pass.
 - Add one new test confirming the wrapper's `instance.subscribe` call count matches direct `useMotionSubscribers` usage with an equivalent single-element array (proves the wrapper isn't accidentally double-subscribing or behaving differently from the thing it delegates to).
 

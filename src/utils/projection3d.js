@@ -13,7 +13,16 @@
  * @param {boolean} [invertTilt=false] - Inverts the depth tilt direction
  * @returns {Object} { x, y } projected 2D coordinates
  */
-export function project3DTo2D(x3d, y3d, z3d, cx, cy, tiltDeg, invertTilt = false, perspective = 1000) {
+export function project3DTo2D(
+  x3d,
+  y3d,
+  z3d,
+  cx,
+  cy,
+  tiltDeg,
+  invertTilt = false,
+  perspective = 1000,
+) {
   const tiltRad = (tiltDeg * Math.PI) / 180;
   const distance = perspective - z3d;
   if (distance <= 0) {
@@ -21,14 +30,17 @@ export function project3DTo2D(x3d, y3d, z3d, cx, cy, tiltDeg, invertTilt = false
   }
 
   const scale = perspective / distance;
-  
+
   const x2d = cx + x3d * scale;
-  const y2d = cy + (y3d * Math.cos(tiltRad) + (invertTilt ? -z3d : z3d) * Math.sin(tiltRad)) * scale;
-  
-  return { 
-    x: Math.round(x2d * 100) / 100, 
+  const y2d =
+    cy +
+    (y3d * Math.cos(tiltRad) + (invertTilt ? -z3d : z3d) * Math.sin(tiltRad)) *
+      scale;
+
+  return {
+    x: Math.round(x2d * 100) / 100,
     y: Math.round(y2d * 100) / 100,
-    scale: Math.round(scale * 10000) / 10000
+    scale: Math.round(scale * 10000) / 10000,
   };
 }
 
@@ -43,18 +55,43 @@ export function project3DTo2D(x3d, y3d, z3d, cx, cy, tiltDeg, invertTilt = false
  * @param {number} [perspective=1000] - CSS perspective value
  * @returns {Array} Array of { x, y, ctrlX?, ctrlY? } projected 2D path nodes
  */
-export function projectPathNodes3DTo2D(pathNodes, cx, cy, tiltDeg, invertTilt = false, perspective = 1000) {
+export function projectPathNodes3DTo2D(
+  pathNodes,
+  cx,
+  cy,
+  tiltDeg,
+  invertTilt = false,
+  perspective = 1000,
+) {
   if (!pathNodes || pathNodes.length === 0) return [];
 
-  return pathNodes.map(node => {
+  return pathNodes.map((node) => {
     const z = node.z !== undefined ? node.z : 0;
-    const projected = project3DTo2D(node.x, node.y, z, cx, cy, tiltDeg, invertTilt, perspective);
+    const projected = project3DTo2D(
+      node.x,
+      node.y,
+      z,
+      cx,
+      cy,
+      tiltDeg,
+      invertTilt,
+      perspective,
+    );
     const result = { x: projected.x, y: projected.y };
 
     // Project control points if present
     if (node.ctrlX !== undefined && node.ctrlY !== undefined) {
       const ctrlZ = node.ctrlZ !== undefined ? node.ctrlZ : 0;
-      const projCtrl = project3DTo2D(node.ctrlX, node.ctrlY, ctrlZ, cx, cy, tiltDeg, invertTilt, perspective);
+      const projCtrl = project3DTo2D(
+        node.ctrlX,
+        node.ctrlY,
+        ctrlZ,
+        cx,
+        cy,
+        tiltDeg,
+        invertTilt,
+        perspective,
+      );
       result.ctrlX = projCtrl.x;
       result.ctrlY = projCtrl.y;
     }
@@ -78,9 +115,9 @@ export const shapeGenerators = {
       const x3d = radius * Math.cos(theta);
       const y3d = p * height;
       const z3d = radius * Math.sin(theta);
-      
+
       nodes.push({ x: x3d, y: y3d, z: z3d });
     }
     return nodes;
-  }
+  },
 };

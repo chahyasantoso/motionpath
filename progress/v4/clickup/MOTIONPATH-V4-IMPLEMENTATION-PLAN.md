@@ -596,34 +596,34 @@ Add integration coverage for:
 
 ## Concern-to-phase map
 
-| Concern | Phase | Deliverable |
-|---|---:|---|
-| R-01 validator not wired | 1 | validation in `Engine.loadProject` |
-| R-02 id vs motionId | 1 | authoritative `id` |
-| R-03 ignored time options | 1 | explicit autoplay/delay/duration semantics |
-| R-04 instance leaks | 1 | `unmount`, adoption, idempotent destroy |
-| R-05 import cycle | 2 | extracted event bus/merge utility |
-| R-06 plugin order | 2 | priority/stage and collision errors |
-| R-07 path anchoring | 3 | explicit path anchor |
-| R-08 filter hardcoding | 3 | output metadata/serializer contract |
-| R-09 renderer denylist | 3 | plugin-declared internal keys |
-| R-10 delegate mismatch | 2 | unified delegate API |
-| R-11 public delegate leak | 2 | Motion control facade |
-| R-12 closed plugin registry | 3 | register/unregister and indexed lookup |
-| R-13 missing orchestration layer | 4 | Spawner and Overlay |
-| R-14 false timeline label | 2 | remove label, document seconds |
-| R-15 multiple DOM writes | 5 | flush scheduler |
-| R-16 no dirty checking | 5 | renderer cache |
-| R-17 float percent keys | 2 | shared percent-key helper |
-| R-18 image preload side effect | 3 | explicit prepare phase |
-| R-19 stale types | 3 | v4 types or `.d.ts` |
-| R-20 stale README | 3 | v4 onboarding docs |
-| R-21 dead code | 3 | delete v3 remnants |
-| R-22 fake version support | 3 | v4-only validation or real migrators |
-| R-23 global singletons | 5 | injectable Engine dependencies |
-| R-24 weak stop validation | 2 | stop sequence rule |
-| R-25 swallowed errors/logging | cross-cutting | contextual teardown logging |
-| R-26 no integration tests | 0, then every phase | end-to-end regression suite |
+| Concern                          |               Phase | Deliverable                                |
+| -------------------------------- | ------------------: | ------------------------------------------ |
+| R-01 validator not wired         |                   1 | validation in `Engine.loadProject`         |
+| R-02 id vs motionId              |                   1 | authoritative `id`                         |
+| R-03 ignored time options        |                   1 | explicit autoplay/delay/duration semantics |
+| R-04 instance leaks              |                   1 | `unmount`, adoption, idempotent destroy    |
+| R-05 import cycle                |                   2 | extracted event bus/merge utility          |
+| R-06 plugin order                |                   2 | priority/stage and collision errors        |
+| R-07 path anchoring              |                   3 | explicit path anchor                       |
+| R-08 filter hardcoding           |                   3 | output metadata/serializer contract        |
+| R-09 renderer denylist           |                   3 | plugin-declared internal keys              |
+| R-10 delegate mismatch           |                   2 | unified delegate API                       |
+| R-11 public delegate leak        |                   2 | Motion control facade                      |
+| R-12 closed plugin registry      |                   3 | register/unregister and indexed lookup     |
+| R-13 missing orchestration layer |                   4 | Spawner and Overlay                        |
+| R-14 false timeline label        |                   2 | remove label, document seconds             |
+| R-15 multiple DOM writes         |                   5 | flush scheduler                            |
+| R-16 no dirty checking           |                   5 | renderer cache                             |
+| R-17 float percent keys          |                   2 | shared percent-key helper                  |
+| R-18 image preload side effect   |                   3 | explicit prepare phase                     |
+| R-19 stale types                 |                   3 | v4 types or `.d.ts`                        |
+| R-20 stale README                |                   3 | v4 onboarding docs                         |
+| R-21 dead code                   |                   3 | delete v3 remnants                         |
+| R-22 fake version support        |                   3 | v4-only validation or real migrators       |
+| R-23 global singletons           |                   5 | injectable Engine dependencies             |
+| R-24 weak stop validation        |                   2 | stop sequence rule                         |
+| R-25 swallowed errors/logging    |       cross-cutting | contextual teardown logging                |
+| R-26 no integration tests        | 0, then every phase | end-to-end regression suite                |
 
 ## Recommended review order
 

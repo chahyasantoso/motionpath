@@ -12,16 +12,16 @@ from this doc without a dedicated brief.
 
 `Track` has two composition mechanisms today that pull in opposite directions:
 
-- **`attach()`/`detach()`** — fan-**in**. A *host* pulls each attached child's `compose()` and
+- **`attach()`/`detach()`** — fan-**in**. A _host_ pulls each attached child's `compose()` and
   merges it into the host's own output (`#attachedChildren` is a Set). "Living together."
-- **`setObserved()`** — fan-**out**, single source. An *observer* folds one source into its
+- **`setObserved()`** — fan-**out**, single source. An _observer_ folds one source into its
   own output, applied last. Today it reads `source.getSnapshot()` (raw proxy values) to stay
   cycle-safe. "Moving together / FK."
 
 Two problems:
 
 1. `setObserved` reading `getSnapshot()` cannot express real forward kinematics. `getSnapshot()`
-   returns a track's *local, raw* proxy (`{x, y, rotation, progress}`) — it does **not** reflect
+   returns a track's _local, raw_ proxy (`{x, y, rotation, progress}`) — it does **not** reflect
    what that track itself observes. A follower needs the source's **fully-resolved world state**,
    which only `compose()` produces.
 2. Two mechanisms for "combine tracks" is one too many. `attach` is single-purpose and single-
@@ -36,7 +36,7 @@ Two problems:
 ## 2. The recursion problem (and why it's two problems)
 
 Folding `source.compose()` makes `compose()` recursive. A track's `compose()` now walks into
-every source it observes, each of which walks into *its* sources. Two failure modes:
+every source it observes, each of which walks into _its_ sources. Two failure modes:
 
 - **Back-edge / cycle** (A observes B, B observes A) → infinite recursion → stack overflow.
 - **Repeated node / diamond** (A observes B and C; B and C both observe D) → D is composed
@@ -67,8 +67,8 @@ compose(rawData) {
 ```
 
 Why the fallback value is correct: the back-edge is the one place where full resolution is
-impossible — resolving it *is* the work in progress. Returning the track's local contribution
-means "use A's own value, not A's B-influenced value." A cycle in *forward* kinematics is
+impossible — resolving it _is_ the work in progress. Returning the track's local contribution
+means "use A's own value, not A's B-influenced value." A cycle in _forward_ kinematics is
 physically meaningless (that's a constraint/IK solver's job), so degrading the cycle-closing
 edge to local state is the honest answer.
 
@@ -88,9 +88,10 @@ no orchestration wiring is needed (and it sidesteps this environment's `Date.now
 
 ```js
 const epoch = gsap.ticker.frame;
-if (this.#cacheEpoch === epoch) return this.#cachedPatch;   // hit
+if (this.#cacheEpoch === epoch) return this.#cachedPatch; // hit
 // ... compute, then:
-this.#cachedPatch = patch; this.#cacheEpoch = epoch;
+this.#cachedPatch = patch;
+this.#cacheEpoch = epoch;
 ```
 
 **Why this is NOT in the shipping brief — the correctness caveat:** the epoch cache is only
@@ -111,7 +112,7 @@ central per-tick barrier and a shared source genuinely does recompose per observ
 
 - A alone: correct, but O(observers) on shared ancestors. Fine for shallow chains, wasteful for
   a real skeleton with many bones observing a shared root.
-- C alone: impossible — its in-progress marker *is* A's guard. "C" is really "A + memo".
+- C alone: impossible — its in-progress marker _is_ A's guard. "C" is really "A + memo".
 - Together: A guarantees termination; C makes each track compose at most once per frame.
 
 ---
@@ -138,7 +139,7 @@ in insertion order, each `mergePatches`'d on top (last wins). This subsumes `att
 merge (a host "observes" each child) and gives n-ary FK joints (a bone driven by several parents).
 
 **Critical semantic change:** the `mapFn` now receives the observed track's **composed patch**
-(`source.compose()` → `{x, y, rotation, …}`), *not* its raw snapshot. This is the point — the
+(`source.compose()` → `{x, y, rotation, …}`), _not_ its raw snapshot. This is the point — the
 follower reads resolved world state. mapFns must read composed fields accordingly.
 
 ---
@@ -153,7 +154,8 @@ local transform. The 2D affine accumulation is identical in both options:
 export function composeWorld(parentWorld, local) {
   // parentWorld / local: { x, y, rotation } — rotation in degrees
   const rad = (parentWorld.rotation * Math.PI) / 180;
-  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const cos = Math.cos(rad),
+    sin = Math.sin(rad);
   return {
     x: parentWorld.x + (local.x * cos - local.y * sin),
     y: parentWorld.y + (local.x * sin + local.y * cos),
@@ -180,19 +182,34 @@ Each joint is a plain `Track`. FK is expressed per edge at wire-up. The `mapFn` 
 parent's already-resolved world patch and stacks this joint's local transform on top.
 
 ```js
-import { composeWorld } from '../lib/fkMath.js';
+import { composeWorld } from "../lib/fkMath.js";
 
 // Each joint's own keyframes animate its local rotation (+ optionally boneLength).
 // forearm.getSnapshot() → { rotation, boneLength, progress }
 
 upperArm.setObserved(shoulder, (parentWorld) =>
-  composeWorld(parentWorld, { x: shoulder.getSnapshot().boneLength ?? 0, y: 0, rotation: 0 }));
+  composeWorld(parentWorld, {
+    x: shoulder.getSnapshot().boneLength ?? 0,
+    y: 0,
+    rotation: 0,
+  }),
+);
 
 forearm.setObserved(upperArm, (parentWorld) =>
-  composeWorld(parentWorld, { x: forearm.getSnapshot().boneLength ?? 0, y: 0, rotation: 0 }));
+  composeWorld(parentWorld, {
+    x: forearm.getSnapshot().boneLength ?? 0,
+    y: 0,
+    rotation: 0,
+  }),
+);
 
 hand.setObserved(forearm, (parentWorld) =>
-  composeWorld(parentWorld, { x: hand.getSnapshot().boneLength ?? 0, y: 0, rotation: 0 }));
+  composeWorld(parentWorld, {
+    x: hand.getSnapshot().boneLength ?? 0,
+    y: 0,
+    rotation: 0,
+  }),
+);
 
 // A DOM element subscribes to the tip. compose() walks the whole chain.
 useMotionSubscribers([{ track: hand }], ref);
@@ -217,12 +234,14 @@ arrives as a field in `rawData`; the `mapFn` shrinks to a pass-through that name
 ```js
 // fkPlugin.js — geometry inside compose(), like pathPlugin
 export const fkPlugin = createAnimationPlugin({
-  keys: ['boneLength'],
+  keys: ["boneLength"],
   lazy: false,
-  claimsKey: (k) => k === 'boneLength' || k === 'parentWorld',
+  claimsKey: (k) => k === "boneLength" || k === "parentWorld",
   contribute(propKey, stops) {
     const percentPatch = {};
-    stops.forEach((s) => { percentPatch[`${s.p * 100}%`] = { boneLength: s.v }; });
+    stops.forEach((s) => {
+      percentPatch[`${s.p * 100}%`] = { boneLength: s.v };
+    });
     return { percentPatch, tweenVars: {} };
   },
   compose(rawData) {
@@ -233,26 +252,28 @@ export const fkPlugin = createAnimationPlugin({
 });
 ```
 
-Wire-up is uniform and thin — every edge is the *same* mapFn, no math at the call site:
+Wire-up is uniform and thin — every edge is the _same_ mapFn, no math at the call site:
 
 ```js
-const asParent = (pw) => ({ parentWorld: { x: pw.x ?? 0, y: pw.y ?? 0, rotation: pw.rotation ?? 0 } });
+const asParent = (pw) => ({
+  parentWorld: { x: pw.x ?? 0, y: pw.y ?? 0, rotation: pw.rotation ?? 0 },
+});
 upperArm.setObserved(shoulder, asParent);
-forearm.setObserved(upperArm,  asParent);
-hand.setObserved(forearm,      asParent);
+forearm.setObserved(upperArm, asParent);
+hand.setObserved(forearm, asParent);
 ```
 
 - **Pros:** cleanest call sites; math is written once and reusable; declarative.
 - **Cons / blocker:** the current fold applies the observed patch **last, overriding** the base.
-  But the plugin needs `parentWorld` as an **input** — present *before* the plugin runs, not merged
+  But the plugin needs `parentWorld` as an **input** — present _before_ the plugin runs, not merged
   after. So Option 2 requires reordering `compose()` so the observed fold lands in `rawData`
-  *before* `composePatch` runs (or a frame-scoped field the next `compose()` reads). That's a real
+  _before_ `composePatch` runs (or a frame-scoped field the next `compose()` reads). That's a real
   structural change to `compose()`, not just a new plugin — hence "future work with its own brief."
 
 ### The anchor connection
 
 Today `anchor` is `{xPercent, yPercent}` — a **self-relative** visual centering applied at the
-render layer, *after* `compose()` (`applyAnchor` in `helpers.js`). It cannot propagate through
+render layer, _after_ `compose()` (`applyAnchor` in `helpers.js`). It cannot propagate through
 folds because it lives post-compose.
 
 There are two distinct offset ideas here. They live at **different layers**, do **different
@@ -264,13 +285,13 @@ both. Decision: **(a) is the anchor feature; (b) is not.**
   A render-layer nudge: `finalX = composedX + offset.x`, applied once, post-compose, in the
   element's own screen space (`applyAnchor`). Lets rotation happen around a displaced point — a
   hinge, a pendulum pivot, a clock hand, an off-center grip. Zero FK dependency, no `compose()`
-  reorder needed. This is the *only* meaning `anchor.offset` carries. Implemented in the
+  reorder needed. This is the _only_ meaning `anchor.offset` carries. Implemented in the
   FK-plugin brief, Step 5.
 
 - **(b) Declarative bone rest-offset → the FK bone vector. DEFER, and NOT on `anchor.offset`.**
-  In `composeWorld`, `local.x = boneLength` already *is* the attachment offset in the parent's
+  In `composeWorld`, `local.x = boneLength` already _is_ the attachment offset in the parent's
   frame — `fkPlugin` consumes it today as an animatable `boneLength` key. So (b) is not a new
-  capability; it only buys *ergonomics for fixed-length bones*: letting a joint declare a static
+  capability; it only buys _ergonomics for fixed-length bones_: letting a joint declare a static
   rest offset instead of writing a 1-stop `boneLength` keyframe. That value is small and
   conditional (needs Option 2's reorder shipped, needs non-animating bone length, needs you to
   actually want it declarative).
@@ -288,7 +309,7 @@ both. Decision: **(a) is the anchor feature; (b) is not.**
 The Spiral demo spawns balls that travel a path, with a scale/opacity **entrance** overlay at
 spawn and a scale/opacity **exit** overlay on pop. The current implementation is v3 machinery
 (multiple `MotionInstance`s, variable-length `sources`, arity-branching `mergeFn`, and
-resubscription when the active instance swaps). Observe replaces the *composition* half cleanly.
+resubscription when the active instance swaps). Observe replaces the _composition_ half cleanly.
 
 The key insight: entrance/exit are **additive overlays** on the path-following base — the ball
 keeps spiraling (base gives x/y) while scale/opacity are layered on top. That is exactly
@@ -296,7 +317,10 @@ fold-applied-last:
 
 ```js
 // Spawn: ball follows the path; entrance overlays scale/opacity.
-ballTrack.setObserved(entranceTrack, (snap) => ({ scale: snap.scale, opacity: snap.opacity }));
+ballTrack.setObserved(entranceTrack, (snap) => ({
+  scale: snap.scale,
+  opacity: snap.opacity,
+}));
 entranceTrack.play();
 entranceTrack.onComplete(() => {
   ballTrack.removeObserved(entranceTrack); // caller clears BEFORE destroying the source
@@ -304,7 +328,10 @@ entranceTrack.onComplete(() => {
 });
 
 // Exit: same wire, different overlay.
-ballTrack.setObserved(exitTrack, (snap) => ({ scale: snap.scale, opacity: snap.opacity }));
+ballTrack.setObserved(exitTrack, (snap) => ({
+  scale: snap.scale,
+  opacity: snap.opacity,
+}));
 exitTrack.play();
 exitTrack.onComplete(() => removeChild(ball)); // ball + its observe refs die together
 ```
@@ -336,14 +363,14 @@ guard isn't even exercised; it's just harmless insurance.
 
 ## 8. Summary of decisions
 
-| Decision | Now (Option 1) | Later (Option 2) |
-|---|---|---|
-| `setObserved` | multi-source, Map-keyed | unchanged |
-| Fold reads | `source.compose()` | `source.compose()` |
-| mapFn receives | composed patch | composed patch |
-| FK math (`composeWorld`) | in each mapFn | in `fkPlugin.compose()` |
-| Cycle safety | Option A guard | Option A guard |
-| Diamond perf | accepted (O(observers)) | add Option C epoch memo (own brief) |
-| `compose()` fold order | last-wins (unchanged) | reorder: observed → rawData before plugins |
-| Offset anchor | self-relative only (unchanged) | parent-frame `anchor.offset` = bone vector |
-| `attach`/`detach` | **deleted** | — |
+| Decision                 | Now (Option 1)                 | Later (Option 2)                           |
+| ------------------------ | ------------------------------ | ------------------------------------------ |
+| `setObserved`            | multi-source, Map-keyed        | unchanged                                  |
+| Fold reads               | `source.compose()`             | `source.compose()`                         |
+| mapFn receives           | composed patch                 | composed patch                             |
+| FK math (`composeWorld`) | in each mapFn                  | in `fkPlugin.compose()`                    |
+| Cycle safety             | Option A guard                 | Option A guard                             |
+| Diamond perf             | accepted (O(observers))        | add Option C epoch memo (own brief)        |
+| `compose()` fold order   | last-wins (unchanged)          | reorder: observed → rawData before plugins |
+| Offset anchor            | self-relative only (unchanged) | parent-frame `anchor.offset` = bone vector |
+| `attach`/`detach`        | **deleted**                    | —                                          |

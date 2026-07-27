@@ -11,6 +11,7 @@ Brief: `progress/v4/engine-identity-and-typed-trigger-hooks-brief.md`
 ## Step 0 — Verification gate
 
 Run the grep checks from the brief's Step 0. Confirm:
+
 - `#instances` keyed by `motion.id` (schema id) — to be fixed
 - `mountInstance` has dedupe-and-destroy branch — to be removed
 - `unmountInstance` has zero callers — to be deleted
@@ -24,6 +25,7 @@ Run `npx vitest run` — all tests must pass before starting.
 **File:** `src/engines/Engine.js`
 
 Changes:
+
 - Remove `TriggerRefRegistry` import and `#triggerRefs` field
 - Add `#instanceCounter = 0`
 - Extract `#mountMotionWithDelegate(motionConfig, delegate)` — generates unique `motion-${++counter}` ID, builds Motion + tracks, calls `motion.init()` (no args), stores in `#instances`
@@ -54,6 +56,7 @@ Change `init(resolveElement)` → `init()`. Change `this.trigger.build(resolveEl
 ### `src/hooks/useScrollMotion.js` (new)
 
 Accepts nullable `schema` (the motion schema object, e.g. `scrollScene`). Returns `{ refs, instance }`.
+
 - Creates `triggerRef`, `pinRef`, `endTriggerRef` unconditionally (Rules of Hooks)
 - Effect deps: `[schema?.id]` — guards with `if (!schema?.id || !triggerRef.current) return`
 - Builds `ScrollTriggerDelegate` with real DOM elements from refs
@@ -74,12 +77,14 @@ Wraps `useMotionInstance`, adds `seek(p)` convenience. Returns `{ instance, seek
 ### `DemoPage.jsx` schemas
 
 All three scenes (`scrollScene`, `dynamicCarouselScene`, `dynamicHelixScene`):
+
 - Remove `trigger: 'xxx-scroll-trigger'` from the trigger config
 - Change `pin: 'xxx-stage-pin'` → `pin: 'pin'` (role-string: separate pin element)
 
 ### `PasarMalamPage.jsx` schema
 
 `pasarMalamScene`:
+
 - Remove `trigger: 'pasar-malam-storytelling'` from the trigger config
 - Change `pin: 'pm-stage'` → `pin: 'pin'`
 
@@ -95,11 +100,13 @@ ScrollDemo({ isLoaded })                    // receives isLoaded from DemoPage
 ```
 
 `DemoPage` changes:
+
 - Remove all 3 `useMotionInstance` calls
 - Pass `isLoaded` to each scene wrapper instead of `instance`
 - Remove `useMotionTrigger` import
 
 Each scene wrapper:
+
 - Remove `useMotionTrigger` calls and manual `containerRef`/`stageRef`
 - Replace with `useScrollMotion`, use `refs.trigger` and `refs.pin`
 - The `instance` variable comes from the hook return, not props
@@ -150,18 +157,18 @@ Both motions live in the top-level component:
 
 ## Files changed (summary)
 
-| File | Action |
-|---|---|
-| `src/engines/Engine.js` | Refactor: unique IDs, shared helper, `mountWithDelegate`, delete registry methods |
-| `src/lib/Motion.js` | `init()` drops `resolveElement` param |
-| `src/lib/TriggerDelegate.js` | `ScrollTriggerDelegate.build()` drops string resolution |
-| `src/hooks/useScrollMotion.js` | New |
-| `src/hooks/useTimeMotion.js` | New |
-| `src/hooks/useManualMotion.js` | New |
-| `src/components/Demo/DemoPage.jsx` | Migrate 3 scroll motions to `useScrollMotion` |
-| `src/components/PasarMalam/PasarMalamPage.jsx` | Migrate 1 scroll + 1 time motion |
-| `src/engines/__tests__/Engine.test.js` | Update + add concurrent instance tests |
-| `src/hooks/useMotionTrigger.js` | Delete |
-| `src/lib/TriggerRefRegistry.js` | Delete |
+| File                                           | Action                                                                            |
+| ---------------------------------------------- | --------------------------------------------------------------------------------- |
+| `src/engines/Engine.js`                        | Refactor: unique IDs, shared helper, `mountWithDelegate`, delete registry methods |
+| `src/lib/Motion.js`                            | `init()` drops `resolveElement` param                                             |
+| `src/lib/TriggerDelegate.js`                   | `ScrollTriggerDelegate.build()` drops string resolution                           |
+| `src/hooks/useScrollMotion.js`                 | New                                                                               |
+| `src/hooks/useTimeMotion.js`                   | New                                                                               |
+| `src/hooks/useManualMotion.js`                 | New                                                                               |
+| `src/components/Demo/DemoPage.jsx`             | Migrate 3 scroll motions to `useScrollMotion`                                     |
+| `src/components/PasarMalam/PasarMalamPage.jsx` | Migrate 1 scroll + 1 time motion                                                  |
+| `src/engines/__tests__/Engine.test.js`         | Update + add concurrent instance tests                                            |
+| `src/hooks/useMotionTrigger.js`                | Delete                                                                            |
+| `src/lib/TriggerRefRegistry.js`                | Delete                                                                            |
 
 **Not touched:** BurstPage, MotorcyclePage, PasarMalamObserverPage, SpiralPage, any test files outside Engine.test.js.

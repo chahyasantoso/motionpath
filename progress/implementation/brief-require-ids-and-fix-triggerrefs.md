@@ -13,23 +13,24 @@ Do the fixes in this order — #3 and #4 depend on #1/#2 being true.
 `src/validators/rules/motion-structure.js`, inside the `motions.entries()` loop:
 
 **WRONG (current):**
+
 ```js
 // Validate motionId
 if (motionId !== undefined && motionId !== null) {
-  if (typeof motionId !== 'string') {
+  if (typeof motionId !== "string") {
     errors.push({
-      ruleId: 'motion-structure',
-      severity: 'error',
-      message: 'motionId must be a string.',
-      path: `${motionPath}.motionId`
+      ruleId: "motion-structure",
+      severity: "error",
+      message: "motionId must be a string.",
+      path: `${motionPath}.motionId`,
     });
   } else {
     if (seenMotionIds.has(motionId)) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
+        ruleId: "motion-structure",
+        severity: "error",
         message: `Duplicate motionId '${motionId}' found.`,
-        path: `${motionPath}.motionId`
+        path: `${motionPath}.motionId`,
       });
     }
     seenMotionIds.add(motionId);
@@ -38,22 +39,23 @@ if (motionId !== undefined && motionId !== null) {
 ```
 
 **CORRECT:**
+
 ```js
 // Validate motionId — required, unlike templateId no longer optional-with-fallback
-if (typeof motionId !== 'string' || motionId === '') {
+if (typeof motionId !== "string" || motionId === "") {
   errors.push({
-    ruleId: 'motion-structure',
-    severity: 'error',
-    message: 'motionId is required and must be a non-empty string.',
-    path: `${motionPath}.motionId`
+    ruleId: "motion-structure",
+    severity: "error",
+    message: "motionId is required and must be a non-empty string.",
+    path: `${motionPath}.motionId`,
   });
 } else {
   if (seenMotionIds.has(motionId)) {
     errors.push({
-      ruleId: 'motion-structure',
-      severity: 'error',
+      ruleId: "motion-structure",
+      severity: "error",
       message: `Duplicate motionId '${motionId}' found.`,
-      path: `${motionPath}.motionId`
+      path: `${motionPath}.motionId`,
     });
   }
   seenMotionIds.add(motionId);
@@ -71,15 +73,16 @@ Every downstream error message in this file that currently reads `motionId || i`
 Same file, inside the tracks loop (`for (const [j, track] of tracks.entries())`):
 
 **WRONG (current):**
+
 ```js
 for (const [j, track] of tracks.entries()) {
-  if (track && typeof track === 'object' && track.use !== undefined) {
+  if (track && typeof track === "object" && track.use !== undefined) {
     if (!seenTemplateIds.has(track.use)) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
+        ruleId: "motion-structure",
+        severity: "error",
         message: `Track references non-existent templateId '${track.use}'.`,
-        path: `${motionPath}.tracks[${j}].use`
+        path: `${motionPath}.tracks[${j}].use`,
       });
     }
   }
@@ -87,33 +90,34 @@ for (const [j, track] of tracks.entries()) {
 ```
 
 **CORRECT:**
+
 ```js
 for (const [j, track] of tracks.entries()) {
-  if (!track || typeof track !== 'object') continue;
+  if (!track || typeof track !== "object") continue;
 
-  if (typeof track.id !== 'string' || track.id === '') {
+  if (typeof track.id !== "string" || track.id === "") {
     errors.push({
-      ruleId: 'motion-structure',
-      severity: 'error',
+      ruleId: "motion-structure",
+      severity: "error",
       message: `Motion "${motionId || i}": track.id is required and must be a non-empty string.`,
-      path: `${motionPath}.tracks[${j}].id`
+      path: `${motionPath}.tracks[${j}].id`,
     });
   }
 
   if (track.use !== undefined) {
     if (!seenTemplateIds.has(track.use)) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
+        ruleId: "motion-structure",
+        severity: "error",
         message: `Track references non-existent templateId '${track.use}'.`,
-        path: `${motionPath}.tracks[${j}].use`
+        path: `${motionPath}.tracks[${j}].use`,
       });
     }
   }
 }
 ```
 
-Track-id *uniqueness within a motion* is already handled by `element-uniqueness.js` (Fix 4 below) — don't duplicate that check here, this only adds the "must be present" requirement.
+Track-id _uniqueness within a motion_ is already handled by `element-uniqueness.js` (Fix 4 below) — don't duplicate that check here, this only adds the "must be present" requirement.
 
 ---
 
@@ -124,29 +128,33 @@ Now that `motionId` is guaranteed present and unique project-wide (validator-enf
 `src/domain/models.js`:
 
 **WRONG:**
+
 ```js
-this.motions = new Map(motions.map(m => [m.motionId, m]));
+this.motions = new Map(motions.map((m) => [m.motionId, m]));
 ```
 
 **CORRECT:**
+
 ```js
 // motionId is validator-guaranteed present and unique by the time a schema
 // reaches this constructor — no positional-index fallback needed or wanted.
-this.motions = new Map(motions.map(m => [m.motionId, m]));
+this.motions = new Map(motions.map((m) => [m.motionId, m]));
 ```
-*(No code change needed here — the line is already correct once Fix 1 guarantees its precondition. Leave as-is; this entry documents why no change is needed so it isn't "fixed" again by mistake.)*
+
+_(No code change needed here — the line is already correct once Fix 1 guarantees its precondition. Leave as-is; this entry documents why no change is needed so it isn't "fixed" again by mistake.)_
 
 Delete the dead fallback-search blocks in all 4 places that reach around `getMotion()`:
 
 Files: `src/engines/ProductionEngine.js` (`mountInstance`, `mountTimeline`), `src/engines/EditorEngine.js` (`mountTimeline`), `src/engines/resolveMotion.js` (`resolve`).
 
 **WRONG (pattern repeated in all 4 places, e.g. `ProductionEngine.mountInstance`):**
+
 ```js
 let schemaMotion = _project.getMotion(motionId);
 if (!schemaMotion) {
   const motionsList = _project.getMotionsList();
   schemaMotion = motionsList.find(
-    (m, idx) => m.motionId === motionId || String(idx) === motionId
+    (m, idx) => m.motionId === motionId || String(idx) === motionId,
   );
 }
 if (!schemaMotion) {
@@ -155,6 +163,7 @@ if (!schemaMotion) {
 ```
 
 **CORRECT:**
+
 ```js
 const schemaMotion = _project.getMotion(motionId);
 if (!schemaMotion) {
@@ -167,57 +176,66 @@ Apply the equivalent simplification in `mountTimeline` (both engines, same patte
 `resolveMotion.js`'s `resolve()` keeps its dual-mode support for being called with either a `MotionProject` or a raw schema object (do not remove that — some callers may still pass a raw schema). Simplify only the domain-object branch:
 
 **WRONG:**
+
 ```js
-const isDomain = schema && typeof schema.getMotion === 'function';
-let originalMotion = isDomain 
-  ? schema.getMotion(motionId) 
+const isDomain = schema && typeof schema.getMotion === "function";
+let originalMotion = isDomain
+  ? schema.getMotion(motionId)
   : schema.motions?.find(
-      m => m && (m.motionId === motionId || (m.motionId === undefined && String(schema.motions.indexOf(m)) === motionId))
+      (m) =>
+        m &&
+        (m.motionId === motionId ||
+          (m.motionId === undefined &&
+            String(schema.motions.indexOf(m)) === motionId)),
     );
 
 if (!originalMotion && isDomain) {
   const motionsList = schema.getMotionsList();
   originalMotion = motionsList.find(
-    (m, idx) => m.motionId === motionId || String(idx) === motionId
+    (m, idx) => m.motionId === motionId || String(idx) === motionId,
   );
 }
 ```
 
 **CORRECT:**
+
 ```js
-const isDomain = schema && typeof schema.getMotion === 'function';
+const isDomain = schema && typeof schema.getMotion === "function";
 const originalMotion = isDomain
   ? schema.getMotion(motionId)
-  : schema.motions?.find(m => m && m.motionId === motionId);
+  : schema.motions?.find((m) => m && m.motionId === motionId);
 ```
+
 (The raw-schema branch also drops its own positional fallback, for the same reason — `motionId` is guaranteed by validation before any of this runs.)
 
 ---
 
 ## Fix 4 — Correct `element-uniqueness.js`'s scope claim, don't change its behavior
 
-**Finding:** the rule's own docstring says *"Project-wide track ID uniqueness check across ALL motions... Any ID appearing in more than one motion → error."* The implementation resets `seenIds` inside the per-motion loop, so it only ever catches duplicates within a single motion — and the existing test suite locks this in explicitly (`'should pass when the same track ID is used across different motions'`, asserting zero errors).
+**Finding:** the rule's own docstring says _"Project-wide track ID uniqueness check across ALL motions... Any ID appearing in more than one motion → error."_ The implementation resets `seenIds` inside the per-motion loop, so it only ever catches duplicates within a single motion — and the existing test suite locks this in explicitly (`'should pass when the same track ID is used across different motions'`, asserting zero errors).
 
 **Decision:** keep the per-motion scope. Nothing in the current architecture looks up a track by `id` without a `motionId` alongside it (`instance.subscribe(trackId, ...)`, `resolveMotion(motionId, progress, overrides)` with overrides keyed per-track within that one motion) — true project-wide uniqueness isn't needed by anything that exists. Don't build it. Just fix the doc so it stops claiming behavior the rule doesn't have.
 
 `src/validators/rules/element-uniqueness.js`:
 
 **WRONG (docstring):**
+
 ```js
 /**
  * Rule: element-uniqueness
  * * Project-wide track ID uniqueness check across ALL motions.
- * 
+ *
  * * Requirements:
  * - Collect every track ID across the entire project's motions.
  * - Any ID appearing in more than one motion -> error.
- * 
+ *
  * @param {unknown[]} motions
  * @returns {ValidationError[]}
  */
 ```
 
 **CORRECT:**
+
 ```js
 /**
  * Rule: element-uniqueness
@@ -244,13 +262,18 @@ No logic or test changes needed — the existing tests already assert the (corre
 Carried over unapplied from two briefs ago. `src/engines/ProductionEngine.js`:
 
 **WRONG (current):**
+
 ```js
 export function createProductionEngine(deps) {
   // ...
   return {
     // ...
-    registerTriggerRef(id, ref) { _triggerRefs.set(id, ref); },
-    unregisterTriggerRef(id) { _triggerRefs.delete(id); }
+    registerTriggerRef(id, ref) {
+      _triggerRefs.set(id, ref);
+    },
+    unregisterTriggerRef(id) {
+      _triggerRefs.delete(id);
+    },
   };
 }
 
@@ -268,21 +291,24 @@ export const productionEngine = createProductionEngine({
 ```
 
 **CORRECT:**
+
 ```js
 export function createProductionEngine(deps = {}) {
   const _triggerRefs = new Map(); // id -> React.RefObject, scoped to this engine instance
 
-  const resolveElement = deps.resolveElement ?? ((id) => {
-    const ref = _triggerRefs.get(id);
-    if (!ref || !ref.current) {
-      throw new Error(
-        `MotionPath: trigger ref '${id}' is not registered. ` +
-        `Ensure useMotionTrigger('${id}', ref) is mounted (and its ref attached) ` +
-        `before this project's scenarios are wired.`
-      );
-    }
-    return ref.current;
-  });
+  const resolveElement =
+    deps.resolveElement ??
+    ((id) => {
+      const ref = _triggerRefs.get(id);
+      if (!ref || !ref.current) {
+        throw new Error(
+          `MotionPath: trigger ref '${id}' is not registered. ` +
+            `Ensure useMotionTrigger('${id}', ref) is mounted (and its ref attached) ` +
+            `before this project's scenarios are wired.`,
+        );
+      }
+      return ref.current;
+    });
 
   const _deps = { ...deps, resolveElement };
   // ... every other use of `deps` in this file (inside mountInstance's
@@ -290,8 +316,12 @@ export function createProductionEngine(deps = {}) {
 
   return {
     // ...
-    registerTriggerRef(id, ref) { _triggerRefs.set(id, ref); },
-    unregisterTriggerRef(id) { _triggerRefs.delete(id); }
+    registerTriggerRef(id, ref) {
+      _triggerRefs.set(id, ref);
+    },
+    unregisterTriggerRef(id) {
+      _triggerRefs.delete(id);
+    },
   };
 }
 
@@ -302,6 +332,7 @@ export default productionEngine;
 ---
 
 ## Non-goals
+
 - Not implementing true project-wide track-id uniqueness — explicitly rejected in Fix 4, doc-only change.
 - Not touching `sectionId`/`timelineId` requiredness — these are optional grouping fields by design, not identity fields, and stay that way.
 - Not forcing `resolveMotion.resolve()` to drop its raw-schema (`isDomain === false`) code path.
@@ -309,6 +340,7 @@ export default productionEngine;
 - Not adding a schema migration/codemod — confirmed zero real content is affected by requiring `motionId`/`track.id`.
 
 ## Verification checklist (fresh clone, grep + a real test run)
+
 1. `validateProject()` on a schema with a motion missing `motionId` returns a hard error mentioning `"motionId is required"`. Same for a track missing `id`.
 2. New/updated tests in `motion-structure.test.js` covering both new required-field errors.
 3. `grep -rn "motionsList.find\|schema.motions.indexOf" src` returns zero hits — confirms every positional-fallback block was deleted, not just the validator added on top of it.

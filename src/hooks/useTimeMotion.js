@@ -1,4 +1,4 @@
-import useMotionInstance from './useMotionInstance.js';
+import useMotionInstance from "./useMotionInstance.js";
 
 /**
  * Mounts a time-triggered motion. TimeTriggerDelegate needs no DOM refs at

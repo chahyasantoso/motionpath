@@ -1,36 +1,51 @@
-import { createAnimationPlugin } from '../createAnimationPlugin.js';
-import { toPercentKey } from '../../usecases/toPercentKey.js';
+import { createAnimationPlugin } from "../createAnimationPlugin.js";
+import { toPercentKey } from "../../usecases/toPercentKey.js";
 
 const imageSequenceWarmCache = new Map();
 
 function canPreloadImages() {
-  if (typeof Image === 'undefined' || typeof window === 'undefined') return false;
+  if (typeof Image === "undefined" || typeof window === "undefined")
+    return false;
   // jsdom exposes window.Image but has no network image loader. Awaiting its
   // load/error event leaves every project load pending forever in tests.
-  if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '')) return false;
+  if (
+    typeof navigator !== "undefined" &&
+    /jsdom/i.test(navigator.userAgent || "")
+  )
+    return false;
   return true;
 }
 
 export function warmFrames(frames) {
   if (!canPreloadImages()) return Promise.resolve();
-  const key = frames.join('\n');
+  const key = frames.join("\n");
   if (imageSequenceWarmCache.has(key)) return imageSequenceWarmCache.get(key);
-  const promise = Promise.all(frames.map((src) => new Promise((resolve) => {
-    const image = new Image();
-    image.onload = resolve;
-    image.onerror = resolve;
-    image.src = src;
-  }))).then(() => undefined);
+  const promise = Promise.all(
+    frames.map(
+      (src) =>
+        new Promise((resolve) => {
+          const image = new Image();
+          image.onload = resolve;
+          image.onerror = resolve;
+          image.src = src;
+        }),
+    ),
+  ).then(() => undefined);
   imageSequenceWarmCache.set(key, promise);
   return promise;
 }
 
-export function _resetPreloadCache() { imageSequenceWarmCache.clear(); }
+export function _resetPreloadCache() {
+  imageSequenceWarmCache.clear();
+}
 
 export function createImageSequencePlugin() {
   return createAnimationPlugin({
-    keys: ['imageSequence', 'imageSequenceIndex'], lazy: false, stage: 'media', priority: 30,
-    outputs: { backgroundImage: { merge: 'replace' } },
+    keys: ["imageSequence", "imageSequenceIndex"],
+    lazy: false,
+    stage: "media",
+    priority: 30,
+    outputs: { backgroundImage: { merge: "replace" } },
     prepare(trackConfig) {
       const frames = trackConfig?.keyframes?.imageSequence?.frames;
       return Array.isArray(frames) ? warmFrames(frames) : undefined;

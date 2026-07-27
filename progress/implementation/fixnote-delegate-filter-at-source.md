@@ -4,7 +4,7 @@
 branch version). Same underlying problem, cleaner fix — read this one instead.
 
 **Scope:** `src/lib/builder.js` (the actual fix), `src/lib/ProductionEngine.js`
-(one deletion, a *consequence* of the real fix, not a separate patch),
+(one deletion, a _consequence_ of the real fix, not a separate patch),
 `src/lib/EditorEngine.js` (no code change — one new test documenting an
 already-correct behavior change).
 
@@ -29,7 +29,7 @@ not any single `if` on its own.
 ## Decision
 
 **Filter, don't branch.** Exclude `driver:"delegate"` motions from
-`buildProject`'s working set *before* the per-motion loop starts, so the loop
+`buildProject`'s working set _before_ the per-motion loop starts, so the loop
 body needs no delegate-awareness at all — there's nothing to skip because
 there's nothing delegate in the list. `buildResult.motions` then only ever
 contains `driver:"timeline"` motions, by construction.
@@ -81,7 +81,7 @@ export async function buildProject(schema, deps) {
   // build's working set. Filtering here means nothing below this line needs
   // to know delegate motions exist at all.
   const motionsArray = (schema.motions || []).filter(
-    m => m.driver?.type !== 'delegate'
+    (m) => m.driver?.type !== "delegate",
   );
 
   // ...tracksMap, trackPlugins, motions = [] declared as before...
@@ -90,14 +90,14 @@ export async function buildProject(schema, deps) {
     const motion = motionsArray[i];
     const sectionId = motion.driver?.sectionId;
 
-    let triggerType = 'time';
+    let triggerType = "time";
     const trigger = motion.driver?.trigger || {};
-    if (trigger.type === 'scroll') {
-      triggerType = trigger.scrub ? 'scroll-scrub' : 'scroll-observer';
+    if (trigger.type === "scroll") {
+      triggerType = trigger.scrub ? "scroll-scrub" : "scroll-observer";
     }
 
     const rawTracks = motion.tracks || [];
-    const tracks = rawTracks.map(t => resolveTrack(t, schema.templates));
+    const tracks = rawTracks.map((t) => resolveTrack(t, schema.templates));
     const trackTweens = [];
 
     for (const track of tracks) {
@@ -111,13 +111,14 @@ export async function buildProject(schema, deps) {
         }
       }
 
-      const tweenDuration = track.duration ?? motion.driver?.trigger?.duration ?? 1;
+      const tweenDuration =
+        track.duration ?? motion.driver?.trigger?.duration ?? 1;
 
       const { proxy, tween, resolvedPlugins } = buildTrackTweenSync(
         track.id,
         keyframes,
         tweenDuration,
-        track
+        track,
       );
 
       trackPlugins.set(track.id, resolvedPlugins);
@@ -128,19 +129,23 @@ export async function buildProject(schema, deps) {
     const motionTimeline = gsap.timeline({ paused: true });
 
     if (
-      (trigger.type === 'time' || (trigger.type === 'scroll' && !trigger.scrub)) &&
-      typeof trigger.delay === 'number'
+      (trigger.type === "time" ||
+        (trigger.type === "scroll" && !trigger.scrub)) &&
+      typeof trigger.delay === "number"
     ) {
       motionTimeline.delay(trigger.delay);
     }
 
     tracks.forEach((track, idx) => {
       const tween = trackTweens[idx];
-      const offset = typeof motion.stagger === 'number' ? motion.stagger * idx : 0;
+      const offset =
+        typeof motion.stagger === "number" ? motion.stagger * idx : 0;
       motionTimeline.add(tween, offset);
     });
 
-    const isPrimary = motion.driver?.timelineId ? !!motion.driver.primary : false;
+    const isPrimary = motion.driver?.timelineId
+      ? !!motion.driver.primary
+      : false;
 
     const motionBuild = {
       motionIndex: i,
@@ -150,7 +155,7 @@ export async function buildProject(schema, deps) {
       triggerConfig: trigger,
       timeline: motionTimeline,
       isPrimary: isPrimary,
-      driverType: motion.driver?.type || 'timeline'
+      driverType: motion.driver?.type || "timeline",
       // driverType will only ever be 'timeline' here now — delegate never
       // reaches this loop. Field kept for shape-compatibility with existing
       // consumers/tests that read it; not a signal to branch on anymore.
@@ -184,10 +189,12 @@ for (const motion of motions) {
 // "for safety", it silently masks a real bug if the filter is ever removed
 // or miswritten (the branch would quietly resume its old workaround instead
 // of the test suite failing loudly). Pick one guard, not two doing the same job.
-const motionsArray = (schema.motions || []).filter(m => m.driver?.type !== 'delegate');
+const motionsArray = (schema.motions || []).filter(
+  (m) => m.driver?.type !== "delegate",
+);
 for (let i = 0; i < motionsArray.length; i++) {
   const motion = motionsArray[i];
-  if (motion.driver?.type === 'delegate') continue; // WRONG — dead, and hides drift
+  if (motion.driver?.type === "delegate") continue; // WRONG — dead, and hides drift
   // ...
 }
 ```
@@ -199,7 +206,7 @@ for (let i = 0; i < motionsArray.length; i++) {
 // "docstring describes old behavior" problem this project has been bitten by
 // twice already. Delete it, don't leave it as defensive dead code.
 for (const motion of motions) {
-  if (motion.driverType === 'delegate') continue; // WRONG — leave this in
+  if (motion.driverType === "delegate") continue; // WRONG — leave this in
   // ...
 }
 ```

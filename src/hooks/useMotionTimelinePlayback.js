@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 /**
  * Ongoing play/pause control for a MotionInstance or Motion.

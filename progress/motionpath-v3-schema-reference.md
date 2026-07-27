@@ -20,10 +20,10 @@ schema (JSON) → validateProject() → [throws on error] → engine.loadProject
 
 ```jsonc
 {
-  "schemaVersion": 2,          // REQUIRED, must be exactly 2 (current constant)
-  "perspective": "1000px",     // optional; if 3D props used without this, WARNING (not error)
-  "templates": [ /* Template[] */ ],
-  "motions": [ /* Motion[] */ ]
+  "schemaVersion": 2, // REQUIRED, must be exactly 2 (current constant)
+  "perspective": "1000px", // optional; if 3D props used without this, WARNING (not error)
+  "templates": [/* Template[] */],
+  "motions": [/* Motion[] */],
 }
 ```
 
@@ -54,11 +54,11 @@ Reusable keyframe fragments. Referenced by tracks via `track.use`.
 
 ```jsonc
 {
-  "motionId": "hero-reveal",   // REQUIRED, non-empty string, unique project-wide
-  "driver": { /* Driver — REQUIRED */ },
-  "stagger": 0.1,               // optional, plain number only, see §7
+  "motionId": "hero-reveal", // REQUIRED, non-empty string, unique project-wide
+  "driver": {/* Driver — REQUIRED */},
+  "stagger": 0.1, // optional, plain number only, see §7
   "staggerTransition": { "duration": 0.3, "ease": "power2.out" }, // optional, used by addChild/removeChild reflow only
-  "tracks": [ /* Track[], REQUIRED, min 1 */ ]
+  "tracks": [/* Track[], REQUIRED, min 1 */],
 }
 ```
 
@@ -71,10 +71,10 @@ Reusable keyframe fragments. Referenced by tracks via `track.use`.
 ```jsonc
 {
   "type": "timeline",
-  "sectionId": "hero",          // default trigger-anchor id (used when trigger.trigger is absent)
-  "timelineId": "hero-group",   // optional — groups this motion into a shared master timeline, see §8
-  "primary": true,               // required exactly once per timelineId group
-  "trigger": { /* Trigger — REQUIRED */ }
+  "sectionId": "hero", // default trigger-anchor id (used when trigger.trigger is absent)
+  "timelineId": "hero-group", // optional — groups this motion into a shared master timeline, see §8
+  "primary": true, // required exactly once per timelineId group
+  "trigger": {/* Trigger — REQUIRED */},
 }
 ```
 
@@ -83,6 +83,7 @@ Reusable keyframe fragments. Referenced by tracks via `track.use`.
 Exactly one `type`: `"scroll"` or `"time"`. Anything else → hard error.
 
 **`type: "scroll"`** — `scrub` is REQUIRED, must be `boolean` or `number` (GSAP scrub smoothing value).
+
 - `scrub: true` (or a number) → **scrub mode**. Directly bound to scroll position.
 - `scrub: false` → **observer mode**. Fires once/toggles via `toggleActions`, runs on a real-seconds autonomous timeline.
 
@@ -90,14 +91,14 @@ Exactly one `type`: `"scroll"` or `"time"`. Anything else → hard error.
 
 ### Field legality matrix (validated by `trigger-shape.js`)
 
-| Field | scrub:true | scrub:false (observer) | time |
-|---|---|---|---|
-| `start`, `end`, `pin`, `pinSpacing`, `snap` | ✅ | ✅ (start only; no pin/snap in practice) | ❌ n/a |
-| `toggleActions` | ❌ (scrub uses animation binding, not toggles) | ✅ | ❌ |
-| `endTrigger` | ✅ only | ❌ hard error | ❌ hard error |
-| `repeat`, `yoyo`, `repeatDelay` | ❌ hard error | ✅ | ✅ |
-| `delay` | ❌ hard error | ✅ (caveat below) | ✅ |
-| `track.duration` (per-track override) | ❌ hard error | ✅ | ✅ |
+| Field                                       | scrub:true                                     | scrub:false (observer)                   | time          |
+| ------------------------------------------- | ---------------------------------------------- | ---------------------------------------- | ------------- |
+| `start`, `end`, `pin`, `pinSpacing`, `snap` | ✅                                             | ✅ (start only; no pin/snap in practice) | ❌ n/a        |
+| `toggleActions`                             | ❌ (scrub uses animation binding, not toggles) | ✅                                       | ❌            |
+| `endTrigger`                                | ✅ only                                        | ❌ hard error                            | ❌ hard error |
+| `repeat`, `yoyo`, `repeatDelay`             | ❌ hard error                                  | ✅                                       | ✅            |
+| `delay`                                     | ❌ hard error                                  | ✅ (caveat below)                        | ✅            |
+| `track.duration` (per-track override)       | ❌ hard error                                  | ✅                                       | ✅            |
 
 **Known GSAP caveat (not a MotionPath bug, community-reported):** on observer triggers with multi-action `toggleActions`, `delay` applies correctly on enter/enterBack but has been reported skipped on leave/leaveBack. Fine for `"play none none none"`.
 
@@ -119,11 +120,11 @@ Delegate motions are resolved on-demand via `engine.resolveMotion(motionId, prog
 
 ```jsonc
 {
-  "id": "hero-card",            // REQUIRED, non-empty string, unique PROJECT-WIDE (all motions)
-  "use": "fade-in",              // optional — merge in a template (whole-key replace, see §3)
-  "duration": 2,                  // optional — per-track override; forbidden on scrub (see §5 matrix)
-  "transformOrigin": "50% 50%",  // optional passthrough to GSAP
-  "keyframes": { /* PropertyKeyframes, keyed by property name */ }
+  "id": "hero-card", // REQUIRED, non-empty string, unique PROJECT-WIDE (all motions)
+  "use": "fade-in", // optional — merge in a template (whole-key replace, see §3)
+  "duration": 2, // optional — per-track override; forbidden on scrub (see §5 matrix)
+  "transformOrigin": "50% 50%", // optional passthrough to GSAP
+  "keyframes": {/* PropertyKeyframes, keyed by property name */},
 }
 ```
 
@@ -142,19 +143,19 @@ Delegate motions are resolved on-demand via `engine.resolveMotion(motionId, prog
 
 - `stops` REQUIRED, min **2** entries (`stop-count.js`) for every animated property, including `path.stops`.
 - Each stop: `p` REQUIRED number in `[0, 1]`; `v` REQUIRED (any defined value); `ease` optional, applies going INTO that stop.
-- **Ease collision**: if two different properties on the same track have stops at the *same literal `p`* with *different* `ease` values → hard error. Fix: nudge one property's `p` slightly. No auto-resolution.
+- **Ease collision**: if two different properties on the same track have stops at the _same literal `p`_ with _different_ `ease` values → hard error. Fix: nudge one property's `p` slightly. No auto-resolution.
 
 ### Supported property keys (plugin registry, `src/domain/plugins.js`)
 
-| Category | Keys |
-|---|---|
-| Position/transform (simple, eager) | `x`, `y`, `z`, `rotation`, `rotationX`, `rotationY`, `rotateX`, `rotateY`, `rotateZ`, `scale`, `scaleX`, `scaleY`, `skewX`, `skewY`, `opacity`, `display`, `zIndex`, `xPercent`, `yPercent`, `transformPerspective` |
-| Color (eager) | `backgroundColor`, `color`, `borderColor` — `v` is a CSS color string |
-| Filter (eager, consolidated) | `blur`, `brightness`, `contrast`, `saturate` — see §11 |
-| CSS custom properties (eager) | any `--*` key |
-| Path (eager) | `path` — `{ points: [...], stops: [...] }`, see §9 |
-| Image sequence (eager) | `imageSequence` — `{ frames: string[], stops: [...] }`, see below |
-| Lazy (GSAP Club add-ons, stub only in current code) | `splitText`, `morphSVG`, `drawSVG`, `scrambleText` |
+| Category                                            | Keys                                                                                                                                                                                                                |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Position/transform (simple, eager)                  | `x`, `y`, `z`, `rotation`, `rotationX`, `rotationY`, `rotateX`, `rotateY`, `rotateZ`, `scale`, `scaleX`, `scaleY`, `skewX`, `skewY`, `opacity`, `display`, `zIndex`, `xPercent`, `yPercent`, `transformPerspective` |
+| Color (eager)                                       | `backgroundColor`, `color`, `borderColor` — `v` is a CSS color string                                                                                                                                               |
+| Filter (eager, consolidated)                        | `blur`, `brightness`, `contrast`, `saturate` — see §11                                                                                                                                                              |
+| CSS custom properties (eager)                       | any `--*` key                                                                                                                                                                                                       |
+| Path (eager)                                        | `path` — `{ points: [...], stops: [...] }`, see §9                                                                                                                                                                  |
+| Image sequence (eager)                              | `imageSequence` — `{ frames: string[], stops: [...] }`, see below                                                                                                                                                   |
+| Lazy (GSAP Club add-ons, stub only in current code) | `splitText`, `morphSVG`, `drawSVG`, `scrambleText`                                                                                                                                                                  |
 
 **`x`/`y` and `path` are mutually exclusive on the same track** — both present → hard error (`path-xy-exclusivity.js`).
 
@@ -175,11 +176,13 @@ Delegate motions are resolved on-demand via `engine.resolveMotion(motionId, prog
 ## 8. `timelineId` / `primary` — grouping motions into one master timeline
 
 Only motions of the **identical trigger type AND scrub value** may share a `driver.timelineId` (validated by `timeline-group.js`):
+
 - scrub-with-scrub only (same `scrub` value across the group)
 - time-with-time only
 - **observer (`scroll`, `scrub:false`) can never join a group** — hard error if it tries.
 
 Rules:
+
 - Exactly one member must have `driver.primary: true` — 0 or 2+ is a hard error.
 - Non-primary members must NOT declare `start`, `end`, `pin`, `pinSpacing`, `snap`, `repeat`, `yoyo`, `repeatDelay` on their own `trigger` — hard error if present. Only `type`/`scrub` compatibility is checked on non-primary members; the primary's config drives the whole group.
 - Members nest into one real GSAP master timeline (`TimelineGroupController`), added in schema-declaration order (sequential positioning, GSAP default — no explicit offset field).
@@ -258,7 +261,7 @@ instance.isDestroyed                            // getter
 ```
 
 - `subscribe()` throws if `trackId` doesn't exist on this instance: `subscribe: track "X" not found in instance.`
-- Multiple `subscribe()` calls with the *same* callback function are independent — each gets its own wrapper and its own unsubscribe.
+- Multiple `subscribe()` calls with the _same_ callback function are independent — each gets its own wrapper and its own unsubscribe.
 - `compose()` returns `{}` (not a throw) if `trackId` doesn't exist — inconsistent with `subscribe()`'s throw; check `tracksMap` yourself if you need to distinguish "no track" from "empty patch."
 
 ### React hooks
@@ -311,27 +314,39 @@ Same `sceneId`/`sectionId` used by unrelated motions that aren't grouped by `tim
           "type": "scroll",
           "scrub": 0.5,
           "start": "top top",
-          "end": "bottom bottom"
-        }
+          "end": "bottom bottom",
+        },
       },
       "tracks": [
         {
           "id": "hero-title",
           "keyframes": {
-            "opacity": { "stops": [{ "p": 0, "v": 0 }, { "p": 0.15, "v": 1, "ease": "power2.out" }, { "p": 1, "v": 0 }] },
-            "y": { "stops": [{ "p": 0, "v": 120 }, { "p": 0.25, "v": 0, "ease": "power2.out" }, { "p": 1, "v": -120 }] }
-          }
-        }
-      ]
-    }
-  ]
+            "opacity": {
+              "stops": [
+                { "p": 0, "v": 0 },
+                { "p": 0.15, "v": 1, "ease": "power2.out" },
+                { "p": 1, "v": 0 },
+              ],
+            },
+            "y": {
+              "stops": [
+                { "p": 0, "v": 120 },
+                { "p": 0.25, "v": 0, "ease": "power2.out" },
+                { "p": 1, "v": -120 },
+              ],
+            },
+          },
+        },
+      ],
+    },
+  ],
 }
 ```
 
 ```jsx
 const project = useMotionProject(schema);
-const instance = useMotionInstance('hero-reveal');
+const instance = useMotionInstance("hero-reveal");
 const ref = useRef(null);
-useMotionTrigger('hero-section', ref);
-useMotionSubscriber(instance, 'hero-title', titleRef);
+useMotionTrigger("hero-section", ref);
+useMotionSubscriber(instance, "hero-title", titleRef);
 ```

@@ -29,7 +29,7 @@ dead" before calling `subscribe()` (which throws if it is).
   `#onSubscriberChange`, etc.) and isn't in scope here.
 - Do **not** make `subscribe()` check `isDestroyed` and return a no-op
   instead of throwing. The existing throw-on-destroyed-subscribe behavior is
-  unchanged; this getter only gives consumers a way to check *before*
+  unchanged; this getter only gives consumers a way to check _before_
   calling subscribe, not a way to make subscribe itself more forgiving.
 - Do **not** add this getter to any other class (engines, etc.) as part of
   this brief. `MotionInstance` only.
@@ -41,6 +41,7 @@ dead" before calling `subscribe()` (which throws if it is).
 Add it near the other public getter already in the file, for consistency:
 
 **WRONG (current, end of file):**
+
 ```js
   get requiredTriggerIds() {
     const trigger = this.schemaMotion.driver?.trigger || {};
@@ -57,6 +58,7 @@ Add it near the other public getter already in the file, for consistency:
 ```
 
 **CORRECT:**
+
 ```js
   get requiredTriggerIds() {
     const trigger = this.schemaMotion.driver?.trigger || {};
@@ -83,8 +85,8 @@ Add it near the other public getter already in the file, for consistency:
 Add to the existing `describe('Teardown and destruction', ...)` block:
 
 ```js
-it('exposes isDestroyed as false before destroy() and true after', () => {
-  const instance = createTestInstance('time-motion', {}, timelineSchema);
+it("exposes isDestroyed as false before destroy() and true after", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
 
   expect(instance.isDestroyed).toBe(false);
 

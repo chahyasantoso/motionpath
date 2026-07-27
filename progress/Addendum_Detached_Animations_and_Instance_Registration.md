@@ -20,7 +20,7 @@ Both are solved by the same underlying shift: **animation definitions become reu
 
 **Rejected approach (considered, not used):** fully detaching animation-to-scene association into React (`useMotionInstance(animationId, sceneId, ...)`). This was rejected because it moves the cross-scenario element-uniqueness check (and other schema-time validations) from build-time to component-mount-time — a real regression in when bugs surface, for no corresponding benefit.
 
-**Adopted approach:** animation definitions move to a top-level `animations[]` array, referenced by scenarios via `bindings[]`. The relationship "this animation belongs to this scene" **stays in schema**, fully static and validatable before any component mounts. Only *cardinality* (how many live instances) is left to the presentation layer, because that is genuinely only knowable at render time.
+**Adopted approach:** animation definitions move to a top-level `animations[]` array, referenced by scenarios via `bindings[]`. The relationship "this animation belongs to this scene" **stays in schema**, fully static and validatable before any component mounts. Only _cardinality_ (how many live instances) is left to the presentation layer, because that is genuinely only knowable at render time.
 
 ```json
 {
@@ -28,19 +28,32 @@ Both are solved by the same underlying shift: **animation definitions become reu
     {
       "animationId": "cardReveal",
       "keyframes": {
-        "y": { "stops": [{ "p": 0, "v": 40 }, { "p": 1, "v": 0 }] },
-        "opacity": { "stops": [{ "p": 0, "v": 0 }, { "p": 1, "v": 1 }] }
+        "y": {
+          "stops": [
+            { "p": 0, "v": 40 },
+            { "p": 1, "v": 0 }
+          ]
+        },
+        "opacity": {
+          "stops": [
+            { "p": 0, "v": 0 },
+            { "p": 1, "v": 1 }
+          ]
+        }
       }
     }
   ],
   "scenarios": [
     {
       "sceneId": "pricingSection",
-      "trigger": { "type": "scroll", "scrub": true, "start": "top top", "end": "+=1500" },
+      "trigger": {
+        "type": "scroll",
+        "scrub": true,
+        "start": "top top",
+        "end": "+=1500"
+      },
       "stagger": 0.1,
-      "bindings": [
-        { "animationId": "cardReveal" }
-      ]
+      "bindings": [{ "animationId": "cardReveal" }]
     }
   ]
 }
@@ -61,8 +74,8 @@ All DOM references now arrive via explicit registration calls from React hooks. 
 These ids are **known statically from schema** at `loadProject` time — they don't need inference, unlike instance cardinality. Engine records them as pending requirements: "a node will be registered under id X." The node itself arrives later via:
 
 ```js
-engine.registerElement(id, domNode)   // called by useMotionTrigger on mount
-engine.unregisterElement(id)          // called on unmount
+engine.registerElement(id, domNode); // called by useMotionTrigger on mount
+engine.unregisterElement(id); // called on unmount
 ```
 
 Cardinality for trigger ids is always exactly 1 (enforced — see §5). This is a **separate id namespace** from `animationId` (§2.2) — a trigger id is never also an animation binding id, so there is no mode-ambiguity to resolve between them. This removes the need for the `assertMode('single'|'instance')` mechanism proposed in the earlier draft entirely (see §6).
@@ -72,11 +85,11 @@ Cardinality for trigger ids is always exactly 1 (enforced — see §5). This is 
 Cardinality is unknown at schema time — could be 0, 1, or N, depending on how many components mount. Registered via:
 
 ```js
-const instanceId = engine.registerInstance(animationId)  // called by useMotionInstance on mount
-engine.unregisterInstance(instanceId)                     // called on unmount
+const instanceId = engine.registerInstance(animationId); // called by useMotionInstance on mount
+engine.unregisterInstance(instanceId); // called on unmount
 ```
 
-No `sceneId` is passed here — the engine already knows which scene an `animationId` belongs to from the schema binding (§1). `registerInstance` only needs to know *which* animation, not *where*.
+No `sceneId` is passed here — the engine already knows which scene an `animationId` belongs to from the schema binding (§1). `registerInstance` only needs to know _which_ animation, not _where_.
 
 ---
 
@@ -84,32 +97,32 @@ No `sceneId` is passed here — the engine already knows which scene an `animati
 
 Two independent things used to happen together at `initScene` (schema parse → build all tweens). They're now split:
 
-| Step | When | What happens |
-|---|---|---|
-| `loadProject(schema)` | Immediately, synchronous | Parse `animations[]` and `scenarios[].bindings[]`. Run all static validation (§5). Create an empty scene timeline per scenario (`gsap.timeline({ paused: true })`), ready to receive children. **No tweens, no proxies, no ScrollTrigger yet.** |
-| `registerInstance(animationId)` | Lazy, once per mounted instance | Build **one proxy + one `gsap.to()`** for this instance (reusing the existing `contribute()`/merge pipeline, unchanged), compute stagger offset from a monotonic per-`animationId` counter, add the tween into the owning scenario's timeline at that offset. |
-| `registerElement(id, node)` | Lazy, once per trigger id | Attach `ScrollTrigger.create({ animation: sceneTimeline, trigger: node, ...triggerConfig })`. Uses GSAP's documented separation of tween/timeline construction from `ScrollTrigger` construction — the timeline can be built and populated before a `ScrollTrigger` is ever attached to it. |
+| Step                            | When                            | What happens                                                                                                                                                                                                                                                                                |
+| ------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `loadProject(schema)`           | Immediately, synchronous        | Parse `animations[]` and `scenarios[].bindings[]`. Run all static validation (§5). Create an empty scene timeline per scenario (`gsap.timeline({ paused: true })`), ready to receive children. **No tweens, no proxies, no ScrollTrigger yet.**                                             |
+| `registerInstance(animationId)` | Lazy, once per mounted instance | Build **one proxy + one `gsap.to()`** for this instance (reusing the existing `contribute()`/merge pipeline, unchanged), compute stagger offset from a monotonic per-`animationId` counter, add the tween into the owning scenario's timeline at that offset.                               |
+| `registerElement(id, node)`     | Lazy, once per trigger id       | Attach `ScrollTrigger.create({ animation: sceneTimeline, trigger: node, ...triggerConfig })`. Uses GSAP's documented separation of tween/timeline construction from `ScrollTrigger` construction — the timeline can be built and populated before a `ScrollTrigger` is ever attached to it. |
 
-**Why this split matters:** it means the *existing* per-element tween-build logic (`contribute()` → merge → `gsap.to()`) is untouched — it just moves from "called N times in a loop at `initScene`" to "called once per `registerInstance` call, whenever that happens." Nothing about how a single tween is built changes.
+**Why this split matters:** it means the _existing_ per-element tween-build logic (`contribute()` → merge → `gsap.to()`) is untouched — it just moves from "called N times in a loop at `initScene`" to "called once per `registerInstance` call, whenever that happens." Nothing about how a single tween is built changes.
 
 ### Monotonic stagger counter
 
 ```js
-let joinCounter = 0 // per animationId, engine-internal, never reset except by destroyScene
+let joinCounter = 0; // per animationId, engine-internal, never reset except by destroyScene
 
 function registerInstance(animationId) {
-  const def = animationDefs.get(animationId)
-  const scenario = findScenarioByBinding(animationId)  // known from schema
-  const index = joinCounter++
-  const offset = index * (scenario.stagger ?? 0)
+  const def = animationDefs.get(animationId);
+  const scenario = findScenarioByBinding(animationId); // known from schema
+  const index = joinCounter++;
+  const offset = index * (scenario.stagger ?? 0);
 
-  const proxy = {}
-  const tween = gsap.to(proxy, { ...buildMergedKeyframes(def), paused: true })
-  getSceneTimeline(scenario.sceneId).add(tween, offset)
+  const proxy = {};
+  const tween = gsap.to(proxy, { ...buildMergedKeyframes(def), paused: true });
+  getSceneTimeline(scenario.sceneId).add(tween, offset);
 
-  const instanceId = `${animationId}#${index}`
-  registerProxy(instanceId, proxy)
-  return instanceId
+  const instanceId = `${animationId}#${index}`;
+  registerProxy(instanceId, proxy);
+  return instanceId;
 }
 ```
 
@@ -126,17 +139,23 @@ Three hooks. `useMotionSubscriber` is unchanged.
 ```tsx
 // trigger role — one node, id known from schema (sceneId/startTrigger/endTrigger)
 function PricingSection() {
-  const ref = useRef<HTMLElement>(null)
-  useMotionTrigger("pricingSection", ref)
-  return <section ref={ref}><PricingCard /><PricingCard /><PricingCard /></section>
+  const ref = useRef<HTMLElement>(null);
+  useMotionTrigger("pricingSection", ref);
+  return (
+    <section ref={ref}>
+      <PricingCard />
+      <PricingCard />
+      <PricingCard />
+    </section>
+  );
 }
 
 // instance role — any number of nodes, one per mount
 function PricingCard() {
-  const ref = useRef<HTMLDivElement>(null)
-  const instanceId = useMotionInstance("cardReveal")  // no sceneId needed — schema already knows
-  useMotionSubscriber(instanceId, ref)                // unchanged hook, just fed an instanceId
-  return <div ref={ref}>Card</div>
+  const ref = useRef<HTMLDivElement>(null);
+  const instanceId = useMotionInstance("cardReveal"); // no sceneId needed — schema already knows
+  useMotionSubscriber(instanceId, ref); // unchanged hook, just fed an instanceId
+  return <div ref={ref}>Card</div>;
 }
 ```
 
@@ -154,15 +173,15 @@ Rejected: a separate `subscribeToScene(sceneId, callback)` API. Adopted instead:
 
 ```js
 timeline.eventCallback("onUpdate", () => {
-  sceneProgressProxy.progress = timeline.progress()
-  broadcast(sceneId, sceneProgressProxy)  // same broadcast fn as instances use
-})
+  sceneProgressProxy.progress = timeline.progress();
+  broadcast(sceneId, sceneProgressProxy); // same broadcast fn as instances use
+});
 ```
 
 ```tsx
 useMotionSubscriber("pricingSection", (raw) => {
-  raw.progress // 0–1, raw number, no prefix — consistent with the existing no-`__` convention
-})
+  raw.progress; // 0–1, raw number, no prefix — consistent with the existing no-`__` convention
+});
 ```
 
 One function, one mental model: give it an id, get raw values back. No second API surface to learn, test, or maintain.

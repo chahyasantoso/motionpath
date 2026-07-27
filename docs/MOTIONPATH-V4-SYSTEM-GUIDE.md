@@ -157,10 +157,10 @@ Progress keys are canonicalized through `toPercentKey()`. Never reintroduce raw 
 
 Plugins have two distinct responsibilities:
 
-| Phase | Method | Frequency | Rule |
-|---|---|---:|---|
-| Compile | `contribute()` | Once per Track | Pure. Converts authored stops into GSAP keyframes and tween vars. |
-| Frame | `compose()` | Up to 60 times/sec | Cheap. Converts proxy state into a render patch. |
+| Phase   | Method         |          Frequency | Rule                                                              |
+| ------- | -------------- | -----------------: | ----------------------------------------------------------------- |
+| Compile | `contribute()` |     Once per Track | Pure. Converts authored stops into GSAP keyframes and tween vars. |
+| Frame   | `compose()`    | Up to 60 times/sec | Cheap. Converts proxy state into a render patch.                  |
 
 ```mermaid
 flowchart TD
@@ -206,7 +206,7 @@ The `ctx` Map is created per external compose call. It uses a composing sentinel
 Observation is not reverse-linked. If an observed source is destroyed, remove the observation first:
 
 ```js
-child.removeObserved(parent)
+child.removeObserved(parent);
 ```
 
 Use `role: 'input'` for data needed by this Track's plugins, such as `parentWorld` for FK. Use the default `output` role when the observed patch should override this Track's final output.
@@ -216,11 +216,11 @@ Use `role: 'input'` for data needed by this Track's plugins, such as `parentWorl
 Application code talks to Motion, not delegates:
 
 ```js
-motion.play()
-motion.pause()
-motion.seek(0.5)
-motion.reverse()
-motion.onComplete(callback)
+motion.play();
+motion.pause();
+motion.seek(0.5);
+motion.reverse();
+motion.onComplete(callback);
 ```
 
 The concrete trigger delegate is private to Motion. Delegates are injectable for Engine internals and direct low-level tests, but they are not an application API.
@@ -310,15 +310,15 @@ When modifying MotionPath, an AI agent should:
 
 ## 13. Quick debugging map
 
-| Symptom | Check first |
-|---|---|
-| `No plugin found for key` | Plugin registry claim and exact authored key |
-| Motion cannot mount | `id`, trigger type, and `loadProject()` completion |
-| First frame is undefined | Missing `p: 0` stop |
-| Path output is wrong | Path anchor and plugin stage/priority collisions |
-| DOM writes are noisy | Complete patch shape and dirty-check cache |
-| Stale overlay output | Remove observation and replace Overlay generation |
-| Memory grows after navigation | `engine.unmount()` in hook cleanup and adopted Track ownership |
+| Symptom                           | Check first                                                            |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `No plugin found for key`         | Plugin registry claim and exact authored key                           |
+| Motion cannot mount               | `id`, trigger type, and `loadProject()` completion                     |
+| First frame is undefined          | Missing `p: 0` stop                                                    |
+| Path output is wrong              | Path anchor and plugin stage/priority collisions                       |
+| DOM writes are noisy              | Complete patch shape and dirty-check cache                             |
+| Stale overlay output              | Remove observation and replace Overlay generation                      |
+| Memory grows after navigation     | `engine.unmount()` in hook cleanup and adopted Track ownership         |
 | CI fails only in one Node version | Reproduce locally with clean `npm ci` and the pinned typecheck command |
 
 ## 14. Verification checklist

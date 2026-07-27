@@ -15,17 +15,17 @@ describe v1 only and should not be treated as current.
 {
   "schemaVersion": 2,
   "perspective": "800px",
-  "templates": [ /* Template[] */ ],
-  "motions": [ /* Motion[] */ ]
+  "templates": [/* Template[] */],
+  "motions": [/* Motion[] */]
 }
 ```
 
-| Field | Required | Notes |
-|---|---|---|
-| `schemaVersion` | **yes** | Must be exactly `2` (literal number). *(`schema-version.js`)* |
-| `perspective` | no | Root-level px string (e.g. `"800px"`). Only relevant if any track uses `z`/`rotationX`/`rotationY`/a 3D `path`. Missing it while using those triggers a **warning**, not an error. *(`perspective-usage.js`)* |
-| `templates` | no | Array of reusable keyframe fragments. See §4. |
-| `motions` | no* | Array of animation definitions. See §2. (*schema-structurally optional, but a project with none does nothing) |
+| Field           | Required | Notes                                                                                                                                                                                                         |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion` | **yes**  | Must be exactly `2` (literal number). _(`schema-version.js`)_                                                                                                                                                 |
+| `perspective`   | no       | Root-level px string (e.g. `"800px"`). Only relevant if any track uses `z`/`rotationX`/`rotationY`/a 3D `path`. Missing it while using those triggers a **warning**, not an error. _(`perspective-usage.js`)_ |
+| `templates`     | no       | Array of reusable keyframe fragments. See §4.                                                                                                                                                                 |
+| `motions`       | no*      | Array of animation definitions. See §2. (*schema-structurally optional, but a project with none does nothing)                                                                                                 |
 
 ---
 
@@ -40,12 +40,12 @@ describe v1 only and should not be treated as current.
 }
 ```
 
-| Field | Required | Notes |
-|---|---|---|
-| `motionId` | no | String. If present, must be unique project-wide. *(`motion-structure.js`)* |
-| `driver` | **yes** | Object, `{ type: "timeline" \| "delegate", ... }`. See §3. |
-| `stagger` | no | Plain number only — **no GSAP object form** (`{each, amount, from}` is rejected). Must be `>= 0`. Non-zero with fewer than 2 tracks → warning (no-op). **Forbidden entirely on `driver.type:"delegate"`** — build-time error if present. *(`stagger-shape.js`, `motion-structure.js`)* |
-| `tracks` | **yes** | Array, minimum 1 entry. *(`motion-structure.js`)* |
+| Field      | Required | Notes                                                                                                                                                                                                                                                                                  |
+| ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `motionId` | no       | String. If present, must be unique project-wide. _(`motion-structure.js`)_                                                                                                                                                                                                             |
+| `driver`   | **yes**  | Object, `{ type: "timeline" \| "delegate", ... }`. See §3.                                                                                                                                                                                                                             |
+| `stagger`  | no       | Plain number only — **no GSAP object form** (`{each, amount, from}` is rejected). Must be `>= 0`. Non-zero with fewer than 2 tracks → warning (no-op). **Forbidden entirely on `driver.type:"delegate"`** — build-time error if present. _(`stagger-shape.js`, `motion-structure.js`)_ |
+| `tracks`   | **yes**  | Array, minimum 1 entry. _(`motion-structure.js`)_                                                                                                                                                                                                                                      |
 
 ---
 
@@ -61,17 +61,17 @@ Every motion has exactly one driver, of one of two types.
   "sectionId": "iceCreamSection",
   "timelineId": "iceCreamSection-master",
   "primary": true,
-  "trigger": { /* Trigger */ }
+  "trigger": {/* Trigger */}
 }
 ```
 
-| Field | Required | Notes |
-|---|---|---|
-| `type` | **yes** | `"timeline"` |
-| `sectionId` | no | Default trigger-anchor element. Only valid under `driver.type:"timeline"`. *(v1's `sceneId`, renamed + relocated — was motion-top-level, now lives under `driver`)* |
-| `timelineId` | no | Groups this motion into a shared master timeline with other motions sharing the same `timelineId`. See §3.2. |
-| `primary` | no | Boolean. Exactly one `true` per `timelineId` group. See §3.2. |
-| `trigger` | **yes** | Object. See §3.1. |
+| Field        | Required | Notes                                                                                                                                                               |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`       | **yes**  | `"timeline"`                                                                                                                                                        |
+| `sectionId`  | no       | Default trigger-anchor element. Only valid under `driver.type:"timeline"`. _(v1's `sceneId`, renamed + relocated — was motion-top-level, now lives under `driver`)_ |
+| `timelineId` | no       | Groups this motion into a shared master timeline with other motions sharing the same `timelineId`. See §3.2.                                                        |
+| `primary`    | no       | Boolean. Exactly one `true` per `timelineId` group. See §3.2.                                                                                                       |
+| `trigger`    | **yes**  | Object. See §3.1.                                                                                                                                                   |
 
 ### `driver.type: "delegate"`
 
@@ -79,7 +79,8 @@ Every motion has exactly one driver, of one of two types.
 { "type": "delegate" }
 ```
 
-No other fields on `driver`. **Build-time errors if any of the following are present** on a `driver.type:"delegate"` motion *(`motion-structure.js`)*:
+No other fields on `driver`. **Build-time errors if any of the following are present** on a `driver.type:"delegate"` motion _(`motion-structure.js`)_:
+
 - `driver.trigger`
 - `driver.sectionId`
 - `driver.timelineId`
@@ -98,15 +99,15 @@ Delegate motions describe reusable, progress-driven animation resolved on demand
 
 All rules from `trigger-shape.js`:
 
-| Rule | Detail |
-|---|---|
-| `trigger.type` | Required, exactly `"scroll"` or `"time"`. |
-| `scroll` requires `scrub` | Required, `boolean` or `number`. |
-| **"scrub"** = `type === "scroll" && (scrub === true \|\| typeof scrub === "number")** | This exact predicate gates every rule below. |
-| `endTrigger` | Only valid when scrub. Error otherwise. |
-| `repeat` / `yoyo` / `repeatDelay` | **Forbidden on scrub.** Error if present. Valid on `time` and scroll-observer (`scroll`+`scrub:false`). |
-| `delay` | **Forbidden on scrub.** Valid on `time` and observer. **Known GSAP-community caveat, not independently verified**: on observer with multi-action `toggleActions`, `delay` reportedly applies on enter/enterBack but is skipped on leave/leaveBack. Not a concern for simple `"play none none none"`. |
-| track-level `duration` | **Forbidden on scrub** — checked per-track, error cites the offending track's `id`. |
+| Rule                                                                                  | Detail                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trigger.type`                                                                        | Required, exactly `"scroll"` or `"time"`.                                                                                                                                                                                                                                                            |
+| `scroll` requires `scrub`                                                             | Required, `boolean` or `number`.                                                                                                                                                                                                                                                                     |
+| **"scrub"** = `type === "scroll" && (scrub === true \|\| typeof scrub === "number")** | This exact predicate gates every rule below.                                                                                                                                                                                                                                                         |
+| `endTrigger`                                                                          | Only valid when scrub. Error otherwise.                                                                                                                                                                                                                                                              |
+| `repeat` / `yoyo` / `repeatDelay`                                                     | **Forbidden on scrub.** Error if present. Valid on `time` and scroll-observer (`scroll`+`scrub:false`).                                                                                                                                                                                              |
+| `delay`                                                                               | **Forbidden on scrub.** Valid on `time` and observer. **Known GSAP-community caveat, not independently verified**: on observer with multi-action `toggleActions`, `delay` reportedly applies on enter/enterBack but is skipped on leave/leaveBack. Not a concern for simple `"play none none none"`. |
+| track-level `duration`                                                                | **Forbidden on scrub** — checked per-track, error cites the offending track's `id`.                                                                                                                                                                                                                  |
 
 Scroll-scrub extras (pass-through, not separately validated here): `pin`, `pinSpacing`, `snap`.
 
@@ -127,18 +128,18 @@ Scroll-scrub extras (pass-through, not separately validated here): `pin`, `pinSp
   "templateId": "enemyPathTemplate",
   "duration": 2,
   "transformOrigin": "50% 50%",
-  "keyframes": { /* same shape as track.keyframes */ }
+  "keyframes": {/* same shape as track.keyframes */}
 }
 ```
 
-| Field | Required | Notes |
-|---|---|---|
-| `templateId` | **yes** | String, unique project-wide. |
-| `duration` | no | Inherited by a referencing track unless the track overrides it. |
-| `transformOrigin` | no | Same inheritance rule. |
-| `keyframes` | no | Same shape as `track.keyframes` — see §5. |
+| Field             | Required | Notes                                                           |
+| ----------------- | -------- | --------------------------------------------------------------- |
+| `templateId`      | **yes**  | String, unique project-wide.                                    |
+| `duration`        | no       | Inherited by a referencing track unless the track overrides it. |
+| `transformOrigin` | no       | Same inheritance rule.                                          |
+| `keyframes`       | no       | Same shape as `track.keyframes` — see §5.                       |
 
-**Forbidden on every template** (build-time error if present) *(`motion-structure.js`)*: `driver`, `timelineId`, `primary`, `trigger`. Templates are pure keyframe fragments — no trigger/grouping concept applies to them directly; only the track that references them (via a real motion) has a driver.
+**Forbidden on every template** (build-time error if present) _(`motion-structure.js`)_: `driver`, `timelineId`, `primary`, `trigger`. Templates are pure keyframe fragments — no trigger/grouping concept applies to them directly; only the track that references them (via a real motion) has a driver.
 
 Referenced only via `track.use: "<templateId>"`. Referencing a non-existent `templateId` is a build-time error.
 
@@ -152,7 +153,7 @@ resolveTrack(track, templates):
   keyframes       = { ...template.keyframes, ...track.keyframes }  // per-KEY overwrite
 ```
 
-**Critical: the keyframes merge is whole-property-key replacement, not a per-stop deep merge.** If both the template and the track's own `keyframes` define `scale`, the track's entire `scale.stops` array wins outright — there is no per-stop splicing between template stops and track stops for the same property key. If the track defines a *different* key than the template touches (e.g. template has `x`/`y`, track adds `filter`), both survive — the merge is `{...template, ...track}` at the top level of the `keyframes` object, so it's key-by-key overwrite-or-add, never partial-array merge within a single key.
+**Critical: the keyframes merge is whole-property-key replacement, not a per-stop deep merge.** If both the template and the track's own `keyframes` define `scale`, the track's entire `scale.stops` array wins outright — there is no per-stop splicing between template stops and track stops for the same property key. If the track defines a _different_ key than the template touches (e.g. template has `x`/`y`, track adds `filter`), both survive — the merge is `{...template, ...track}` at the top level of the `keyframes` object, so it's key-by-key overwrite-or-add, never partial-array merge within a single key.
 
 `duration` and `transformOrigin` are simple `??` fallbacks (track wins if present at all, otherwise template's value, otherwise `undefined`) — not deep-merged, not overridable per-field-inside-them (they're scalars/strings, this is moot for them specifically, noted for completeness).
 
@@ -170,23 +171,24 @@ resolveTrack(track, templates):
 }
 ```
 
-| Field | Required | Notes |
-|---|---|---|
-| `id` | **yes** (practically) | String. **Project-wide unique** — across ALL motions, regardless of driver type or `sectionId`. Duplicate → error listing every colliding motion index. *(`element-uniqueness.js`)* One flat registry, not scoped per-motion or per-section. |
-| `use` | no | References a `templateId`. See §4 for merge semantics. |
-| `duration` | no | **Forbidden if the owning motion's trigger is scroll-scrub** (checked per-track in `trigger-shape.js`, error cites the track's own `id`). Valid on `time`/observer. |
-| `transformOrigin` | no | e.g. `"50% 50%"`. |
-| `keyframes` | no (but pointless without it) | Flat object — each key is an animatable property. See §6. |
+| Field             | Required                      | Notes                                                                                                                                                                                                                                        |
+| ----------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | **yes** (practically)         | String. **Project-wide unique** — across ALL motions, regardless of driver type or `sectionId`. Duplicate → error listing every colliding motion index. _(`element-uniqueness.js`)_ One flat registry, not scoped per-motion or per-section. |
+| `use`             | no                            | References a `templateId`. See §4 for merge semantics.                                                                                                                                                                                       |
+| `duration`        | no                            | **Forbidden if the owning motion's trigger is scroll-scrub** (checked per-track in `trigger-shape.js`, error cites the track's own `id`). Valid on `time`/observer.                                                                          |
+| `transformOrigin` | no                            | e.g. `"50% 50%"`.                                                                                                                                                                                                                            |
+| `keyframes`       | no (but pointless without it) | Flat object — each key is an animatable property. See §6.                                                                                                                                                                                    |
 
 ---
 
 ## 6. `keyframes` — Property Reference
 
-Every animated property requires **`>= 2` stops** — enforced project-wide regardless of property type *(`stop-count.js`)*. Each stop:
+Every animated property requires **`>= 2` stops** — enforced project-wide regardless of property type _(`stop-count.js`)_. Each stop:
 
 ```json
 { "p": 0.0, "v": 0, "ease": "power2.out" }
 ```
+
 `p` = progress 0–1, `v` = value (number or string depending on property), `ease` = optional, applies to the segment leading into this stop.
 
 ### 6.1 Simple numeric properties (`createSimplePropertyPlugin`, keys from `plugins.js`)
@@ -194,6 +196,7 @@ Every animated property requires **`>= 2` stops** — enforced project-wide rega
 ```
 x, y, z, rotation, rotationX, rotationY, scaleX, scaleY, skewX, skewY, opacity
 ```
+
 Map directly to GSAP. No special validation beyond the universal stop-count rule.
 
 ### 6.2 Color properties (`createColorPropertyPlugin`)
@@ -201,6 +204,7 @@ Map directly to GSAP. No special validation beyond the universal stop-count rule
 ```
 backgroundColor, color, borderColor
 ```
+
 `v` is a color string. Same stop-count rule, no extra validation.
 
 ### 6.3 Filter properties — consolidated (`filterGroupPlugin`, `filterProperty.js`)
@@ -208,6 +212,7 @@ backgroundColor, color, borderColor
 ```
 blur, brightness, contrast, saturate
 ```
+
 All four are owned by **one plugin**, not four separate ones (Brief 10, confirmed implemented). Each still tweens independently via the normal keyframes mechanism, but `compose()` merges whatever subset is present into a single **plain numeric object**: `{ filter: { blur: 4, brightness: 1.1 } }` — **not** a CSS string. CSS stringification (`"blur(4px) brightness(1.1)"`) happens only in `domRenderer.js` (§8), never inside `compose()` itself. This is what makes the patch renderer-agnostic (portable to a hypothetical Flutter/Canvas renderer without touching the plugin).
 
 ### 6.4 CSS custom properties (`cssVarProperty.js`)
@@ -227,14 +232,14 @@ Any key starting with `--` (e.g. `--glow-opacity`) is claimed dynamically — no
 }
 ```
 
-- **`points` is a raw waypoint array, not a pre-converted cubic Bézier array.** `pathPlugin.js` converts internally via `convertToCubicPath()` at build time — do not pre-convert. *(`path-shape.js`)*
+- **`points` is a raw waypoint array, not a pre-converted cubic Bézier array.** `pathPlugin.js` converts internally via `convertToCubicPath()` at build time — do not pre-convert. _(`path-shape.js`)_
 - `points` needs **≥ 2 waypoints**.
 - Each point needs numeric `x`/`y`. `z` optional (3D — triggers the `perspective` warning if used without root `perspective`).
 - `ctrlX`/`ctrlY` must be provided **together or not at all** (mismatched pair → error).
 - `ctrlX`/`ctrlY` on the **first** point → warning (no preceding segment to curve, has no effect).
 - `path.stops[].v` is **progress along the path**, not a raw value — must satisfy `0 <= v <= 1`.
 - `autoRotate` — boolean.
-- **Mutually exclusive with `x`/`y` on the same track** — having both `path` and explicit `x`/`y` keyframes is a build-time error. *(`path-xy-exclusivity.js`)*
+- **Mutually exclusive with `x`/`y` on the same track** — having both `path` and explicit `x`/`y` keyframes is a build-time error. _(`path-xy-exclusivity.js`)_
 
 ### 6.6 `imageSequence`
 
@@ -255,6 +260,7 @@ Any key starting with `--` (e.g. `--glow-opacity`) is claimed dynamically — no
 ```
 splitText, morphSVG, drawSVG, scrambleText
 ```
+
 Registered in `plugins.js` with `lazy: true` and empty `contribute()` — present in the plugin registry so `resolvePluginForKey` recognizes the keys, but not functionally built out. Roadmap item, not currently usable.
 
 ---
@@ -263,15 +269,15 @@ Registered in `plugins.js` with `lazy: true` and empty `contribute()` — presen
 
 Both `ProductionEngine` and `EditorEngine` expose:
 
-| Method | Valid on | Throws when |
-|---|---|---|
-| `mountTimeline(motionId)` | `driver.type:"timeline"` only | Motion not found, or motion is `driver.type:"delegate"` (`mountTimeline: cannot mount delegate motion "X".`) |
-| `resolveMotion(motionId, progress, overrides?)` | `driver.type:"delegate"` only | Project not loaded; (implicitly, by construction) never called against a timeline motion in current usage — no explicit reverse-guard found, but semantically delegate-only |
-| `pauseTimer(id)` / `playTimer(id)` | Grouped (`timelineId`) or individual `time`/observer motions | `no group or motion found for id "X"` |
-| `subscribe(trackId, callback)` | DOM-rendered (`driver.type:"timeline"`) tracks | — |
-| `compose(trackId, rawData)` | DOM-rendered tracks (used by `useMotionSubscriber`) | — |
-| `enableScroll()` / `disableScroll()` | — | — |
-| `destroySection(sectionId)` | Motions with a matching `driver.sectionId` (delegate motions never match — they never have one) | — |
+| Method                                          | Valid on                                                                                        | Throws when                                                                                                                                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mountTimeline(motionId)`                       | `driver.type:"timeline"` only                                                                   | Motion not found, or motion is `driver.type:"delegate"` (`mountTimeline: cannot mount delegate motion "X".`)                                                                |
+| `resolveMotion(motionId, progress, overrides?)` | `driver.type:"delegate"` only                                                                   | Project not loaded; (implicitly, by construction) never called against a timeline motion in current usage — no explicit reverse-guard found, but semantically delegate-only |
+| `pauseTimer(id)` / `playTimer(id)`              | Grouped (`timelineId`) or individual `time`/observer motions                                    | `no group or motion found for id "X"`                                                                                                                                       |
+| `subscribe(trackId, callback)`                  | DOM-rendered (`driver.type:"timeline"`) tracks                                                  | —                                                                                                                                                                           |
+| `compose(trackId, rawData)`                     | DOM-rendered tracks (used by `useMotionSubscriber`)                                             | —                                                                                                                                                                           |
+| `enableScroll()` / `disableScroll()`            | —                                                                                               | —                                                                                                                                                                           |
+| `destroySection(sectionId)`                     | Motions with a matching `driver.sectionId` (delegate motions never match — they never have one) | —                                                                                                                                                                           |
 
 ### `resolveMotion(motionId, progress, overrides?)` — return shape
 
@@ -280,6 +286,7 @@ Always `Record<trackId, DOMPatch>` — **keyed by track id regardless of track c
 `overrides` shape: keyed by track id, same shape as a track-level override object (`{ duration?, transformOrigin?, keyframes? }`). Keyframes merge is the **same whole-key-replacement rule as §4** — not per-stop.
 
 **Caching contract** (implementation detail, but load-bearing for perf):
+
 - No `overrides` passed → tween built once per `(motionId, trackId)` pair, cached, reused via `.progress()` on every subsequent call.
 - `overrides` passed → cache bypassed entirely, tween built fresh and killed immediately after every call. Deliberate — overrides can differ per call/instance (e.g. a per-shot projectile arc), so caching would risk serving a stale tween built for a different override.
 
@@ -292,6 +299,7 @@ Always `Record<trackId, DOMPatch>` — **keyed by track id regardless of track c
 `compose()` (both the DOM-path `engineCore.compose()` and `resolveMotion`'s own compose step) returns a **renderer-agnostic-numeric** patch — plain numbers and structured objects, no CSS strings, no `gsap.set()` calls anywhere inside plugin code or `compose()` itself.
 
 `src/lib/renderers/domRenderer.js` is the **only** place that:
+
 - Serializes the `filter` sub-object into a CSS string (`"blur(4px) brightness(1.1)"`)
 - Calls `gsap.set()` on a real DOM element
 

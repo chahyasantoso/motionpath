@@ -12,6 +12,7 @@
 MotionPath is a **data-first animation runtime** on top of GSAP. Animations are declared as JSON, compiled once into GSAP tweens over **plain proxy objects** (never DOM nodes), and broadcast per frame to subscribers that write styles directly to the DOM via `gsap.set`. React is used only to mount, unmount, and toggle high-level state — it never re-renders at 60fps. The core insight: **the animation graph and the render target are fully decoupled**, so the same compiled project can drive DOM, canvas, or a headless test.
 
 **Two non-negotiable invariants:**
+
 1. **Zero re-render.** Nothing in the frame loop touches React state. A `setState` inside a subscriber callback is a bug.
 2. **The domain never knows about the DOM.** `Track`, `Motion`, plugins, and use cases deal in plain objects. Only `renderers/domRenderer.js` touches an element.
 
@@ -66,11 +67,11 @@ src/
 
 ## 3. The three core concepts
 
-| Concept | Owns | Analogy |
-|---|---|---|
-| **Motion** | one trigger, one GSAP master timeline, N mounted tracks | a scene / a timeline in an NLE |
-| **Track** | one playhead (0..1), one proxy object, its plugin set, its subscribers, its children | a layer / an animated entity |
-| **Plugin** | how one property key compiles (`contribute`) and how it renders (`compose`) | a codec for one property |
+| Concept    | Owns                                                                                 | Analogy                        |
+| ---------- | ------------------------------------------------------------------------------------ | ------------------------------ |
+| **Motion** | one trigger, one GSAP master timeline, N mounted tracks                              | a scene / a timeline in an NLE |
+| **Track**  | one playhead (0..1), one proxy object, its plugin set, its subscribers, its children | a layer / an animated entity   |
+| **Plugin** | how one property key compiles (`contribute`) and how it renders (`compose`)          | a codec for one property       |
 
 A **Track knows nothing about what it animates.** It produces a style patch. A subscriber decides where that patch lands.
 
@@ -89,7 +90,7 @@ engine.loadProject(schema)
         └── returns { templates, motionConfigs: Map, trackConfigs: Map, getMotionConfig, getTrackConfig }
 ```
 
-Nothing is instantiated yet. Load produces **configs**, not runtime objects. Both `motion.tracks[]` and top-level `schema.tracks[]` land in the same `trackConfigs` map, which is what makes runtime *stamping* (§6.3) possible.
+Nothing is instantiated yet. Load produces **configs**, not runtime objects. Both `motion.tracks[]` and top-level `schema.tracks[]` land in the same `trackConfigs` map, which is what makes runtime _stamping_ (§6.3) possible.
 
 ### 4.2 Mount (sync, per motion)
 
@@ -145,12 +146,12 @@ GSAP ticker -> masterTimeline -> child tween -> track.progress(p)
 A plugin is a plain object. No classes, no `this`.
 
 ```js
-import { createAnimationPlugin } from '../createAnimationPlugin.js';
+import { createAnimationPlugin } from "../createAnimationPlugin.js";
 
 export const myPlugin = createAnimationPlugin({
-  keys: ['wobble'],          // keys this plugin owns
-  lazy: false,               // true => load() is awaited during parseV4Project
-  claimsKey: k => k === 'wobble' || k === 'wobbleAmount',   // optional; defaults to keys.includes
+  keys: ["wobble"], // keys this plugin owns
+  lazy: false, // true => load() is awaited during parseV4Project
+  claimsKey: (k) => k === "wobble" || k === "wobbleAmount", // optional; defaults to keys.includes
 
   // COMPILE TIME — once per track. Pure. Returns GSAP keyframe patches.
   contribute(propKey, stops, trackConfig) {
@@ -172,12 +173,12 @@ export const myPlugin = createAnimationPlugin({
 
 **`contribute` vs `compose` is the most important distinction in the codebase:**
 
-| | `contribute` | `compose` |
-|---|---|---|
-| When | once, at `createTrack` | every frame, per subscriber |
-| Input | authored `stops` + track config | interpolated proxy snapshot |
-| Output | GSAP `keyframes` + `tweenVars` | style patch object |
-| Cost budget | free | ~microseconds |
+|             | `contribute`                    | `compose`                   |
+| ----------- | ------------------------------- | --------------------------- |
+| When        | once, at `createTrack`          | every frame, per subscriber |
+| Input       | authored `stops` + track config | interpolated proxy snapshot |
+| Output      | GSAP `keyframes` + `tweenVars`  | style patch object          |
+| Cost budget | free                            | ~microseconds               |
 
 **To register a new plugin today you must edit `src/domain/plugins.js` and append to `ALL_PLUGINS`** — there is no `registerPlugin()`. If your plugin puts intermediate state on the proxy (like `path` does with `pathProgress`/`cubicPath`), you must **also** add those keys to the strip list in `renderers/domRenderer.js` or GSAP will warn. Both are known design gaps (review R-09/R-12).
 
@@ -191,8 +192,8 @@ This is the part of v4 that has no v3 equivalent and the part most likely to be 
 
 ```js
 parentTrack.addChild(childTrack, { stagger: 0.35 });
-parentTrack.getChild(id);        // pure read, safe in render
-parentTrack.childCount;          // O(1)
+parentTrack.getChild(id); // pure read, safe in render
+parentTrack.childCount; // O(1)
 parentTrack.removeChild(id);
 ```
 
@@ -209,13 +210,18 @@ Reflow motion is animated by the motion's `staggerTransition` — `TrackGroup._r
 
 ```js
 // role 'output' (default): fold AFTER plugins, overrides this track's own fields
-ballTrack.setObserved(exitOverlayTrack, patch => ({ scale: patch.scale, opacity: patch.opacity }));
+ballTrack.setObserved(exitOverlayTrack, (patch) => ({
+  scale: patch.scale,
+  opacity: patch.opacity,
+}));
 
 // role 'input': inject INTO rawData BEFORE plugins run (this is how FK gets parentWorld)
-forearm.setObserved(upperArm, world => ({ parentWorld: world }), { role: 'input' });
+forearm.setObserved(upperArm, (world) => ({ parentWorld: world }), {
+  role: "input",
+});
 
-ballTrack.removeObserved(t);   // drop one
-ballTrack.setObserved(null);   // clear all
+ballTrack.removeObserved(t); // drop one
+ballTrack.setObserved(null); // clear all
 ```
 
 `compose()` reads `source.compose()` — the **fully resolved** patch, not a raw snapshot — so FK chains accumulate correctly through arbitrary depth. Cycles and diamonds are handled by a **per-call `ctx` Map** created fresh on every external `compose()` call: a `COMPOSING` sentinel short-circuits back-edges to the track's own plugin-only patch, and a resolved entry memoizes diamonds so a shared ancestor is computed once per frame. This is the single best-engineered piece of the codebase.
@@ -227,8 +233,11 @@ ballTrack.setObserved(null);   // clear all
 Declare a track under top-level `schema.tracks[]`, then clone it per instance:
 
 ```js
-const cfg = engine.getTrackConfig('ball-track');
-const track = createTrack({ ...cfg, id: `ball-${n}`, duration: 4 }, engine.templates);
+const cfg = engine.getTrackConfig("ball-track");
+const track = createTrack(
+  { ...cfg, id: `ball-${n}`, duration: 4 },
+  engine.templates,
+);
 parentTrack.addChild(track, { stagger: 0.35 });
 ```
 
@@ -238,17 +247,17 @@ This is how the Spiral demo spawns 30 balls from one schema entry. **Caveat:** t
 
 ## 7. React hooks
 
-| Hook | Signature | Notes |
-|---|---|---|
-| `useMotionProject` | `(project) => isLoaded` | Loads once, `engine.destroy()` on unmount. **Gate all child mounts on `isLoaded`** — mounting early throws "project not loaded". |
-| `useMotionInstance` | `(motionId, config) => Motion \| Track \| null` | `config` is mount-time only (dev warns if you change it). Pass `null` to defer. |
-| `useTimeMotion` | `(motionId, config) => { instance }` | Thin wrapper; time motions need no refs. |
-| `useScrollMotion` | `(schema) => { refs, instance }` | Takes the **schema object**, not an id. Builds its own `ScrollTriggerDelegate` from component-local refs, so N instances of one motion never collide. Attach `refs.trigger` / `refs.pin` / `refs.endTrigger`. `pin: 'pin'` in the schema means "use my separate pin ref". **The trigger element must exist in the same commit** or the effect no-ops. |
-| `useManualMotion` | `(motionId, config) => { instance, seek }` | `seek(p)` calls `delegate.progress(p)`. **Silently no-ops on non-manual motions.** |
-| `useMotionSubscriber` | `(instance, trackId, ref, transformFn?)` | Single-source wrapper over the plural hook. |
-| `useMotionSubscribers` | `(sources, ref, mergeFn?)` | The real implementation. `sources[] = { track \| (instance + trackId), transformFn?, anchor? }`. Resubscribes only when the source **signature** changes; `transformFn` and `anchor` are read live so an animated anchor is never frozen. |
-| `useMotionTimelinePlayback` | `(timelineId, isPlaying)` | Play/pause from any depth. |
-| `useDynamicHeight`, `useSmoothScroll` | — | Layout/Lenis helpers. |
+| Hook                                  | Signature                                       | Notes                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useMotionProject`                    | `(project) => isLoaded`                         | Loads once, `engine.destroy()` on unmount. **Gate all child mounts on `isLoaded`** — mounting early throws "project not loaded".                                                                                                                                                                                                                      |
+| `useMotionInstance`                   | `(motionId, config) => Motion \| Track \| null` | `config` is mount-time only (dev warns if you change it). Pass `null` to defer.                                                                                                                                                                                                                                                                       |
+| `useTimeMotion`                       | `(motionId, config) => { instance }`            | Thin wrapper; time motions need no refs.                                                                                                                                                                                                                                                                                                              |
+| `useScrollMotion`                     | `(schema) => { refs, instance }`                | Takes the **schema object**, not an id. Builds its own `ScrollTriggerDelegate` from component-local refs, so N instances of one motion never collide. Attach `refs.trigger` / `refs.pin` / `refs.endTrigger`. `pin: 'pin'` in the schema means "use my separate pin ref". **The trigger element must exist in the same commit** or the effect no-ops. |
+| `useManualMotion`                     | `(motionId, config) => { instance, seek }`      | `seek(p)` calls `delegate.progress(p)`. **Silently no-ops on non-manual motions.**                                                                                                                                                                                                                                                                    |
+| `useMotionSubscriber`                 | `(instance, trackId, ref, transformFn?)`        | Single-source wrapper over the plural hook.                                                                                                                                                                                                                                                                                                           |
+| `useMotionSubscribers`                | `(sources, ref, mergeFn?)`                      | The real implementation. `sources[] = { track \| (instance + trackId), transformFn?, anchor? }`. Resubscribes only when the source **signature** changes; `transformFn` and `anchor` are read live so an animated anchor is never frozen.                                                                                                             |
+| `useMotionTimelinePlayback`           | `(timelineId, isPlaying)`                       | Play/pause from any depth.                                                                                                                                                                                                                                                                                                                            |
+| `useDynamicHeight`, `useSmoothScroll` | —                                               | Layout/Lenis helpers.                                                                                                                                                                                                                                                                                                                                 |
 
 ### Rendering a track: the canonical pattern
 
@@ -258,7 +267,7 @@ function Ball({ track, color }) {
 
   // Derive styles from progress WITHOUT React state.
   const transformFn = useCallback((raw, compose) => {
-    const p = compose(raw);                 // run the plugin chain
+    const p = compose(raw); // run the plugin chain
     return { ...p, scale: 0.8 + raw.progress * 0.4 };
   }, []);
 
@@ -268,6 +277,7 @@ function Ball({ track, color }) {
 ```
 
 **Hard rules for subscriber callbacks:**
+
 1. Never call a state setter without a change-gate (`useRef` threshold). Unconditional `setState` per tick = React max-update-depth crash.
 2. `useMotionSubscribers` bails if `ref.current` is null — you cannot register a "ghost" subscriber just to watch progress. Attach it to a real element.
 3. Return a **new object**; do not mutate `rawData`.
@@ -276,19 +286,19 @@ function Ball({ track, color }) {
 
 ## 8. Debugging playbook
 
-| Symptom | Most likely cause |
-|---|---|
-| `No plugin found for key "foo"` | Key not claimed by any plugin. Check spelling against the catalog; `--` vars and `path`/`boneLength` aliases are claimed by predicate, not by `keys`. |
-| `mountInstance: motion or track "x" not found` | Schema used `motionId` instead of `id`, or you mounted before `isLoaded`. |
-| `Ease collision on track ... at percent "50%"` | Two properties put different eases at the same stop. One percent = one ease per track. |
-| Element jumps to a corner / ignores its curve | `path` and `x`/`y`/`xPercent` in the same track. Compose order decided by key order. Split into two tracks. |
-| Element is offset by half its size | `path` hardcodes `xPercent/yPercent: -50`. Expected, but not overridable. |
-| `autoplay: false` plays anyway | `TimeTriggerDelegate` ignores `autoplay`/`delay`/`duration`. Call `motion.pause()` after mount. |
-| Stagger positions look wrong | `stagger` is in **seconds**, not progress fractions. The `addLabel('end', 1)` in `Motion.init()` does **not** normalize the timeline (review R-06). |
-| GSAP warns about an invalid property | A plugin put internal state on the proxy that `domRenderer` does not strip. |
-| Composed patch has stale values from a destroyed track | You destroyed an observed source without `removeObserved()` first. |
-| Memory grows across route changes | `Engine.#instances` never prunes; stamped tracks are never adopted. |
-| Nothing animates, no error | Validation never ran (it is not wired in). Call `validateProject(schema)` manually. |
+| Symptom                                                | Most likely cause                                                                                                                                     |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No plugin found for key "foo"`                        | Key not claimed by any plugin. Check spelling against the catalog; `--` vars and `path`/`boneLength` aliases are claimed by predicate, not by `keys`. |
+| `mountInstance: motion or track "x" not found`         | Schema used `motionId` instead of `id`, or you mounted before `isLoaded`.                                                                             |
+| `Ease collision on track ... at percent "50%"`         | Two properties put different eases at the same stop. One percent = one ease per track.                                                                |
+| Element jumps to a corner / ignores its curve          | `path` and `x`/`y`/`xPercent` in the same track. Compose order decided by key order. Split into two tracks.                                           |
+| Element is offset by half its size                     | `path` hardcodes `xPercent/yPercent: -50`. Expected, but not overridable.                                                                             |
+| `autoplay: false` plays anyway                         | `TimeTriggerDelegate` ignores `autoplay`/`delay`/`duration`. Call `motion.pause()` after mount.                                                       |
+| Stagger positions look wrong                           | `stagger` is in **seconds**, not progress fractions. The `addLabel('end', 1)` in `Motion.init()` does **not** normalize the timeline (review R-06).   |
+| GSAP warns about an invalid property                   | A plugin put internal state on the proxy that `domRenderer` does not strip.                                                                           |
+| Composed patch has stale values from a destroyed track | You destroyed an observed source without `removeObserved()` first.                                                                                    |
+| Memory grows across route changes                      | `Engine.#instances` never prunes; stamped tracks are never adopted.                                                                                   |
+| Nothing animates, no error                             | Validation never ran (it is not wired in). Call `validateProject(schema)` manually.                                                                   |
 
 ---
 

@@ -1,4 +1,4 @@
-import useMotionSubscribers from './useMotionSubscribers.js';
+import useMotionSubscribers from "./useMotionSubscribers.js";
 
 /**
  * Smart Subscriber Hook — Listens to coordinate broadcasts from a MotionInstance
@@ -14,6 +14,11 @@ import useMotionSubscribers from './useMotionSubscribers.js';
  * @param {Function} [transformFn] - Optional transform function. Receives data (rawData)
  *   and compose function (rawData => patch) and must return an object of CSS properties for domRenderer.
  */
-export default function useMotionSubscriber(instance, trackId, ref, transformFn) {
+export default function useMotionSubscriber(
+  instance,
+  trackId,
+  ref,
+  transformFn,
+) {
   useMotionSubscribers([{ instance, trackId, transformFn }], ref);
 }

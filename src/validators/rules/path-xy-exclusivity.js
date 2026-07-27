@@ -13,12 +13,12 @@
 export function pathXYExclusivityRule(track, motion, context, path) {
   const errors = [];
 
-  if (!track || typeof track !== 'object') {
+  if (!track || typeof track !== "object") {
     return errors;
   }
 
   const keyframes = track.keyframes;
-  if (!keyframes || typeof keyframes !== 'object') {
+  if (!keyframes || typeof keyframes !== "object") {
     return errors;
   }
 
@@ -27,12 +27,14 @@ export function pathXYExclusivityRule(track, motion, context, path) {
   const hasY = keyframes.y !== undefined && keyframes.y !== null;
 
   if (hasPath && (hasX || hasY)) {
-    const offendingProps = [hasX ? 'x' : '', hasY ? 'y' : ''].filter(Boolean).join('/');
+    const offendingProps = [hasX ? "x" : "", hasY ? "y" : ""]
+      .filter(Boolean)
+      .join("/");
     errors.push({
       ruleId: "path-xy-exclusivity",
       severity: "error",
       message: `Track has both a 'path' property and explicit '${offendingProps}' keyframes. They are mutually exclusive.`,
-      path: `${path}.keyframes`
+      path: `${path}.keyframes`,
     });
   }
 

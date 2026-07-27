@@ -56,6 +56,7 @@ can locate it exactly.
 ## Change 1 — constructor: add tracking fields + reflow dependency
 
 **WRONG (current, lines ~18–41):**
+
 ```js
   #subscribers = new Map(); // trackId -> Set<wrapper>
   #childListeners = new Set();
@@ -84,6 +85,7 @@ can locate it exactly.
 ```
 
 **CORRECT:**
+
 ```js
   #subscribers = new Map(); // trackId -> Set<wrapper>
   #childListeners = new Set();
@@ -122,6 +124,7 @@ default (Change 3) is used.
 ## Change 2 — `addChild`: guard against destroyed instance
 
 **WRONG (current, lines ~275–279):**
+
 ```js
   addChild(motionIdOrConfig, config) {
     let targetMotionId = this.motionId;
@@ -131,6 +134,7 @@ default (Change 3) is used.
 ```
 
 **CORRECT:**
+
 ```js
   addChild(motionIdOrConfig, config) {
     if (this.#destroyed) {
@@ -152,12 +156,13 @@ at the end of `addChild`.
 ## Change 3 — replace `removeChild` entirely
 
 **WRONG (current, lines ~313–346, the full method):**
+
 ```js
   removeChild(child) {
     const idx = this.children.indexOf(child);
     if (idx !== -1) {
       this.children.splice(idx, 1);
-      
+
       // Native GSAP detach
       this.timeline.remove(child.timeline);
       child.destroy();
@@ -191,6 +196,7 @@ at the end of `addChild`.
 
 **CORRECT (replace the whole method with these four methods, in this order,
 right where `removeChild` was):**
+
 ```js
   removeChild(child) {
     const idx = this.children.indexOf(child);
@@ -252,6 +258,7 @@ right where `removeChild` was):**
 ```
 
 Notes for implementation:
+
 - `#reflowSiblings` wraps the injected/default call in `Promise.resolve(...)`
   so a custom `reflowSiblings` that returns `undefined` (synchronous, no
   animation) doesn't break the `await` in `#finishRemoval`.
@@ -266,6 +273,7 @@ Notes for implementation:
 ## Change 4 — `destroy()`: clean up in-flight removals
 
 **WRONG (current, lines ~348–369, the full method):**
+
 ```js
   destroy() {
     if (this.#scrollTrigger) {
@@ -292,6 +300,7 @@ Notes for implementation:
 ```
 
 **CORRECT:**
+
 ```js
   destroy() {
     this.#destroyed = true;
@@ -335,12 +344,13 @@ what makes `#finishRemoval`'s post-await check correct.
 ### Delete these 3 tests (currently failing, testing an abandoned approach)
 
 In `describe('Scroll-Driver Stagger Freeze/Unfreeze', ...)`:
+
 - `'disables ScrollTrigger before addChild mutation'`
 - `'calls scroll() to sync position after unfreeze on addChild with no stagger change'`
 - `'defers actual timeline removal until stagger slide completes on removeChild'`
 
 Also delete the test `'does NOT freeze ScrollTrigger on removeChild (deferred removal)'`
-— it happens to pass today, but it's asserting the *absence* of machinery we
+— it happens to pass today, but it's asserting the _absence_ of machinery we
 are now permanently deleting (not "not yet built"), so its premise is gone.
 Delete the whole `describe('Scroll-Driver Stagger Freeze/Unfreeze', ...)`
 block, including its `beforeEach`, once these are gone — nothing scrub-related
@@ -359,12 +369,12 @@ chain — do not "fix" the test by adding `await`; fix the code instead.
 ### Add these new tests
 
 ```js
-it('removeChild is a no-op if called twice on the same child mid-reflow', () => {
-  const instance = createTestInstance('time-motion', {}, timelineSchema);
-  const child1 = instance.addChild('child-motion', {});
-  instance.addChild('child-motion', {});
+it("removeChild is a no-op if called twice on the same child mid-reflow", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const child1 = instance.addChild("child-motion", {});
+  instance.addChild("child-motion", {});
 
-  const removeSpy = vi.spyOn(instance.timeline, 'remove');
+  const removeSpy = vi.spyOn(instance.timeline, "remove");
   instance.removeChild(child1);
   instance.removeChild(child1); // second call, still mid-reflow
 
@@ -374,21 +384,23 @@ it('removeChild is a no-op if called twice on the same child mid-reflow', () => 
   expect(instance.children).toHaveLength(1);
 });
 
-it('addChild throws after destroy()', () => {
-  const instance = createTestInstance('time-motion', {}, timelineSchema);
+it("addChild throws after destroy()", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
   instance.destroy();
 
-  expect(() => instance.addChild('child-motion', {})).toThrow(/destroyed/);
+  expect(() => instance.addChild("child-motion", {})).toThrow(/destroyed/);
 });
 
-it('destroy() kills delayTween and destroys children pending removal', () => {
-  const instance = createTestInstance('time-motion', {}, timelineSchema);
-  const child1 = instance.addChild('child-motion', {});
-  instance.addChild('child-motion', {});
+it("destroy() kills delayTween and destroys children pending removal", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const child1 = instance.addChild("child-motion", {});
+  instance.addChild("child-motion", {});
 
   instance.removeChild(child1); // starts reflow, child1 now pending
-  const destroySpy = vi.spyOn(child1, 'destroy');
-  const tweenKillSpy = child1.delayTween ? vi.spyOn(child1.delayTween, 'kill') : null;
+  const destroySpy = vi.spyOn(child1, "destroy");
+  const tweenKillSpy = child1.delayTween
+    ? vi.spyOn(child1.delayTween, "kill")
+    : null;
 
   instance.destroy();
 
@@ -396,11 +408,15 @@ it('destroy() kills delayTween and destroys children pending removal', () => {
   if (tweenKillSpy) expect(tweenKillSpy).toHaveBeenCalled();
 });
 
-it('uses an injected reflowSiblings function instead of the default tween', async () => {
+it("uses an injected reflowSiblings function instead of the default tween", async () => {
   const customReflow = vi.fn().mockResolvedValue(undefined);
-  const instance = createTestInstance('time-motion', { reflowSiblings: customReflow }, timelineSchema);
-  const child1 = instance.addChild('child-motion', {});
-  instance.addChild('child-motion', {});
+  const instance = createTestInstance(
+    "time-motion",
+    { reflowSiblings: customReflow },
+    timelineSchema,
+  );
+  const child1 = instance.addChild("child-motion", {});
+  instance.addChild("child-motion", {});
 
   instance.removeChild(child1);
   await Promise.resolve(); // flush microtasks so #finishRemoval's await resolves
@@ -410,10 +426,14 @@ it('uses an injected reflowSiblings function instead of the default tween', asyn
   expect(targets).toEqual([{ child: expect.anything(), delay: 0 }]);
 });
 
-it('onChildChange fires for removeChild only after reflow completes, not at splice time', async () => {
+it("onChildChange fires for removeChild only after reflow completes, not at splice time", async () => {
   const customReflow = vi.fn().mockResolvedValue(undefined);
-  const instance = createTestInstance('time-motion', { reflowSiblings: customReflow }, timelineSchema);
-  const child1 = instance.addChild('child-motion', {});
+  const instance = createTestInstance(
+    "time-motion",
+    { reflowSiblings: customReflow },
+    timelineSchema,
+  );
+  const child1 = instance.addChild("child-motion", {});
 
   const listener = vi.fn();
   instance.onChildChange(listener);

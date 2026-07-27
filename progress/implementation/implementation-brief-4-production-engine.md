@@ -21,17 +21,25 @@ The real, live-playing driver: attaches actual `ScrollTrigger` instances for scr
 ```ts
 interface ProductionEngine {
   loadProject(schema: unknown): Promise<void>;
-  subscribe(elementId: string, callback: (rawState: Record<string, unknown>) => void): UnsubscribeFn;
-  compose(elementId: string, rawData?: Record<string, unknown>): Record<string, unknown>;
+  subscribe(
+    elementId: string,
+    callback: (rawState: Record<string, unknown>) => void,
+  ): UnsubscribeFn;
+  compose(
+    elementId: string,
+    rawData?: Record<string, unknown>,
+  ): Record<string, unknown>;
   destroyScene(sceneId: string): void;
   destroy(): void;
-  pauseTimer(id: string): void;   // id = timelineId (grouped) or scenarioIndex-as-string (ungrouped)
+  pauseTimer(id: string): void; // id = timelineId (grouped) or scenarioIndex-as-string (ungrouped)
   playTimer(id: string): void;
   enableScroll(): void;
   disableScroll(): void;
 }
 
-function createProductionEngine(deps: { resolveElement: (id: string) => Element }): ProductionEngine
+function createProductionEngine(deps: {
+  resolveElement: (id: string) => Element;
+}): ProductionEngine;
 
 // Singleton export, mirroring motionEngine.js's current shape for a drop-in hook swap:
 export const productionEngine: ProductionEngine;
@@ -47,33 +55,56 @@ export const productionEngine: ProductionEngine;
 4. **Wire real triggers** — this is the only genuinely new logic in this module:
 
 **Grouped scenarios** (`buildResult.timelineGroups`), per group:
+
 - Find the primary scenario's raw `triggerConfig` (via `primaryScenarioIndex`, looked up in `schema.scenarios`).
 - `triggerType === "scroll-scrub"`: create exactly **one** `ScrollTrigger` for the whole group, targeting `masterTimeline`:
   ```js
   ScrollTrigger.create({
     ...primaryTriggerConfig,
-    trigger: resolveTriggerRef(primaryTriggerConfig.trigger, primaryScenario.sceneId, deps.resolveElement),
-    endTrigger: resolveTriggerRef(primaryTriggerConfig.endTrigger, undefined, deps.resolveElement),
-    pin: resolveTriggerRef(primaryTriggerConfig.pin, undefined, deps.resolveElement),
+    trigger: resolveTriggerRef(
+      primaryTriggerConfig.trigger,
+      primaryScenario.sceneId,
+      deps.resolveElement,
+    ),
+    endTrigger: resolveTriggerRef(
+      primaryTriggerConfig.endTrigger,
+      undefined,
+      deps.resolveElement,
+    ),
+    pin: resolveTriggerRef(
+      primaryTriggerConfig.pin,
+      undefined,
+      deps.resolveElement,
+    ),
     animation: group.masterTimeline,
   });
   ```
   Non-primary members' own `start`/`end`/`pin` fields are never read here — Brief 1 already guarantees they're compatibility-only declarations, not real config.
 - `triggerType === "time"`: apply primary's loop config to the whole group, then play:
   ```js
-  group.masterTimeline.repeat(primaryTriggerConfig.repeat ?? 0)
-                       .yoyo(!!primaryTriggerConfig.yoyo)
-                       .repeatDelay(primaryTriggerConfig.repeatDelay ?? 0);
+  group.masterTimeline
+    .repeat(primaryTriggerConfig.repeat ?? 0)
+    .yoyo(!!primaryTriggerConfig.yoyo)
+    .repeatDelay(primaryTriggerConfig.repeatDelay ?? 0);
   group.masterTimeline.play();
   ```
 
 **Ungrouped scenarios** (`buildResult.scenarios` without a `timelineId`), per scenario:
+
 - `triggerType === "scroll-scrub"`:
   ```js
   ScrollTrigger.create({
     ...triggerConfig,
-    trigger: resolveTriggerRef(triggerConfig.trigger, scenario.sceneId, deps.resolveElement),
-    endTrigger: resolveTriggerRef(triggerConfig.endTrigger, undefined, deps.resolveElement),
+    trigger: resolveTriggerRef(
+      triggerConfig.trigger,
+      scenario.sceneId,
+      deps.resolveElement,
+    ),
+    endTrigger: resolveTriggerRef(
+      triggerConfig.endTrigger,
+      undefined,
+      deps.resolveElement,
+    ),
     pin: resolveTriggerRef(triggerConfig.pin, undefined, deps.resolveElement),
     animation: scenario.timeline,
   });
@@ -81,7 +112,11 @@ export const productionEngine: ProductionEngine;
 - `triggerType === "scroll-observer"`: resolve the trigger element per the schema's cascade rule — `triggerConfig.startTrigger ?? scenario.sceneId`, passed through the shared `resolveTriggerRef` helper:
   ```js
   ScrollTrigger.create({
-    trigger: resolveTriggerRef(triggerConfig.startTrigger, scenario.sceneId, deps.resolveElement),
+    trigger: resolveTriggerRef(
+      triggerConfig.startTrigger,
+      scenario.sceneId,
+      deps.resolveElement,
+    ),
     start: triggerConfig.start,
     toggleActions: triggerConfig.toggleActions,
     animation: scenario.timeline,
@@ -89,9 +124,10 @@ export const productionEngine: ProductionEngine;
   ```
 - `triggerType === "time"`:
   ```js
-  scenario.timeline.repeat(triggerConfig.repeat ?? 0)
-                    .yoyo(!!triggerConfig.yoyo)
-                    .repeatDelay(triggerConfig.repeatDelay ?? 0);
+  scenario.timeline
+    .repeat(triggerConfig.repeat ?? 0)
+    .yoyo(!!triggerConfig.yoyo)
+    .repeatDelay(triggerConfig.repeatDelay ?? 0);
   scenario.timeline.play();
   ```
 
@@ -112,7 +148,7 @@ export const productionEngine: ProductionEngine;
 ## 5. Security & Robustness
 
 - `loadProject` must not leave a half-wired project if trigger-wiring throws partway through — if `ScrollTrigger.create()` fails for scenario 3 of 5, kill everything built so far (`buildResult` timelines) before re-throwing, so a failed load doesn't leave orphaned `ScrollTrigger` instances attached to a DOM that no longer has a valid engine behind it.
-- `destroy()` must call `ScrollTrigger.getAll().forEach(st => st.kill())` scoped to only the triggers this engine created — if multiple `ProductionEngine` instances can coexist (unlikely given the singleton export, but not structurally prevented), killing *all* `ScrollTrigger` instances globally would affect unrelated engine instances. Track created `ScrollTrigger` references locally and kill only those.
+- `destroy()` must call `ScrollTrigger.getAll().forEach(st => st.kill())` scoped to only the triggers this engine created — if multiple `ProductionEngine` instances can coexist (unlikely given the singleton export, but not structurally prevented), killing _all_ `ScrollTrigger` instances globally would affect unrelated engine instances. Track created `ScrollTrigger` references locally and kill only those.
 
 ---
 
@@ -144,26 +180,28 @@ A single shared helper used for every trigger-adjacent field — this is the fun
 function resolveTriggerRef(
   value: string | boolean | undefined,
   fallbackSceneId: string | undefined,
-  resolveElement: (id: string) => Element
+  resolveElement: (id: string) => Element,
 ): Element | boolean | undefined {
   if (value === undefined) {
-    return fallbackSceneId !== undefined ? resolveElement(fallbackSceneId) : undefined;
+    return fallbackSceneId !== undefined
+      ? resolveElement(fallbackSceneId)
+      : undefined;
   }
-  if (typeof value === 'boolean') return value;          // passthrough, e.g. pin: true
-  return resolveElement(value);                            // string -> resolve via data-motion-id
+  if (typeof value === "boolean") return value; // passthrough, e.g. pin: true
+  return resolveElement(value); // string -> resolve via data-motion-id
 }
 ```
 
 Behavior by field:
 
-| Field | Input type | Resolution |
-|---|---|---|
-| `trigger` | `undefined` | falls back to scene's own `sceneId` element |
-| `startTrigger` | string | resolved via `data-motion-id` |
-| `endTrigger` | string | resolved via `data-motion-id` |
-| `pin` | boolean (`true`) | passthrough, not resolved as an element ref |
-| `pin` | string | resolved via `data-motion-id` (pin to a specific element) |
-| `start` / `end` | string | **never resolved** — raw GSAP position syntax |
+| Field           | Input type       | Resolution                                                |
+| --------------- | ---------------- | --------------------------------------------------------- |
+| `trigger`       | `undefined`      | falls back to scene's own `sceneId` element               |
+| `startTrigger`  | string           | resolved via `data-motion-id`                             |
+| `endTrigger`    | string           | resolved via `data-motion-id`                             |
+| `pin`           | boolean (`true`) | passthrough, not resolved as an element ref               |
+| `pin`           | string           | resolved via `data-motion-id` (pin to a specific element) |
+| `start` / `end` | string           | **never resolved** — raw GSAP position syntax             |
 
 Use this one helper for every trigger-adjacent field — do not write field-specific resolution logic per field.
 

@@ -5,8 +5,12 @@ export class EventBus {
     this.#listeners.get(name).add(callback);
     return () => this.#listeners.get(name)?.delete(callback);
   }
-  emit(name, payload) { this.#listeners.get(name)?.forEach((callback) => callback(payload)); }
-  clear() { this.#listeners.clear(); }
+  emit(name, payload) {
+    this.#listeners.get(name)?.forEach((callback) => callback(payload));
+  }
+  clear() {
+    this.#listeners.clear();
+  }
 }
 
 // Compatibility default for directly-created Tracks and legacy helper imports.

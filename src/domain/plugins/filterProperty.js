@@ -1,22 +1,30 @@
-import { createAnimationPlugin } from '../createAnimationPlugin.js';
-import { toPercentKey } from '../../usecases/toPercentKey.js';
+import { createAnimationPlugin } from "../createAnimationPlugin.js";
+import { toPercentKey } from "../../usecases/toPercentKey.js";
 
-const filterKeys = ['blur', 'brightness', 'contrast', 'saturate'];
-const filterSuffixes = { blur: 'px', brightness: '', contrast: '', saturate: '' };
+const filterKeys = ["blur", "brightness", "contrast", "saturate"];
+const filterSuffixes = {
+  blur: "px",
+  brightness: "",
+  contrast: "",
+  saturate: "",
+};
 
 export function serializeFilter(values) {
   return Object.entries(values)
-    .filter(([key, value]) => value !== undefined && filterSuffixes[key] !== undefined)
+    .filter(
+      ([key, value]) =>
+        value !== undefined && filterSuffixes[key] !== undefined,
+    )
     .map(([key, value]) => `${key}(${value}${filterSuffixes[key]})`)
-    .join(' ');
+    .join(" ");
 }
 
 export function createFilterGroupPlugin() {
   return createAnimationPlugin({
     keys: filterKeys,
-    stage: 'filter',
+    stage: "filter",
     priority: 20,
-    outputs: { filter: { merge: 'shallow', serialize: serializeFilter } },
+    outputs: { filter: { merge: "shallow", serialize: serializeFilter } },
     contribute(key, stops) {
       const percentPatch = {};
       stops.forEach((stop) => {
@@ -28,7 +36,8 @@ export function createFilterGroupPlugin() {
     },
     compose(rawData) {
       const filterValues = {};
-      for (const key of filterKeys) if (rawData[key] !== undefined) filterValues[key] = rawData[key];
+      for (const key of filterKeys)
+        if (rawData[key] !== undefined) filterValues[key] = rawData[key];
       return Object.keys(filterValues).length ? { filter: filterValues } : {};
     },
   });

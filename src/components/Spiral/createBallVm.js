@@ -3,7 +3,7 @@ export function createBallVm({ id, color, ballTrack }) {
     id,
     color,
     ballTrack,
-    status: 'active',
+    status: "active",
     isClickable: true,
     onClick: () => {},
   };

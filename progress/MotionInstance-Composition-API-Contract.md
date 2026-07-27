@@ -17,10 +17,12 @@ for "is this a bug or intended" when touching this code.
 ## 1. `addChild(motionIdOrConfig, config?)` → `MotionInstance`
 
 **Signature is overloaded:**
+
 - `addChild(configObject)` — reuses the parent's own `motionId`.
 - `addChild(motionId, configObject?)` — mounts a different motion as the child.
 
 **Guarantees:**
+
 - Synchronous. Returns the fully-constructed child instance immediately —
   never a Promise.
 - Throws if called after the parent has been `destroy()`ed.
@@ -35,10 +37,11 @@ for "is this a bug or intended" when touching this code.
   suppression won't happen.
 
 **Stagger delay assignment** — see §2 for the auto/custom distinction:
+
 - If `config.delay` is omitted, the child is **auto-staggered**: its delay
   is computed as `autoIndex * schemaMotion.stagger` (or
   `schemaMotion.driver?.stagger`), where `autoIndex` counts only among
-  *other already-added auto children* — custom-delay siblings do not
+  _other already-added auto children_ — custom-delay siblings do not
   consume a slot in that count.
 - If `config.delay` is provided explicitly, the child is **custom**: that
   exact value is used, verbatim, and the child is permanently excluded from
@@ -72,11 +75,12 @@ supported, intentional pattern — not an edge case to guard against.
 ## 3. `removeChild(child)` → `void`
 
 **Guarantees, in order:**
+
 1. **Synchronous, immediate:** `child` is spliced out of `parent.children`.
    Anything reading `parent.children` right after this call sees the child
    already gone.
 2. **Synchronous, immediate:** the reflow target list is computed — every
-   *remaining auto* child gets a new delay via `autoIndex * stagger`, custom
+   _remaining auto_ child gets a new delay via `autoIndex * stagger`, custom
    children are excluded entirely (§2).
 3. **Async, not awaited by the caller:** the reflow animation runs (default:
    a `gsap.to` sliding each auto sibling's `startTime` to its new delay; see
@@ -119,12 +123,14 @@ see `Engine_Architecture_Decisions` §11).
 
 The only customization surface is data, read from
 `schemaMotion.staggerTransition`:
+
 ```json
 "staggerTransition": { "duration": 0.4, "ease": "power3.out" }
 ```
+
 Falls back to `{ duration: 0.6, ease: 'power2.out' }` when absent.
 
-**If a genuinely different reflow *mechanism* (not just timing) is ever
+**If a genuinely different reflow _mechanism_ (not just timing) is ever
 needed** — e.g. fade instead of slide, or no animation at all — the
 intended direction is a schema-level discriminator (tentatively
 `staggerTransition.type`) that `MotionInstance` dispatches on internally,
@@ -171,7 +177,7 @@ calling code owns these:
   and empirically causes a scroll-position jump on scrub-driven parents.
   `onChildChange`'s deferred-until-settled firing (§3) exists specifically
   so consumers have a safe point to call `refresh()` from.
-- **Exit animations on a *parent* instance itself are not covered by any of
+- **Exit animations on a _parent_ instance itself are not covered by any of
   this.** `destroy()` is synchronous and unconditional, by design — it's
   also called from project-swap cleanup paths that require a guaranteed
   synchronous teardown. If you want "children fade out, then the whole

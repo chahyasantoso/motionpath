@@ -53,9 +53,9 @@ position on the timeline, instantly — before any scroll event, before any
 `refresh()` call. A box at 25% progress on a 1-second timeline jumped to
 100% complete the instant a second tween extended the timeline to 2
 seconds, because `ScrollTrigger` drives playback via
-`tl.totalProgress(fraction)`, and `totalProgress` is fraction-of-*current*-
+`tl.totalProgress(fraction)`, and `totalProgress` is fraction-of-_current_-
 duration by definition — not something `refresh()` can intervene in.
-`refresh()` only recomputes duration-*derived* pixel boundaries; this
+`refresh()` only recomputes duration-_derived_ pixel boundaries; this
 schema's `trigger.end` is an intentionally fixed, author-declared literal,
 never derived from duration, so there was nothing stale for `refresh()` to
 fix in the first place.
@@ -70,7 +70,7 @@ Mathematically verified to prevent the jump for growth — elapsed time
 held constant. But: it reintroduces a page-wide cascade (every downstream
 `ScrollTrigger`'s position shifts and needs its own refresh — a real UX
 problem for content the user hasn't scrolled to yet), and it has no answer
-for shrinkage — unmounting/unregistering content the user is *currently*
+for shrinkage — unmounting/unregistering content the user is _currently_
 scrolled into has no jump-free solution under any scheme, because you'd be
 removing scrollable distance out from under their current position.
 
@@ -78,7 +78,7 @@ removing scrollable distance out from under their current position.
 at the moment of mutation, then manually drive `tl.time()` via
 `ScrollTrigger`'s `onUpdate` using the delta from that frozen anchor,
 bypassing GSAP's automatic `animation:` binding. Verified to correctly
-prevent the jump *and* avoid the page cascade (since `end` never moves).
+prevent the jump _and_ avoid the page cascade (since `end` never moves).
 But: it causes registration-timing-dependent **pacing distortion** for all
 content after the mutation point — verified against real numbers that the
 local playback rate changes by a factor dependent on exactly when in the
@@ -86,7 +86,7 @@ scroll range the late registration happened, which is a runtime accident,
 not something any author controls or can predict. It still has no clean
 answer for shrinkage of already-visited content, and — since you can't know
 in advance which scrub groups will ever receive a late registrant — it
-would have to become the *default* wiring for every scrub group, not an
+would have to become the _default_ wiring for every scrub group, not an
 opt-in, making it a permanent complexity tax on `ProductionEngine` rather
 than a contained feature.
 
@@ -125,6 +125,6 @@ arises for a trigger anchor owned by a component that mounts after
 anchor today lives in the same component that calls `useMotionProject`),
 the extension is to generalize the deferred-call buffer (see
 Implementation Brief 9) to also cover trigger-ref registration — deferring
-only the *timing of the one-time `ScrollTrigger.create()` call*, never
+only the _timing of the one-time `ScrollTrigger.create()` call_, never
 mutating a timeline after attachment. This does not require revisiting
 anything in this document; it's additive.

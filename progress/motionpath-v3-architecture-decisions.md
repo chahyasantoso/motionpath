@@ -1,6 +1,6 @@
 # MotionPath v3 — Engine Architecture Decisions
 
-The *why* companion to `motionpath-v3-schema-reference.md` (the *what*). Grep-verified against `chahyasantoso/motionpath`, branch `v3`, commit `90dc7b7`. Supersedes the v2-era `Engine_Architecture_Decisions` doc — that doc's `element-uniqueness` section was already known-stale; treat this one as the current source of truth for v3 reasoning.
+The _why_ companion to `motionpath-v3-schema-reference.md` (the _what_). Grep-verified against `chahyasantoso/motionpath`, branch `v3`, commit `90dc7b7`. Supersedes the v2-era `Engine_Architecture_Decisions` doc — that doc's `element-uniqueness` section was already known-stale; treat this one as the current source of truth for v3 reasoning.
 
 ---
 
@@ -30,7 +30,7 @@ instance.destroy = () => {
 
 This works, but it's a module reaching into an object it doesn't own and replacing a public method on it after construction — invisible from the class definition itself, and a second caller doing the same thing would silently clobber the first patch.
 
-**Current pattern:** the engine's cross-cutting cleanup (removing the instance from its own tracking map, tearing down an empty timeline group) is passed in as an `onDestroy` callback inside the construction context, and `CreateMotionInstance.js` calls it *after* the instance's own `destroy()` completes:
+**Current pattern:** the engine's cross-cutting cleanup (removing the instance from its own tracking map, tearing down an empty timeline group) is passed in as an `onDestroy` callback inside the construction context, and `CreateMotionInstance.js` calls it _after_ the instance's own `destroy()` completes:
 
 ```js
 const originalDestroy = instance.destroy.bind(instance);
@@ -46,12 +46,13 @@ instance.destroy = () => {
 This is still technically a wrapper around `destroy`, but the difference matters: it happens once, at construction time, in the factory that owns the object's creation — not from an unrelated module reaching in after the fact. The factory is allowed to decorate its own output before handing it out; a consumer replacing a method on an object it merely received is the pattern being avoided.
 
 **Idempotency is enforced at two independent layers, deliberately:**
+
 - `MotionInstance.destroy()` itself has an early-exit `if (this.#destroyed) return;` guard — protects internal teardown (killing `ScrollTrigger`, timeline, children) from running twice.
 - `CreateMotionInstance`'s wrapper has its own `destroyed` flag — protects `context.onDestroy(instance)` from firing twice.
 
 These aren't redundant despite guarding the same method: without the wrapper's own flag, a second `destroy()` call would correctly no-op internally (first guard catches it) but `onDestroy` would still fire again, calling `controller.removeMember()` a second time on an already-removed group member. Two guards, two different things protected.
 
-**Ordering fix inside `destroy()` itself:** the `#onSubscriberChange` notification was moved from the *end* of `destroy()` to immediately after computing `hadActiveSubscribers`, *before* `ScrollTrigger`/timeline/children teardown runs. Rationale (from the code comment): the engine needs to unregister the instance while it's still structurally intact, not after its internals have already been killed.
+**Ordering fix inside `destroy()` itself:** the `#onSubscriberChange` notification was moved from the _end_ of `destroy()` to immediately after computing `hadActiveSubscribers`, _before_ `ScrollTrigger`/timeline/children teardown runs. Rationale (from the code comment): the engine needs to unregister the instance while it's still structurally intact, not after its internals have already been killed.
 
 **`broadcast()` also gained a guard:** `if (this.#destroyed) return;` at the top. Defensive — GSAP's ticker can still fire a broadcast in flight even after logical destruction has been flagged, before `.kill()` fully detaches listeners.
 
@@ -61,11 +62,12 @@ These aren't redundant despite guarding the same method: without the wrapper's o
 
 Unchanged core design from v2, still load-bearing in v3: `subscribe(trackId, callback)` broadcasts **raw** proxy values every tick, no composition applied. `compose(trackId, rawData?)` — a **pull**, not a subscription — runs the resolved plugins' `compose()` for that track and returns a DOM-ready patch. If `rawData` is omitted, it defaults to the track's current live proxy snapshot + `timeline.progress()`.
 
-**Why `compose()` accepts an omittable `rawData` matters in practice:** it's what makes cross-instance reads cheap and correct. A component driving a *different* instance's track (e.g. an exit animation) can call `otherInstance.compose('some-track')` with no argument and get that instance's live current state — no subscription needed, no staleness, because nothing paused the original instance's timeline just because nothing is listening to it anymore.
+**Why `compose()` accepts an omittable `rawData` matters in practice:** it's what makes cross-instance reads cheap and correct. A component driving a _different_ instance's track (e.g. an exit animation) can call `otherInstance.compose('some-track')` with no argument and get that instance's live current state — no subscription needed, no staleness, because nothing paused the original instance's timeline just because nothing is listening to it anymore.
 
 **Two known asymmetries, worth remembering when debugging:**
+
 - `subscribe()` throws if `trackId` doesn't exist on the instance (`subscribe: track "X" not found in instance.`). `compose()` returns `{}` instead of throwing for the same condition. This inconsistency is real, not intentional API design — check `tracksMap` yourself if you need to distinguish "no such track" from "track exists but composed to an empty patch."
-- `useMotionSubscriber`'s hook-level `transformFn(rawData, composeFn)` gives you a `composeFn` that is **pre-bound to whatever instance/trackId is currently subscribed** — it's `(data) => instance.compose(trackId, data)` with `instance`/`trackId` closed over at subscription time. It is *not* a general-purpose "compose anything" utility. If a swap happens (see §4), `composeFn` starts pointing at the new instance — it does not, and structurally cannot, reach back to the old one. Reading a different instance's live state requires holding a stable reference to that instance directly (e.g. a component prop that doesn't get swapped) and calling `.compose()` on it explicitly.
+- `useMotionSubscriber`'s hook-level `transformFn(rawData, composeFn)` gives you a `composeFn` that is **pre-bound to whatever instance/trackId is currently subscribed** — it's `(data) => instance.compose(trackId, data)` with `instance`/`trackId` closed over at subscription time. It is _not_ a general-purpose "compose anything" utility. If a swap happens (see §4), `composeFn` starts pointing at the new instance — it does not, and structurally cannot, reach back to the old one. Reading a different instance's live state requires holding a stable reference to that instance directly (e.g. a component prop that doesn't get swapped) and calling `.compose()` on it explicitly.
 
 ---
 
@@ -73,21 +75,21 @@ Unchanged core design from v2, still load-bearing in v3: `subscribe(trackId, cal
 
 Two distinct needs came up this session, and they call for genuinely different code shapes — conflating them was the source of real confusion mid-session:
 
-**Pattern A — clean handoff (subscription swap).** One instance/track fully replaces another as the thing driving a DOM node's *entire* patch. Implemented by swapping React state (`activeInstance`, `activeTrackId`) that both feed the same `useMotionSubscriber` call. When the state changes, the hook's `useEffect` dependency array changes identity, the old subscription's cleanup unsubscribes, a fresh subscription opens on the new instance/track. From that point, the old instance's ticks have no DOM-facing effect — it becomes headless *for rendering purposes* (see caveat below). Appropriate when the new track should own 100% of the output.
+**Pattern A — clean handoff (subscription swap).** One instance/track fully replaces another as the thing driving a DOM node's _entire_ patch. Implemented by swapping React state (`activeInstance`, `activeTrackId`) that both feed the same `useMotionSubscriber` call. When the state changes, the hook's `useEffect` dependency array changes identity, the old subscription's cleanup unsubscribes, a fresh subscription opens on the new instance/track. From that point, the old instance's ticks have no DOM-facing effect — it becomes headless _for rendering purposes_ (see caveat below). Appropriate when the new track should own 100% of the output.
 
-**Pattern B — live composition (cross-instance pull inside a transform).** Two instances' outputs need to blend on the same node simultaneously — e.g. an exit-pop effect that should still track the ball's live path position. Implemented by pulling the companion instance's `compose()` result *inside* the active track's `transformFn`, merged with explicit precedence:
+**Pattern B — live composition (cross-instance pull inside a transform).** Two instances' outputs need to blend on the same node simultaneously — e.g. an exit-pop effect that should still track the ball's live path position. Implemented by pulling the companion instance's `compose()` result _inside_ the active track's `transformFn`, merged with explicit precedence:
 
 ```js
 function exitVisualTransform(rawData, composeFn) {
-  const positionPatch = instance.compose('ball-track');  // live pull, no rawData arg
-  const exitPatch = composeFn(rawData);                   // this track's own output
-  return { ...positionPatch, ...exitPatch };               // explicit precedence, in source
+  const positionPatch = instance.compose("ball-track"); // live pull, no rawData arg
+  const exitPatch = composeFn(rawData); // this track's own output
+  return { ...positionPatch, ...exitPatch }; // explicit precedence, in source
 }
 ```
 
-This was chosen over running two *independent* `useMotionSubscriber` subscriptions (one per instance, each writing disjoint CSS properties via `gsap.set`'s partial-patch behavior) specifically because independent subscriptions can't guarantee override order on any property both tracks touch — GSAP tick order across two separate root timelines isn't a design-level guarantee in this codebase. A single merge point with explicit `{...a, ...b}` precedence removes that ambiguity entirely. Two-subscription composition remains a legitimate lighter option **only** when the two sources are known to write fully disjoint properties.
+This was chosen over running two _independent_ `useMotionSubscriber` subscriptions (one per instance, each writing disjoint CSS properties via `gsap.set`'s partial-patch behavior) specifically because independent subscriptions can't guarantee override order on any property both tracks touch — GSAP tick order across two separate root timelines isn't a design-level guarantee in this codebase. A single merge point with explicit `{...a, ...b}` precedence removes that ambiguity entirely. Two-subscription composition remains a legitimate lighter option **only** when the two sources are known to write fully disjoint properties.
 
-**The headless-instance caveat (a real correction made mid-session):** after a Pattern-A swap, the old instance stops driving the DOM, but calling it "headless" without qualification is inaccurate. It's still a live member of its parent container's `children` array until `removeChild()` explicitly detaches it — and the container's reflow logic (`addChild`'s `frontmostDelay` calculation, see §5) actively reads its `currentDelay` to place *other*, newly-spawned siblings. Three states, not two: driving-DOM-and-counted-for-placement → not-driving-DOM-but-still-counted-for-placement → fully detached after `removeChild`.
+**The headless-instance caveat (a real correction made mid-session):** after a Pattern-A swap, the old instance stops driving the DOM, but calling it "headless" without qualification is inaccurate. It's still a live member of its parent container's `children` array until `removeChild()` explicitly detaches it — and the container's reflow logic (`addChild`'s `frontmostDelay` calculation, see §5) actively reads its `currentDelay` to place _other_, newly-spawned siblings. Three states, not two: driving-DOM-and-counted-for-placement → not-driving-DOM-but-still-counted-for-placement → fully detached after `removeChild`.
 
 ---
 
@@ -95,17 +97,17 @@ This was chosen over running two *independent* `useMotionSubscriber` subscriptio
 
 The heaviest real-world exercise of this mechanism in the repo (Spiral/"Zuma" demo). Three layered bugs were found and fixed here, and the fixes generalize into standing rules for any future reflow/placement work.
 
-**Bug 1 — spawn placement drift.** A monotonic counter for "where does the next spawn go" looked correct until `removeChild`'s cascade reflow shifted the *existing* chain — after that, the counter under-spaced new spawns by one stagger-width per prior removal, because it was tracking "how many spawned," not "where things actually are now."
+**Bug 1 — spawn placement drift.** A monotonic counter for "where does the next spawn go" looked correct until `removeChild`'s cascade reflow shifted the _existing_ chain — after that, the counter under-spaced new spawns by one stagger-width per prior removal, because it was tracking "how many spawned," not "where things actually are now."
 
-**Fix:** spawn placement must be derived from the current *actual* position of the frontmost live child: `children.reduce((max, c) => Math.max(max, c.currentDelay ?? 0), -stagger) + stagger`. Never a counter, never a fixed formula — always read the live state.
+**Fix:** spawn placement must be derived from the current _actual_ position of the frontmost live child: `children.reduce((max, c) => Math.max(max, c.currentDelay ?? 0), -stagger) + stagger`. Never a counter, never a fixed formula — always read the live state.
 
-**Bug 2 — stale-read race on `currentDelay`.** `removeChild`'s cascade reflow originally deferred writing `child.currentDelay = delay` until the reflow tween's `onComplete` fired. In practice, spawn interval was *shorter* than reflow tween duration — so a new `addChild` call could read `currentDelay` before the previous reflow had finished, getting a stale pre-cascade value and placing the new spawn one extra stagger-width too far out.
+**Bug 2 — stale-read race on `currentDelay`.** `removeChild`'s cascade reflow originally deferred writing `child.currentDelay = delay` until the reflow tween's `onComplete` fired. In practice, spawn interval was _shorter_ than reflow tween duration — so a new `addChild` call could read `currentDelay` before the previous reflow had finished, getting a stale pre-cascade value and placing the new spawn one extra stagger-width too far out.
 
-**Fix:** the reflow target's `currentDelay` is now written eagerly and synchronously the moment a reflow target is decided, not deferred to tween completion. The tween still animates the *visual* transition, but the *logical* position of record updates immediately. (This is also exactly the value the duration-0 short-circuit added later reads/writes directly, bypassing tween creation entirely when there's nothing to animate — see §6.)
+**Fix:** the reflow target's `currentDelay` is now written eagerly and synchronously the moment a reflow target is decided, not deferred to tween completion. The tween still animates the _visual_ transition, but the _logical_ position of record updates immediately. (This is also exactly the value the duration-0 short-circuit added later reads/writes directly, bypassing tween creation entirely when there's nothing to animate — see §6.)
 
-**Bug 3 — cascading on the wrong rank.** Initially, *any* child removal triggered a cascade reflow of the remaining chain. But removals happen two ways: rank-0 (the frontmost child, closest to natural completion) and rank>0 (an actual mid-chain removal, e.g. a clicked ball). Cascading on every rank-0 completion repositions every survivor's `startTime` earlier, every single time — and once a spawner reaches steady state, completions happen continuously, so this compounds. Eventually a child's `startTime` gets pushed *behind* the parent's actual playhead, which triggers GSAP's instant-complete-on-reposition behavior — an avalanche of simultaneous completions cascading into each other.
+**Bug 3 — cascading on the wrong rank.** Initially, _any_ child removal triggered a cascade reflow of the remaining chain. But removals happen two ways: rank-0 (the frontmost child, closest to natural completion) and rank>0 (an actual mid-chain removal, e.g. a clicked ball). Cascading on every rank-0 completion repositions every survivor's `startTime` earlier, every single time — and once a spawner reaches steady state, completions happen continuously, so this compounds. Eventually a child's `startTime` gets pushed _behind_ the parent's actual playhead, which triggers GSAP's instant-complete-on-reposition behavior — an avalanche of simultaneous completions cascading into each other.
 
-**Fix:** the cascade only fires for rank>0 removals. A rank-0 completion is the natural order of things and needs no chain repair; only removing something *out of order* creates a real gap that needs closing.
+**Fix:** the cascade only fires for rank>0 removals. A rank-0 completion is the natural order of things and needs no chain repair; only removing something _out of order_ creates a real gap that needs closing.
 
 **Standing methodology rule from this hunt:** all three fixes were verified via fresh clone + hand-built live reproduction scripts using **real async GSAP timing** (small real durations, not synchronous stand-ins). Synthetic tests that manually force `currentDelay` to settle immediately can and did mask the real race in Bug 2 — a test that skips real timing skips the exact condition that caused the bug. This is now a standing verification requirement for any future reflow/placement change, not a one-off.
 
@@ -113,7 +115,7 @@ The heaviest real-world exercise of this mechanism in the repo (Spiral/"Zuma" de
 
 ## 6. Duration-zero reflow short-circuit
 
-A leftover Indonesian-language TODO comment in the reflow code (*"kalau duration 0 masih kurang efisien karena masih bikin object tween meskipun langsung resolve"* — "if duration is 0 it's still inefficient because it still creates a tween object even though it resolves immediately") flagged a real, if minor, cost: building a `gsap.to()` tween just to animate *zero* seconds and resolve on the next tick.
+A leftover Indonesian-language TODO comment in the reflow code (_"kalau duration 0 masih kurang efisien karena masih bikin object tween meskipun langsung resolve"_ — "if duration is 0 it's still inefficient because it still creates a tween object even though it resolves immediately") flagged a real, if minor, cost: building a `gsap.to()` tween just to animate _zero_ seconds and resolve on the next tick.
 
 **Fix:** when `transition.duration === 0`, skip tween construction entirely — set `child.timeline.startTime(delay)` directly (the same property the tween would have animated to), then force the parent timeline to re-render at its current position (`this.timeline.time(this.timeline.time())`, a standard GSAP idiom for making a direct child mutation take visual effect immediately, since GSAP doesn't auto-relayout on a raw `startTime` write). `child.currentDelay = delay` is written before this branch runs either way, so the eager-write invariant from Bug 2 above holds regardless of which path executes.
 
@@ -125,9 +127,9 @@ A leftover Indonesian-language TODO comment in the reflow code (*"kalau duration
 
 **Fix:** the check now reads `trigger.type === 'scroll'` (with `driver.type === 'gsap-scroll'/'scroll'` kept as legacy fallbacks), and a new test exercises the real v3 shape — `{ driver: { type: 'timeline', trigger: { type: 'scroll', scrub: true } } }` — asserting `ScrollTrigger.create` is actually called with the master timeline as its `animation` target.
 
-**Open verification item, not yet closed:** the test proves the call happens against a mocked `ScrollTrigger`, which proves the branch is now *reachable*, not that scrubbing against real scroll behaves correctly once reached. A live browser check against a real scrub-grouped demo is the outstanding step — this is the same category of risk the Bug 2 reflow race represented: a mocked/synchronous test can confirm code paths execute without confirming real-world timing/behavior is correct.
+**Open verification item, not yet closed:** the test proves the call happens against a mocked `ScrollTrigger`, which proves the branch is now _reachable_, not that scrubbing against real scroll behaves correctly once reached. A live browser check against a real scrub-grouped demo is the outstanding step — this is the same category of risk the Bug 2 reflow race represented: a mocked/synchronous test can confirm code paths execute without confirming real-world timing/behavior is correct.
 
-**Companion fix in `MotionInstance.#setupDriver`:** grouped (non-primary) timeline members previously had their own `repeat`/`yoyo`/`repeatDelay` applied to their own child timeline unconditionally — redundant with, and potentially conflicting against, the master's own loop configuration once nested. Both the repeat/yoyo/repeatDelay configuration *and* the autoplay call are now gated behind `#ownsTrigger(config)` (`!config.parentId && !config._suppressDriver`), which the engine sets to `false` for grouped non-primary members. This matches the architecture as originally specified — "primary's `repeat`/`yoyo`/`repeatDelay` apply to the whole nested group as one loopable unit" — it just wasn't fully enforced in code until now.
+**Companion fix in `MotionInstance.#setupDriver`:** grouped (non-primary) timeline members previously had their own `repeat`/`yoyo`/`repeatDelay` applied to their own child timeline unconditionally — redundant with, and potentially conflicting against, the master's own loop configuration once nested. Both the repeat/yoyo/repeatDelay configuration _and_ the autoplay call are now gated behind `#ownsTrigger(config)` (`!config.parentId && !config._suppressDriver`), which the engine sets to `false` for grouped non-primary members. This matches the architecture as originally specified — "primary's `repeat`/`yoyo`/`repeatDelay` apply to the whole nested group as one loopable unit" — it just wasn't fully enforced in code until now.
 
 ---
 

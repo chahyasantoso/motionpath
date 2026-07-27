@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
-import Lenis from 'lenis';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useEffect } from "react";
+import Lenis from "lenis";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 /**
  * Custom React hook to enable Lenis smooth scrolling.
@@ -17,11 +17,11 @@ export default function useSmoothScroll(enabled = true, options = {}) {
     // 1. Initialize Lenis
     const lenis = new Lenis({
       lerp: options.lerp ?? 0.1,
-      ...options
+      ...options,
     });
 
     // 2. Notify ScrollTrigger on every scroll step
-    lenis.on('scroll', ScrollTrigger.update);
+    lenis.on("scroll", ScrollTrigger.update);
 
     // 3. Link to GSAP Ticker for frame synchronization
     const updateTicker = (time) => {

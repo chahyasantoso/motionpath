@@ -1,4 +1,4 @@
-import { LayoutDelegate } from './LayoutDelegate.js';
+import { LayoutDelegate } from "./LayoutDelegate.js";
 
 /**
  * Default layout policy: new children append after the frontmost existing
@@ -19,7 +19,10 @@ export class GaplessLayoutDelegate extends LayoutDelegate {
     // it. Anchoring to the real frontmost position is immune to both
     // failure modes at once, and needs no reset bookkeeping — an empty
     // children array naturally resolves to offset 0.
-    const frontmostOffset = children.reduce((max, c) => Math.max(max, c.currentOffset ?? 0), -stagger);
+    const frontmostOffset = children.reduce(
+      (max, c) => Math.max(max, c.currentOffset ?? 0),
+      -stagger,
+    );
     return frontmostOffset + stagger;
   }
 
@@ -30,7 +33,9 @@ export class GaplessLayoutDelegate extends LayoutDelegate {
     // (the settled logical position), never a live timeline position —
     // that's actively animating during an in-flight reflow and would give
     // unstable targets.
-    const ordered = [...children].sort((a, b) => (a.currentOffset ?? 0) - (b.currentOffset ?? 0));
+    const ordered = [...children].sort(
+      (a, b) => (a.currentOffset ?? 0) - (b.currentOffset ?? 0),
+    );
     const removedRank = ordered.indexOf(removedChild);
 
     // Cascade only when removing from the middle of the chain (rank > 0).
@@ -43,7 +48,10 @@ export class GaplessLayoutDelegate extends LayoutDelegate {
 
     const targets = [];
     for (let k = removedRank + 1; k < ordered.length; k++) {
-      targets.push({ child: ordered[k], offset: ordered[k - 1].currentOffset ?? 0 });
+      targets.push({
+        child: ordered[k],
+        offset: ordered[k - 1].currentOffset ?? 0,
+      });
     }
     return targets;
   }

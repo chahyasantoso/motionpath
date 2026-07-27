@@ -34,23 +34,23 @@ This is the central method for plugin resolution and is the reason the engine st
 
 #### Why `keys.includes(key)` alone is not enough
 
-| Scenario | `keys.includes(key)` | `claimsKey(key)` |
-|---|---|---|
-| `cssVarPlugin` claiming `'--brand-color'` | ❌ (`keys: []`) | ✅ (`key.startsWith('--')`) |
-| `filterPlugin` claiming its proxy key `'blur'` | ✅ | ✅ |
-| `pathPlugin` claiming `'pathProgress'` | ❌ (`keys: ['path']`) | ✅ |
-| `simplePlugin` claiming `'opacity'` | ✅ | ✅ (same result) |
+| Scenario                                       | `keys.includes(key)`  | `claimsKey(key)`            |
+| ---------------------------------------------- | --------------------- | --------------------------- |
+| `cssVarPlugin` claiming `'--brand-color'`      | ❌ (`keys: []`)       | ✅ (`key.startsWith('--')`) |
+| `filterPlugin` claiming its proxy key `'blur'` | ✅                    | ✅                          |
+| `pathPlugin` claiming `'pathProgress'`         | ❌ (`keys: ['path']`) | ✅                          |
+| `simplePlugin` claiming `'opacity'`            | ✅                    | ✅ (same result)            |
 
 #### Implementations by plugin type
 
-| Plugin | `claimsKey` body |
-|---|---|
-| `simpleProperty` | `key === propKey` |
-| `colorProperty` | `key === propKey` |
-| `filterProperty` | `key === propKey` (e.g. `'blur'`) |
-| `pathPlugin` | `key === 'path' \|\| key === 'pathProgress' \|\| key === 'cubicPath' \|\| key === 'autoRotate'` |
-| `cssVarPlugin` | `key.startsWith('--')` |
-| Lazy stubs | `key === 'splitText'` (etc.) |
+| Plugin           | `claimsKey` body                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| `simpleProperty` | `key === propKey`                                                                               |
+| `colorProperty`  | `key === propKey`                                                                               |
+| `filterProperty` | `key === propKey` (e.g. `'blur'`)                                                               |
+| `pathPlugin`     | `key === 'path' \|\| key === 'pathProgress' \|\| key === 'cubicPath' \|\| key === 'autoRotate'` |
+| `cssVarPlugin`   | `key.startsWith('--')`                                                                          |
+| Lazy stubs       | `key === 'splitText'` (etc.)                                                                    |
 
 ---
 
@@ -88,7 +88,7 @@ Translates the **current animated proxy state** into a CSS-ready style patch tha
 
 ## Optional Fields
 
-### `load(): Promise<void>` *(lazy plugins only)*
+### `load(): Promise<void>` _(lazy plugins only)_
 
 An async loader called once by the builder before the first `contribute()`. Only required when `lazy: true`.
 
@@ -96,10 +96,10 @@ An async loader called once by the builder before the first `contribute()`. Only
 
 ## Calling Sites
 
-| Location | How `claimsKey` is used |
-|---|---|
-| [`plugins.js` — `resolvePluginForKey`](file:///d:/dev/motionpath/src/lib/plugins.js) | `ALL_PLUGINS.find(p => p.claimsKey(key))` — finds the right plugin for a schema keyframe property at build time. |
-| [`engineCore.js` — `compose()`](file:///d:/dev/motionpath/src/lib/engineCore.js) | `Object.keys(source).some(key => p.claimsKey(key))` — detects whether a fallback plugin should be added to the composition pipeline for runtime data keys not declared in the schema. |
+| Location                                                                             | How `claimsKey` is used                                                                                                                                                               |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`plugins.js` — `resolvePluginForKey`](file:///d:/dev/motionpath/src/lib/plugins.js) | `ALL_PLUGINS.find(p => p.claimsKey(key))` — finds the right plugin for a schema keyframe property at build time.                                                                      |
+| [`engineCore.js` — `compose()`](file:///d:/dev/motionpath/src/lib/engineCore.js)     | `Object.keys(source).some(key => p.claimsKey(key))` — detects whether a fallback plugin should be added to the composition pipeline for runtime data keys not declared in the schema. |
 
 ---
 
@@ -111,4 +111,3 @@ An async loader called once by the builder before the first `contribute()`. Only
 - [ ] Implement `contribute(key, stops, element?)` — returns `{ percentPatch, tweenVars }`.
 - [ ] Implement `compose(rawData, elementCfg)` — returns a CSS-ready patch object.
 - [ ] Register the plugin in `ALL_PLUGINS` in [`plugins.js`](file:///d:/dev/motionpath/src/lib/plugins.js).
-

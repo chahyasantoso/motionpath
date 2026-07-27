@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { engine } from '../engines/Engine.js';
+import { useEffect, useRef, useState } from "react";
+import { engine } from "../engines/Engine.js";
 
 /**
  * React Hook to load a complete MotionPath project once.
@@ -24,8 +24,9 @@ export default function useMotionProject(project) {
       .then(() => {
         if (!cancelled) setIsLoaded(true);
       })
-      .catch(err => {
-        if (!cancelled) console.error('[useMotionProject] loadProject failed:', err);
+      .catch((err) => {
+        if (!cancelled)
+          console.error("[useMotionProject] loadProject failed:", err);
       });
 
     return () => {

@@ -266,96 +266,102 @@
 ### Replace this test (asserts the old skip-custom-children behavior we're removing)
 
 **WRONG (delete this test):**
+
 ```js
-    it('does not reflow a child that was given an explicit custom delay', async () => {
-      const instance = createTestInstance('time-motion', {}, timelineSchema);
-      const auto1 = instance.addChild('child-motion', {});
-      const custom = instance.addChild('child-motion', { delay: 5 });
+it("does not reflow a child that was given an explicit custom delay", async () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const auto1 = instance.addChild("child-motion", {});
+  const custom = instance.addChild("child-motion", { delay: 5 });
 
-      instance.removeChild(auto1);
+  instance.removeChild(auto1);
 
-      expect(custom.delayTween).toBeNull(); // never touched by reflow
-      expect(custom.currentDelay).toBe(5);  // untouched
-    });
+  expect(custom.delayTween).toBeNull(); // never touched by reflow
+  expect(custom.currentDelay).toBe(5); // untouched
+});
 
-    it('auto children reindex among themselves, skipping custom children', () => {
-      const instance = createTestInstance('time-motion', {}, timelineSchema);
-      const auto1 = instance.addChild('child-motion', {});          // auto, index 0
-      instance.addChild('child-motion', { delay: 99 });              // custom, ignored for indexing
-      const auto2 = instance.addChild('child-motion', {});           // auto, index 1
+it("auto children reindex among themselves, skipping custom children", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const auto1 = instance.addChild("child-motion", {}); // auto, index 0
+  instance.addChild("child-motion", { delay: 99 }); // custom, ignored for indexing
+  const auto2 = instance.addChild("child-motion", {}); // auto, index 1
 
-      expect(auto1.currentDelay).toBe(0);
-      expect(auto2.currentDelay).toBeCloseTo(0.1); // stagger=0.1 in timelineSchema, index 1 among autos
-    });
+  expect(auto1.currentDelay).toBe(0);
+  expect(auto2.currentDelay).toBeCloseTo(0.1); // stagger=0.1 in timelineSchema, index 1 among autos
+});
 ```
 
 **CORRECT (replace with):**
+
 ```js
-    it('reflows a manually-delayed child too — no more auto/manual distinction', async () => {
-      const instance = createTestInstance('time-motion', {}, timelineSchema);
-      const auto1 = instance.addChild('child-motion', {});                // delay 0
-      const custom = instance.addChild('child-motion', { delay: 99 });    // manual, far out
+it("reflows a manually-delayed child too — no more auto/manual distinction", async () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const auto1 = instance.addChild("child-motion", {}); // delay 0
+  const custom = instance.addChild("child-motion", { delay: 99 }); // manual, far out
 
-      instance.removeChild(auto1);
+  instance.removeChild(auto1);
 
-      // custom is now a survivor ranked after auto1 in position order, so it
-      // must be reflowed onto auto1's vacated slot (delay 0), same as any
-      // other survivor.
-      expect(custom.delayTween).not.toBeNull();
-    });
+  // custom is now a survivor ranked after auto1 in position order, so it
+  // must be reflowed onto auto1's vacated slot (delay 0), same as any
+  // other survivor.
+  expect(custom.delayTween).not.toBeNull();
+});
 
-    it('cascades survivors onto the vacated predecessor slot, not a recomputed formula', () => {
-      const instance = createTestInstance('time-motion', {}, timelineSchema);
-      const c0 = instance.addChild('child-motion', {}); // delay 0
-      const c1 = instance.addChild('child-motion', {}); // delay 0.1
-      const c2 = instance.addChild('child-motion', {}); // delay 0.2
-      const c3 = instance.addChild('child-motion', {}); // delay 0.3
+it("cascades survivors onto the vacated predecessor slot, not a recomputed formula", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const c0 = instance.addChild("child-motion", {}); // delay 0
+  const c1 = instance.addChild("child-motion", {}); // delay 0.1
+  const c2 = instance.addChild("child-motion", {}); // delay 0.2
+  const c3 = instance.addChild("child-motion", {}); // delay 0.3
 
-      // settle currentDelay as if prior reflows already completed, so the
-      // cascade has real predecessor values to read
-      c0.currentDelay = 0;
-      c1.currentDelay = 0.1;
-      c2.currentDelay = 0.2;
-      c3.currentDelay = 0.3;
+  // settle currentDelay as if prior reflows already completed, so the
+  // cascade has real predecessor values to read
+  c0.currentDelay = 0;
+  c1.currentDelay = 0.1;
+  c2.currentDelay = 0.2;
+  c3.currentDelay = 0.3;
 
-      instance.removeChild(c1); // remove the second one
+  instance.removeChild(c1); // remove the second one
 
-      // c2 must inherit c1's vacated slot (0.1), c3 must inherit c2's
-      // original slot (0.2) — a cascade, not a re-derived index*stagger.
-      expect(c2.delayTween).not.toBeNull();
-      expect(c3.delayTween).not.toBeNull();
-    });
+  // c2 must inherit c1's vacated slot (0.1), c3 must inherit c2's
+  // original slot (0.2) — a cascade, not a re-derived index*stagger.
+  expect(c2.delayTween).not.toBeNull();
+  expect(c3.delayTween).not.toBeNull();
+});
 
-    it('spawn placement uses a monotonic counter, immune to live-count plateauing under churn', () => {
-      const instance = createTestInstance('time-motion', {}, timelineSchema);
+it("spawn placement uses a monotonic counter, immune to live-count plateauing under churn", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
 
-      const a = instance.addChild('child-motion', {}); // spawn #0 -> delay 0
-      expect(a.currentDelay).toBe(0);
+  const a = instance.addChild("child-motion", {}); // spawn #0 -> delay 0
+  expect(a.currentDelay).toBe(0);
 
-      instance.removeChild(a); // live count drops back to 0, but spawn count must not reset mid-flight
+  instance.removeChild(a); // live count drops back to 0, but spawn count must not reset mid-flight
 
-      const b = instance.addChild('child-motion', {}); // spawn #1 -> delay 0.1, NOT 0
-      expect(b.currentDelay).toBeCloseTo(0.1);
-    });
+  const b = instance.addChild("child-motion", {}); // spawn #1 -> delay 0.1, NOT 0
+  expect(b.currentDelay).toBeCloseTo(0.1);
+});
 
-    it('resets the spawn counter once all children have been removed', async () => {
-      const schemaNoTransition = { ...timelineSchema, staggerTransition: { duration: 0 } };
-      const instance = createTestInstance('time-motion', {}, schemaNoTransition);
+it("resets the spawn counter once all children have been removed", async () => {
+  const schemaNoTransition = {
+    ...timelineSchema,
+    staggerTransition: { duration: 0 },
+  };
+  const instance = createTestInstance("time-motion", {}, schemaNoTransition);
 
-      const a = instance.addChild('child-motion', {}); // spawn #0
-      instance.removeChild(a);
-      await new Promise(resolve => setTimeout(resolve, 0));
+  const a = instance.addChild("child-motion", {}); // spawn #0
+  instance.removeChild(a);
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(instance.children).toHaveLength(0);
+  expect(instance.children).toHaveLength(0);
 
-      const b = instance.addChild('child-motion', {}); // wave cleared, should restart at 0
-      expect(b.currentDelay).toBe(0);
-    });
+  const b = instance.addChild("child-motion", {}); // wave cleared, should restart at 0
+  expect(b.currentDelay).toBe(0);
+});
 ```
 
 ### Update this test (drop the now-removed `isAutoStagger` assertion)
 
 **WRONG:**
+
 ```js
       const instance = createTestInstance('time-motion', { mountInstance: mountInstanceSpy }, timelineSchema);
       instance.addChild('child-motion', {});
@@ -367,6 +373,7 @@
 ```
 
 **CORRECT:**
+
 ```js
       const instance = createTestInstance('time-motion', { mountInstance: mountInstanceSpy }, timelineSchema);
       instance.addChild('child-motion', {});

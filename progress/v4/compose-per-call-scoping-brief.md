@@ -56,7 +56,7 @@ Add this module-level sentinel near the top of the file, alongside `clamp01`/`me
 ```js
 // Per-call compose() sentinel: marks a track as "currently being resolved" within
 // one root compose() call's ctx Map. See Step 2 below / compose-per-call-scoping-design.md.
-const COMPOSING = Symbol('composing');
+const COMPOSING = Symbol("composing");
 ```
 
 ---
@@ -140,6 +140,7 @@ Replace the WHOLE method with:
 ```
 
 **Important details you must not change:**
+
 - The back-edge branch returns `composePatch(...)` on `source` — identical fallback value to the
   original guard. Do not return `{}` or a raw snapshot.
 - No `try`/`finally` is needed anymore. `ctx` is a local variable never stored on `this`, so if a
@@ -189,43 +190,49 @@ observation)', ...)` block (append after the last `it(...)` in that block, befor
 `});`):
 
 ```js
-    it('memoizes a diamond-shared source within a single compose() call', () => {
-      const proxy = { x: 0, y: 0 };
-      const tween = gsap.to(proxy, { x: 100, y: 200, duration: 1, ease: 'none', paused: true });
-      const pluginComposeSpy = vi.fn((raw) => ({
-        transform: `translate3d(${raw.x ?? 0}px, ${raw.y ?? 0}px, 0px)`,
-      }));
-      const d = new Track({
-        id: 'diamond-d',
-        interpolationTimeline: tween,
-        proxyState: proxy,
-        plugins: [{ keys: ['x', 'y'], compose: pluginComposeSpy }],
-        resolvedTrack: { id: 'diamond-d', keyframes: { x: {}, y: {} } },
-      });
+it("memoizes a diamond-shared source within a single compose() call", () => {
+  const proxy = { x: 0, y: 0 };
+  const tween = gsap.to(proxy, {
+    x: 100,
+    y: 200,
+    duration: 1,
+    ease: "none",
+    paused: true,
+  });
+  const pluginComposeSpy = vi.fn((raw) => ({
+    transform: `translate3d(${raw.x ?? 0}px, ${raw.y ?? 0}px, 0px)`,
+  }));
+  const d = new Track({
+    id: "diamond-d",
+    interpolationTimeline: tween,
+    proxyState: proxy,
+    plugins: [{ keys: ["x", "y"], compose: pluginComposeSpy }],
+    resolvedTrack: { id: "diamond-d", keyframes: { x: {}, y: {} } },
+  });
 
-      // b and c both observe d (the diamond's shared ancestor).
-      const b = createDummyTrack('diamond-b');
-      const c = createDummyTrack('diamond-c');
-      b.setObserved(d, (composed) => ({ fromD: composed.transform }));
-      c.setObserved(d, (composed) => ({ fromD: composed.transform }));
+  // b and c both observe d (the diamond's shared ancestor).
+  const b = createDummyTrack("diamond-b");
+  const c = createDummyTrack("diamond-c");
+  b.setObserved(d, (composed) => ({ fromD: composed.transform }));
+  c.setObserved(d, (composed) => ({ fromD: composed.transform }));
 
-      // a observes both b and c, closing the diamond: a -> b -> d, a -> c -> d.
-      const a = createDummyTrack('diamond-a');
-      a.setObserved(b, (composed) => ({ fromB: composed.fromD }));
-      a.setObserved(c, (composed) => ({ fromC: composed.fromD }));
+  // a observes both b and c, closing the diamond: a -> b -> d, a -> c -> d.
+  const a = createDummyTrack("diamond-a");
+  a.setObserved(b, (composed) => ({ fromB: composed.fromD }));
+  a.setObserved(c, (composed) => ({ fromC: composed.fromD }));
 
-      a.compose();
+  a.compose();
 
-      // d's own plugin work must run exactly once per root compose() call, even
-      // though d is reached via two different paths (b and c).
-      expect(pluginComposeSpy).toHaveBeenCalledTimes(1);
+  // d's own plugin work must run exactly once per root compose() call, even
+  // though d is reached via two different paths (b and c).
+  expect(pluginComposeSpy).toHaveBeenCalledTimes(1);
 
-      // A second, separate root call must recompute from scratch (no cross-call
-      // caching) — this is what distinguishes per-call scoping from a persistent
-      // cache and is what keeps it correct under scrubbing/seek.
-      a.compose();
-      expect(pluginComposeSpy).toHaveBeenCalledTimes(2);
-    });
+  // A second, separate root call must recompute from scratch (no cross-call
+  // caching) — this is what distinguishes per-call scoping from a persistent
+  // cache and is what keeps it correct under scrubbing/seek.
+  a.compose();
+  expect(pluginComposeSpy).toHaveBeenCalledTimes(2);
+});
 ```
 
 ---

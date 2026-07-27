@@ -1,7 +1,7 @@
 # Spike: Late-Added Timeline Children vs. `ScrollTrigger.refresh()`
 
 **Question this answers:** if a component registers itself (adds a tween to an
-already-attached ScrollTrigger's master timeline) *after* `ScrollTrigger.create()`
+already-attached ScrollTrigger's master timeline) _after_ `ScrollTrigger.create()`
 has already run, does it work correctly with no extra step, silently misbehave,
 or require a manual `ScrollTrigger.refresh()` call? This is the hard blocking
 dependency for the B2 proposal (lazy `registerInstance()`-driven construction) —
@@ -21,6 +21,7 @@ methodology already used to settle the "MotionPathPlugin dropped" decision
 ```
 npm run dev
 ```
+
 Open `/spike-refresh`. The page has a sticky readout panel, a 300px pinned
 section 60vh down containing `box1` (blue), and an event log at the bottom.
 
@@ -32,7 +33,7 @@ section 60vh down containing `box1` (blue), and an event log at the bottom.
    exist in the timeline yet.
 2. **While scrolled to roughly the middle of the pin (progress ≈ 0.3–0.6),
    click "Add Late Element (box2)".** This appends a second tween to the
-   *same* master timeline GSAP already handed to `ScrollTrigger.create()` —
+   _same_ master timeline GSAP already handed to `ScrollTrigger.create()` —
    simulating a `registerInstance()` call arriving after attach. Do **not**
    click "Call ScrollTrigger.refresh()" yet.
 3. **Keep scrolling through the rest of the pin without refreshing.** Watch:
@@ -41,7 +42,7 @@ section 60vh down containing `box1` (blue), and an event log at the bottom.
    - Does `timeline duration` in the readout increase (it should — GSAP's
      timeline model itself should reflect the new child immediately)?
    - Does `ScrollTrigger end` change, or does it stay at its original
-     value from step 1 — i.e. does the *scroll distance* still only cover
+     value from step 1 — i.e. does the _scroll distance_ still only cover
      the original (shorter) timeline duration, meaning box2's tween gets
      compressed/rushed into whatever scroll range is left, or cut off
      entirely before its tween can complete?
@@ -58,7 +59,7 @@ section 60vh down containing `box1` (blue), and an event log at the bottom.
      matters independently of whether refresh is "correct" — a visible
      snap during production use would be a real UX problem even if the
      math becomes correct afterward.)
-   - Does scrolling through the pin *after* refresh now correctly animate
+   - Does scrolling through the pin _after_ refresh now correctly animate
      both box1 and box2 across the full (now-longer) scroll range, with
      `progress` reaching exactly `1.0` at the new end point?
 
@@ -78,7 +79,7 @@ section 60vh down containing `box1` (blue), and an event log at the bottom.
 - **If pre-refresh behavior is silently wrong** (box2 either doesn't
   animate, animates in the wrong scroll range, or the pin's total scroll
   distance doesn't reflect the new content) **and** refresh() fixes it
-  cleanly with no visible jump: B2 is viable, but *only* if every late
+  cleanly with no visible jump: B2 is viable, but _only_ if every late
   `registerInstance()` call is followed by a deliberate, debounced
   `ScrollTrigger.refresh()` — this becomes a required, non-optional part
   of the B2 design, not an edge case to handle later. That refresh call

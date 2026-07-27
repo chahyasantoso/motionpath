@@ -4,7 +4,7 @@ Confirmed via grep across the whole `src` tree: nothing in the actual app —
 no engine construction call, no demo, no hook — ever passes `reflowSiblings`.
 It was added speculatively as a customization seam without a concrete need;
 what it was meant to cover (reflow duration/ease) is already fully handled
-by `schemaMotion.staggerTransition`, which is schema *data* and therefore
+by `schemaMotion.staggerTransition`, which is schema _data_ and therefore
 portable to a future non-JS engine, unlike an injected function. Removing it.
 
 **Files to edit:** `src/domain/instance/MotionInstance.js`, `src/engines/BaseEngine.js`
@@ -19,7 +19,7 @@ portable to a future non-JS engine, unlike an injected function. Removing it.
    `schemaMotion.staggerTransition` for duration/ease exactly as it does now
    — that part is unaffected, only the function-injection layer is removed.
 2. `BaseEngine` no longer accepts or forwards a `reflowSiblings` dep.
-3. If a genuinely different reflow *mechanism* (not just duration/ease) is
+3. If a genuinely different reflow _mechanism_ (not just duration/ease) is
    needed later, it gets designed then, as its own scoped brief — do not
    leave a partial/commented-out version of this plumbing "just in case."
    Remove it cleanly.
@@ -39,20 +39,22 @@ portable to a future non-JS engine, unlike an injected function. Removing it.
 ## Change 1 — `MotionInstance.js` constructor: stop reading `context.reflowSiblings`
 
 **WRONG (current):**
+
 ```js
-    this.deps = {
-      resolveElement: context.resolveElement,
-      mountInstance: context.mountInstance,
-      reflowSiblings: context.reflowSiblings
-    };
+this.deps = {
+  resolveElement: context.resolveElement,
+  mountInstance: context.mountInstance,
+  reflowSiblings: context.reflowSiblings,
+};
 ```
 
 **CORRECT:**
+
 ```js
-    this.deps = {
-      resolveElement: context.resolveElement,
-      mountInstance: context.mountInstance
-    };
+this.deps = {
+  resolveElement: context.resolveElement,
+  mountInstance: context.mountInstance,
+};
 ```
 
 ---
@@ -60,6 +62,7 @@ portable to a future non-JS engine, unlike an injected function. Removing it.
 ## Change 2 — `#reflowSiblings`: drop the injectable fallback, call `#defaultReflow` directly
 
 **WRONG (current):**
+
 ```js
   #reflowSiblings(targets) {
     const reflow = this.#deps.reflowSiblings ?? MotionInstance.#defaultReflow;
@@ -69,6 +72,7 @@ portable to a future non-JS engine, unlike an injected function. Removing it.
 ```
 
 **CORRECT:**
+
 ```js
   #reflowSiblings(targets) {
     const transition = this.schemaMotion.staggerTransition ?? {};
@@ -86,6 +90,7 @@ possibly-non-promise custom function) is no longer needed.
 ## Change 3 — `BaseEngine.js`: remove the field, constructor read, and context forwarding
 
 **WRONG (current, fields + constructor):**
+
 ```js
   #resolveElement;
   #reflowSiblings;
@@ -107,6 +112,7 @@ possibly-non-promise custom function) is no longer needed.
 ```
 
 **CORRECT:**
+
 ```js
   #resolveElement;
 
@@ -126,28 +132,30 @@ possibly-non-promise custom function) is no longer needed.
 ```
 
 **WRONG (current, inside `mountInstance`'s context object):**
+
 ```js
-    const instance = createMotionInstance(motionId, effectiveConfig, {
-      project: this._project,
-      resolveElement: this.#resolveElement,
-      mountInstance: (childMotionId, childConfig) => {
-        return this.mountInstance(childMotionId, childConfig);
-      },
-      onSubscriberChange,
-      reflowSiblings: this.#reflowSiblings
-    });
+const instance = createMotionInstance(motionId, effectiveConfig, {
+  project: this._project,
+  resolveElement: this.#resolveElement,
+  mountInstance: (childMotionId, childConfig) => {
+    return this.mountInstance(childMotionId, childConfig);
+  },
+  onSubscriberChange,
+  reflowSiblings: this.#reflowSiblings,
+});
 ```
 
 **CORRECT:**
+
 ```js
-    const instance = createMotionInstance(motionId, effectiveConfig, {
-      project: this._project,
-      resolveElement: this.#resolveElement,
-      mountInstance: (childMotionId, childConfig) => {
-        return this.mountInstance(childMotionId, childConfig);
-      },
-      onSubscriberChange
-    });
+const instance = createMotionInstance(motionId, effectiveConfig, {
+  project: this._project,
+  resolveElement: this.#resolveElement,
+  mountInstance: (childMotionId, childConfig) => {
+    return this.mountInstance(childMotionId, childConfig);
+  },
+  onSubscriberChange,
+});
 ```
 
 ---
@@ -157,40 +165,32 @@ possibly-non-promise custom function) is no longer needed.
 ### `createTestInstance`: stop threading `reflowSiblings` through
 
 **WRONG (current):**
+
 ```js
-  function createTestInstance(motionId, config, schemaMotion) {
-    const { reflowSiblings, mountInstance, ...restConfig } = config || {};
-    return new MotionInstance(
-      motionId,
-      restConfig,
-      schemaMotion,
-      {
-        project: { templates },
-        resolveElement: mockDeps.resolveElement,
-        mountInstance: mountInstance || mockDeps.mountInstance,
-        onSubscriberChange: mockOnSubscriberChange,
-        reflowSiblings
-      }
-    );
-  }
+function createTestInstance(motionId, config, schemaMotion) {
+  const { reflowSiblings, mountInstance, ...restConfig } = config || {};
+  return new MotionInstance(motionId, restConfig, schemaMotion, {
+    project: { templates },
+    resolveElement: mockDeps.resolveElement,
+    mountInstance: mountInstance || mockDeps.mountInstance,
+    onSubscriberChange: mockOnSubscriberChange,
+    reflowSiblings,
+  });
+}
 ```
 
 **CORRECT:**
+
 ```js
-  function createTestInstance(motionId, config, schemaMotion) {
-    const { mountInstance, ...restConfig } = config || {};
-    return new MotionInstance(
-      motionId,
-      restConfig,
-      schemaMotion,
-      {
-        project: { templates },
-        resolveElement: mockDeps.resolveElement,
-        mountInstance: mountInstance || mockDeps.mountInstance,
-        onSubscriberChange: mockOnSubscriberChange
-      }
-    );
-  }
+function createTestInstance(motionId, config, schemaMotion) {
+  const { mountInstance, ...restConfig } = config || {};
+  return new MotionInstance(motionId, restConfig, schemaMotion, {
+    project: { templates },
+    resolveElement: mockDeps.resolveElement,
+    mountInstance: mountInstance || mockDeps.mountInstance,
+    onSubscriberChange: mockOnSubscriberChange,
+  });
+}
 ```
 
 ### Delete this test entirely — it tests the feature being removed
@@ -202,16 +202,22 @@ it('uses an injected reflowSiblings function instead of the default tween', asyn
 ```
 
 ### Rewrite this test — it currently relies on `reflowSiblings` injection purely
+
 as a way to control timing in the test, not because the test is actually
 about custom reflow. Replace with spying on `gsap.to` directly and manually
 invoking the captured `onComplete` to simulate the tween finishing:
 
 **WRONG (current):**
+
 ```js
-it('onChildChange fires for removeChild only after reflow completes, not at splice time', async () => {
+it("onChildChange fires for removeChild only after reflow completes, not at splice time", async () => {
   const customReflow = vi.fn().mockResolvedValue(undefined);
-  const instance = createTestInstance('time-motion', { reflowSiblings: customReflow }, timelineSchema);
-  const child1 = instance.addChild('child-motion', {});
+  const instance = createTestInstance(
+    "time-motion",
+    { reflowSiblings: customReflow },
+    timelineSchema,
+  );
+  const child1 = instance.addChild("child-motion", {});
 
   const listener = vi.fn();
   instance.onChildChange(listener);
@@ -219,21 +225,22 @@ it('onChildChange fires for removeChild only after reflow completes, not at spli
 
   expect(listener).not.toHaveBeenCalled(); // reflow (mocked) hasn't resolved yet
 
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   expect(listener).toHaveBeenCalledTimes(1);
 });
 ```
 
 **CORRECT:**
+
 ```js
-it('onChildChange fires for removeChild only after reflow completes, not at splice time', async () => {
-  const instance = createTestInstance('time-motion', {}, timelineSchema);
-  const child1 = instance.addChild('child-motion', {});
-  instance.addChild('child-motion', {}); // survivor — gives the reflow something to do
+it("onChildChange fires for removeChild only after reflow completes, not at splice time", async () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const child1 = instance.addChild("child-motion", {});
+  instance.addChild("child-motion", {}); // survivor — gives the reflow something to do
 
   let capturedOnComplete;
-  const toSpy = vi.spyOn(gsap, 'to').mockImplementation((target, vars) => {
+  const toSpy = vi.spyOn(gsap, "to").mockImplementation((target, vars) => {
     capturedOnComplete = vars.onComplete;
     return { kill: vi.fn() };
   });
@@ -245,7 +252,7 @@ it('onChildChange fires for removeChild only after reflow completes, not at spli
   expect(listener).not.toHaveBeenCalled(); // reflow tween hasn't completed yet
 
   capturedOnComplete(); // simulate the tween finishing
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   expect(listener).toHaveBeenCalledTimes(1);
   toSpy.mockRestore();

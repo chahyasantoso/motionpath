@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { engine } from '../engines/Engine.js';
-import { ScrollTriggerDelegate } from '../lib/TriggerDelegate.js';
+import { useEffect, useRef, useState } from "react";
+import { engine } from "../engines/Engine.js";
+import { ScrollTriggerDelegate } from "../lib/TriggerDelegate.js";
 
 /**
  * Mounts a scroll-triggered motion using component-local DOM refs instead of
@@ -31,7 +31,7 @@ export default function useScrollMotion(schema) {
     const delegate = new ScrollTriggerDelegate({
       ...config,
       trigger: triggerRef.current,
-      pin: config.pin === 'pin' ? pinRef.current : config.pin, // 'pin' role-string -> separate element; `true`/falsy pass through
+      pin: config.pin === "pin" ? pinRef.current : config.pin, // 'pin' role-string -> separate element; `true`/falsy pass through
       endTrigger: config.endTrigger ? endTriggerRef.current : undefined,
     });
 
@@ -48,7 +48,7 @@ export default function useScrollMotion(schema) {
 
   const refs = {
     trigger: triggerRef,
-    pin: config?.pin === 'pin' ? pinRef : undefined,
+    pin: config?.pin === "pin" ? pinRef : undefined,
     endTrigger: config?.endTrigger ? endTriggerRef : undefined,
   };
 

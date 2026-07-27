@@ -14,7 +14,7 @@
 export function staggerShapeRule(motion, context, path) {
   const errors = [];
 
-  if (!motion || typeof motion !== 'object') {
+  if (!motion || typeof motion !== "object") {
     return errors;
   }
 
@@ -26,12 +26,13 @@ export function staggerShapeRule(motion, context, path) {
   const tracks = motion.tracks || [];
   const staggerPath = `${path}.stagger`;
 
-  if (typeof stagger !== 'number') {
+  if (typeof stagger !== "number") {
     errors.push({
       ruleId: "stagger-shape",
       severity: "error",
-      message: "motion.stagger must be a plain number. Object-form stagger (e.g. { each, amount, from }) is not supported.",
-      path: staggerPath
+      message:
+        "motion.stagger must be a plain number. Object-form stagger (e.g. { each, amount, from }) is not supported.",
+      path: staggerPath,
     });
     return errors;
   }
@@ -44,7 +45,7 @@ export function staggerShapeRule(motion, context, path) {
       ruleId: "stagger-shape",
       severity: "error",
       message: `motion.stagger must not be negative. Got: ${JSON.stringify(stagger)}.`,
-      path: staggerPath
+      path: staggerPath,
     });
   }
 

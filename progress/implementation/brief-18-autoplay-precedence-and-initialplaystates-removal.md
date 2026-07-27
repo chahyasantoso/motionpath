@@ -15,7 +15,7 @@ Two related, already-decided fixes. Do not relitigate either — both were reach
 
 ## Non-goals
 
-- Do not touch `TimelineGroupController.js`'s own `shouldPlay = primaryInstance.config.autoplay ?? true` read — that's a separate, already-correct code path (it reads the *primary instance's own* `config.autoplay` for grouped time motions) and is out of scope here. If you find it doesn't account for `trigger.autoplay`, flag it in your summary — don't fix it silently, this brief doesn't cover master-timeline-group autoplay precedence, only the ungrouped/single-instance path in `MotionInstance.#setupDriver`.
+- Do not touch `TimelineGroupController.js`'s own `shouldPlay = primaryInstance.config.autoplay ?? true` read — that's a separate, already-correct code path (it reads the _primary instance's own_ `config.autoplay` for grouped time motions) and is out of scope here. If you find it doesn't account for `trigger.autoplay`, flag it in your summary — don't fix it silently, this brief doesn't cover master-timeline-group autoplay precedence, only the ungrouped/single-instance path in `MotionInstance.#setupDriver`.
 - Do not add a JSDoc `@typedef` or type changes beyond what's shown below.
 - Do not change `spiralMotions.js`'s existing `driver.trigger.autoplay` values (`true` for `spiral-container`, `false` for `ball-exit`) — they're already correct for the new precedence, this brief doesn't touch that file.
 - Do not remove or rename `config.autoplay` itself — it remains a valid fallback, just no longer the only source of truth.
@@ -27,36 +27,39 @@ Two related, already-decided fixes. Do not relitigate either — both were reach
 File: `src/domain/instance/MotionInstance.js`, inside `#setupDriver(config)`.
 
 **WRONG (current):**
-```js
-      if (owns) {
-        this.timeline
-          .repeat(trigger.repeat ?? 0)
-          .yoyo(!!trigger.yoyo)
-          .repeatDelay(trigger.repeatDelay ?? 0);
 
-        if (config.autoplay ?? true) {
-          this.timeline.play();
-        }
-      }
+```js
+if (owns) {
+  this.timeline
+    .repeat(trigger.repeat ?? 0)
+    .yoyo(!!trigger.yoyo)
+    .repeatDelay(trigger.repeatDelay ?? 0);
+
+  if (config.autoplay ?? true) {
+    this.timeline.play();
+  }
+}
 ```
 
 **CORRECT:**
-```js
-      if (owns) {
-        this.timeline
-          .repeat(trigger.repeat ?? 0)
-          .yoyo(!!trigger.yoyo)
-          .repeatDelay(trigger.repeatDelay ?? 0);
 
-        if (trigger.autoplay ?? config.autoplay ?? true) {
-          this.timeline.play();
-        }
-      }
+```js
+if (owns) {
+  this.timeline
+    .repeat(trigger.repeat ?? 0)
+    .yoyo(!!trigger.yoyo)
+    .repeatDelay(trigger.repeatDelay ?? 0);
+
+  if (trigger.autoplay ?? config.autoplay ?? true) {
+    this.timeline.play();
+  }
+}
 ```
 
 That's the entire functional change in this file. `trigger` is already defined earlier in the method (`const trigger = this.schemaMotion.driver?.trigger || {};`) — reuse it, don't redeclare.
 
 ### Verification checklist for Fix 1
+
 - `grep -n "trigger.autoplay ?? config.autoplay ?? true" src/domain/instance/MotionInstance.js` returns exactly one match.
 - `grep -n "config.autoplay ?? true" src/domain/instance/MotionInstance.js` returns zero matches (the old precedence must be fully gone, not left as a second code path).
 - Add a test in `src/domain/instance/__tests__/MotionInstance.test.js` (or wherever existing `#setupDriver`/autoplay tests live — check first, don't create a duplicate file) asserting all three cases with a spy on `timeline.play`:
@@ -71,9 +74,10 @@ That's the entire functional change in this file. `trigger` is already defined e
 File: `src/hooks/useMotionProject.js`.
 
 **WRONG (current — full file):**
+
 ```js
-import { useEffect, useRef, useState } from 'react';
-import { productionEngine } from '../engines/ProductionEngine.js';
+import { useEffect, useRef, useState } from "react";
+import { productionEngine } from "../engines/ProductionEngine.js";
 
 /**
  * React Hook to load a complete MotionPath project once.
@@ -89,7 +93,10 @@ import { productionEngine } from '../engines/ProductionEngine.js';
  *   ongoing control.
  * @returns {boolean} True once the project has successfully loaded
  */
-export default function useMotionProject(project, { initialPlayStates = {} } = {}) {
+export default function useMotionProject(
+  project,
+  { initialPlayStates = {} } = {},
+) {
   const [isLoaded, setIsLoaded] = useState(false);
   const projectRef = useRef(project);
   projectRef.current = project;
@@ -102,12 +109,15 @@ export default function useMotionProject(project, { initialPlayStates = {} } = {
     setIsLoaded(false);
 
     productionEngine
-      .loadProject(projectRef.current, { playStates: initialPlayStatesRef.current })
+      .loadProject(projectRef.current, {
+        playStates: initialPlayStatesRef.current,
+      })
       .then(() => {
         if (!cancelled) setIsLoaded(true);
       })
-      .catch(err => {
-        if (!cancelled) console.error('[useMotionProject] loadProject failed:', err);
+      .catch((err) => {
+        if (!cancelled)
+          console.error("[useMotionProject] loadProject failed:", err);
       });
 
     return () => {
@@ -121,9 +131,10 @@ export default function useMotionProject(project, { initialPlayStates = {} } = {
 ```
 
 **CORRECT (full file):**
+
 ```js
-import { useEffect, useRef, useState } from 'react';
-import { productionEngine } from '../engines/ProductionEngine.js';
+import { useEffect, useRef, useState } from "react";
+import { productionEngine } from "../engines/ProductionEngine.js";
 
 /**
  * React Hook to load a complete MotionPath project once.
@@ -148,8 +159,9 @@ export default function useMotionProject(project) {
       .then(() => {
         if (!cancelled) setIsLoaded(true);
       })
-      .catch(err => {
-        if (!cancelled) console.error('[useMotionProject] loadProject failed:', err);
+      .catch((err) => {
+        if (!cancelled)
+          console.error("[useMotionProject] loadProject failed:", err);
       });
 
     return () => {
@@ -169,6 +181,7 @@ export default function useMotionProject(project) {
 File: `src/engines/BaseEngine.js`. Currently `async loadProject(schema, options = {}) {` — `options` is accepted but never read anywhere in the method body. **Leave the parameter in place** (removing it could break `EditorEngine.loadProject(schema, options)`'s `super.loadProject(schema, options)` call signature, and other future callers may still want an options bag) — this brief is only removing the one specific dead consumer (`initialPlayStates`/`playStates`), not the general extension point. Do not add, remove, or rename anything in `BaseEngine.js` or `EditorEngine.js` for this brief.
 
 ### Verification checklist for Fix 2
+
 - `grep -rn "initialPlayStates" src` returns zero matches anywhere in the codebase after this brief (including `PasarMalamPage.jsx`, fixed below).
 - `grep -rn "playStates" src` returns zero matches.
 - `useMotionProject.test.js` (or wherever its tests live — check first): remove/update any test that passes a second argument or asserts on `initialPlayStates`/`playStates` being forwarded to `loadProject`. Add or confirm a test that `loadProject` is called with exactly one argument (the project) — spy-based call-args assertion, not just "did it run."
@@ -180,30 +193,41 @@ File: `src/engines/BaseEngine.js`. Currently `async loadProject(schema, options 
 File: `src/components/PasarMalam/PasarMalamPage.jsx`, lines ~392–397.
 
 **WRONG (current):**
+
 ```js
-  // initialPlayStates starts the bounce scenario paused to prevent a one-frame flash on load.
-  // Dynamic play/pause control is handled by useMotionTimelinePlayback below.
-  const isLoaded = useMotionProject(pmProject, { initialPlayStates: { 'lantern-bounce-tl': false } });
-  const storytellingInstance = useMotionInstance(isLoaded ? 'pasar-malam-storytelling' : null);
-  const lanternInstance = useMotionInstance(isLoaded ? 'lantern-scene' : null);
-  const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce' : null);
+// initialPlayStates starts the bounce scenario paused to prevent a one-frame flash on load.
+// Dynamic play/pause control is handled by useMotionTimelinePlayback below.
+const isLoaded = useMotionProject(pmProject, {
+  initialPlayStates: { "lantern-bounce-tl": false },
+});
+const storytellingInstance = useMotionInstance(
+  isLoaded ? "pasar-malam-storytelling" : null,
+);
+const lanternInstance = useMotionInstance(isLoaded ? "lantern-scene" : null);
+const bounceInstance = useMotionInstance(isLoaded ? "lantern-bounce" : null);
 ```
 
 **CORRECT:**
+
 ```js
-  // 'lantern-bounce' is the primary of the 'lantern-bounce-tl' group — passing
-  // autoplay:false here suppresses the master timeline's initial play() call
-  // at construction, so it never plays before useMotionTimelinePlayback (below)
-  // takes over ongoing control. No flash, and no reliance on effect-ordering.
-  const isLoaded = useMotionProject(pmProject);
-  const storytellingInstance = useMotionInstance(isLoaded ? 'pasar-malam-storytelling' : null);
-  const lanternInstance = useMotionInstance(isLoaded ? 'lantern-scene' : null);
-  const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce' : null, { autoplay: false });
+// 'lantern-bounce' is the primary of the 'lantern-bounce-tl' group — passing
+// autoplay:false here suppresses the master timeline's initial play() call
+// at construction, so it never plays before useMotionTimelinePlayback (below)
+// takes over ongoing control. No flash, and no reliance on effect-ordering.
+const isLoaded = useMotionProject(pmProject);
+const storytellingInstance = useMotionInstance(
+  isLoaded ? "pasar-malam-storytelling" : null,
+);
+const lanternInstance = useMotionInstance(isLoaded ? "lantern-scene" : null);
+const bounceInstance = useMotionInstance(isLoaded ? "lantern-bounce" : null, {
+  autoplay: false,
+});
 ```
 
 Note `useMotionProject(pmProject)` — single argument, matching Fix 2. Do not pass an empty options object.
 
 ### Verification checklist for Fix 3
+
 - `grep -n "initialPlayStates" src/components/PasarMalam/PasarMalamPage.jsx` returns zero matches.
 - `grep -n "useMotionInstance(isLoaded ? 'lantern-bounce' : null, { autoplay: false })" src/components/PasarMalam/PasarMalamPage.jsx` returns exactly one match.
 - Do not touch `PasarMalamObserverPage.jsx` — it uses a differently-named motion (`lantern-bounce-observer`) with no `timelineId`/`primary`/`initialPlayStates` involvement at all; out of scope, confirm with a grep that it's unaffected (`git diff` for that file should be empty).

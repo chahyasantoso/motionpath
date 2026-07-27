@@ -1,39 +1,48 @@
-import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import './BurstPage.css';
-import useMotionInstance from '../../hooks/useMotionInstance';
-import useMotionProject from '../../hooks/useMotionProject';
-import useMotionSubscriber from '../../hooks/useMotionSubscriber';
-import useMotionTrigger from '../../hooks/useMotionTrigger';
-import { buildMotionPath } from '../../utils/pathUtils';
-import { projectPathNodes3DTo2D } from '../../utils/projection3d';
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+} from "react";
+import "./BurstPage.css";
+import useMotionInstance from "../../hooks/useMotionInstance";
+import useMotionProject from "../../hooks/useMotionProject";
+import useMotionSubscriber from "../../hooks/useMotionSubscriber";
+import useMotionTrigger from "../../hooks/useMotionTrigger";
+import { buildMotionPath } from "../../utils/pathUtils";
+import { projectPathNodes3DTo2D } from "../../utils/projection3d";
 
 // ─── Strawberry Burst Demo Configs ──────────────────────────────
 const STRAW_PERSPECTIVE = 800;
 
 const strawberryScene = {
-  motionId: 'strawberry-burst-scroll',
+  motionId: "strawberry-burst-scroll",
   driver: {
-    type: 'timeline',
-    sectionId: 'strawberry-burst-scroll',
+    type: "timeline",
+    sectionId: "strawberry-burst-scroll",
     trigger: {
-      type: 'scroll',
+      type: "scroll",
       scrub: 0.5,
-      pin: 'burst-stage',
-      start: 'top top',
-      end: 'bottom bottom'
-    }
+      pin: "burst-stage",
+      start: "top top",
+      end: "bottom bottom",
+    },
   },
   tracks: [
     {
-      id: 'strawberry-1',
+      id: "strawberry-1",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -1420 }, { x: -160, y: -120, z: 200 }],
+          points: [
+            { x: 0, y: 0, z: -1420 },
+            { x: -160, y: -120, z: 200 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.45, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -41,21 +50,24 @@ const strawberryScene = {
             { p: 0.0675, v: 1 },
             { p: 0.3825, v: 1 },
             { p: 0.45, v: 0 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'strawberry-2',
+      id: "strawberry-2",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -280 }, { x: 160, y: -120, z: 150 }],
+          points: [
+            { x: 0, y: 0, z: -280 },
+            { x: 160, y: -120, z: 150 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.45, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -63,22 +75,25 @@ const strawberryScene = {
             { p: 0.0675, v: 1 },
             { p: 0.3825, v: 1 },
             { p: 0.45, v: 0 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'strawberry-3',
+      id: "strawberry-3",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -1350 }, { x: -40, y: 140, z: 250 }],
+          points: [
+            { x: 0, y: 0, z: -1350 },
+            { x: -40, y: 140, z: 250 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.15, v: 0 },
             { p: 0.6, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -87,22 +102,25 @@ const strawberryScene = {
             { p: 0.2175, v: 1 },
             { p: 0.5325, v: 1 },
             { p: 0.6, v: 0 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'strawberry-4',
+      id: "strawberry-4",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -1220 }, { x: -200, y: 30, z: 180 }],
+          points: [
+            { x: 0, y: 0, z: -1220 },
+            { x: -200, y: 30, z: 180 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.15, v: 0 },
             { p: 0.6, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -111,22 +129,25 @@ const strawberryScene = {
             { p: 0.2175, v: 1 },
             { p: 0.5325, v: 1 },
             { p: 0.6, v: 0 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'strawberry-5',
+      id: "strawberry-5",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -400 }, { x: 200, y: 60, z: 220 }],
+          points: [
+            { x: 0, y: 0, z: -400 },
+            { x: 200, y: 60, z: 220 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.3, v: 0 },
             { p: 0.75, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -135,22 +156,25 @@ const strawberryScene = {
             { p: 0.3675, v: 1 },
             { p: 0.6825, v: 1 },
             { p: 0.75, v: 0 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'strawberry-6',
+      id: "strawberry-6",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -1310 }, { x: -100, y: -180, z: 120 }],
+          points: [
+            { x: 0, y: 0, z: -1310 },
+            { x: -100, y: -180, z: 120 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.3, v: 0 },
             { p: 0.75, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -159,22 +183,25 @@ const strawberryScene = {
             { p: 0.3675, v: 1 },
             { p: 0.6825, v: 1 },
             { p: 0.75, v: 0 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'strawberry-7',
+      id: "strawberry-7",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -450 }, { x: 100, y: -180, z: 240 }],
+          points: [
+            { x: 0, y: 0, z: -450 },
+            { x: 100, y: -180, z: 240 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.45, v: 0 },
             { p: 0.9, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -183,22 +210,25 @@ const strawberryScene = {
             { p: 0.5175, v: 1 },
             { p: 0.8325, v: 1 },
             { p: 0.9, v: 0 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'strawberry-8',
+      id: "strawberry-8",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -1260 }, { x: 80, y: 160, z: 160 }],
+          points: [
+            { x: 0, y: 0, z: -1260 },
+            { x: 80, y: 160, z: 160 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.45, v: 0 },
             { p: 0.9, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -207,21 +237,24 @@ const strawberryScene = {
             { p: 0.5175, v: 1 },
             { p: 0.8325, v: 1 },
             { p: 0.9, v: 0 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'strawberry-9',
+      id: "strawberry-9",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -370 }, { x: -120, y: 100, z: 300 }],
+          points: [
+            { x: 0, y: 0, z: -370 },
+            { x: -120, y: 100, z: 300 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.6, v: 0 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -229,21 +262,24 @@ const strawberryScene = {
             { p: 0.6, v: 0 },
             { p: 0.66, v: 1 },
             { p: 0.94, v: 1 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'strawberry-10',
+      id: "strawberry-10",
       keyframes: {
         path: {
-          points: [{ x: 0, y: 0, z: -200 }, { x: 180, y: -50, z: 100 }],
+          points: [
+            { x: 0, y: 0, z: -200 },
+            { x: 180, y: -50, z: 100 },
+          ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.6, v: 0 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
@@ -251,103 +287,106 @@ const strawberryScene = {
             { p: 0.6, v: 0 },
             { p: 0.66, v: 1 },
             { p: 0.94, v: 1 },
-            { p: 1.0, v: 0 }
-          ]
-        }
-      }
+            { p: 1.0, v: 0 },
+          ],
+        },
+      },
     },
     {
-      id: 'ice-cream-center',
+      id: "ice-cream-center",
       keyframes: {
         path: {
           points: [
             { x: 0, y: 0, z: 400 },
-            { x: 0, y: -35, z: 0 }
+            { x: 0, y: -35, z: 0 },
           ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.7, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
-        }
-      }
-    }
-  ]
+            { p: 1.0, v: 1 },
+          ],
+        },
+      },
+    },
+  ],
 };
 
 const iceCreamCardScene = {
-  motionId: 'ice-cream-card-slide',
+  motionId: "ice-cream-card-slide",
   driver: {
-    type: 'timeline',
-    sectionId: 'ice-cream-card-slide',
+    type: "timeline",
+    sectionId: "ice-cream-card-slide",
     trigger: {
-      type: 'scroll',
+      type: "scroll",
       scrub: false,
-      startTrigger: 'strawberry-burst-scroll',
-      start: 'top 30%',
-      toggleActions: 'play none none none'
-    }
+      startTrigger: "strawberry-burst-scroll",
+      start: "top 30%",
+      toggleActions: "play none none none",
+    },
   },
   tracks: [
     {
-      id: 'strawberry-card',
+      id: "strawberry-card",
       duration: 2.2,
       keyframes: {
         path: {
           points: [
             { x: 0, y: 300 },
-            { x: 0, y: 0 }
+            { x: 0, y: 0 },
           ],
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.3, v: 0 },
-            { p: 1.0, v: 1 }
-          ]
+            { p: 1.0, v: 1 },
+          ],
         },
         opacity: {
           stops: [
             { p: 0.0, v: 0 },
             { p: 0.3, v: 0 },
             { p: 0.767, v: 1 },
-            { p: 1.0, v: 1 }
-          ]
-        }
-      }
-    }
-  ]
+            { p: 1.0, v: 1 },
+          ],
+        },
+      },
+    },
+  ],
 };
 
 // ─── Strawberry Burst Demo Components ───────────────────────────
 function Strawberry({ instance, elementId, emoji }) {
   const ref = useRef(null);
-  
+
   // Stable random starting rotation angle between 0 and 360 degrees
   const startRotation = useRef(Math.floor(Math.random() * 360)).current;
 
-  const transform = useCallback((rawData, composeFn) => {
-    const point3D = composeFn(rawData);
-    const progress = rawData.pathProgress ?? 0;
-    const rotation = startRotation + (progress * 90);
+  const transform = useCallback(
+    (rawData, composeFn) => {
+      const point3D = composeFn(rawData);
+      const progress = rawData.pathProgress ?? 0;
+      const rotation = startRotation + progress * 90;
 
-    let blurVal = 0;
-    if (point3D.z < -100) {
-      // Background blur (soft focus)
-      blurVal = Math.min(3, (-point3D.z - 100) / 80);
-    } else if (point3D.z > 50) {
-      // Foreground lens blur (macro bokeh)
-      blurVal = Math.min(8, (point3D.z - 50) / 20);
-    }
+      let blurVal = 0;
+      if (point3D.z < -100) {
+        // Background blur (soft focus)
+        blurVal = Math.min(3, (-point3D.z - 100) / 80);
+      } else if (point3D.z > 50) {
+        // Foreground lens blur (macro bokeh)
+        blurVal = Math.min(8, (point3D.z - 50) / 20);
+      }
 
-    const composed = composeFn({
-      ...rawData,
-      blur: Math.round(blurVal * 10) / 10
-    });
+      const composed = composeFn({
+        ...rawData,
+        blur: Math.round(blurVal * 10) / 10,
+      });
 
-    return {
-      ...composed, // Has x, y, z, rotation, opacity, filter (merged blur + others), xPercent, yPercent, transformOrigin auto-aligned
-      rotation: rotation,
-    };
-  }, [startRotation]);
+      return {
+        ...composed, // Has x, y, z, rotation, opacity, filter (merged blur + others), xPercent, yPercent, transformOrigin auto-aligned
+        rotation: rotation,
+      };
+    },
+    [startRotation],
+  );
 
   useMotionSubscriber(instance, elementId, ref, transform);
 
@@ -365,14 +404,23 @@ function IceCreamCard({ instance }) {
     return composeFn(rawData);
   }, []);
 
-  useMotionSubscriber(instance, 'strawberry-card', ref, transform);
+  useMotionSubscriber(instance, "strawberry-card", ref, transform);
 
   return (
     <div ref={ref} className="burst-card">
       <div className="badge">Limited Flavor</div>
       <h3>Strawberry Sundae</h3>
-      <p>A double scoop of fresh strawberry and creamy vanilla ice cream, topped with rich syrup and juicy strawberry bursts.</p>
-      <div className="growth-readout" style={{ color: '#ff6bca', border: '1px solid rgba(255, 107, 202, 0.3)' }}>
+      <p>
+        A double scoop of fresh strawberry and creamy vanilla ice cream, topped
+        with rich syrup and juicy strawberry bursts.
+      </p>
+      <div
+        className="growth-readout"
+        style={{
+          color: "#ff6bca",
+          border: "1px solid rgba(255, 107, 202, 0.3)",
+        }}
+      >
         🍓 $4.99 SPECIAL
       </div>
     </div>
@@ -386,7 +434,7 @@ function IceCreamCenterpiece({ instance }) {
     return composeFn(rawData);
   }, []);
 
-  useMotionSubscriber(instance, 'ice-cream-center', ref, transform);
+  useMotionSubscriber(instance, "ice-cream-center", ref, transform);
 
   return (
     <div ref={ref} className="ice-cream-wrapper">
@@ -418,27 +466,34 @@ export default function BurstPage() {
     };
   }, []);
 
-  const project = useMemo(() => ({
-    schemaVersion: 2,
-    projectId: 'burst-page',
-    perspective: STRAW_PERSPECTIVE,
-    motions: [strawberryScene, iceCreamCardScene],
-  }), []);
+  const project = useMemo(
+    () => ({
+      schemaVersion: 2,
+      projectId: "burst-page",
+      perspective: STRAW_PERSPECTIVE,
+      motions: [strawberryScene, iceCreamCardScene],
+    }),
+    [],
+  );
 
   const isLoaded = useMotionProject(project);
 
-  const strawberryInstance = useMotionInstance(isLoaded ? 'strawberry-burst-scroll' : null);
-  const cardInstance = useMotionInstance(isLoaded ? 'ice-cream-card-slide' : null);
+  const strawberryInstance = useMotionInstance(
+    isLoaded ? "strawberry-burst-scroll" : null,
+  );
+  const cardInstance = useMotionInstance(
+    isLoaded ? "ice-cream-card-slide" : null,
+  );
 
-  useMotionTrigger('strawberry-burst-scroll', containerRef);
-  useMotionTrigger('burst-stage', stageRef);
+  useMotionTrigger("strawberry-burst-scroll", containerRef);
+  useMotionTrigger("burst-stage", stageRef);
 
   const strawCx = dimensions.width * 0.25;
   const strawCy = dimensions.height * 0.5;
 
   // Map 3D path nodes to 2D for all 10 strawberries dynamically (excluding ice cream center)
   const strawberryPaths = strawberryScene.tracks
-    .filter((el) => el.id.startsWith('strawberry'))
+    .filter((el) => el.id.startsWith("strawberry"))
     .map((el) => {
       const nodes = projectPathNodes3DTo2D(
         el.keyframes.path.points,
@@ -446,7 +501,7 @@ export default function BurstPage() {
         strawCy,
         0,
         false,
-        STRAW_PERSPECTIVE
+        STRAW_PERSPECTIVE,
       );
       return {
         id: el.id,
@@ -459,18 +514,32 @@ export default function BurstPage() {
   return (
     <div className="app">
       <header className="header">
-        <h1>MotionPath <span className="accent">Burst Demo</span></h1>
-        <p className="subtitle">Staggered Timeframes • Native 3D Z-Depth Projection</p>
+        <h1>
+          MotionPath <span className="accent">Burst Demo</span>
+        </h1>
+        <p className="subtitle">
+          Staggered Timeframes • Native 3D Z-Depth Projection
+        </p>
       </header>
 
       <section ref={containerRef} className="burst-scene">
         <div ref={stageRef} className="burst-stage">
           <div className="scene-label">
             <h2>Multi-Scene Orchestration (Scroll Scrub + Scroll Observer)</h2>
-            <p>Ten scroll-triggered strawberries burst sequentially using staggered timeframes, while a scroll-observer triggered card slides in autonomously when the stage enters viewport.</p>
+            <p>
+              Ten scroll-triggered strawberries burst sequentially using
+              staggered timeframes, while a scroll-observer triggered card
+              slides in autonomously when the stage enters viewport.
+            </p>
           </div>
 
-          <div className="burst-inner" style={{ perspective: `${STRAW_PERSPECTIVE}px`, perspectiveOrigin: `${strawCx}px ${strawCy}px` }}>
+          <div
+            className="burst-inner"
+            style={{
+              perspective: `${STRAW_PERSPECTIVE}px`,
+              perspectiveOrigin: `${strawCx}px ${strawCy}px`,
+            }}
+          >
             <svg className="path-guide" width="100%" height="100%">
               {strawberryPaths.map((path) => (
                 <path
@@ -482,15 +551,28 @@ export default function BurstPage() {
                   strokeDasharray="5 5"
                 />
               ))}
-              <g transform={`translate(${dimensions.width * 0.72}, ${dimensions.height * 0.5})`}>
-                <path d={buildMotionPath(cardNodes)} fill="none" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="8 6" />
+              <g
+                transform={`translate(${dimensions.width * 0.72}, ${dimensions.height * 0.5})`}
+              >
+                <path
+                  d={buildMotionPath(cardNodes)}
+                  fill="none"
+                  stroke="rgba(255, 255, 255, 0.05)"
+                  strokeWidth="1"
+                  strokeDasharray="8 6"
+                />
               </g>
             </svg>
 
             {strawberryScene.tracks
-              .filter((el) => el.id.startsWith('strawberry'))
+              .filter((el) => el.id.startsWith("strawberry"))
               .map((el) => (
-                <Strawberry key={el.id} instance={strawberryInstance} elementId={el.id} emoji="🍓" />
+                <Strawberry
+                  key={el.id}
+                  instance={strawberryInstance}
+                  elementId={el.id}
+                  emoji="🍓"
+                />
               ))}
 
             <IceCreamCenterpiece instance={strawberryInstance} />
@@ -499,7 +581,7 @@ export default function BurstPage() {
           </div>
         </div>
       </section>
-      
+
       <footer className="footer">
         <p>Scroll down/up to trigger the burst effect</p>
       </footer>

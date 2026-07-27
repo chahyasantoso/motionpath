@@ -11,16 +11,16 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
   "schemaVersion": 1,
   "projectId": "iceCreamLanding",
   "perspective": 800,
-  "scenarios": [ /* ... */ ]
+  "scenarios": [/* ... */]
 }
 ```
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `schemaVersion` | integer | **yes** | Must equal `1` exactly for this schema generation. No leniency, no version-branching logic — validator rejects any other value outright. |
-| `projectId` | string | yes | Author-facing identifier, no engine semantics. |
-| `perspective` | number (px) | no | CSS `perspective`, applied once to the root stage container at `loadProject()` time. Omit for no 3D depth. **Validator warns** if any element uses `z`/`rotationX`/`rotationY` while this is absent. |
-| `scenarios` | array | yes | The grouping unit — replaces any flat `elements` concept. |
+| Field           | Type        | Required | Notes                                                                                                                                                                                                |
+| --------------- | ----------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion` | integer     | **yes**  | Must equal `1` exactly for this schema generation. No leniency, no version-branching logic — validator rejects any other value outright.                                                             |
+| `projectId`     | string      | yes      | Author-facing identifier, no engine semantics.                                                                                                                                                       |
+| `perspective`   | number (px) | no       | CSS `perspective`, applied once to the root stage container at `loadProject()` time. Omit for no 3D depth. **Validator warns** if any element uses `z`/`rotationX`/`rotationY` while this is absent. |
+| `scenarios`     | array       | yes      | The grouping unit — replaces any flat `elements` concept.                                                                                                                                            |
 
 ---
 
@@ -33,18 +33,18 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
   "primary": true,
   "trigger": { "type": "time", "duration": 1.2 },
   "stagger": 0.15,
-  "elements": [ /* ... */ ]
+  "elements": [/* ... */]
 }
 ```
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `sceneId` | string | yes | Default trigger element; groups scenarios for the element-uniqueness rule. |
-| `trigger` | object | yes | **One trigger type per scenario, no exceptions.** See Trigger below. |
-| `timelineId` | string | no | Groups scenarios into one real GSAP master timeline. Only scenarios of **identical trigger type** may share a value (scrub-with-scrub, or time-with-time). Scroll **observer** scenarios can never carry this — build-time error if present. Children nest under the master **in schema-declaration order**, GSAP's default sequential positioning — no offset/overlap field exists in v1 (see Wishlist). |
-| `primary` | boolean | no | Exactly one `true` per `timelineId` group. Scrub groups: primary's trigger config (`start`/`end`/`pin`/etc.) is the one real ScrollTrigger; others only declare `type`/`scrub` compatibility. Time groups: primary's `repeat`/`yoyo`/`repeatDelay` apply to the whole nested group. Non-primary scenarios are forbidden from declaring trigger fields (`start`, `end`, `pin`, `pinSpacing`, `snap`, `repeat`, `yoyo`, `repeatDelay`) — build-time error. Zero or 2+ primary per group is a build-time error. |
-| `stagger` | number (seconds) | no | Each element's start offset = `index * stagger`, index = declaration order in `elements[]`. Manual per-element positional offset in the build loop — **not** GSAP's native `stagger` vars option (rejected: requires uniform tween shapes across targets, incompatible with our per-element merged keyframe model). Non-negative; validator warns if set with <2 elements. |
-| `elements` | array | yes | See Element below. |
+| Field        | Type             | Required | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------ | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sceneId`    | string           | yes      | Default trigger element; groups scenarios for the element-uniqueness rule.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `trigger`    | object           | yes      | **One trigger type per scenario, no exceptions.** See Trigger below.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `timelineId` | string           | no       | Groups scenarios into one real GSAP master timeline. Only scenarios of **identical trigger type** may share a value (scrub-with-scrub, or time-with-time). Scroll **observer** scenarios can never carry this — build-time error if present. Children nest under the master **in schema-declaration order**, GSAP's default sequential positioning — no offset/overlap field exists in v1 (see Wishlist).                                                                                                    |
+| `primary`    | boolean          | no       | Exactly one `true` per `timelineId` group. Scrub groups: primary's trigger config (`start`/`end`/`pin`/etc.) is the one real ScrollTrigger; others only declare `type`/`scrub` compatibility. Time groups: primary's `repeat`/`yoyo`/`repeatDelay` apply to the whole nested group. Non-primary scenarios are forbidden from declaring trigger fields (`start`, `end`, `pin`, `pinSpacing`, `snap`, `repeat`, `yoyo`, `repeatDelay`) — build-time error. Zero or 2+ primary per group is a build-time error. |
+| `stagger`    | number (seconds) | no       | Each element's start offset = `index * stagger`, index = declaration order in `elements[]`. Manual per-element positional offset in the build loop — **not** GSAP's native `stagger` vars option (rejected: requires uniform tween shapes across targets, incompatible with our per-element merged keyframe model). Non-negative; validator warns if set with <2 elements.                                                                                                                                   |
+| `elements`   | array            | yes      | See Element below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 **Cross-scenario rule:** two scenarios sharing the same `sceneId` must not reference the same element `id` — build-time error.
 
@@ -65,12 +65,12 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
 { "type": "time", "duration": 2, "repeat": -1, "yoyo": true, "repeatDelay": 0.5 }
 ```
 
-| Extra field | Valid on | Notes |
-|---|---|---|
-| `pin`, `pinSpacing`, `snap` | scrub only | Pure pass-through to GSAP/ScrollTrigger. |
-| `repeat`, `yoyo`, `repeatDelay` | time / observer only | **Forbidden on scrub** — build-time error. Progress is a direct function of scroll position; looping is meaningless there. |
-| `endTrigger` | scrub only | Forbidden outside `scroll`+`scrub:true` — build-time error. Native GSAP `trigger`/`endTrigger` fields, no custom logic. |
-| `delay` | time / observer only | Forbidden on scrub — build-time error. **Known caveat, community-reported, not independently verified:** on observer with multi-action `toggleActions`, applies correctly on enter/enterBack but reportedly skipped on leave/leaveBack. Not a concern for simple `"play none none none"` usage. |
+| Extra field                     | Valid on             | Notes                                                                                                                                                                                                                                                                                           |
+| ------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pin`, `pinSpacing`, `snap`     | scrub only           | Pure pass-through to GSAP/ScrollTrigger.                                                                                                                                                                                                                                                        |
+| `repeat`, `yoyo`, `repeatDelay` | time / observer only | **Forbidden on scrub** — build-time error. Progress is a direct function of scroll position; looping is meaningless there.                                                                                                                                                                      |
+| `endTrigger`                    | scrub only           | Forbidden outside `scroll`+`scrub:true` — build-time error. Native GSAP `trigger`/`endTrigger` fields, no custom logic.                                                                                                                                                                         |
+| `delay`                         | time / observer only | Forbidden on scrub — build-time error. **Known caveat, community-reported, not independently verified:** on observer with multi-action `toggleActions`, applies correctly on enter/enterBack but reportedly skipped on leave/leaveBack. Not a concern for simple `"play none none none"` usage. |
 
 `toggleActions`'s four-state dispatch (enter/leave/enterBack/leaveBack → play/pause/resume/reverse) is fully handled by GSAP internally. Scrub and `toggleActions` are mutually exclusive per GSAP docs — validates the `scrub:true` vs `scrub:false`+`toggleActions` split as GSAP-level, not arbitrary.
 
@@ -83,16 +83,16 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
   "id": "sprinkle1",
   "duration": 0.8,
   "transformOrigin": "50% 50%",
-  "keyframes": { /* ... */ }
+  "keyframes": {/* ... */}
 }
 ```
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes | **Logical identifier, not a CSS selector.** Resolved via push-based DOM subscription (`useMotionSubscriber(elementId, ref)`) — decouples animation targeting from page styling/structure. Must be unique within a scenario's element list. Missing markup does not cause build-time errors since subscriptions occur dynamically at runtime. |
-| `duration` | number (seconds) | no | Overrides scenario duration; observer/time-scoped only. Forbidden on scrub scenarios — build-time error. |
-| `transformOrigin` | string | no | e.g. `"50% 50%"`. Direct CSS pass-through. |
-| `keyframes` | object | yes | Flat — each key is an animatable property. |
+| Field             | Type             | Required | Notes                                                                                                                                                                                                                                                                                                                                        |
+| ----------------- | ---------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | string           | yes      | **Logical identifier, not a CSS selector.** Resolved via push-based DOM subscription (`useMotionSubscriber(elementId, ref)`) — decouples animation targeting from page styling/structure. Must be unique within a scenario's element list. Missing markup does not cause build-time errors since subscriptions occur dynamically at runtime. |
+| `duration`        | number (seconds) | no       | Overrides scenario duration; observer/time-scoped only. Forbidden on scrub scenarios — build-time error.                                                                                                                                                                                                                                     |
+| `transformOrigin` | string           | no       | e.g. `"50% 50%"`. Direct CSS pass-through.                                                                                                                                                                                                                                                                                                   |
+| `keyframes`       | object           | yes      | Flat — each key is an animatable property.                                                                                                                                                                                                                                                                                                   |
 
 ---
 
@@ -107,18 +107,18 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
 
 **Stops format:** `p` = progress 0–1, `v` = value (number or string), `ease` = optional, set per-entry. **Each animated property must explicitly declare at least two stops (minimum length >= 2). Single-stop shorthand is not allowed.**
 
-| Property | Type | Unit |
-|---|---|---|
-| `x`, `y`, `z` | number | px |
-| `rotation`, `rotationX`, `rotationY` | number | degrees |
-| `scaleX`, `scaleY` | number | unitless multiplier (1 = 100%) |
-| `skewX`, `skewY` | number | degrees |
-| `opacity` | number | 0–1 |
-| `blur` | number | px (composed as `blur(Npx)` — see Filter Consolidation) |
-| `brightness`, `contrast`, `saturate` | number | unitless multiplier (1 = 100%) |
-| `backgroundColor`, `color`, `borderColor` | string | any valid CSS color |
-| `--any-custom-property` | string | raw CSS value, no unit assumed — no-ops on unrecognized engines (no cross-platform equivalent) |
-| `path` | object | see Path below |
+| Property                                  | Type   | Unit                                                                                           |
+| ----------------------------------------- | ------ | ---------------------------------------------------------------------------------------------- |
+| `x`, `y`, `z`                             | number | px                                                                                             |
+| `rotation`, `rotationX`, `rotationY`      | number | degrees                                                                                        |
+| `scaleX`, `scaleY`                        | number | unitless multiplier (1 = 100%)                                                                 |
+| `skewX`, `skewY`                          | number | degrees                                                                                        |
+| `opacity`                                 | number | 0–1                                                                                            |
+| `blur`                                    | number | px (composed as `blur(Npx)` — see Filter Consolidation)                                        |
+| `brightness`, `contrast`, `saturate`      | number | unitless multiplier (1 = 100%)                                                                 |
+| `backgroundColor`, `color`, `borderColor` | string | any valid CSS color                                                                            |
+| `--any-custom-property`                   | string | raw CSS value, no unit assumed — no-ops on unrecognized engines (no cross-platform equivalent) |
+| `path`                                    | object | see Path below                                                                                 |
 
 `path` and `x`/`y` are **mutually exclusive** per element — build-time error if both present.
 
@@ -161,14 +161,20 @@ Two properties contributing different `ease` values at the same literal `p` perc
     "sceneId": "iceCreamSection",
     "timelineId": "iceCreamSection-master",
     "primary": true,
-    "trigger": { "type": "scroll", "scrub": true, "pin": true, "start": "top top", "end": "+=2000" },
-    "elements": [ /* cone, scoop1, scoop2, scoop3 */ ]
+    "trigger": {
+      "type": "scroll",
+      "scrub": true,
+      "pin": true,
+      "start": "top top",
+      "end": "+=2000"
+    },
+    "elements": [/* cone, scoop1, scoop2, scoop3 */]
   },
   {
     "sceneId": "iceCreamSection",
     "timelineId": "iceCreamSection-master",
     "trigger": { "type": "scroll", "scrub": true },
-    "elements": [ /* sprinkles, cherry, syrup */ ]
+    "elements": [/* sprinkles, cherry, syrup */]
   }
 ]
 ```

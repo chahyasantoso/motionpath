@@ -1,16 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import { pathPlugin } from '../pathPlugin.js';
+import { describe, it, expect } from "vitest";
+import { pathPlugin } from "../pathPlugin.js";
 
-describe('pathPlugin', () => {
-  it('declares correct keys list', () => {
-    expect(pathPlugin.keys).toEqual(['path']);
+describe("pathPlugin", () => {
+  it("declares correct keys list", () => {
+    expect(pathPlugin.keys).toEqual(["path"]);
     expect(pathPlugin.lazy).toBe(false);
   });
 
-  it('contribute maps progress stops and injects cubicPath and auto-rotate metadata at 0%', () => {
+  it("contribute maps progress stops and injects cubicPath and auto-rotate metadata at 0%", () => {
     const stops = [
       { p: 0.1, v: 0.1 },
-      { p: 0.8, v: 0.8, ease: 'power1.out' }
+      { p: 0.8, v: 0.8, ease: "power1.out" },
     ];
 
     // autoRotate lives inside keyframes.path (not on the element root).
@@ -23,20 +23,23 @@ describe('pathPlugin', () => {
             { x: 0, y: 0 },
             { x: 5, y: 5 },
             { x: 10, y: 10 },
-            { x: 15, y: 15 }
-          ]
-        }
-      }
+            { x: 15, y: 15 },
+          ],
+        },
+      },
     };
 
-    const result = pathPlugin.contribute('path', stops, mockElement);
+    const result = pathPlugin.contribute("path", stops, mockElement);
 
     // Verify raw progress stops mapping
-    expect(result.percentPatch['10%']).toEqual({ pathProgress: 0.1 });
-    expect(result.percentPatch['80%']).toEqual({ pathProgress: 0.8, ease: 'power1.out' });
+    expect(result.percentPatch["10%"]).toEqual({ pathProgress: 0.1 });
+    expect(result.percentPatch["80%"]).toEqual({
+      pathProgress: 0.8,
+      ease: "power1.out",
+    });
 
     // Verify proxy metadata seeding at 0%
-    const zeroFrame = result.percentPatch['0%'];
+    const zeroFrame = result.percentPatch["0%"];
     expect(zeroFrame).toBeDefined();
     expect(zeroFrame.autoRotate).toBe(true);
     expect(zeroFrame.cubicPath).toBeInstanceOf(Array);
@@ -46,22 +49,22 @@ describe('pathPlugin', () => {
     expect(zeroFrame.cubicPath[0]).toEqual({ x: 0, y: 0, z: 0 });
   });
 
-  describe('compose', () => {
-    it('returns empty object if rawData has no path progress or cubicPath', () => {
+  describe("compose", () => {
+    it("returns empty object if rawData has no path progress or cubicPath", () => {
       expect(pathPlugin.compose({})).toEqual({});
       expect(pathPlugin.compose({ pathProgress: 0.5 })).toEqual({});
     });
 
-    it('interpolates coordinate along cubic path and injects automatic centering', () => {
+    it("interpolates coordinate along cubic path and injects automatic centering", () => {
       const rawData = {
         pathProgress: 0.5,
         cubicPath: [
           { x: 0, y: 0 },
           { x: 5, y: 5 },
           { x: 10, y: 10 },
-          { x: 15, y: 15 }
+          { x: 15, y: 15 },
         ],
-        autoRotate: true
+        autoRotate: true,
       };
 
       const result = pathPlugin.compose(rawData);

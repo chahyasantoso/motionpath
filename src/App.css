@@ -7,7 +7,7 @@
   box-sizing: border-box;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap");
 
 :root {
   --bg: #0a0a1a;
@@ -23,7 +23,7 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
@@ -89,7 +89,7 @@ body {
   display: flex;
   flex-direction: column;
   color: var(--text);
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   overflow: hidden;
 }
 
@@ -207,7 +207,10 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.04) 1px,
+    transparent 1px
+  );
   background-size: 20px 20px;
   pointer-events: none;
 }
@@ -297,7 +300,9 @@ body {
   cursor: grab;
   user-select: none;
   z-index: 10;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .node-handle:hover {
@@ -385,7 +390,7 @@ body {
 .editor-preview-item .preview-label {
   font-size: 2.2rem;
   line-height: 1;
-  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
 }
 
 .editor-preview-item .preview-id {
@@ -408,7 +413,7 @@ body {
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
 }
 
 .editor-preview-item.card .preview-label {
@@ -702,7 +707,7 @@ body {
 
 .json-output-area {
   flex: 1;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: "Courier New", Courier, monospace;
   font-size: 0.7rem;
   color: #00ffaa;
   background: #060613;
@@ -714,6 +719,3 @@ body {
   white-space: pre;
   overflow: auto;
 }
-
-
-

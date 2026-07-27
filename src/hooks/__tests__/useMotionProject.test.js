@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
-import React from 'react';
-import { render, renderHook } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import useMotionProject from '../useMotionProject';
-import { engine } from '../../engines/Engine.js';
-import DemoPage from '../../components/Demo/DemoPage';
+import React from "react";
+import { render, renderHook } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import useMotionProject from "../useMotionProject";
+import { engine } from "../../engines/Engine.js";
+import DemoPage from "../../components/Demo/DemoPage";
 
-vi.mock('../../engines/Engine.js', () => {
+vi.mock("../../engines/Engine.js", () => {
   const mockInstance = {
-    id: 'mock-inst',
+    id: "mock-inst",
     tracksMap: new Map(),
     subscribe: vi.fn(() => vi.fn()),
     compose: vi.fn(() => ({})),
-    destroy: vi.fn()
+    destroy: vi.fn(),
   };
   return {
     engine: {
@@ -23,7 +23,7 @@ vi.mock('../../engines/Engine.js', () => {
       registerTriggerRef: vi.fn(),
       unregisterTriggerRef: vi.fn(),
       mountInstance: vi.fn(() => mockInstance),
-    }
+    },
   };
 });
 
@@ -33,21 +33,21 @@ global.ResizeObserver = class ResizeObserver {
   disconnect = vi.fn();
 };
 
-describe('useMotionProject', () => {
+describe("useMotionProject", () => {
   let consoleErrorSpy;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('calls loadProject exactly once with the project schema on mount and destroy on unmount', async () => {
+  it("calls loadProject exactly once with the project schema on mount and destroy on unmount", async () => {
     engine.loadProject.mockResolvedValue();
-    const project = { schemaVersion: 2, projectId: 'p1', motions: [] };
+    const project = { schemaVersion: 2, projectId: "p1", motions: [] };
 
     const { unmount } = renderHook(() => useMotionProject(project));
 
@@ -58,14 +58,17 @@ describe('useMotionProject', () => {
     expect(engine.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it('destroys old engine state and loads new project when project reference changes', async () => {
+  it("destroys old engine state and loads new project when project reference changes", async () => {
     engine.loadProject.mockResolvedValue();
-    const project1 = { schemaVersion: 2, projectId: 'p1', motions: [] };
-    const project2 = { schemaVersion: 2, projectId: 'p2', motions: [] };
+    const project1 = { schemaVersion: 2, projectId: "p1", motions: [] };
+    const project2 = { schemaVersion: 2, projectId: "p2", motions: [] };
 
-    const { rerender } = renderHook(({ project }) => useMotionProject(project), {
-      initialProps: { project: project1 }
-    });
+    const { rerender } = renderHook(
+      ({ project }) => useMotionProject(project),
+      {
+        initialProps: { project: project1 },
+      },
+    );
 
     expect(engine.loadProject).toHaveBeenCalledTimes(1);
     expect(engine.loadProject).toHaveBeenLastCalledWith(project1);
@@ -79,10 +82,10 @@ describe('useMotionProject', () => {
     expect(engine.loadProject).toHaveBeenLastCalledWith(project2);
   });
 
-  it('logs loadProject failure without throwing synchronously', async () => {
-    const error = new Error('load failed');
+  it("logs loadProject failure without throwing synchronously", async () => {
+    const error = new Error("load failed");
     engine.loadProject.mockRejectedValue(error);
-    const project = { schemaVersion: 2, projectId: 'p1', motions: [] };
+    const project = { schemaVersion: 2, projectId: "p1", motions: [] };
 
     // Should not throw synchronously
     expect(() => {
@@ -92,24 +95,27 @@ describe('useMotionProject', () => {
     // Wait for the promise rejection microtask to flush
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('[useMotionProject] loadProject failed:', error);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[useMotionProject] loadProject failed:",
+      error,
+    );
   });
 
-  it('integration: rendering DemoPage loads the project exactly once', async () => {
+  it("integration: rendering DemoPage loads the project exactly once", async () => {
     engine.loadProject.mockResolvedValue();
     render(React.createElement(DemoPage));
 
     expect(engine.loadProject).toHaveBeenCalledTimes(1);
     const loadedSchema = engine.loadProject.mock.calls[0][0];
-    expect(loadedSchema.projectId).toBe('demo-page');
+    expect(loadedSchema.projectId).toBe("demo-page");
   });
 
-  it('should reload project if reference changes, even if projectId is the same', async () => {
+  it("should reload project if reference changes, even if projectId is the same", async () => {
     engine.loadProject.mockResolvedValue();
-    const project = { schemaVersion: 2, projectId: 'p1', motions: [] };
+    const project = { schemaVersion: 2, projectId: "p1", motions: [] };
 
     const { rerender } = renderHook(({ p }) => useMotionProject(p), {
-      initialProps: { p: project }
+      initialProps: { p: project },
     });
 
     rerender({ p: { ...project } });

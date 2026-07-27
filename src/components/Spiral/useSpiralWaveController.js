@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { engine } from '../../engines/Engine.js';
-import { createBallVm } from './createBallVm.js';
-import { Overlay } from '../../usecases/Overlay.js';
-import { Spawner } from '../../usecases/Spawner.js';
-import { gsapTickerClock } from '../../lib/gsapTickerClock.js';
-import { BALL_COLORS } from './spiralConfig.js';
-import { MIN_SPAWN_PROGRESS, BALL_TRAVEL_SECONDS, SPAWN_INTERVAL_MS } from './spiralPath.js';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { engine } from "../../engines/Engine.js";
+import { gsapTickerClock } from "../../lib/gsapTickerClock.js";
+import { Overlay } from "../../usecases/Overlay.js";
+import { Spawner } from "../../usecases/Spawner.js";
+import { createBallVm } from "./createBallVm.js";
+import { BALL_COLORS } from "./spiralConfig.js";
+import {
+  BALL_TRAVEL_SECONDS,
+  MIN_SPAWN_PROGRESS,
+  SPAWN_INTERVAL_MS,
+} from "./spiralPath.js";
 
 const WAVE_SIZE = 30;
 
@@ -15,13 +19,20 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
   const ballCounterRef = useRef(0);
   const spawnerRef = useRef(null);
 
-  const getBallVm = useCallback((ballId) => ballVmsRef.current.find((ball) => ball.id === ballId) ?? null, []);
+  const getBallVm = useCallback(
+    (ballId) => ballVmsRef.current.find((ball) => ball.id === ballId) ?? null,
+    [],
+  );
   const updateBallVm = useCallback((ballId, patch) => {
-    ballVmsRef.current = ballVmsRef.current.map((ball) => ball.id === ballId ? { ...ball, ...patch } : ball);
+    ballVmsRef.current = ballVmsRef.current.map((ball) =>
+      ball.id === ballId ? { ...ball, ...patch } : ball,
+    );
     setBallVms([...ballVmsRef.current]);
   }, []);
   const removeBallVm = useCallback((ballId) => {
-    ballVmsRef.current = ballVmsRef.current.filter((ball) => ball.id !== ballId);
+    ballVmsRef.current = ballVmsRef.current.filter(
+      (ball) => ball.id !== ballId,
+    );
     setBallVms([...ballVmsRef.current]);
   }, []);
 
@@ -33,48 +44,79 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     vm.overlayTrack = null;
   }, []);
 
-  const startExit = useCallback((ballId) => {
-    const current = getBallVm(ballId);
-    if (!current || current.status === 'exiting') return;
-    disposeOverlay(current);
-    const exitTrack = engine.createTrackInstance('ball-exit-track', { id: `exit-${ballId}`, duration: 0.35 });
-    const overlay = new Overlay().attach(current.ballTrack, exitTrack, (patch) => ({ scale: patch.scale, opacity: patch.opacity }));
-    current.overlay = overlay; current.overlayTrack = exitTrack;
-    updateBallVm(ballId, { status: 'exiting', isClickable: false });
-    overlay.play().then(() => {
+  const startExit = useCallback(
+    (ballId) => {
+      const current = getBallVm(ballId);
+      if (!current || current.status === "exiting") return;
       disposeOverlay(current);
-      const latest = getBallVm(ballId);
-      if (!latest) return;
-      const parentTrack = containerInstance?.getTrack('keepalive');
-      parentTrack?.removeChild(latest.ballTrack.id);
-      spawnerRef.current?.notifyRemoved(1);
-      removeBallVm(ballId);
-    }).catch(() => {});
-  }, [containerInstance, disposeOverlay, getBallVm, removeBallVm, updateBallVm]);
+      const exitTrack = engine.createTrackInstance("ball-exit-track", {
+        id: `exit-${ballId}`,
+        duration: 0.35,
+      });
+      const overlay = new Overlay().attach(
+        current.ballTrack,
+        exitTrack,
+        (patch) => ({ scale: patch.scale, opacity: patch.opacity }),
+      );
+      current.overlay = overlay;
+      current.overlayTrack = exitTrack;
+      updateBallVm(ballId, { status: "exiting", isClickable: false });
+      overlay
+        .play()
+        .then(() => {
+          disposeOverlay(current);
+          const latest = getBallVm(ballId);
+          if (!latest) return;
+          const parentTrack = containerInstance?.getTrack("keepalive");
+          parentTrack?.removeChild(latest.ballTrack.id);
+          spawnerRef.current?.notifyRemoved(1);
+          removeBallVm(ballId);
+        })
+        .catch(() => {});
+    },
+    [containerInstance, disposeOverlay, getBallVm, removeBallVm, updateBallVm],
+  );
 
-  const startEntrance = useCallback((ballId) => {
-    const current = getBallVm(ballId);
-    if (!current) return;
-    disposeOverlay(current);
-    const entranceTrack = engine.createTrackInstance('ball-entrance-track', { id: `entrance-${ballId}`, duration: 0.35 });
-    const overlay = new Overlay().attach(current.ballTrack, entranceTrack, (patch) => ({ scale: patch.scale, opacity: patch.opacity }));
-    current.overlay = overlay; current.overlayTrack = entranceTrack;
-    updateBallVm(ballId, { status: 'spawning', isClickable: false });
-    overlay.play().then(() => {
-      const latest = getBallVm(ballId);
-      if (!latest || latest.status !== 'spawning') return;
-      disposeOverlay(latest);
-      updateBallVm(ballId, { status: 'active', isClickable: true });
-    }).catch(() => {});
-  }, [disposeOverlay, getBallVm, updateBallVm]);
+  const startEntrance = useCallback(
+    (ballId) => {
+      const current = getBallVm(ballId);
+      if (!current) return;
+      disposeOverlay(current);
+      const entranceTrack = engine.createTrackInstance("ball-entrance-track", {
+        id: `entrance-${ballId}`,
+        duration: 0.35,
+      });
+      const overlay = new Overlay().attach(
+        current.ballTrack,
+        entranceTrack,
+        (patch) => ({ scale: patch.scale, opacity: patch.opacity }),
+      );
+      current.overlay = overlay;
+      current.overlayTrack = entranceTrack;
+      updateBallVm(ballId, { status: "spawning", isClickable: false });
+      overlay
+        .play()
+        .then(() => {
+          const latest = getBallVm(ballId);
+          if (!latest || latest.status !== "spawning") return;
+          disposeOverlay(latest);
+          updateBallVm(ballId, { status: "active", isClickable: true });
+        })
+        .catch(() => {});
+    },
+    [disposeOverlay, getBallVm, updateBallVm],
+  );
 
   const spawnBall = useCallback(() => {
     if (!containerInstance) return null;
-    const parentTrack = containerInstance.getTrack('keepalive');
+    const parentTrack = containerInstance.getTrack("keepalive");
     if (!parentTrack) return null;
     const id = ++ballCounterRef.current;
     const color = BALL_COLORS[id % BALL_COLORS.length];
-    const ballTrack = engine.createTrackInstance('ball-track', { id: `ball-track-${id}`, duration: BALL_TRAVEL_SECONDS });
+    const ballTrack = engine.createTrackInstance("ball-track", {
+      id: `ball-track-${id}`,
+      duration: BALL_TRAVEL_SECONDS,
+    });
     const vm = createBallVm({ id, color, ballTrack });
     vm.onClick = () => startExit(id);
     ballVmsRef.current = [...ballVmsRef.current, vm];
@@ -85,7 +127,7 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
       if (snapshot.progress >= 1) {
         unsub();
         const current = getBallVm(id);
-        if (current?.status === 'active') startExit(id);
+        if (current?.status === "active") startExit(id);
       }
     });
     return vm;
@@ -93,7 +135,7 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
 
   useEffect(() => {
     if (!isLoaded || !containerInstance) return undefined;
-    const parentTrack = containerInstance.getTrack('keepalive');
+    const parentTrack = containerInstance.getTrack("keepalive");
     if (!parentTrack) return undefined;
     const spawner = new Spawner({
       clock: gsapTickerClock,

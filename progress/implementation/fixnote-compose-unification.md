@@ -12,10 +12,10 @@ same conceptual thing — call each resolved plugin's `compose()`, merge the
 contributions into a patch object — but they were written independently and have
 silently drifted:
 
-| | `engineCore.js` `compose()` | `resolveMotion.js` (inline) |
-|---|---|---|
-| Plugin error handling | **Swallows silently** (`catch { continue }`) | **Throws** with context |
-| `filter` key merge | **Flat overwrite** (`patch[k] = v`) | **Spread-merge** |
+|                       | `engineCore.js` `compose()`                  | `resolveMotion.js` (inline) |
+| --------------------- | -------------------------------------------- | --------------------------- |
+| Plugin error handling | **Swallows silently** (`catch { continue }`) | **Throws** with context     |
+| `filter` key merge    | **Flat overwrite** (`patch[k] = v`)          | **Spread-merge**            |
 
 Both are real gaps, verified via direct code read + `git blame` (not assumption):
 
@@ -38,7 +38,7 @@ not shared**, so behavior drifts every time one copy is touched and the other is
 
 ## Decision
 
-Extract the compose-and-merge loop only (not plugin *resolution* — see Non-Goals)
+Extract the compose-and-merge loop only (not plugin _resolution_ — see Non-Goals)
 into one shared function, `composePatch()`. Both `engineCore.js` and
 `resolveMotion.js` call it. Fixes both divergences by construction — there's only
 one place left to drift.
@@ -69,26 +69,26 @@ one place left to drift.
  * @param {string} [context] - human-readable identifier for error messages,
  *   e.g. `track "heroCard"` or `motion "enemyMovement", track "lane1"`
  */
-export function composePatch(plugins, rawData, trackConfig, context = '') {
+export function composePatch(plugins, rawData, trackConfig, context = "") {
   const patch = {};
 
   for (const plugin of plugins) {
-    if (typeof plugin.compose !== 'function') continue;
+    if (typeof plugin.compose !== "function") continue;
 
     let contribution;
     try {
       contribution = plugin.compose(rawData, trackConfig);
     } catch (e) {
       throw new Error(
-        `composePatch: plugin compose failed${context ? ` for ${context}` : ''}, ` +
-        `property key(s) [${plugin.keys?.join(', ') ?? '?'}]: ${e.message}`
+        `composePatch: plugin compose failed${context ? ` for ${context}` : ""}, ` +
+          `property key(s) [${plugin.keys?.join(", ") ?? "?"}]: ${e.message}`,
       );
     }
 
     if (!contribution) continue;
 
     for (const [k, v] of Object.entries(contribution)) {
-      if (k === 'filter' && typeof v === 'object' && v !== null) {
+      if (k === "filter" && typeof v === "object" && v !== null) {
         patch.filter = { ...(patch.filter || {}), ...v };
       } else {
         patch[k] = v;
@@ -104,7 +104,12 @@ export function composePatch(plugins, rawData, trackConfig, context = '') {
 
 ```js
 // plugins resolved above (track's own + claimsKey fallback scan — unchanged)
-return composePatch(plugins, source, trackBuild.trackConfig ?? trackBuild, `track "${trackId}"`);
+return composePatch(
+  plugins,
+  source,
+  trackBuild.trackConfig ?? trackBuild,
+  `track "${trackId}"`,
+);
 ```
 
 **`resolveMotion.js` `resolve()` — replace the inline loop:**
@@ -114,7 +119,7 @@ result[track.id] = composePatch(
   cached.resolvedPlugins,
   cached.proxy,
   cached.resolvedTrack,
-  `motion "${motionId}", track "${track.id}"`
+  `motion "${motionId}", track "${track.id}"`,
 );
 ```
 
@@ -142,7 +147,12 @@ for (const plugin of cached.resolvedPlugins) {
 // entire point of the fix. Do not add a new catch here or anywhere else
 // composePatch is called.
 try {
-  return composePatch(plugins, source, trackBuild.trackConfig ?? trackBuild, `track "${trackId}"`);
+  return composePatch(
+    plugins,
+    source,
+    trackBuild.trackConfig ?? trackBuild,
+    `track "${trackId}"`,
+  );
 } catch {
   return {};
 }
@@ -152,12 +162,12 @@ try {
 
 ## Non-Goals
 
-- **Do not touch plugin *resolution* logic.** `engineCore.compose()`'s `claimsKey`
+- **Do not touch plugin _resolution_ logic.** `engineCore.compose()`'s `claimsKey`
   fallback scan (picks up plugins for keys not in the track's build-time resolved
   set — needed for `useMotionSubscriber`'s `transformFn` escape hatch) stays
   exactly as-is. `resolveMotion.js` correctly has no such fallback (delegate
   motions have a closed, build-time-known key set) — also stays as-is. This
-  fix-note only unifies what happens *after* the plugin list is already decided.
+  fix-note only unifies what happens _after_ the plugin list is already decided.
 - **Do not change `resolveMotion`'s caching behavior.** Cache-on-no-override,
   build-and-kill-on-override — untouched.
 - **Do not add filter-merge logic anywhere else.** Only `composePatch` owns the

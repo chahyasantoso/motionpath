@@ -56,6 +56,7 @@ at all if the shape happens to also look enough like something the parser tolera
 whole point of validating up front is to catch this here.
 
 ### WRONG (current state — dual-mode branch)
+
 ```js
 if (isV4 || (driver === undefined && trigger !== undefined)) {
   // v4 checks: forbid driver/timelineId/primary/lifecycle/playback, require trigger
@@ -75,68 +76,111 @@ if (isV4 || (driver === undefined && trigger !== undefined)) {
 ```
 
 ### CORRECT
+
 Delete the `isV4` flag and the entire `else` (legacy) branch. Every motion is validated the
 same way, unconditionally:
 
 ```js
 for (const [i, motion] of motions.entries()) {
   const motionPath = `motions[${i}]`;
-  if (!motion || typeof motion !== 'object') continue;
+  if (!motion || typeof motion !== "object") continue;
 
-  const { id, motionId, driver, trigger, tracks, timelineId, primary, lifecycle, playback } = motion;
+  const {
+    id,
+    motionId,
+    driver,
+    trigger,
+    tracks,
+    timelineId,
+    primary,
+    lifecycle,
+    playback,
+  } = motion;
   const effectiveId = id ?? motionId;
 
-  if (typeof effectiveId !== 'string' || effectiveId === '') {
-    errors.push({ ruleId: 'motion-structure', severity: 'error',
-      message: 'motionId is required and must be a non-empty string.',
-      path: `${motionPath}.${id !== undefined ? 'id' : 'motionId'}` });
+  if (typeof effectiveId !== "string" || effectiveId === "") {
+    errors.push({
+      ruleId: "motion-structure",
+      severity: "error",
+      message: "motionId is required and must be a non-empty string.",
+      path: `${motionPath}.${id !== undefined ? "id" : "motionId"}`,
+    });
   } else {
     if (seenMotionIds.has(effectiveId)) {
-      errors.push({ ruleId: 'motion-structure', severity: 'error',
+      errors.push({
+        ruleId: "motion-structure",
+        severity: "error",
         message: `Duplicate motionId '${effectiveId}' found.`,
-        path: `${motionPath}.${id !== undefined ? 'id' : 'motionId'}` });
+        path: `${motionPath}.${id !== undefined ? "id" : "motionId"}`,
+      });
     }
     seenMotionIds.add(effectiveId);
   }
 
   if (driver !== undefined) {
-    errors.push({ ruleId: 'motion-structure', severity: 'error',
-      message: '"driver" is a v2/v3 field, not valid in v4 — motions always have a trigger, no driver wrapper needed.',
-      path: `${motionPath}.driver` });
+    errors.push({
+      ruleId: "motion-structure",
+      severity: "error",
+      message:
+        '"driver" is a v2/v3 field, not valid in v4 — motions always have a trigger, no driver wrapper needed.',
+      path: `${motionPath}.driver`,
+    });
   }
   if (timelineId !== undefined) {
-    errors.push({ ruleId: 'motion-structure', severity: 'error',
-      message: '"timelineId" is a v2/v3 field, not valid in v4 — tracks under the same motion share a trigger automatically.',
-      path: `${motionPath}.timelineId` });
+    errors.push({
+      ruleId: "motion-structure",
+      severity: "error",
+      message:
+        '"timelineId" is a v2/v3 field, not valid in v4 — tracks under the same motion share a trigger automatically.',
+      path: `${motionPath}.timelineId`,
+    });
   }
   if (primary !== undefined) {
-    errors.push({ ruleId: 'motion-structure', severity: 'error',
+    errors.push({
+      ruleId: "motion-structure",
+      severity: "error",
       message: '"primary" is a v2/v3 field, not valid in v4.',
-      path: `${motionPath}.primary` });
+      path: `${motionPath}.primary`,
+    });
   }
   if (lifecycle !== undefined) {
-    errors.push({ ruleId: 'motion-structure', severity: 'error',
+    errors.push({
+      ruleId: "motion-structure",
+      severity: "error",
       message: '"lifecycle" is a v2/v3 field, not valid in v4.',
-      path: `${motionPath}.lifecycle` });
+      path: `${motionPath}.lifecycle`,
+    });
   }
   if (playback !== undefined) {
-    errors.push({ ruleId: 'motion-structure', severity: 'error',
+    errors.push({
+      ruleId: "motion-structure",
+      severity: "error",
       message: '"playback" is a v2/v3 field, not valid in v4.',
-      path: `${motionPath}.playback` });
+      path: `${motionPath}.playback`,
+    });
   }
 
   if (trigger === undefined || trigger === null) {
-    errors.push({ ruleId: 'motion-structure', severity: 'error',
-      message: 'trigger is required on every motion in v4.',
-      path: `${motionPath}.trigger` });
-  } else if (typeof trigger !== 'object') {
-    errors.push({ ruleId: 'motion-structure', severity: 'error',
-      message: 'trigger must be an object.',
-      path: `${motionPath}.trigger` });
-  } else if (!trigger.type || typeof trigger.type !== 'string') {
-    errors.push({ ruleId: 'motion-structure', severity: 'error',
-      message: 'trigger.type is required and must be a string.',
-      path: `${motionPath}.trigger.type` });
+    errors.push({
+      ruleId: "motion-structure",
+      severity: "error",
+      message: "trigger is required on every motion in v4.",
+      path: `${motionPath}.trigger`,
+    });
+  } else if (typeof trigger !== "object") {
+    errors.push({
+      ruleId: "motion-structure",
+      severity: "error",
+      message: "trigger must be an object.",
+      path: `${motionPath}.trigger`,
+    });
+  } else if (!trigger.type || typeof trigger.type !== "string") {
+    errors.push({
+      ruleId: "motion-structure",
+      severity: "error",
+      message: "trigger.type is required and must be a string.",
+      path: `${motionPath}.trigger.type`,
+    });
   }
 
   validateTracksArray(tracks, `${motionPath}.tracks`, effectiveId || i);
@@ -157,19 +201,22 @@ The template-level forbidden-field checks (`driver`/`timelineId`/`primary`/`trig
 **File:** `src/validators/rules/trigger-shape.js`
 
 **Why:** Same issue, different file. This rule currently does:
+
 ```js
-if (motion.driver?.type === 'delegate') {
+if (motion.driver?.type === "delegate") {
   return errors; // skip validation entirely for legacy delegate motions
 }
 const isV4Trigger = motion.trigger !== undefined;
 const trigger = motion.trigger ?? motion.driver?.trigger;
 ```
+
 This reads `trigger` off `motion.driver.trigger` as a fallback, and skips validation
 entirely when `motion.driver?.type === 'delegate'`. Since Fix 1 now makes `driver` itself a
 hard error at the `motion-structure` level, this rule doesn't need to know `driver` exists at
 all.
 
 ### WRONG
+
 ```js
 export function triggerShapeRule(motion, context, path) {
   const errors = [];
@@ -189,6 +236,7 @@ export function triggerShapeRule(motion, context, path) {
 ```
 
 ### CORRECT
+
 ```js
 export function triggerShapeRule(motion, context, path) {
   const errors = [];
@@ -230,22 +278,26 @@ grep — zero importers outside themselves:
   `getTrack`) is **only imported by the two files above**. It has zero other importers.
 
 ### Step 0 — verify before deleting (do this first, don't skip)
+
 ```bash
 grep -rn "from '.*domain/models" --include="*.js" --include="*.jsx" src/
 grep -rn "CreateMotionInstance\|createMotionInstance" --include="*.js" --include="*.jsx" src/ | grep -v CreateMotionInstance.js
 grep -rn "ParseProjectSchema\|parseProjectSchema" --include="*.js" --include="*.jsx" src/ | grep -v ParseProjectSchema.js
 ```
+
 Expected: the first command returns only `CreateMotionInstance.js` and
 `ParseProjectSchema.js`; the other two return nothing. If anything else shows up, **stop and
 report back** — something imports these that this brief didn't account for, and deleting
 blind would break it.
 
 ### CORRECT
+
 ```bash
 git rm src/usecases/CreateMotionInstance.js
 git rm src/usecases/ParseProjectSchema.js
 git rm src/domain/models.js
 ```
+
 (No test files exist for any of the three — confirmed via `find . -iname "*models.test.js" -o
 -iname "*ParseProjectSchema.test.js" -o -iname "*CreateMotionInstance.test.js"` returning
 nothing. If your local tree has any, delete those too.)
@@ -266,15 +318,22 @@ nothing. If your local tree has any, delete those too.)
    nothing under `src/usecases/` or `src/domain/` (test/doc mentions elsewhere are fine, this
    brief doesn't touch docs).
 5. Write a quick throwaway script (don't commit it) that calls `validateProject()` with a
-   schema shaped like the *old* v3 example below, and confirm it now returns errors instead
+   schema shaped like the _old_ v3 example below, and confirm it now returns errors instead
    of `[]`:
    ```js
    {
-     motions: [{
-       motionId: 'test',
-       driver: { type: 'timeline', timelineId: 'group-a', primary: true, trigger: { type: 'scroll', scrub: true } },
-       tracks: [{ id: 'track-1', keyframes: {} }]
-     }]
+     motions: [
+       {
+         motionId: "test",
+         driver: {
+           type: "timeline",
+           timelineId: "group-a",
+           primary: true,
+           trigger: { type: "scroll", scrub: true },
+         },
+         tracks: [{ id: "track-1", keyframes: {} }],
+       },
+     ];
    }
    ```
    Expected: at least 3 errors (`driver` forbidden, `timelineId` forbidden, `primary`

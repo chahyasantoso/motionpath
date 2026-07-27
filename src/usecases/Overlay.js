@@ -1,4 +1,4 @@
-import { gsap } from 'gsap';
+import { gsap } from "gsap";
 
 /** Owns observe -> animate -> unobserve -> destroy for one overlay track. */
 export class Overlay {
@@ -12,7 +12,8 @@ export class Overlay {
   attach(sourceTrack, overlayTrack, mapFn = (patch) => patch) {
     this.#assertAlive();
     this.replace();
-    if (!sourceTrack || !overlayTrack) throw new TypeError('Overlay.attach requires source and overlay tracks.');
+    if (!sourceTrack || !overlayTrack)
+      throw new TypeError("Overlay.attach requires source and overlay tracks.");
     this.#source = sourceTrack;
     this.#overlay = overlayTrack;
     this.#mapFn = mapFn;
@@ -24,17 +25,20 @@ export class Overlay {
     this.#generation += 1;
     this.#tween?.kill();
     this.#tween = null;
-    if (this.#source && this.#overlay) this.#source.removeObserved(this.#overlay);
+    if (this.#source && this.#overlay)
+      this.#source.removeObserved(this.#overlay);
     this.#source = null;
     this.#overlay = null;
     this.#mapFn = null;
-    if (sourceTrack || overlayTrack) return this.attach(sourceTrack, overlayTrack, mapFn);
+    if (sourceTrack || overlayTrack)
+      return this.attach(sourceTrack, overlayTrack, mapFn);
     return this;
   }
 
-  play(progress = 1, { duration = 0.35, ease = 'none' } = {}) {
+  play(progress = 1, { duration = 0.35, ease = "none" } = {}) {
     this.#assertAlive();
-    if (!this.#overlay) return Promise.reject(new Error('Overlay has no attached tracks.'));
+    if (!this.#overlay)
+      return Promise.reject(new Error("Overlay has no attached tracks."));
     const generation = this.#generation;
     this.#tween?.kill();
     return new Promise((resolve, reject) => {
@@ -43,14 +47,19 @@ export class Overlay {
         duration,
         ease,
         onComplete: () => {
-          if (generation !== this.#generation || this.#destroyed) return reject(new Error('Overlay animation superseded or destroyed.'));
+          if (generation !== this.#generation || this.#destroyed)
+            return reject(
+              new Error("Overlay animation superseded or destroyed."),
+            );
           resolve(this.#overlay);
         },
       });
     });
   }
 
-  detach() { return this.replace(); }
+  detach() {
+    return this.replace();
+  }
 
   destroy() {
     if (this.#destroyed) return;
@@ -60,5 +69,7 @@ export class Overlay {
     overlay?.destroy?.();
   }
 
-  #assertAlive() { if (this.#destroyed) throw new Error('Overlay is destroyed.'); }
+  #assertAlive() {
+    if (this.#destroyed) throw new Error("Overlay is destroyed.");
+  }
 }

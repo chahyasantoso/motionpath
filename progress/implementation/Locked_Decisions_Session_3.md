@@ -18,13 +18,17 @@ type MotionValue = number | string | boolean | null;
 
 interface Plugin {
   claimsKey(key: string): boolean;
-  contribute(propertyKey: string, stops: Stop[], elementCfg: unknown): {
+  contribute(
+    propertyKey: string,
+    stops: Stop[],
+    elementCfg: unknown,
+  ): {
     percentPatch: Record<string, Record<string, unknown>>;
     tweenVars?: Record<string, unknown>;
   };
   compose?(
-    data: Record<string, MotionValue>,   // proxy state — whatever keys this element actually animates
-    elementCfg: unknown                   // static schema config (e.g. path.points)
+    data: Record<string, MotionValue>, // proxy state — whatever keys this element actually animates
+    elementCfg: unknown, // static schema config (e.g. path.points)
   ): Record<string, unknown>;
 }
 ```

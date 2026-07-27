@@ -17,17 +17,26 @@ Isolated-canvas scrubbing driver for editor/preview tooling. No real scroll or t
 ```ts
 interface EditorEngine {
   loadProject(schema: unknown): Promise<void>;
-  subscribe(elementId: string, callback: (rawState: Record<string, unknown>) => void): UnsubscribeFn;
-  compose(elementId: string, rawData?: Record<string, unknown>): Record<string, unknown>;
+  subscribe(
+    elementId: string,
+    callback: (rawState: Record<string, unknown>) => void,
+  ): UnsubscribeFn;
+  compose(
+    elementId: string,
+    rawData?: Record<string, unknown>,
+  ): Record<string, unknown>;
   destroyScene(sceneId: string): void;
   destroy(): void;
   setProgress(target: string, progress: number): void;
 }
 
-function createEditorEngine(deps: { resolveElement: (id: string) => Element }): EditorEngine
+function createEditorEngine(deps: {
+  resolveElement: (id: string) => Element;
+}): EditorEngine;
 ```
 
 **`target` addressing — deliberately unambiguous, reusing `BuildResult`'s own keys rather than inventing a new addressing scheme:**
+
 - If the scenario is grouped: `target` is the `timelineId` string.
 - If ungrouped: `target` is the scenario's `scenarioIndex`, passed as a string (e.g. `"2"`).
 
@@ -48,12 +57,16 @@ if (group) {
   group.masterTimeline.progress(clamped);
   return;
 }
-const scenario = buildResult.scenarios.find(s => String(s.scenarioIndex) === target);
+const scenario = buildResult.scenarios.find(
+  (s) => String(s.scenarioIndex) === target,
+);
 if (scenario) {
   scenario.timeline.progress(clamped);
   return;
 }
-throw new Error(`setProgress: no group or scenario found for target "${target}".`);
+throw new Error(
+  `setProgress: no group or scenario found for target "${target}".`,
+);
 ```
 
 - Group lookup first, scenario fallback second — matches architecture §10's resolution order exactly. Observer scenarios always fall into the ungrouped branch (Brief 1 guarantees they can never carry a `timelineId`).

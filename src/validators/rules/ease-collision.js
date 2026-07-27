@@ -14,7 +14,7 @@
 export function easeCollisionRule(motion, context, path) {
   const errors = [];
 
-  if (!motion || typeof motion !== 'object') {
+  if (!motion || typeof motion !== "object") {
     return errors;
   }
 
@@ -24,29 +24,29 @@ export function easeCollisionRule(motion, context, path) {
   }
 
   tracks.forEach((track, i) => {
-    if (!track || typeof track !== 'object') return;
+    if (!track || typeof track !== "object") return;
     const trackPath = `${path}.tracks[${i}]`;
     const keyframes = track.keyframes;
-    if (!keyframes || typeof keyframes !== 'object') return;
+    if (!keyframes || typeof keyframes !== "object") return;
 
     // Group stops by progress p
     // pKey -> Map(ease -> Array of propKeys)
     const stopsByP = new Map();
 
     Object.entries(keyframes).forEach(([propKey, value]) => {
-      if (!value || typeof value !== 'object') return;
-      
+      if (!value || typeof value !== "object") return;
+
       // Determine the stops array.
       // If it's a 'path' property, the stops are under keyframes.path.stops.
       // Otherwise they are under keyframes[propKey].stops.
       const stops = value.stops;
       if (!Array.isArray(stops)) return;
 
-      stops.forEach(stop => {
-        if (!stop || typeof stop !== 'object') return;
+      stops.forEach((stop) => {
+        if (!stop || typeof stop !== "object") return;
         const { p, ease } = stop;
         if (p === undefined || p === null) return;
-        if (ease === undefined || ease === null || ease === '') return;
+        if (ease === undefined || ease === null || ease === "") return;
 
         // Use exact number as key (we can stringify it)
         const pKey = String(p);
@@ -68,14 +68,14 @@ export function easeCollisionRule(motion, context, path) {
         // Collect detail for the error message
         const conflictDetails = [];
         easeMap.forEach((props, ease) => {
-          conflictDetails.push(`'${props.join(', ')}' wants '${ease}'`);
+          conflictDetails.push(`'${props.join(", ")}' wants '${ease}'`);
         });
 
         errors.push({
           ruleId: "ease-collision",
           severity: "error",
-          message: `Track '${track.id || i}' has conflicting eases at p=${pKey}: ${conflictDetails.join(', ')}.`,
-          path: `${trackPath}.keyframes`
+          message: `Track '${track.id || i}' has conflicting eases at p=${pKey}: ${conflictDetails.join(", ")}.`,
+          path: `${trackPath}.keyframes`,
         });
       }
     });

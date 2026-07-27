@@ -1,4 +1,4 @@
-import { GaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
+import { GaplessLayoutDelegate } from "./GaplessLayoutDelegate.js";
 
 /**
  * Same spawn placement as GaplessLayoutDelegate (frontmost + stagger), but

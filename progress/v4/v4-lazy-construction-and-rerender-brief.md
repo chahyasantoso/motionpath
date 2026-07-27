@@ -17,6 +17,7 @@ grep -n "\.then(" src/components/Demo/DemoPage.jsx
 ```
 
 Expected findings (confirms both bugs are real, current, and connected):
+
 - `parseV4Project.js` builds every `Track`/`Motion` for the whole schema eagerly at `loadProject` time.
 - `Motion`'s constructor takes `lazy = false` default and calls `init()` immediately unless `lazy: true`; `lazy` is set to `triggerType === 'scroll'` at the one call site in `Engine.js`.
 - `Motion.init()` calls `this.#masterTimeline.scrollTrigger.refresh()` and `.update()` unconditionally, once, right after mounting `#initialTracks`.
@@ -29,19 +30,22 @@ If any of these don't match current source, stop and re-report actual findings �
 ## 1. Problem Statement (two parts, causally linked)
 
 ### 1a. Eager construction (original finding)
+
 **v3 reference** (confirmed via `BaseEngine.js` + `CreateMotionInstance.js`): `loadProject()` only parses schema and warms plugin caches (`await ensureLoaded(plugin)` for every plugin referenced anywhere). `mountInstance(motionId)` is **synchronous** — it builds the real `MotionInstance` (GSAP tween/timeline) for that one motion only, on demand.
 
 **v4 current:** `parseV4Project()` eagerly `await createTrack()`s and constructs every `Motion`/`Track` for the **entire schema** at `loadProject` time, regardless of what ever gets mounted. `Engine.mountInstance()` today does no construction — just a lookup.
 
 ### 1b. Composition re-render gap under scroll (found while investigating why fixing 1a alone isn't sufficient)
-**v3 reference** (confirmed via `MotionInstance.js` `#setupDriver`/`addChild`/`#reflowSiblings`, direct trace, no assumptions): `ScrollTrigger.create()` is called once at driver setup with **zero** `.refresh()`/`.update()` calls anywhere in that path. What v3 *does* do, inside `#reflowSiblings` (the engine-internal cascade triggered by `removeChild`), is a plain GSAP re-render trick: `this.timeline.time(this.timeline.time())` — reassigning the timeline's own current time to itself, forcing every nested child to re-render at the timeline's current position. This is pure `gsap.timeline` API — no `ScrollTrigger`, no DOM, no React involved.
 
-**v4 current:** `TrackGroup.mount()`/`_mountChild()`/`_unmountChild()` call `this.#masterTimeline.add(tween, position)` and stop. Confirmed empirically (Node repro against the real `gsap` package, no DOM/ScrollTrigger needed — this isn't a scroll-specific question): a tween added to an already-progressed timeline sits at its own default value (`progress: 0`) until the *next* explicit `.progress()`/`.time()` call on the timeline. If nothing re-applies the current position right after the `.add()`, and the user isn't actively scrolling at that exact moment, the newly added content stays invisible indefinitely — this is the "cards stuck at start" symptom.
+**v3 reference** (confirmed via `MotionInstance.js` `#setupDriver`/`addChild`/`#reflowSiblings`, direct trace, no assumptions): `ScrollTrigger.create()` is called once at driver setup with **zero** `.refresh()`/`.update()` calls anywhere in that path. What v3 _does_ do, inside `#reflowSiblings` (the engine-internal cascade triggered by `removeChild`), is a plain GSAP re-render trick: `this.timeline.time(this.timeline.time())` — reassigning the timeline's own current time to itself, forcing every nested child to re-render at the timeline's current position. This is pure `gsap.timeline` API — no `ScrollTrigger`, no DOM, no React involved.
+
+**v4 current:** `TrackGroup.mount()`/`_mountChild()`/`_unmountChild()` call `this.#masterTimeline.add(tween, position)` and stop. Confirmed empirically (Node repro against the real `gsap` package, no DOM/ScrollTrigger needed — this isn't a scroll-specific question): a tween added to an already-progressed timeline sits at its own default value (`progress: 0`) until the _next_ explicit `.progress()`/`.time()` call on the timeline. If nothing re-applies the current position right after the `.add()`, and the user isn't actively scrolling at that exact moment, the newly added content stays invisible indefinitely — this is the "cards stuck at start" symptom.
 
 Separately, `Motion.init()`'s `scrollTrigger.refresh()`/`.update()` calls are **not** ported from v3 (confirmed absent from `#setupDriver`) and are not the fix for 1b — `ScrollTrigger.refresh()` re-measures DOM/pixel geometry (a page-layout concern), which is unrelated to a GSAP timeline's internal progress-to-child-value application (a pure animation-engine concern). These calls should be removed, not extended.
 
 ### Why 1a makes 1b unavoidable, structurally
-Before 1a is fixed, `Motion`/`ScrollTrigger` construction and `DemoPage`'s dynamic card-adding are both tangled into the same eager parse path, so their relative timing is accidental. After 1a is fixed, they become two **guaranteed-separate** React effects: `useMotionInstance`'s effect calls `mountInstance()` (building `Motion`/`ScrollTrigger` synchronously), which triggers a re-render, and only *then* does `CarouselDemo`'s own effect fire and start calling `addChild()`. This is structurally the "B2" scenario the v3 team's own `RefreshSpikePage.jsx` spike anticipated (children registering after `ScrollTrigger` already exists) — a real, new-to-v4 capability, not a v3 regression. It needs 1b's fix to work correctly.
+
+Before 1a is fixed, `Motion`/`ScrollTrigger` construction and `DemoPage`'s dynamic card-adding are both tangled into the same eager parse path, so their relative timing is accidental. After 1a is fixed, they become two **guaranteed-separate** React effects: `useMotionInstance`'s effect calls `mountInstance()` (building `Motion`/`ScrollTrigger` synchronously), which triggers a re-render, and only _then_ does `CarouselDemo`'s own effect fire and start calling `addChild()`. This is structurally the "B2" scenario the v3 team's own `RefreshSpikePage.jsx` spike anticipated (children registering after `ScrollTrigger` already exists) — a real, new-to-v4 capability, not a v3 regression. It needs 1b's fix to work correctly.
 
 **Fix order matters: implement 1a first, then 1b. Fixing 1b alone without 1a would mask the problem only by accident of current tangled timing; fixing 1a alone without 1b reintroduces exactly the stuck-card symptom, now deterministically instead of by accident.**
 
@@ -74,6 +78,7 @@ Before 1a is fixed, `Motion`/`ScrollTrigger` construction and `DemoPage`'s dynam
 ### 4.1 `parseV4Project.js` — config parsing + plugin warm-up only
 
 **WRONG (current):**
+
 ```js
 for (const motionConfig of rawMotions) {
   ...
@@ -85,6 +90,7 @@ for (const motionConfig of rawMotions) {
 ```
 
 **CORRECT:**
+
 ```js
 export async function parseV4Project(schema = {}, deps = {}) {
   const templates = schema.templates || [];
@@ -93,9 +99,14 @@ export async function parseV4Project(schema = {}, deps = {}) {
 
   for (const motionConfig of rawMotions) {
     const triggerType = motionConfig.trigger?.type;
-    if (!triggerType) throw new Error(`Motion "${motionConfig.id}" is missing required trigger.type.`);
+    if (!triggerType)
+      throw new Error(
+        `Motion "${motionConfig.id}" is missing required trigger.type.`,
+      );
     if (!triggerDelegateRegistry.get(triggerType)) {
-      throw new Error(`Unknown trigger type "${triggerType}" on motion "${motionConfig.id}"...`);
+      throw new Error(
+        `Unknown trigger type "${triggerType}" on motion "${motionConfig.id}"...`,
+      );
     }
   }
 
@@ -106,15 +117,18 @@ export async function parseV4Project(schema = {}, deps = {}) {
       if (plugin) pluginsToLoad.add(plugin);
     }
   };
-  for (const motionConfig of rawMotions) (motionConfig.tracks || []).forEach(collectPlugins);
+  for (const motionConfig of rawMotions)
+    (motionConfig.tracks || []).forEach(collectPlugins);
   rawTracks.forEach(collectPlugins);
   for (const plugin of pluginsToLoad) await ensureLoaded(plugin);
 
-  const motionConfigsMap = new Map(rawMotions.map(m => [m.id, m]));
-  const trackConfigsMap = new Map(rawTracks.map(t => [t.id, t]));
+  const motionConfigsMap = new Map(rawMotions.map((m) => [m.id, m]));
+  const trackConfigsMap = new Map(rawTracks.map((t) => [t.id, t]));
 
   return {
-    templates, motionConfigsMap, trackConfigsMap,
+    templates,
+    motionConfigsMap,
+    trackConfigsMap,
     getMotionConfig: (id) => motionConfigsMap.get(id),
     getTrackConfig: (id) => trackConfigsMap.get(id),
   };
@@ -124,6 +138,7 @@ export async function parseV4Project(schema = {}, deps = {}) {
 ### 4.2 `createTrack.js` — drop the internal plugin-load loop, become sync
 
 **WRONG (current):**
+
 ```js
 export async function createTrack(config, templates = []) {
   const resolvedTrack = resolveTrack(config, templates);
@@ -138,15 +153,20 @@ export async function createTrack(config, templates = []) {
 ```
 
 **CORRECT:**
+
 ```js
 export function createTrack(config, templates = []) {
   const resolvedTrack = resolveTrack(config, templates);
-  if (!resolvedTrack) throw new Error('createTrack: invalid track configuration.');
+  if (!resolvedTrack)
+    throw new Error("createTrack: invalid track configuration.");
 
   const keyframes = resolvedTrack.keyframes || {};
   const duration = resolvedTrack.duration ?? 1;
   const { proxy, tween, resolvedPlugins } = buildTrackTweenSync(
-    resolvedTrack.id, keyframes, duration, resolvedTrack
+    resolvedTrack.id,
+    keyframes,
+    duration,
+    resolvedTrack,
   );
 
   return new Track({
@@ -159,11 +179,13 @@ export function createTrack(config, templates = []) {
   });
 }
 ```
+
 Assumes every plugin `resolvePluginForKey` can return is already loaded by the time `createTrack` runs — true as long as `createTrack` is only ever called after `loadProject` has resolved (i.e., from `mountInstance` or from app code like `DemoPage`'s card-adding effects, both of which only run post-load).
 
 ### 4.3 `Motion.js` — delete `lazy`/`init()` split; delete unjustified refresh calls; add `TrackGroup` re-render step
 
 **WRONG (current):**
+
 ```js
 export class TrackGroup {
   ...
@@ -216,6 +238,7 @@ export class Motion {
 ```
 
 **CORRECT:**
+
 ```js
 export class TrackGroup {
   ...
@@ -271,11 +294,13 @@ export class Motion {
   ...
 }
 ```
+
 `_mountChild`/`_unmountChild` on both classes need no changes — they already delegate to `mount`/`unmount`, which now carry the re-render step.
 
 ### 4.4 `Engine.mountInstance` — the actual construction point, synchronous
 
 **WRONG (current — just a lookup):**
+
 ```js
 mountInstance(motionId, config = {}) {
   const motion = this.#v4Project.getMotion(motionId);
@@ -290,6 +315,7 @@ mountInstance(motionId, config = {}) {
 ```
 
 **CORRECT:**
+
 ```js
 mountInstance(motionId, config = {}) {
   if (!this.#v4Project) throw new Error('mountInstance: project not loaded.');
@@ -324,27 +350,31 @@ mountInstance(motionId, config = {}) {
   throw new Error(`mountInstance: motion or track "${motionId}" not found in project.`);
 }
 ```
+
 Note: `i * stagger` here spaces **schema-declared top-level tracks** within one motion (e.g. if a motion ever declares 2+ tracks). For `carousel-storytelling`/`helix-storytelling`, there is exactly one schema track, so this always resolves to position `0` — irrelevant to the dynamic per-card stagger, which is a completely separate value passed explicitly to `addChild(track, { stagger })` by `DemoPage.jsx`. Do not conflate the two `stagger` uses.
 
 ### 4.5 `DemoPage.jsx` — sync fallout from `createTrack` no longer returning a Promise
 
 **WRONG (current, `CarouselDemo`'s child-track effect):**
+
 ```js
 useEffect(() => {
   const parentTrack = parentTrackRef.current;
   if (!parentTrack) return;
   const map = childTracksMapRef.current;
-  const missingCards = cards.filter(c => !map.has(c.id));
+  const missingCards = cards.filter((c) => !map.has(c.id));
   if (missingCards.length === 0) return;
 
   let cancelled = false;
   const trackCfg = dynamicCarouselScene.tracks[0];
   Promise.all(
-    missingCards.map(card =>
-      createTrack({ id: `carousel-child-${card.id}`, keyframes: trackCfg.keyframes })
-        .then(track => ({ cardId: card.id, track }))
-    )
-  ).then(results => {
+    missingCards.map((card) =>
+      createTrack({
+        id: `carousel-child-${card.id}`,
+        keyframes: trackCfg.keyframes,
+      }).then((track) => ({ cardId: card.id, track })),
+    ),
+  ).then((results) => {
     if (cancelled) return;
     for (const { cardId, track } of results) {
       if (!map.has(cardId)) {
@@ -352,39 +382,47 @@ useEffect(() => {
         map.set(cardId, track);
       }
     }
-    setTrackVersion(v => v + 1);
+    setTrackVersion((v) => v + 1);
   });
 
-  return () => { cancelled = true; };
-// eslint-disable-next-line react-hooks/exhaustive-deps
+  return () => {
+    cancelled = true;
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [cards, instance, trackVersion === 0 ? instance : null]);
 ```
 
 **CORRECT:**
+
 ```js
 useEffect(() => {
   const parentTrack = parentTrackRef.current;
   if (!parentTrack) return;
   const map = childTracksMapRef.current;
-  const missingCards = cards.filter(c => !map.has(c.id));
+  const missingCards = cards.filter((c) => !map.has(c.id));
   if (missingCards.length === 0) return;
 
   const trackCfg = dynamicCarouselScene.tracks[0];
   for (const card of missingCards) {
-    const track = createTrack({ id: `carousel-child-${card.id}`, keyframes: trackCfg.keyframes });
+    const track = createTrack({
+      id: `carousel-child-${card.id}`,
+      keyframes: trackCfg.keyframes,
+    });
     parentTrack.addChild(track, { stagger: dynamicCarouselScene.stagger });
     map.set(card.id, track);
   }
-  setTrackVersion(v => v + 1);
+  setTrackVersion((v) => v + 1);
 }, [cards, instance]);
 ```
-`trackVersion` state itself can be deleted along with its `setTrackVersion` calls — it existed to force a second effect pass after an async batch resolved; with synchronous `createTrack`, the whole effect completes in one pass. Its remaining use (forcing `CarouselDemo`'s render to pick up newly-populated `childTracksMapRef` entries) still needs *some* re-render trigger since the map is a ref, not state — keep a single `setTrackVersion(v => v + 1)` call at the end for that reason, but drop the `trackVersion === 0 ? instance : null` dependency hack entirely; it's no longer needed once there's no async second pass to guard against.
+
+`trackVersion` state itself can be deleted along with its `setTrackVersion` calls — it existed to force a second effect pass after an async batch resolved; with synchronous `createTrack`, the whole effect completes in one pass. Its remaining use (forcing `CarouselDemo`'s render to pick up newly-populated `childTracksMapRef` entries) still needs _some_ re-render trigger since the map is a ref, not state — keep a single `setTrackVersion(v => v + 1)` call at the end for that reason, but drop the `trackVersion === 0 ? instance : null` dependency hack entirely; it's no longer needed once there's no async second pass to guard against.
 
 **WRONG (current, `HelixDemo`'s child-track effect):**
+
 ```js
 useEffect(() => {
   if (!instance) return;
-  const parentTrack = instance.getTrack('helix-card-track');
+  const parentTrack = instance.getTrack("helix-card-track");
   if (!parentTrack) return;
 
   let cancelled = false;
@@ -392,38 +430,46 @@ useEffect(() => {
   const trackCfg = dynamicHelixScene.tracks[0];
   Promise.all(
     helixCards.map((_, i) =>
-      createTrack({ id: `helix-child-${i}`, keyframes: trackCfg.keyframes })
-    )
-  ).then(tracks => {
+      createTrack({ id: `helix-child-${i}`, keyframes: trackCfg.keyframes }),
+    ),
+  ).then((tracks) => {
     if (cancelled) return;
     childTracksRef.current = tracks;
-    tracks.forEach(track => parentTrack.addChild(track, { stagger: dynamicHelixScene.stagger }));
+    tracks.forEach((track) =>
+      parentTrack.addChild(track, { stagger: dynamicHelixScene.stagger }),
+    );
     setHelixTracksReady(true);
   });
 
-  return () => { cancelled = true; };
+  return () => {
+    cancelled = true;
+  };
 }, [instance]);
 ```
 
 **CORRECT:**
+
 ```js
 useEffect(() => {
   if (!instance) return;
-  const parentTrack = instance.getTrack('helix-card-track');
+  const parentTrack = instance.getTrack("helix-card-track");
   if (!parentTrack) return;
 
   const helixCards = MOCK_CARDS.slice(0, 6);
   const trackCfg = dynamicHelixScene.tracks[0];
   const tracks = helixCards.map((_, i) =>
-    createTrack({ id: `helix-child-${i}`, keyframes: trackCfg.keyframes })
+    createTrack({ id: `helix-child-${i}`, keyframes: trackCfg.keyframes }),
   );
   childTracksRef.current = tracks;
-  tracks.forEach(track => parentTrack.addChild(track, { stagger: dynamicHelixScene.stagger }));
+  tracks.forEach((track) =>
+    parentTrack.addChild(track, { stagger: dynamicHelixScene.stagger }),
+  );
   setHelixTracksReady(true);
 }, [instance]);
 ```
 
 **WRONG (current, `CarouselCard`'s exit handler):**
+
 ```js
 createTrack({
   id: `exit-${cardData.id}`,
@@ -439,6 +485,7 @@ createTrack({
 ```
 
 **CORRECT:**
+
 ```js
 const exitTrack = createTrack({
   id: `exit-${cardData.id}`,
@@ -451,6 +498,7 @@ gsap.to(exitTrack, {
   onComplete: () => { exitTrack.destroy(); onRemove(cardData.id, cardTrack); }
 });
 ```
+
 Note: `gsap.to(exitTrack, {progress: 1, ...})` was already correct as-is (relies on `Track` being GSAP-accessor-shaped per the locked design — `Track#progress()` duck-types for `gsap.to`). No proxy-object indirection needed here; only the `.then()` wrapper comes off.
 
 ---

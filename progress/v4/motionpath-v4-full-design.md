@@ -21,13 +21,13 @@ Supersedes `motionpath-v4-track-first-class.md` (Phase 1 draft). This is the con
 3. **`driver` enum is DELETED.** Mounted (`motion.mount(track)`) vs. not is a runtime relationship, not a schema-declared type.
 4. **`timelineId`/`primary` grouping is DELETED.** Tracks needing one shared trigger are authored under one `Motion`; GSAP's native `.add()` sequential positioning replaces the old same-type/exactly-one-primary validator.
 5. **`trigger.type` selects a pluggable `TriggerDelegate`, resolved via a registry — not a hardcoded branch inside `Motion`.** Every `motions[]` entry always has a `trigger` with a `type` (`"scroll"`, `"time"`, `"manual"`, or any custom type registered via `registerTriggerDelegate()`); `Motion` itself never branches on trigger type internally — it just calls whatever delegate the registry hands back. **Each delegate owns its own control surface** — `ScrollTriggerDelegate`/`TimeTriggerDelegate` expose `play`/`pause`/`seek`/`reverse`/`onComplete` (a real autonomous clock); `ManualTriggerDelegate` exposes only `progress(p?)` (no clock — external code, e.g. a game loop, drives it). This means every method on a given delegate is unconditionally meaningful — no conditionally-inert methods depending on a hidden flag, and no separate runtime class needed for the "externally driven, but coordinated" case (`Motion` + `ManualTriggerDelegate` covers it). Custom delegates (MIDI clock, websocket-driven, etc.) can be added without touching `Motion` or core parsing code at all. See §2.
-6. **Composition (`addChild`/`removeChild`) lives on `Track`**, scoped strictly to *coordinated placement* (rank, spawn offset, reflow cascade) — "moving together." Never used for entry/exit or any other relationship.
+6. **Composition (`addChild`/`removeChild`) lives on `Track`**, scoped strictly to _coordinated placement_ (rank, spawn offset, reflow cascade) — "moving together." Never used for entry/exit or any other relationship.
 7. **No `lifecycle`/`playback` schema field, ever.** Self-play, entry, exit are runtime concerns. Schema only ever describes `keyframes`/`use`/`id` — an entry-pop track and ordinary content track are schematically identical, distinguished only by what runtime code does with them.
 8. **A track never has more than one active driver at a time.** `Track` itself does not enforce this — it stays dumb, accepts whatever `progress()` calls arrive. Enforcement is the orchestration layer's job (`Motion.mount()` throws if a track is already mounted elsewhere).
 9. **`Track` keeps GSAP's raw/compose split**, mirroring the real (grep-verified) `MotionInstance.getCurrentSnapshot()`/`compose()` pattern from v3: `subscribe()` delivers raw proxy state, `compose()` is a separate, explicitly-called step. This was a real correction mid-design — an earlier draft collapsed the two into one pre-composed subscribe path; that was wrong and has been reverted.
 10. **`Track`'s internal GSAP timeline (used for interpolation) is private and never nested into any master.** `Motion.mount()` always drives tracks via an external accessor tween — the same uniform mechanism `autoPlay`/`playOnEvent` use — never by nesting the track's own internal timeline directly. Nesting was considered and rejected: it saves one object per mount but creates two possible GSAP touchpoints per track and breaks the single-driving-mechanism property.
 11. **Multiple valid patterns for "one track's output depends on another's" — not a single canonical mechanism.** See §5. `attach`/`detach` (merge, both stay active) and switch-instance (replace subscription, one snapshot handoff) solve different shapes of the same category of problem. Pick per case.
-12. **Portability claim is scoped narrowly.** Only `Track`'s *public contract* (`progress`, `compose`, `getSnapshot`, `subscribe` — plain data in, plain data out) is engine-agnostic. `Track`'s internals (private GSAP interpolation timeline) are exactly as GSAP-coupled as `MotionInstance` always was — no regression, but no new portability gained there either.
+12. **Portability claim is scoped narrowly.** Only `Track`'s _public contract_ (`progress`, `compose`, `getSnapshot`, `subscribe` — plain data in, plain data out) is engine-agnostic. `Track`'s internals (private GSAP interpolation timeline) are exactly as GSAP-coupled as `MotionInstance` always was — no regression, but no new portability gained there either.
 13. **All three cross-track relationships (`_mount`/`#host`, `attach`/`#attachedTo`, `addChild`/`#parent`) enforce single-ownership the same way — bidirectional backreference, throws on conflict rather than silently double-assigning.** `addChild` originally lacked this (only `Motion.mount` and `attach` had it) — fixed mid-design once flagged; a `Track` could otherwise be silently added as a child of two parents at once with no error, corrupting rank/reflow math quietly.
 
 ## 2. Object Model
@@ -37,21 +37,21 @@ class Track {
   readonly id: string;
 
   #interpolationTimeline: gsap.core.Timeline; // PRIVATE, built once from contribute()'s merged output.
-                                                 // Pure computation only — never exposed, never nested
-                                                 // into any master. See Decision 10 and 12.
-  #proxyState: Record<string, number> = {};    // the actual tween target every nested contribute()
-                                                 // tween writes onto — Timeline itself has no .targets(),
-                                                 // only Tween does, so this must be tracked explicitly.
-                                                 // Confirmed against real MotionInstance.trackBuild.proxy.
+  // Pure computation only — never exposed, never nested
+  // into any master. See Decision 10 and 12.
+  #proxyState: Record<string, number> = {}; // the actual tween target every nested contribute()
+  // tween writes onto — Timeline itself has no .targets(),
+  // only Tween does, so this must be tracked explicitly.
+  // Confirmed against real MotionInstance.trackBuild.proxy.
   #plugins: Plugin[];
-  #resolvedTrack: ResolvedTrackConfig;          // needed by composePatch's 3rd arg (context/error messages).
-                                                 // Was mistakenly removed in an earlier review pass —
-                                                 // confirmed real via v3's compose(trackId, rawData), which
-                                                 // passes trackBuild.resolvedTrack the same way.
-  #host: Motion | null = null;         // mount relationship — set only via Motion, single active driver
-  #attachedTo: Track | null = null;    // merge relationship — set only via attach()
+  #resolvedTrack: ResolvedTrackConfig; // needed by composePatch's 3rd arg (context/error messages).
+  // Was mistakenly removed in an earlier review pass —
+  // confirmed real via v3's compose(trackId, rawData), which
+  // passes trackBuild.resolvedTrack the same way.
+  #host: Motion | null = null; // mount relationship — set only via Motion, single active driver
+  #attachedTo: Track | null = null; // merge relationship — set only via attach()
   #attachedChildren: Set<Track> = new Set();
-  #parent: Track | null = null;        // moving-together relationship — set only via addChild, single owner
+  #parent: Track | null = null; // moving-together relationship — set only via addChild, single owner
   #children: Map<string, Track> = new Map(); // addChild/removeChild — ranked, "moving together"
   #subscribers: Set<(raw: RawProxyState) => void> = new Set();
 
@@ -65,7 +65,7 @@ class Track {
   // delegator object instead of tweening Track directly, which was deliberately avoided (Decision 10).
   progress(p?: Progress): Progress | void {
     if (p === undefined) return this.#interpolationTimeline.progress();
-    this.#interpolationTimeline.progress(clamp01(p));   // pure interpolation, not a scheduling object
+    this.#interpolationTimeline.progress(clamp01(p)); // pure interpolation, not a scheduling object
     this.#notify();
   }
 
@@ -73,24 +73,34 @@ class Track {
     // RAW values (x, y, __blur, etc. + progress) — NOT composed. Matches v3's getCurrentSnapshot exactly.
     // Read from #proxyState directly, NOT via #interpolationTimeline.targets() — Timeline has no
     // .targets() method (that's a Tween-only API); #proxyState is the actual shared tween target.
-    return { ...this.#proxyState, progress: this.#interpolationTimeline.progress() };
+    return {
+      ...this.#proxyState,
+      progress: this.#interpolationTimeline.progress(),
+    };
   }
 
   compose(rawData?: RawProxyState): DOMPatch {
     const source = rawData ?? this.getSnapshot();
-    let patch = composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.id}"`);
+    let patch = composePatch(
+      this.#plugins,
+      source,
+      this.#resolvedTrack,
+      `track "${this.id}"`,
+    );
     for (const child of this.#attachedChildren) {
-      patch = mergePatches(patch, child.compose());    // pulled fresh at compose time, never cached
+      patch = mergePatches(patch, child.compose()); // pulled fresh at compose time, never cached
     }
     return patch;
   }
 
   subscribe(cb: (raw: RawProxyState) => void): UnsubscribeFn {
     if (this.#attachedTo) {
-      throw new Error(`Track "${this.id}" is attached to "${this.#attachedTo.id}" — subscribe to the host instead.`);
+      throw new Error(
+        `Track "${this.id}" is attached to "${this.#attachedTo.id}" — subscribe to the host instead.`,
+      );
     }
     this.#subscribers.add(cb);
-    cb(this.getSnapshot());   // immediate replay of current raw state, matches v3 subscribe() behavior
+    cb(this.getSnapshot()); // immediate replay of current raw state, matches v3 subscribe() behavior
     return () => this.#subscribers.delete(cb);
   }
 
@@ -101,16 +111,25 @@ class Track {
 
   // --- mount lifecycle (Motion only, private — names mirror their public caller) ---
   _mount(host: Motion): void {
-    if (this.#host) throw new Error(`Track "${this.id}" already mounted to "${this.#host.id}"`);
+    if (this.#host)
+      throw new Error(
+        `Track "${this.id}" already mounted to "${this.#host.id}"`,
+      );
     this.#host = host;
   }
-  _unmount(): void { this.#host = null; }
-  get isMounted(): boolean { return this.#host !== null; }
+  _unmount(): void {
+    this.#host = null;
+  }
+  get isMounted(): boolean {
+    return this.#host !== null;
+  }
 
   // --- cross-track merge: "living together", NOT moving together ---
   attach(host: Track): void {
     if (this.#attachedTo) {
-      throw new Error(`Track "${this.id}" already attached to "${this.#attachedTo.id}"`);
+      throw new Error(
+        `Track "${this.id}" already attached to "${this.#attachedTo.id}"`,
+      );
     }
     this.#attachedTo = host;
     host.#attachedChildren.add(this);
@@ -119,27 +138,31 @@ class Track {
     this.#attachedTo = null;
     host.#attachedChildren.delete(this);
   }
-  get isAttached(): boolean { return this.#attachedTo !== null; }
+  get isAttached(): boolean {
+    return this.#attachedTo !== null;
+  }
 
   // --- composition: "moving together", ranked, reflowed ---
   addChild(child: Track, opts: { stagger: number }): void {
     if (child.#parent) {
-      throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`);
+      throw new Error(
+        `Track "${child.id}" is already a child of "${child.#parent.id}"`,
+      );
     }
     child.#parent = this;
     const spawnOffset = this.#computeSpawnOffset(opts.stagger); // frontmost-live-child derived, never a counter
     this.#children.set(child.id, child);
     if (this.#host) this.#host._mountChild(child, spawnOffset);
-    eventBus.emit('child:spawned', { id: child.id, parentId: this.id });
+    eventBus.emit("child:spawned", { id: child.id, parentId: this.id });
   }
   removeChild(id: string): void {
     const child = this.#children.get(id);
     if (!child) return;
     const rank = this.#rankOf(child);
     this.#children.delete(id);
-    child.#parent = null;             // clears backref on logical removal, mirrors _unmount's role
-    if (rank > 0) this.#reflow();     // eager synchronous currentDelay write; rank-0 never cascades
-    eventBus.emit('child:removing', { id: child.id, parentId: this.id });
+    child.#parent = null; // clears backref on logical removal, mirrors _unmount's role
+    if (rank > 0) this.#reflow(); // eager synchronous currentDelay write; rank-0 never cascades
+    eventBus.emit("child:removing", { id: child.id, parentId: this.id });
     // Track does NOT call this.#host?.unmount(child) here, deliberately — see §4. Logical removal
     // (above) is immediate; if the child has an exit animation, physical disposal (unmount/kill)
     // is the orchestration layer's responsibility, triggered from its own exit-complete callback,
@@ -162,11 +185,21 @@ interface TriggerDelegate {
 // matching the project's existing composition-over-inheritance preference for driver architecture.
 class AutonomousTimelineControls {
   constructor(private timeline: gsap.core.Timeline) {}
-  play(): void { this.timeline.play(); }
-  pause(): void { this.timeline.pause(); }
-  seek(p: Progress): void { this.timeline.progress(clamp01(p)); }
-  reverse(): void { this.timeline.reverse(); }
-  onComplete(cb: () => void): void { this.timeline.eventCallback('onComplete', cb); }
+  play(): void {
+    this.timeline.play();
+  }
+  pause(): void {
+    this.timeline.pause();
+  }
+  seek(p: Progress): void {
+    this.timeline.progress(clamp01(p));
+  }
+  reverse(): void {
+    this.timeline.reverse();
+  }
+  onComplete(cb: () => void): void {
+    this.timeline.eventCallback("onComplete", cb);
+  }
 }
 
 class ScrollTriggerDelegate implements TriggerDelegate {
@@ -175,35 +208,62 @@ class ScrollTriggerDelegate implements TriggerDelegate {
   build(resolveElement: (id: string) => Element): gsap.core.Timeline {
     const timeline = gsap.timeline({
       scrollTrigger: {
-        trigger: resolveElement(this.config.trigger),   // §8 — push-registration, never querySelector
-        start: this.config.start, end: this.config.end,
-        scrub: this.config.scrub, pin: this.config.pin, pinSpacing: this.config.pinSpacing,
+        trigger: resolveElement(this.config.trigger), // §8 — push-registration, never querySelector
+        start: this.config.start,
+        end: this.config.end,
+        scrub: this.config.scrub,
+        pin: this.config.pin,
+        pinSpacing: this.config.pinSpacing,
         toggleActions: this.config.toggleActions,
       },
     });
     this.#controls = new AutonomousTimelineControls(timeline);
     return timeline;
   }
-  play(): void { this.#controls.play(); }
-  pause(): void { this.#controls.pause(); }
-  seek(p: Progress): void { this.#controls.seek(p); }
-  reverse(): void { this.#controls.reverse(); }
-  onComplete(cb: () => void): void { this.#controls.onComplete(cb); }
+  play(): void {
+    this.#controls.play();
+  }
+  pause(): void {
+    this.#controls.pause();
+  }
+  seek(p: Progress): void {
+    this.#controls.seek(p);
+  }
+  reverse(): void {
+    this.#controls.reverse();
+  }
+  onComplete(cb: () => void): void {
+    this.#controls.onComplete(cb);
+  }
 }
 
 class TimeTriggerDelegate implements TriggerDelegate {
   #controls!: AutonomousTimelineControls;
   constructor(private config: TimeTriggerConfig) {}
   build(): gsap.core.Timeline {
-    const timeline = gsap.timeline({ repeat: this.config.repeat, yoyo: this.config.yoyo, repeatDelay: this.config.repeatDelay });
+    const timeline = gsap.timeline({
+      repeat: this.config.repeat,
+      yoyo: this.config.yoyo,
+      repeatDelay: this.config.repeatDelay,
+    });
     this.#controls = new AutonomousTimelineControls(timeline);
     return timeline;
   }
-  play(): void { this.#controls.play(); }
-  pause(): void { this.#controls.pause(); }
-  seek(p: Progress): void { this.#controls.seek(p); }
-  reverse(): void { this.#controls.reverse(); }
-  onComplete(cb: () => void): void { this.#controls.onComplete(cb); }
+  play(): void {
+    this.#controls.play();
+  }
+  pause(): void {
+    this.#controls.pause();
+  }
+  seek(p: Progress): void {
+    this.#controls.seek(p);
+  }
+  reverse(): void {
+    this.#controls.reverse();
+  }
+  onComplete(cb: () => void): void {
+    this.#controls.onComplete(cb);
+  }
 }
 
 // No clock at all — deliberately has ONLY progress(), no play/pause/reverse/onComplete. The
@@ -223,13 +283,21 @@ class ManualTriggerDelegate implements TriggerDelegate {
 
 // Registry — the actual extensibility mechanism. Custom delegates (MIDI clock, websocket-driven,
 // video-scrub-synced, etc.) register here; Motion/parseV4Project never need to know they exist.
-type TriggerDelegateFactory = (config: Record<string, unknown>) => TriggerDelegate;
+type TriggerDelegateFactory = (
+  config: Record<string, unknown>,
+) => TriggerDelegate;
 const triggerDelegateRegistry = new Map<string, TriggerDelegateFactory>([
-  ['scroll', (config) => new ScrollTriggerDelegate(config as ScrollTriggerConfig)],
-  ['time', (config) => new TimeTriggerDelegate(config as TimeTriggerConfig)],
-  ['manual', () => new ManualTriggerDelegate()],
+  [
+    "scroll",
+    (config) => new ScrollTriggerDelegate(config as ScrollTriggerConfig),
+  ],
+  ["time", (config) => new TimeTriggerDelegate(config as TimeTriggerConfig)],
+  ["manual", () => new ManualTriggerDelegate()],
 ]);
-function registerTriggerDelegate(type: string, factory: TriggerDelegateFactory): void {
+function registerTriggerDelegate(
+  type: string,
+  factory: TriggerDelegateFactory,
+): void {
   triggerDelegateRegistry.set(type, factory);
 }
 
@@ -241,7 +309,9 @@ function registerTriggerDelegate(type: string, factory: TriggerDelegateFactory):
 class TrackGroup {
   #masterTimeline: gsap.core.Timeline;
   #proxies: Map<string, gsap.core.Tween> = new Map();
-  constructor(masterTimeline: gsap.core.Timeline) { this.#masterTimeline = masterTimeline; }
+  constructor(masterTimeline: gsap.core.Timeline) {
+    this.#masterTimeline = masterTimeline;
+  }
   mount(track: Track, position?: gsap.Position): void {
     track._mount(this);
     const tween = gsap.to(track, { progress: 1, paused: true });
@@ -253,25 +323,40 @@ class TrackGroup {
     this.#proxies.delete(track.id);
     track._unmount();
   }
-  _mountChild(child: Track, spawnOffset: number): void { this.mount(child, `>${spawnOffset}`); }
-  _unmountChild(child: Track): void { this.unmount(child); }
+  _mountChild(child: Track, spawnOffset: number): void {
+    this.mount(child, `>${spawnOffset}`);
+  }
+  _unmountChild(child: Track): void {
+    this.unmount(child);
+  }
 }
 
 class Motion {
   readonly id: string;
-  readonly trigger: TriggerDelegate;   // public — IS the control surface, type tells you what's callable
+  readonly trigger: TriggerDelegate; // public — IS the control surface, type tells you what's callable
   #group: TrackGroup;
 
-  constructor(config: { id: string; triggerDelegate: TriggerDelegate }, deps: { resolveElement: (id: string) => Element }) {
+  constructor(
+    config: { id: string; triggerDelegate: TriggerDelegate },
+    deps: { resolveElement: (id: string) => Element },
+  ) {
     this.id = config.id;
     this.trigger = config.triggerDelegate;
     this.#group = new TrackGroup(this.trigger.build(deps.resolveElement));
   }
 
-  mount(track: Track, position?: gsap.Position): void { this.#group.mount(track, position); }
-  unmount(track: Track): void { this.#group.unmount(track); }
-  _mountChild(child: Track, spawnOffset: number): void { this.#group._mountChild(child, spawnOffset); }
-  _unmountChild(child: Track): void { this.#group._unmountChild(child); }
+  mount(track: Track, position?: gsap.Position): void {
+    this.#group.mount(track, position);
+  }
+  unmount(track: Track): void {
+    this.#group.unmount(track);
+  }
+  _mountChild(child: Track, spawnOffset: number): void {
+    this.#group._mountChild(child, spawnOffset);
+  }
+  _unmountChild(child: Track): void {
+    this.#group._unmountChild(child);
+  }
 }
 
 // --- runtime-only helpers, NEVER schema concepts ---
@@ -281,7 +366,11 @@ class Motion {
 // require Track/Motion to know these helpers exist. They live beside the engine, not inside it —
 // placed here for reference alongside the core classes, not because they ARE core classes.
 
-function autoPlay(track: Track, durationSeconds: number, vars?: gsap.TweenVars): gsap.core.Tween {
+function autoPlay(
+  track: Track,
+  durationSeconds: number,
+  vars?: gsap.TweenVars,
+): gsap.core.Tween {
   return gsap.to(track, { progress: 1, duration: durationSeconds, ...vars });
 }
 
@@ -293,18 +382,22 @@ class EventBus {
     return () => this.#listeners.get(name)?.delete(cb);
   }
   emit(name: string, payload?: unknown): void {
-    this.#listeners.get(name)?.forEach(cb => cb(payload));
+    this.#listeners.get(name)?.forEach((cb) => cb(payload));
   }
 }
 const eventBus = new EventBus();
 
-function playOnEvent(track: Track, eventName: string, vars?: gsap.TweenVars): UnsubscribeFn {
+function playOnEvent(
+  track: Track,
+  eventName: string,
+  vars?: gsap.TweenVars,
+): UnsubscribeFn {
   return eventBus.on(eventName, (payload?: { id?: string }) => {
     // Global bus means every listener for this event name fires on EVERY track's spawn/removal,
     // not just this one's — must filter by payload id or every entry-pop across every chain
     // would replay whenever ANY orb spawns anywhere. Real bug, not a defensive nicety.
     if (payload?.id !== track.id) return;
-    gsap.to(track, { progress: 0, duration: 0 });  // reset-on-retrigger is the default
+    gsap.to(track, { progress: 0, duration: 0 }); // reset-on-retrigger is the default
     gsap.to(track, { progress: 1, ...vars });
   });
 }
@@ -317,11 +410,11 @@ function switchToTrack(
   fromTrack: Track,
   unsubscribeFrom: UnsubscribeFn,
   toTrack: Track,
-  vars?: gsap.TweenVars
+  vars?: gsap.TweenVars,
 ): UnsubscribeFn {
   const frozenPosition = fromTrack.compose(fromTrack.getSnapshot()); // one-time, explicit, read-only
   unsubscribeFrom();
-  const unsub = toTrack.subscribe(raw => {
+  const unsub = toTrack.subscribe((raw) => {
     domRenderer(el, mergePatches(frozenPosition, toTrack.compose(raw)));
   });
   gsap.to(toTrack, { progress: 1, ...vars });
@@ -333,9 +426,13 @@ function switchToTrack(
 
 ```json
 {
-  "templates": [ /* unchanged: reusable keyframe fragments, referenced via track.use */ ],
-  "motions": [ /* zero or more — only when a trigger is involved */ ],
-  "tracks": [ /* zero or more — bare tracks, no trigger, driven manually/by event/by autoPlay */ ]
+  "templates": [
+    /* unchanged: reusable keyframe fragments, referenced via track.use */
+  ],
+  "motions": [/* zero or more — only when a trigger is involved */],
+  "tracks": [
+    /* zero or more — bare tracks, no trigger, driven manually/by event/by autoPlay */
+  ]
 }
 ```
 
@@ -344,15 +441,38 @@ Track-ID uniqueness stays **project-wide** across `motions[*].tracks[]` and top-
 **No schema field, anywhere, for:** `driver`, `timelineId`, `primary`, `lifecycle`, `playback`, `attach`/`detach`, switch-instance. All of these are runtime-only, established at the point some other code (an `addChild` call, a click handler, an event registration) decides the relationship — never baked into a track's static definition.
 
 ### 3a. Scroll-driven (one motion, multiple tracks — replaces old `timelineId`+`primary`)
+
 ```json
 {
   "motions": [
     {
       "id": "iceCreamSection",
-      "trigger": { "type": "scroll", "scrub": true, "pin": true, "start": "top top", "end": "+=2000" },
+      "trigger": {
+        "type": "scroll",
+        "scrub": true,
+        "pin": true,
+        "start": "top top",
+        "end": "+=2000"
+      },
       "tracks": [
-        { "id": "cone", "keyframes": { "y": [{ "p": 0, "v": 0 }, { "p": 1, "v": -40 }] } },
-        { "id": "scoop1", "keyframes": { "y": [{ "p": 0, "v": 0 }, { "p": 1, "v": -80 }] } },
+        {
+          "id": "cone",
+          "keyframes": {
+            "y": [
+              { "p": 0, "v": 0 },
+              { "p": 1, "v": -40 }
+            ]
+          }
+        },
+        {
+          "id": "scoop1",
+          "keyframes": {
+            "y": [
+              { "p": 0, "v": 0 },
+              { "p": 1, "v": -80 }
+            ]
+          }
+        },
         { "id": "sprinkles", "use": "sparkle-template" }
       ]
     }
@@ -361,40 +481,88 @@ Track-ID uniqueness stays **project-wide** across `motions[*].tracks[]` and top-
 ```
 
 ### 3b. Time-driven (`repeat`/`yoyo`/`repeatDelay`/`delay` carry over unchanged — never a grouping concern)
+
 ```json
 {
   "motions": [
     {
       "id": "toastLoop",
-      "trigger": { "type": "time", "duration": 1.2, "repeat": -1, "yoyo": true },
-      "tracks": [ { "id": "toastPopup", "keyframes": { "y": [{ "p": 0, "v": 100 }, { "p": 1, "v": 0 }] } } ]
+      "trigger": {
+        "type": "time",
+        "duration": 1.2,
+        "repeat": -1,
+        "yoyo": true
+      },
+      "tracks": [
+        {
+          "id": "toastPopup",
+          "keyframes": {
+            "y": [
+              { "p": 0, "v": 100 },
+              { "p": 1, "v": 0 }
+            ]
+          }
+        }
+      ]
     }
   ]
 }
 ```
 
 ### 3c. Manual / externally-driven (replaces `driver:"delegate"` — no Motion at all)
+
 ```json
-{ "tracks": [
-  { "id": "enemy-lane-1", "keyframes": { "path": { "points": [ /* waypoints */ ] } } },
-  { "id": "projectile-arc", "keyframes": { "x": [/*...*/], "y": [/*...*/] } }
-] }
+{
+  "tracks": [
+    {
+      "id": "enemy-lane-1",
+      "keyframes": { "path": { "points": [/* waypoints */] } }
+    },
+    { "id": "projectile-arc", "keyframes": { "x": [/*...*/], "y": [/*...*/] } }
+  ]
+}
 ```
+
 ```js
 // runtime, per frame:
-engine.getTrack('enemy-lane-1').progress(enemy.progress);
+engine.getTrack("enemy-lane-1").progress(enemy.progress);
 ```
 
 ### 3d. Entry/exit — for contrast, schema-identical to any other track
+
 ```json
-{ "tracks": [
-  { "id": "orb-pop-in", "keyframes": { "scale": [{"p":0,"v":0},{"p":1,"v":1}], "opacity": [{"p":0,"v":0},{"p":1,"v":1}] } },
-  { "id": "orb-pop-out", "keyframes": { "scale": [{"p":0,"v":1},{"p":1,"v":0}] } }
-] }
+{
+  "tracks": [
+    {
+      "id": "orb-pop-in",
+      "keyframes": {
+        "scale": [
+          { "p": 0, "v": 0 },
+          { "p": 1, "v": 1 }
+        ],
+        "opacity": [
+          { "p": 0, "v": 0 },
+          { "p": 1, "v": 1 }
+        ]
+      }
+    },
+    {
+      "id": "orb-pop-out",
+      "keyframes": {
+        "scale": [
+          { "p": 0, "v": 1 },
+          { "p": 1, "v": 0 }
+        ]
+      }
+    }
+  ]
+}
 ```
+
 What makes these "entry" or "exit" is purely which runtime call touches them (§5) — nothing in the JSON marks them as such.
 
 ### 3e. Manual-clock group (`trigger.type: "manual"` — coordinated tracks, externally driven, no autonomous clock)
+
 ```json
 {
   "motions": [
@@ -402,18 +570,37 @@ What makes these "entry" or "exit" is purely which runtime call touches them (§
       "id": "waveFormation",
       "trigger": { "type": "manual" },
       "tracks": [
-        { "id": "enemyA", "keyframes": { "x": [{"p":0,"v":0},{"p":1,"v":300}] } },
-        { "id": "enemyB", "keyframes": { "x": [{"p":0,"v":0},{"p":1,"v":300}] } }
+        {
+          "id": "enemyA",
+          "keyframes": {
+            "x": [
+              { "p": 0, "v": 0 },
+              { "p": 1, "v": 300 }
+            ]
+          }
+        },
+        {
+          "id": "enemyB",
+          "keyframes": {
+            "x": [
+              { "p": 0, "v": 0 },
+              { "p": 1, "v": 300 }
+            ]
+          }
+        }
       ]
     }
   ]
 }
 ```
+
 Same `motions[]` array as any other entry, same `Motion` runtime class — `trigger.type` decides which `TriggerDelegate` gets built (§2). A game engine drives the whole group with one number; `Motion.trigger.progress(p)` fans it out to `enemyA`/`enemyB` with their correct relative offsets (GSAP's own `.add()` sequencing, same mechanism scroll/time motions already use):
+
 ```js
-const formation = engine.getMotion('waveFormation');
-formation.trigger.progress(computeGroupProgress());   // per frame — only progress() exists on this delegate
+const formation = engine.getMotion("waveFormation");
+formation.trigger.progress(computeGroupProgress()); // per frame — only progress() exists on this delegate
 ```
+
 Contrast with §3c (bare top-level `tracks[]`, no `Motion` at all) — that case has no relative-offset coordination between tracks, each driven fully independently. Use `trigger.type: "manual"` when tracks need to stay positioned relative to each other but nothing autonomous should drive them; use bare `tracks[]` when they're unrelated to each other.
 
 ## 4. Composition — "Moving Together" (`addChild`/`removeChild`)
@@ -431,9 +618,11 @@ Relocated from v3's `MotionInstance` to `Track`. Three invariants, hard-won from
 Never participate in rank or reflow. Two supported patterns — **pick per case, neither is universally correct:**
 
 ### 5.1 `attach`/`detach` — merge, both stay active
-Right when the attached track should render *simultaneously* with its host — e.g. entry pop-in while the host is still moving into place. Host's compose output and attached track's compose output merge key-by-key (same algorithm `composePatch.js` already uses for filter sub-properties, one level up). `subscribe()` on an attached track throws — it has no independent output, nothing should ever wire a renderer to it directly.
+
+Right when the attached track should render _simultaneously_ with its host — e.g. entry pop-in while the host is still moving into place. Host's compose output and attached track's compose output merge key-by-key (same algorithm `composePatch.js` already uses for filter sub-properties, one level up). `subscribe()` on an attached track throws — it has no independent output, nothing should ever wire a renderer to it directly.
 
 ### 5.2 Event mechanism (`EventBus` + `playOnEvent`)
+
 Generic — not entry/exit-specific. Any named event (`child:spawned`, `child:removing`, `hover:enter`, a wave boundary, a click) can drive a track's playhead once via the same accessor tween pattern as everything else. `playOnEvent` resets to 0 before playing by default (retrigger-safe); a fire-once variant is NOT built speculatively — add only when a real case needs it. This closes the previously-backlogged `driver.type:"event"` gap — mark that item resolved.
 
 **Honest comparison to real v3's `MotionInstance.onChildChange(callback)`:** covers similar ground (something in the composition changed) but is a different shape, not a straight port. v3's version is **instance-scoped** (subscribe to one `MotionInstance`'s own children only) and **payload-less** (fires a bare recompute signal). `EventBus` here is **global** (one bus, string-named events) and **carries a payload** (`{id, parentId}`). The global-bus shape is deliberate for v4 — it lets `playOnEvent` attach to a specific spawn/removal by id rather than "something, somewhere changed" — but it's worth someone consciously signing off on trading instance-scoping for a global namespace, since collisions become a real (if unlikely, given project-wide track-id uniqueness) risk if event names aren't namespaced carefully at scale.
@@ -441,18 +630,21 @@ Generic — not entry/exit-specific. Any named event (`child:spawned`, `child:re
 `Motion.onComplete(callback)` (§2) separately covers v3's `MotionInstance.onComplete` — GSAP's own timeline completion event, unrelated to the child-composition `EventBus`. This was missing from earlier drafts of this doc and has been added.
 
 ### 5.3 Switch-instance — replace subscription, one snapshot handoff
+
 Right when the host track's output should be fully **replaced**, not merged — e.g. click-to-pop exit where the ball freezes and only fades/shrinks, no continued path movement. The outgoing track's current state is read via `getSnapshot()` (raw, read-only) and explicitly composed **once** at the orchestration layer (`switchToTrack`, §2) into a frozen position patch, merged into every subsequent patch the incoming track emits. No mutator is added to `Track` for this — it stays a pure read plus an explicit compose call outside the class. This is real new surface — `attach` never needs it because content keeps running and contributing live; switch-instance is a one-time handoff.
 
 Disposal after a switch-instance exit finishes is the caller's job (per §4's correction) — e.g.:
+
 ```js
-parent.removeChild(ball.id);                  // logical removal + reflow, immediate
+parent.removeChild(ball.id); // logical removal + reflow, immediate
 switchToTrack(el, contentTrack, unsub, exitTrack, {
   duration: 0.2,
-  onComplete: () => parentMotion.unmount(contentTrack),  // physical disposal, explicit, caller-owned
+  onComplete: () => parentMotion.unmount(contentTrack), // physical disposal, explicit, caller-owned
 });
 ```
 
 ### 5.4 Choosing between 5.1 and 5.3
+
 Ask: **does the host track still need to contribute anything (position, etc.) while the overlay plays?** Yes → attach (entry, typically). No, host is done and should stop being computed → switch-instance (exit, typically). Don't force one through the other's mechanism.
 
 ## 6. `contribute()`/`compose()` — Unchanged in Purpose, Re-homed
@@ -470,6 +662,7 @@ Hooks still bind `compose` as a second arg exactly per the original architecture
 Consumption-layer only — engine, builder, and schema untouched, exactly as the source doc for this addendum states. Solves: an element attached to a track defaults to positioning by its top-left corner (`x`/`y` applied via `gsap.set`); `anchor` lets an individual attached element say "my center (or any other point) should land here instead," without a custom `transformFn`.
 
 **Where it lives — the `source` entry, re-pointed at v4's instance-based subscribe:**
+
 ```js
 { track: engine.getTrack('handJoint'), anchor: { xPercent: -50, yPercent: -50 } }
 ```
@@ -478,15 +671,16 @@ Consumption-layer only — engine, builder, and schema untouched, exactly as the
 
 ```js
 function applyAnchor(patch, anchor) {
-  if (!anchor) return patch;   // no default when omitted — a gap resolves to no opinion, not a chosen one
+  if (!anchor) return patch; // no default when omitted — a gap resolves to no opinion, not a chosen one
   return { ...patch, ...anchor };
 }
 
 // wired into the v4 subscribe path:
-track.subscribe(raw => {
-  const basePatch = typeof transformFn === 'function'
-    ? transformFn(raw, track.compose.bind(track))
-    : track.compose(raw);
+track.subscribe((raw) => {
+  const basePatch =
+    typeof transformFn === "function"
+      ? transformFn(raw, track.compose.bind(track))
+      : track.compose(raw);
   const patch = applyAnchor(basePatch, anchor);
   domRenderer(el, patch);
 });
@@ -499,10 +693,12 @@ track.subscribe(raw => {
 **Open question this redesign surfaces that v3 never had:** `switchToTrack` (§5.3) calls `domRenderer` directly, bypassing the hook layer entirely — so it's currently anchor-unaware. Decision, per Decision 7's "don't build for cases you don't have yet": **`applyAnchor` stays hook-only for now.** If a switch-instance element needs anchoring (e.g. a popped Zuma ball should stay centered on its last path point through the pop), the call site wires `xPercent`/`yPercent` into `switchToTrack`'s merge manually rather than baking anchor support into the helper speculatively. Revisit only if Phase 3 hits a concrete case.
 
 **Testability — unchanged, still a pure function:**
+
 ```js
-test('merges xPercent/yPercent into patch, no-op when anchor omitted', () => {
-  expect(applyAnchor({ x: 100, y: 50 }, { xPercent: -50, yPercent: -50 }))
-    .toEqual({ x: 100, y: 50, xPercent: -50, yPercent: -50 });
+test("merges xPercent/yPercent into patch, no-op when anchor omitted", () => {
+  expect(
+    applyAnchor({ x: 100, y: 50 }, { xPercent: -50, yPercent: -50 }),
+  ).toEqual({ x: 100, y: 50, xPercent: -50, yPercent: -50 });
   expect(applyAnchor({ x: 100, y: 50 }, undefined)).toEqual({ x: 100, y: 50 });
 });
 ```
@@ -526,24 +722,31 @@ useMotionTrigger(id, ref) {
 ```ts
 class TriggerRefRegistry {
   #refs = new Map<string, React.RefObject<Element>>();
-  register(id: string, ref: React.RefObject<Element>): void { this.#refs.set(id, ref); }
+  register(id: string, ref: React.RefObject<Element>): void {
+    this.#refs.set(id, ref);
+  }
   unregister(id: string, ref: React.RefObject<Element>): void {
     if (this.#refs.get(id) === ref) this.#refs.delete(id);
   }
   resolveElement(id: string): Element {
     const ref = this.#refs.get(id);
     if (!ref?.current) {
-      throw new Error(`MotionPath: trigger ref '${id}' is not registered. Mount useMotionTrigger('${id}', ref) before this project's motions are built.`);
+      throw new Error(
+        `MotionPath: trigger ref '${id}' is not registered. Mount useMotionTrigger('${id}', ref) before this project's motions are built.`,
+      );
     }
     return ref.current;
   }
 }
 
 class Motion {
-  constructor(config: { id: string; triggerDelegate: TriggerDelegate }, deps: { resolveElement: (id: string) => Element }) {
+  constructor(
+    config: { id: string; triggerDelegate: TriggerDelegate },
+    deps: { resolveElement: (id: string) => Element },
+  ) {
     this.id = config.id;
     this.trigger = config.triggerDelegate;
-    this.#group = new TrackGroup(this.trigger.build(deps.resolveElement));   // resolveElement flows into the delegate's own build(), e.g. ScrollTriggerDelegate — see §2
+    this.#group = new TrackGroup(this.trigger.build(deps.resolveElement)); // resolveElement flows into the delegate's own build(), e.g. ScrollTriggerDelegate — see §2
   }
 }
 ```
@@ -557,31 +760,46 @@ Real gap: `Track` as described in §2 has no explicit constructor, implying sync
 **Fix: `Track` has no public constructor at all — only reachable via an async factory.** This keeps `Track` itself simple and synchronous internally (consistent with keeping the class "dumb," per the project's own stated philosophy) while pushing the async concern to the one place it actually needs to live — the boundary where a track is created, whether at initial project load or at runtime spawn time:
 
 ```ts
-async function createTrack(config: TrackConfig, templates: TemplateMap): Promise<Track> {
+async function createTrack(
+  config: TrackConfig,
+  templates: TemplateMap,
+): Promise<Track> {
   const usedPluginKeys = Object.keys(config.keyframes);
-  const lazyPlugins = resolveLazyPlugins(usedPluginKeys);   // splitText, morphSVG, etc. if referenced
+  const lazyPlugins = resolveLazyPlugins(usedPluginKeys); // splitText, morphSVG, etc. if referenced
   for (const plugin of lazyPlugins) {
-    await ensureLoaded(plugin);   // same module-level cached promise pattern as v2/v3 — no double-import
+    await ensureLoaded(plugin); // same module-level cached promise pattern as v2/v3 — no double-import
   }
-  return new Track(config, templates);   // now safe — constructor stays synchronous, plugins guaranteed ready
+  return new Track(config, templates); // now safe — constructor stays synchronous, plugins guaranteed ready
 }
 ```
 
-**Where this matters beyond initial load:** `parseV4Project.js` uses `createTrack` for every track in the initial project (`Promise.all` over the full set, same shape as `BaseEngine.loadProject`'s existing await loop — no new pattern, just re-scoped). But it's *also* needed for **runtime-spawned tracks** — e.g. Spiral's `addChild` spawning a new orb from a template that happens to use a lazy plugin — since `deferredCall`'s original job (buffering calls until ready) doesn't apply here at all if construction itself is what's gated. `addChild(child, opts)` as documented in §4 takes an already-constructed `Track` — so the async wait belongs at the *call site* (`const orb = await createTrack(orbTemplate, templates); parent.addChild(orb, {...})`), not inside `addChild` itself, keeping `addChild` synchronous and consistent with the rest of `Track`'s design.
+**Where this matters beyond initial load:** `parseV4Project.js` uses `createTrack` for every track in the initial project (`Promise.all` over the full set, same shape as `BaseEngine.loadProject`'s existing await loop — no new pattern, just re-scoped). But it's _also_ needed for **runtime-spawned tracks** — e.g. Spiral's `addChild` spawning a new orb from a template that happens to use a lazy plugin — since `deferredCall`'s original job (buffering calls until ready) doesn't apply here at all if construction itself is what's gated. `addChild(child, opts)` as documented in §4 takes an already-constructed `Track` — so the async wait belongs at the _call site_ (`const orb = await createTrack(orbTemplate, templates); parent.addChild(orb, {...})`), not inside `addChild` itself, keeping `addChild` synchronous and consistent with the rest of `Track`'s design.
 
 **`motions[]` entry construction (via `TriggerDelegate` registry, §2):** `parseV4Project.js` always constructs exactly one `Motion` per entry — no dispatch to a second class. `trigger.type` selects the delegate from `triggerDelegateRegistry`:
+
 ```ts
-async function buildMotionEntry(config: MotionEntryConfig, deps): Promise<Motion> {
-  const tracks = await Promise.all(config.tracks.map(t => createTrack(t, templates)));
+async function buildMotionEntry(
+  config: MotionEntryConfig,
+  deps,
+): Promise<Motion> {
+  const tracks = await Promise.all(
+    config.tracks.map((t) => createTrack(t, templates)),
+  );
   const factory = triggerDelegateRegistry.get(config.trigger.type);
   if (!factory) {
-    throw new Error(`Unknown trigger type "${config.trigger.type}" — register it via registerTriggerDelegate() before parsing.`);
+    throw new Error(
+      `Unknown trigger type "${config.trigger.type}" — register it via registerTriggerDelegate() before parsing.`,
+    );
   }
-  const motion = new Motion({ id: config.id, triggerDelegate: factory(config.trigger) }, deps);
-  tracks.forEach((t, i) => motion.mount(t, i === 0 ? undefined : '>0'));
+  const motion = new Motion(
+    { id: config.id, triggerDelegate: factory(config.trigger) },
+    deps,
+  );
+  tracks.forEach((t, i) => motion.mount(t, i === 0 ? undefined : ">0"));
   return motion;
 }
 ```
+
 The engine registry only ever needs one lookup map, `getMotion(id)` — every `motions[]` entry, trigger type notwithstanding, produces the same class. Callers reach the type-specific control surface via `motion.trigger` (§2, §3e), not via a different top-level accessor.
 
 ## 10. Validator Pipeline Migration (found partially missing in review, addressed here)
@@ -593,6 +811,7 @@ Real `validateProject()` runs three tiers. Mapping each to v4:
 **Deleted:** `timeline-group` — validated `timelineId`/`primary` same-type/exactly-one-primary rules, which no longer exist as schema concepts (§1, Decision 4). Remove entirely, don't stub it out.
 
 **Rewritten — real v3 rule, real v4 shape mismatch:** `motion-structure`. v3's version required `driver` (object, `type: 'timeline'|'delegate'`, with delegate-specific forbidden-field checks for `trigger`/`sectionId`/`timelineId`/`primary`/`stagger`). v4 has no `driver` at all — every `Motion` always has exactly one `trigger` (§1, Decision 5). New version should:
+
 - Validate `motions[].id` required + project-unique (was `motionId`).
 - Validate `motions[].trigger` is **required** (not `driver`) — every entry needs a `trigger` with a `type`. `trigger.type` must match a key in `triggerDelegateRegistry` (§2) at validation time — NOT a hardcoded `'scroll'|'time'` enum, since custom delegates can be registered by userland code and must validate successfully too. `"manual"` is a built-in type like any other, not a special absence-of-field case.
 - Validate `motions[].tracks` and top-level `tracks[]` — both must have ≥1 valid `id` (non-empty string), `use` must reference a real `templateId` if present.
@@ -610,23 +829,37 @@ Real `validateProject()` runs three tiers. Mapping each to v4:
 Build the entire v4 core in one pass: `Track`/`Motion` classes (§2 — accessor pattern, private interpolation timeline, raw/compose split), `TriggerDelegate` interface + `ScrollTriggerDelegate`/`TimeTriggerDelegate`/`ManualTriggerDelegate` + `triggerDelegateRegistry`/`registerTriggerDelegate()` (§2), `TrackGroup` (internal, unexported), `EventBus`/`playOnEvent`/`autoPlay`/`switchToTrack` (§5, §2), `applyAnchor` (§7a), new `parseV4Project.js` for the `{templates, motions, tracks}` shape, `TriggerRefRegistry` + `Motion`'s `resolveElement` dependency (§8), `createTrack()` async factory + lazy-plugin await (§9), and the rewritten `motion-structure`/extended `element-uniqueness`/all other migrated validators (§10) — all of it, since every piece depends on every other piece and there's no correct partial-core state to hand off to a demo migration.
 
 **Explicit non-goals for this phase — do not do these:**
+
 - Do NOT touch any demo (`PasarMalam`, `TowerDefense`, `Spiral`) in this phase. They stay on v3/broken until their own migration phase — do not attempt to make them "still work" mid-rewrite.
 - Do NOT keep `MotionInstance`/`BaseEngine`/`ProductionEngine`/`EditorEngine`/`resolveMotion.js`/`TimelineGroupController`/old `driver`-aware validators (`motion-structure.js`'s v3 version, `timeline-group.js`) running alongside the new core "just in case." **Delete them outright** once the new core's own tests pass — do not leave dead v3 code as an unused fallback; that's exactly the dual-code-path outcome this phased split exists to avoid.
 - Do NOT build an adapter/shim translating old `MotionInstance` calls onto the new `Track`/`Motion` API. Demos migrate to the real new API directly in their own phase — a shim layer is throwaway work with its own bug surface, for a transition period this plan is deliberately structured to skip.
 - No proxy objects (`{p:0}` + `onUpdate`); no pre-composed subscribe path (must deliver raw, per Decision 9); no nesting of `Track`'s internal timeline into any master (per Decision 10); no `lifecycle`/`playback` schema field; no `querySelector`-based trigger resolution (must use push-registration per §8); no synchronous `Track` construction reachable from outside `createTrack()` (per §9); no string-preset anchors (`align: 'center'`), no `offset`/`dx`/`dy` field, no default anchor value when omitted (per §7a); no hardcoded trigger-type branching inside `Motion` (per Decision 5 — must go through `triggerDelegateRegistry`).
 
 **WRONG:**
+
 ```js
-const proxy = gsap.to({ p: 0 }, { p: 1, onUpdate() { track.setProgress(this.targets()[0].p); } });
+const proxy = gsap.to(
+  { p: 0 },
+  {
+    p: 1,
+    onUpdate() {
+      track.setProgress(this.targets()[0].p);
+    },
+  },
+);
 ```
+
 ```js
 subscribe(cb) { this.#subscribers.add(cb); cb(this.compose()); } // pre-composed — wrong, must be raw
 ```
+
 **CORRECT:**
+
 ```js
 const tween = gsap.to(track, { progress: 1, paused: true });
 masterTimeline.add(tween, position);
 ```
+
 ```js
 subscribe(cb) { this.#subscribers.add(cb); cb(this.getSnapshot()); } // raw
 ```
@@ -643,11 +876,12 @@ Bare `tracks[]` + direct `progress()` calls for unrelated entities, plus `motion
 
 ### Phase 3 — Migrate Spiral/Zuma onto the finished v4 core
 
-Composition move to `Track.addChild`/`removeChild` (§4) plus entry/exit via `attach`+`playOnEvent` (entry, §5.1/5.2) and switch-instance (exit, §5.3). Non-goals: no `lifecycle` schema field, no second public write-path on `Track`, no reuse of `addChild` for entry/exit tracks, no mutator method for snapshot handoff (must stay read-only `getSnapshot()` + explicit external `compose()` call). Treat the three original composition invariants as **re-derivation targets, not ported code** — re-verify with live async GSAP reproduction scripts (real durations, not synchronous stand-ins). New invariant to verify: a mid-chain removal with a real exit-animation duration, with a new sibling spawned *during* that exit window, must place the new spawn using post-reflow state while the exiting sibling remains independently visible and correctly fading.
+Composition move to `Track.addChild`/`removeChild` (§4) plus entry/exit via `attach`+`playOnEvent` (entry, §5.1/5.2) and switch-instance (exit, §5.3). Non-goals: no `lifecycle` schema field, no second public write-path on `Track`, no reuse of `addChild` for entry/exit tracks, no mutator method for snapshot handoff (must stay read-only `getSnapshot()` + explicit external `compose()` call). Treat the three original composition invariants as **re-derivation targets, not ported code** — re-verify with live async GSAP reproduction scripts (real durations, not synchronous stand-ins). New invariant to verify: a mid-chain removal with a real exit-animation duration, with a new sibling spawned _during_ that exit window, must place the new spawn using post-reflow state while the exiting sibling remains independently visible and correctly fading.
 
 ### Verification checklist
 
 **Phase 0 (core, run before any demo migration begins):**
+
 1. `grep -rn "onUpdate" src/lib/Motion.js src/lib/*.js` → zero matches touching `Track` drivers. Confirms accessor pattern throughout, no proxy objects.
 2. `grep -rn "driver\|timelineId\|primary" src/lib/schema/parseV4Project.js` → zero matches.
 3. `grep -rn "lifecycle\|playback" src/lib/Track.js` → zero matches. Confirms no schema-adjacent field crept back in.
@@ -670,7 +904,4 @@ Composition move to `Track.addChild`/`removeChild` (§4) plus entry/exit via `at
 20. `grep -rln "MotionInstance\|BaseEngine\|ProductionEngine\|EditorEngine\|resolveMotion\|TimelineGroupController" src/` → zero matches anywhere in the tree once Phase 0 is declared done — confirms old v3 code was actually deleted, not left dead alongside the new core.
 21. `npx vitest run` on fresh clone — full suite green, core-only (demo tests will be red until their own phase — that's expected at this point, not a blocker).
 
-**Per-demo-migration-phase (repeat for Phase 1/2/3):**
-22. Behavioral: mid-chain removal + real exit duration + spawn-during-exit (Phase 3 specific, real async timing) — assert new sibling placement is correct and the exiting sibling remains visible/fading independently.
-23. `npx vitest run` on fresh clone — full suite green, including the demo just migrated.
-24. Manual visual check for the demo just migrated, unchanged from its pre-migration `v3` visual behavior.
+**Per-demo-migration-phase (repeat for Phase 1/2/3):** 22. Behavioral: mid-chain removal + real exit duration + spawn-during-exit (Phase 3 specific, real async timing) — assert new sibling placement is correct and the exiting sibling remains visible/fading independently. 23. `npx vitest run` on fresh clone — full suite green, including the demo just migrated. 24. Manual visual check for the demo just migrated, unchanged from its pre-migration `v3` visual behavior.

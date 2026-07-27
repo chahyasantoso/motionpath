@@ -14,7 +14,10 @@
   background-color: var(--bg-dark);
   color: var(--text-primary);
   min-height: 100vh;
-  font-family: 'Inter', -apple-system, sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    sans-serif;
   padding: 80px 20px;
 }
 
@@ -246,7 +249,6 @@
   border-radius: 16px;
 }
 
-
 .stage-label {
   position: absolute;
   top: 16px;
@@ -370,7 +372,7 @@
   .stagger-spike__container {
     padding-right: 0;
   }
-  
+
   .stagger-spike__panel {
     position: fixed;
     top: auto;
@@ -384,7 +386,7 @@
     z-index: 1000;
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
   }
-  
+
   .stagger-spike__panel .readout-grid {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -395,4 +397,3 @@
     grid-template-columns: 1fr 1fr;
   }
 }
-

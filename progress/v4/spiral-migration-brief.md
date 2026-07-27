@@ -12,7 +12,7 @@
 > **Current design of record:** `feature-swarm-design.md` §"Part A′: Track-direct swarm".
 > The observe wiring itself (setObserved/removeObserved, the stale-entrance guard,
 > the `setObserved(null)` hard-replace on exit) landed as described below and is
-> still accurate — only the *track-acquisition* mechanism (Steps 0–2, and the
+> still accurate — only the _track-acquisition_ mechanism (Steps 0–2, and the
 > `mountInstance`/`baseInstance`/`getTrack` calls in Steps 3–4) is obsolete.
 
 ---
@@ -31,6 +31,7 @@
 The Spiral demo currently uses v3 machinery: each ball holds two `MotionInstance` references (`baseInstance` / `activeInstance`), `SpiralBall` subscribes to a variable-length `sources` array that changes mid-animation, and `mergeFn` branches on `patches.length`. This causes a subscription teardown and rebuild at the exact moment a ball starts entering or exiting.
 
 This brief replaces the **composition half** with v4 observe:
+
 - The ball element subscribes to **one `Track` for its whole life**.
 - Entrance/exit overlays are folded in via `setObserved` / `removeObserved` — no resubscription.
 - The lifecycle state machine (spawn cadence, `addChild`/`removeChild`, `play()`/`onComplete`, wave reset) is **unchanged**. Observe is a composition primitive, not a state machine.
@@ -44,6 +45,7 @@ Read these three files before starting. Do not modify them yet.
 **`createBallVm.js`** — creates a vm with `baseInstance`, `activeInstance`, `activeTrackId`, `status`.
 
 **`useSpiralWaveController.js`** — the lifecycle state machine:
+
 - `spawnBall`: calls `containerInstance.addChild('spiral-zuma')` → gets a `baseInstance` (a v3 MotionInstance). Calls `startEntrance(id)`.
 - `startEntrance`: mounts a second instance (`ball-exit` motion, `ball-entrance-track`), plays it, on complete swaps vm back to `baseInstance`.
 - `startExit`: mounts a second instance (`ball-exit` motion, `ball-exit-track`), plays it, on complete calls `containerInstance.removeChild` and removes the vm.
@@ -59,7 +61,7 @@ The problem: when `activeInstance` changes, `sourcesSignature` changes, the `use
 
 Each `MotionInstance` in v4 exposes its tracks. The ball's path track is a `Track` instance. `Track.setObserved(overlayTrack, mapFn)` folds the overlay's scale/opacity into the ball track's compose output, applied last (overrides). `Track.removeObserved(overlayTrack)` removes it. The element subscribes to the ball track once and never resubscribes.
 
-The overlay tracks (entrance/exit) are still separate `MotionInstance`s driven by the existing lifecycle — only the *render wiring* changes.
+The overlay tracks (entrance/exit) are still separate `MotionInstance`s driven by the existing lifecycle — only the _render wiring_ changes.
 
 ---
 
@@ -89,8 +91,8 @@ export function createBallVm({ id, color, baseInstance, ballTrack }) {
     id,
     color,
     baseInstance,
-    ballTrack,       // ← the Track the element subscribes to (never changes)
-    status: 'active',
+    ballTrack, // ← the Track the element subscribes to (never changes)
+    status: "active",
     isClickable: true,
     onClick: () => {},
   };
@@ -111,12 +113,12 @@ In `spawnBall`, after `containerInstance.addChild('spiral-zuma')` returns `baseI
 const spawnBall = useCallback(() => {
   if (!containerInstance) return;
 
-  const baseInstance = containerInstance.addChild('spiral-zuma');
+  const baseInstance = containerInstance.addChild("spiral-zuma");
   if (!baseInstance) return;
 
   // Extract the ball's path Track — this is what the element subscribes to.
   // Use the exact API you confirmed in Step 0.
-  const ballTrack = baseInstance.getTrack('ball-track'); // adjust if API differs
+  const ballTrack = baseInstance.getTrack("ball-track"); // adjust if API differs
   if (!ballTrack) return;
 
   const id = ++ballCounterRef.current;
@@ -133,7 +135,7 @@ const spawnBall = useCallback(() => {
   baseInstance.onComplete(() => {
     const current = getBallVm(id);
     if (!current) return;
-    if (current.status !== 'active') return;
+    if (current.status !== "active") return;
     startExit(id);
   });
 }, [containerInstance, startEntrance, startExit, getBallVm]);
@@ -150,47 +152,50 @@ The entrance overlay animates `scale` and `opacity`. Wire it via `setObserved` o
 **Critical ordering:** `removeObserved(entranceTrack)` MUST be called BEFORE `entranceTrack.destroy()`. The ball survives entrance-complete, so the ball Track would otherwise hold a reference to a destroyed track and call `compose()` on it next tick.
 
 ```js
-const startEntrance = useCallback((ballId) => {
-  const current = getBallVm(ballId);
-  if (!current) return;
+const startEntrance = useCallback(
+  (ballId) => {
+    const current = getBallVm(ballId);
+    if (!current) return;
 
-  const entranceInstance = productionEngine.mountInstance('ball-exit');
-  if (!entranceInstance) return;
+    const entranceInstance = productionEngine.mountInstance("ball-exit");
+    if (!entranceInstance) return;
 
-  // Get the entrance overlay Track.
-  const entranceTrack = entranceInstance.getTrack('ball-entrance-track'); // adjust if API differs
-  if (!entranceTrack) return;
+    // Get the entrance overlay Track.
+    const entranceTrack = entranceInstance.getTrack("ball-entrance-track"); // adjust if API differs
+    if (!entranceTrack) return;
 
-  // Fold entrance scale/opacity into the ball Track's compose output.
-  current.ballTrack.setObserved(
-    entranceTrack,
-    (patch) => ({ scale: patch.scale, opacity: patch.opacity })
-  );
+    // Fold entrance scale/opacity into the ball Track's compose output.
+    current.ballTrack.setObserved(entranceTrack, (patch) => ({
+      scale: patch.scale,
+      opacity: patch.opacity,
+    }));
 
-  // Status update — no longer need activeInstance/activeTrackId.
-  updateBallVm(ballId, { status: 'spawning', isClickable: false });
+    // Status update — no longer need activeInstance/activeTrackId.
+    updateBallVm(ballId, { status: "spawning", isClickable: false });
 
-  entranceInstance.play();
-  entranceInstance.onComplete(() => {
-    const latest = getBallVm(ballId);
-    if (!latest) return;
+    entranceInstance.play();
+    entranceInstance.onComplete(() => {
+      const latest = getBallVm(ballId);
+      if (!latest) return;
 
-    // Guard: a fast click during entrance may have already started the exit
-    // (status 'exiting'), which cleared observations and folded the exit overlay.
-    // In that case the entrance is stale — clean up its instance but do NOT
-    // touch observations (exit owns them now) and do NOT flip status back to active.
-    if (latest.status !== 'spawning') {
+      // Guard: a fast click during entrance may have already started the exit
+      // (status 'exiting'), which cleared observations and folded the exit overlay.
+      // In that case the entrance is stale — clean up its instance but do NOT
+      // touch observations (exit owns them now) and do NOT flip status back to active.
+      if (latest.status !== "spawning") {
+        entranceInstance.destroy();
+        return;
+      }
+
+      // MUST clear before destroy — ball Track survives, entranceTrack does not.
+      latest.ballTrack.removeObserved(entranceTrack);
       entranceInstance.destroy();
-      return;
-    }
 
-    // MUST clear before destroy — ball Track survives, entranceTrack does not.
-    latest.ballTrack.removeObserved(entranceTrack);
-    entranceInstance.destroy();
-
-    updateBallVm(ballId, { status: 'active', isClickable: true });
-  });
-}, [getBallVm, updateBallVm]);
+      updateBallVm(ballId, { status: "active", isClickable: true });
+    });
+  },
+  [getBallVm, updateBallVm],
+);
 ```
 
 Run `npx vitest run`. Must still pass.
@@ -202,52 +207,57 @@ Run `npx vitest run`. Must still pass.
 Exit-complete removes the whole ball, so the ball Track dies with it — no explicit `removeObserved` needed on exit-complete. The `setObserved` call replaces any existing observation (entrance may still be active if the user clicks very fast — `setObserved` with the same or a new source replaces without throwing).
 
 ```js
-const startExit = useCallback((ballId) => {
-  const current = getBallVm(ballId);
-  if (!current) return;
-  if (current.status === 'exiting') return;
+const startExit = useCallback(
+  (ballId) => {
+    const current = getBallVm(ballId);
+    if (!current) return;
+    if (current.status === "exiting") return;
 
-  const exitInstance = productionEngine.mountInstance('ball-exit');
-  if (!exitInstance) {
-    containerInstance?.removeChild(current.baseInstance);
-    removeBallVm(ballId);
-    return;
-  }
+    const exitInstance = productionEngine.mountInstance("ball-exit");
+    if (!exitInstance) {
+      containerInstance?.removeChild(current.baseInstance);
+      removeBallVm(ballId);
+      return;
+    }
 
-  const exitTrack = exitInstance.getTrack('ball-exit-track'); // adjust if API differs
-  if (!exitTrack) {
-    exitInstance.destroy();
-    containerInstance?.removeChild(current.baseInstance);
-    removeBallVm(ballId);
-    return;
-  }
+    const exitTrack = exitInstance.getTrack("ball-exit-track"); // adjust if API differs
+    if (!exitTrack) {
+      exitInstance.destroy();
+      containerInstance?.removeChild(current.baseInstance);
+      removeBallVm(ballId);
+      return;
+    }
 
-  // Fold exit scale/opacity into the ball Track's compose output.
-  // Clear ALL observations first so a still-active entrance overlay (fast click
-  // during entrance) is hard-replaced immediately — exit is the sole overlay.
-  current.ballTrack.setObserved(null);
-  current.ballTrack.setObserved(
-    exitTrack,
-    (patch) => ({ scale: patch.scale, opacity: patch.opacity })
-  );
+    // Fold exit scale/opacity into the ball Track's compose output.
+    // Clear ALL observations first so a still-active entrance overlay (fast click
+    // during entrance) is hard-replaced immediately — exit is the sole overlay.
+    current.ballTrack.setObserved(null);
+    current.ballTrack.setObserved(exitTrack, (patch) => ({
+      scale: patch.scale,
+      opacity: patch.opacity,
+    }));
 
-  updateBallVm(ballId, { status: 'exiting', isClickable: false });
+    updateBallVm(ballId, { status: "exiting", isClickable: false });
 
-  exitInstance.play();
-  exitInstance.onComplete(() => {
-    exitInstance.destroy();
+    exitInstance.play();
+    exitInstance.onComplete(() => {
+      exitInstance.destroy();
 
-    const latest = getBallVm(ballId);
-    if (!latest) return;
+      const latest = getBallVm(ballId);
+      if (!latest) return;
 
-    // Ball Track dies with the ball — no removeObserved needed.
-    const aliveAfter = containerInstance ? containerInstance.children.length - 1 : 0;
-    console.log(`[wave] remove ball #${ballId} | alive after: ${aliveAfter}`);
+      // Ball Track dies with the ball — no removeObserved needed.
+      const aliveAfter = containerInstance
+        ? containerInstance.children.length - 1
+        : 0;
+      console.log(`[wave] remove ball #${ballId} | alive after: ${aliveAfter}`);
 
-    containerInstance?.removeChild(latest.baseInstance);
-    removeBallVm(ballId);
-  });
-}, [containerInstance, getBallVm, removeBallVm, updateBallVm]);
+      containerInstance?.removeChild(latest.baseInstance);
+      removeBallVm(ballId);
+    });
+  },
+  [containerInstance, getBallVm, removeBallVm, updateBallVm],
+);
 ```
 
 Run `npx vitest run`. Must still pass.
@@ -259,8 +269,8 @@ Run `npx vitest run`. Must still pass.
 The element now subscribes to one track for its whole life. Remove the variable-length sources, the `activeInstance`/`activeTrackId` branching, and the `mergeFn`.
 
 ```jsx
-import { useRef } from 'react';
-import useMotionSubscribers from '../../hooks/useMotionSubscribers';
+import { useRef } from "react";
+import useMotionSubscribers from "../../hooks/useMotionSubscribers";
 
 export default function SpiralBall({ vm }) {
   const ref = useRef(null);
@@ -269,9 +279,9 @@ export default function SpiralBall({ vm }) {
     track: vm.ballTrack,
     transformFn: (rawData, compose) => {
       const p = rawData?.pathProgress ?? 0;
-      if (p <= 0 || p >= 1) return { display: 'none', opacity: 0 };
-      return { ...compose(rawData), display: 'flex' };
-    }
+      if (p <= 0 || p >= 1) return { display: "none", opacity: 0 };
+      return { ...compose(rawData), display: "flex" };
+    },
   };
 
   useMotionSubscribers([source], ref);
@@ -281,7 +291,7 @@ export default function SpiralBall({ vm }) {
       ref={ref}
       className="element spiral-ball"
       onClick={vm.isClickable ? vm.onClick : undefined}
-      style={{ '--ball-color': vm.color }}
+      style={{ "--ball-color": vm.color }}
     />
   );
 }
@@ -290,6 +300,7 @@ export default function SpiralBall({ vm }) {
 Note: `transformTransition` is no longer needed — delete it or leave it unused (it is not exported to other files, so either is safe).
 
 Run `npx vitest run`. Must still pass. Then verify in the browser:
+
 - Balls spawn and travel the spiral path.
 - Entrance animation (scale pop-in) plays on spawn.
 - Clicking a ball triggers the exit animation (scale-up then fade).
@@ -307,7 +318,7 @@ Before reporting done:
 - [ ] `spawnBall` extracts `ballTrack` from `baseInstance` and passes it to `createBallVm`.
 - [ ] `startEntrance` calls `ballTrack.setObserved(entranceTrack, mapFn)` and, on complete, guards `status === 'spawning'` before touching observations/status; when stale it only destroys the instance. In the live path it calls `ballTrack.removeObserved(entranceTrack)` **before** `entranceInstance.destroy()`.
 - [ ] `startExit` calls `ballTrack.setObserved(null)` then `ballTrack.setObserved(exitTrack, mapFn)` — hard-replaces any active entrance overlay; no `removeObserved` on complete (ball dies).
-- [ ] Browser: fast-click a ball *during* its entrance pop-in — it must transition straight into the exit animation (no snap back to full size, no double overlay) and remain non-clickable.
+- [ ] Browser: fast-click a ball _during_ its entrance pop-in — it must transition straight into the exit animation (no snap back to full size, no double overlay) and remain non-clickable.
 - [ ] `SpiralBall.jsx` subscribes to `[{ track: vm.ballTrack, transformFn }]` — one source, no `mergeFn`.
 - [ ] No `activeInstance`, `activeTrackId`, `patches.length` branching, or `transformTransition` call anywhere in the three changed files.
 - [ ] Browser: spawn, entrance, click-exit, auto-exit, and wave-reset all work correctly.

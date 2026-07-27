@@ -22,7 +22,7 @@ export class LayoutDelegate {
    * @returns {number} offset for the new child
    */
   computeSpawnOffset(children, context) {
-    throw new Error('LayoutDelegate.computeSpawnOffset not implemented');
+    throw new Error("LayoutDelegate.computeSpawnOffset not implemented");
   }
 
   /**
@@ -32,6 +32,6 @@ export class LayoutDelegate {
    * @returns {{ child: Track, offset: number }[]} reflow targets, [] if none
    */
   computeReflow(children, removedChild, context) {
-    throw new Error('LayoutDelegate.computeReflow not implemented');
+    throw new Error("LayoutDelegate.computeReflow not implemented");
   }
 }

@@ -1,12 +1,12 @@
-import { createAnimationPlugin } from '../createAnimationPlugin.js';
-import { toPercentKey } from '../../usecases/toPercentKey.js';
+import { createAnimationPlugin } from "../createAnimationPlugin.js";
+import { toPercentKey } from "../../usecases/toPercentKey.js";
 
 export function createSimplePropertyPlugin(propKey) {
   return createAnimationPlugin({
     keys: [propKey],
-    stage: 'base',
+    stage: "base",
     priority: 10,
-    outputs: { [propKey]: { merge: 'replace' } },
+    outputs: { [propKey]: { merge: "replace" } },
     contribute(key, stops) {
       const percentPatch = {};
       stops.forEach((stop) => {

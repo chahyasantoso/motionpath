@@ -76,36 +76,39 @@ Add this method anywhere among the other private methods (e.g. right above
 ## Change 2 — `addChild`: track `isAutoStagger`, use the shared helper
 
 **WRONG (current, inside `addChild`):**
+
 ```js
-    const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
-    const childIndex = this.children.length;
-    const calculatedDelay = targetConfig.delay ?? (childIndex * stagger);
+const stagger =
+  this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
+const childIndex = this.children.length;
+const calculatedDelay = targetConfig.delay ?? childIndex * stagger;
 
-    const child = this.#deps.mountInstance(targetMotionId, {
-      ...targetConfig,
-      delay: calculatedDelay,
-      parentId: this.id
-    });
+const child = this.#deps.mountInstance(targetMotionId, {
+  ...targetConfig,
+  delay: calculatedDelay,
+  parentId: this.id,
+});
 
-    child.currentDelay = calculatedDelay;
-    this.children.push(child);
+child.currentDelay = calculatedDelay;
+this.children.push(child);
 ```
 
 **CORRECT:**
+
 ```js
-    const isAutoStagger = targetConfig.delay === undefined;
-    const autoIndex = this.children.filter(c => c.isAutoStagger).length;
-    const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(autoIndex);
+const isAutoStagger = targetConfig.delay === undefined;
+const autoIndex = this.children.filter((c) => c.isAutoStagger).length;
+const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(autoIndex);
 
-    const child = this.#deps.mountInstance(targetMotionId, {
-      ...targetConfig,
-      delay: calculatedDelay,
-      parentId: this.id
-    });
+const child = this.#deps.mountInstance(targetMotionId, {
+  ...targetConfig,
+  delay: calculatedDelay,
+  parentId: this.id,
+});
 
-    child.currentDelay = calculatedDelay;
-    child.isAutoStagger = isAutoStagger;
-    this.children.push(child);
+child.currentDelay = calculatedDelay;
+child.isAutoStagger = isAutoStagger;
+this.children.push(child);
 ```
 
 Note `autoIndex` is computed from `this.children` **before** the new child is
@@ -117,6 +120,7 @@ children only.
 ## Change 3 — `removeChild`: only reflow auto children, use the shared helper
 
 **WRONG (current, the `removeChild` method as left by the base brief):**
+
 ```js
   removeChild(child) {
     const idx = this.children.indexOf(child);
@@ -133,6 +137,7 @@ children only.
 ```
 
 **CORRECT:**
+
 ```js
   removeChild(child) {
     const idx = this.children.indexOf(child);
@@ -154,6 +159,7 @@ children only.
 ## Change 4 — `#reflowSiblings` / `#defaultReflow`: read `staggerTransition`
 
 **WRONG (current, as left by the base brief):**
+
 ```js
   #reflowSiblings(targets) {
     const reflow = this.#deps.reflowSiblings ?? MotionInstance.#defaultReflow;
@@ -186,6 +192,7 @@ children only.
 ```
 
 **CORRECT:**
+
 ```js
   #reflowSiblings(targets) {
     const reflow = this.#deps.reflowSiblings ?? MotionInstance.#defaultReflow;
@@ -232,27 +239,35 @@ custom reflow.
 ## Change 5 — `#setupDriver`: extract `#ownsTrigger()`, pure DRY, no behavior change
 
 **WRONG (current, two separate occurrences inside `#setupDriver`):**
+
 ```js
-      // Auto-play if not a child instance and autoplay is enabled
-      const shouldPlay = !config.parentId && !config._groupMember && (config.autoplay ?? true);
+// Auto-play if not a child instance and autoplay is enabled
+const shouldPlay =
+  !config.parentId && !config._groupMember && (config.autoplay ?? true);
 ```
+
 and, further down in the same method:
+
 ```js
       if (!config.parentId && !config._groupMember) {
 ```
 
 **CORRECT:** add this private method (anywhere among the other private
 methods):
+
 ```js
   #ownsTrigger(config) {
     return !config.parentId && !config._groupMember;
   }
 ```
+
 then replace the two call sites:
+
 ```js
-      // Auto-play if not a child instance and autoplay is enabled
-      const shouldPlay = this.#ownsTrigger(config) && (config.autoplay ?? true);
+// Auto-play if not a child instance and autoplay is enabled
+const shouldPlay = this.#ownsTrigger(config) && (config.autoplay ?? true);
 ```
+
 ```js
       if (this.#ownsTrigger(config)) {
 ```
@@ -265,64 +280,68 @@ branches, same trigger resolution, same everything. This is extraction only.
 ## Change 6 — constructor owns `currentDelay`/`isAutoStagger`; `addChild` stops reaching into the child after construction
 
 **WRONG (current constructor, as left by the base brief):**
+
 ```js
-    this.templates = context.project?.templates || {};
-    this.children = [];
-    this.tracksMap = new Map();
-    this.currentDelay = undefined;
-    this.delayTween = null;
-    this.paddingCallback = null;
+this.templates = context.project?.templates || {};
+this.children = [];
+this.tracksMap = new Map();
+this.currentDelay = undefined;
+this.delayTween = null;
+this.paddingCallback = null;
 ```
 
 **CORRECT:**
+
 ```js
-    this.templates = context.project?.templates || {};
-    this.children = [];
-    this.tracksMap = new Map();
-    this.currentDelay = config.delay ?? undefined;
-    this.isAutoStagger = config.isAutoStagger ?? true;
-    this.delayTween = null;
-    this.paddingCallback = null;
+this.templates = context.project?.templates || {};
+this.children = [];
+this.tracksMap = new Map();
+this.currentDelay = config.delay ?? undefined;
+this.isAutoStagger = config.isAutoStagger ?? true;
+this.delayTween = null;
+this.paddingCallback = null;
 ```
 
 `config` here is the constructor's own `config` parameter (already in scope
 at this point in the constructor — same one used a few lines earlier for
 `this.config = config || {}`). Default `isAutoStagger` to `true` when absent
 — top-level instances (never in anyone's `.children[]`) will carry this field
-unused, which is harmless; it's only ever read by a *parent* iterating its
+unused, which is harmless; it's only ever read by a _parent_ iterating its
 own `.children`.
 
 **WRONG (current `addChild`, as left by Change 2 of this same addendum):**
+
 ```js
-    const isAutoStagger = targetConfig.delay === undefined;
-    const autoIndex = this.children.filter(c => c.isAutoStagger).length;
-    const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(autoIndex);
+const isAutoStagger = targetConfig.delay === undefined;
+const autoIndex = this.children.filter((c) => c.isAutoStagger).length;
+const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(autoIndex);
 
-    const child = this.#deps.mountInstance(targetMotionId, {
-      ...targetConfig,
-      delay: calculatedDelay,
-      parentId: this.id
-    });
+const child = this.#deps.mountInstance(targetMotionId, {
+  ...targetConfig,
+  delay: calculatedDelay,
+  parentId: this.id,
+});
 
-    child.currentDelay = calculatedDelay;
-    child.isAutoStagger = isAutoStagger;
-    this.children.push(child);
+child.currentDelay = calculatedDelay;
+child.isAutoStagger = isAutoStagger;
+this.children.push(child);
 ```
 
 **CORRECT:**
+
 ```js
-    const isAutoStagger = targetConfig.delay === undefined;
-    const autoIndex = this.children.filter(c => c.isAutoStagger).length;
-    const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(autoIndex);
+const isAutoStagger = targetConfig.delay === undefined;
+const autoIndex = this.children.filter((c) => c.isAutoStagger).length;
+const calculatedDelay = targetConfig.delay ?? this.#staggerDelay(autoIndex);
 
-    const child = this.#deps.mountInstance(targetMotionId, {
-      ...targetConfig,
-      delay: calculatedDelay,
-      isAutoStagger,
-      parentId: this.id
-    });
+const child = this.#deps.mountInstance(targetMotionId, {
+  ...targetConfig,
+  delay: calculatedDelay,
+  isAutoStagger,
+  parentId: this.id,
+});
 
-    this.children.push(child);
+this.children.push(child);
 ```
 
 The child now sets its own `currentDelay`/`isAutoStagger` in its constructor
@@ -351,35 +370,35 @@ destructures fine with an extra 3rd arg present), but confirm it still passes.
 ### Add these new tests
 
 ```js
-it('does not reflow a child that was given an explicit custom delay', async () => {
-  const instance = createTestInstance('time-motion', {}, timelineSchema);
-  const auto1 = instance.addChild('child-motion', {});
-  const custom = instance.addChild('child-motion', { delay: 5 });
+it("does not reflow a child that was given an explicit custom delay", async () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const auto1 = instance.addChild("child-motion", {});
+  const custom = instance.addChild("child-motion", { delay: 5 });
 
   instance.removeChild(auto1);
 
   expect(custom.delayTween).toBeNull(); // never touched by reflow
-  expect(custom.currentDelay).toBe(5);  // untouched
+  expect(custom.currentDelay).toBe(5); // untouched
 });
 
-it('auto children reindex among themselves, skipping custom children', () => {
-  const instance = createTestInstance('time-motion', {}, timelineSchema);
-  const auto1 = instance.addChild('child-motion', {});          // auto, index 0
-  instance.addChild('child-motion', { delay: 99 });              // custom, ignored for indexing
-  const auto2 = instance.addChild('child-motion', {});           // auto, index 1
+it("auto children reindex among themselves, skipping custom children", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const auto1 = instance.addChild("child-motion", {}); // auto, index 0
+  instance.addChild("child-motion", { delay: 99 }); // custom, ignored for indexing
+  const auto2 = instance.addChild("child-motion", {}); // auto, index 1
 
   expect(auto1.currentDelay).toBe(0);
   expect(auto2.currentDelay).toBeCloseTo(0.1); // stagger=0.1 in timelineSchema, index 1 among autos
 });
 
-it('reads duration/ease from schemaMotion.staggerTransition when present', async () => {
+it("reads duration/ease from schemaMotion.staggerTransition when present", async () => {
   const schemaWithTransition = {
     ...timelineSchema,
-    staggerTransition: { duration: 0.25, ease: 'power1.in' }
+    staggerTransition: { duration: 0.25, ease: "power1.in" },
   };
-  const instance = createTestInstance('time-motion', {}, schemaWithTransition);
-  const child1 = instance.addChild('child-motion', {});
-  instance.addChild('child-motion', {});
+  const instance = createTestInstance("time-motion", {}, schemaWithTransition);
+  const child1 = instance.addChild("child-motion", {});
+  instance.addChild("child-motion", {});
 
   instance.removeChild(child1);
 
@@ -433,11 +452,18 @@ npx vitest run src/domain/instance/__tests__/MotionInstance.test.js
 ### One more test to add, for Change 5/6
 
 ```js
-it('addChild passes isAutoStagger/delay through config instead of mutating the child after construction', () => {
-  const mountInstanceSpy = vi.fn((motionId, config) => new MotionInstance(motionId, config, timelineSchema, testContext));
-  const instance = createTestInstance('time-motion', { mountInstance: mountInstanceSpy }, timelineSchema);
+it("addChild passes isAutoStagger/delay through config instead of mutating the child after construction", () => {
+  const mountInstanceSpy = vi.fn(
+    (motionId, config) =>
+      new MotionInstance(motionId, config, timelineSchema, testContext),
+  );
+  const instance = createTestInstance(
+    "time-motion",
+    { mountInstance: mountInstanceSpy },
+    timelineSchema,
+  );
 
-  instance.addChild('child-motion', {});
+  instance.addChild("child-motion", {});
 
   const [, configArg] = mountInstanceSpy.mock.calls[0];
   expect(configArg.isAutoStagger).toBe(true);

@@ -18,28 +18,43 @@
  */
 export const v4Project = {
   schemaVersion: 4,
-  projectId: 'integration-fixture',
+  projectId: "integration-fixture",
   perspective: 1200,
 
   templates: [
     {
-      templateId: 'fade-pop',
+      templateId: "fade-pop",
       duration: 0.6,
-      transformOrigin: '50% 50%',
+      transformOrigin: "50% 50%",
       keyframes: {
-        opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
-        scale: { stops: [{ p: 0, v: 0.8 }, { p: 1, v: 1, ease: 'back.out(2)' }] },
+        opacity: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: 1 },
+          ],
+        },
+        scale: {
+          stops: [
+            { p: 0, v: 0.8 },
+            { p: 1, v: 1, ease: "back.out(2)" },
+          ],
+        },
       },
     },
   ],
 
   motions: [
     {
-      id: 'scroll-scrub',
-      trigger: { type: 'scroll', scrub: true, start: 'top top', end: 'bottom top' },
+      id: "scroll-scrub",
+      trigger: {
+        type: "scroll",
+        scrub: true,
+        start: "top top",
+        end: "bottom top",
+      },
       tracks: [
         {
-          id: 'scroll-path-track',
+          id: "scroll-path-track",
           keyframes: {
             path: {
               points: [
@@ -47,69 +62,100 @@ export const v4Project = {
                 { x: 320, y: 180, ctrlX: 160, ctrlY: 0 },
                 { x: 640, y: 0 },
               ],
-              stops: [{ p: 0, v: 0 }, { p: 1, v: 1, ease: 'none' }],
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 1, ease: "none" },
+              ],
               autoRotate: true,
             },
-            blur: { stops: [{ p: 0, v: 0 }, { p: 0.5, v: 6 }, { p: 1, v: 0 }] },
+            blur: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 0.5, v: 6 },
+                { p: 1, v: 0 },
+              ],
+            },
           },
         },
       ],
     },
 
     {
-      id: 'time-loop',
-      trigger: { type: 'time', repeat: 1, yoyo: true, repeatDelay: 0.1 },
+      id: "time-loop",
+      trigger: { type: "time", repeat: 1, yoyo: true, repeatDelay: 0.1 },
       stagger: 0.12,
-      staggerTransition: { duration: 0.55, ease: 'power2.out' },
+      staggerTransition: { duration: 0.55, ease: "power2.out" },
       tracks: [
-        { id: 'card-1', use: 'fade-pop' },
-        { id: 'card-2', use: 'fade-pop', duration: 0.9 },
+        { id: "card-1", use: "fade-pop" },
+        { id: "card-2", use: "fade-pop", duration: 0.9 },
         {
-          id: 'card-3',
-          use: 'fade-pop',
+          id: "card-3",
+          use: "fade-pop",
           duration: 1,
           keyframes: {
-            '--card-size': { stops: [{ p: 0, v: '28px' }, { p: 1, v: '56px' }] },
+            "--card-size": {
+              stops: [
+                { p: 0, v: "28px" },
+                { p: 1, v: "56px" },
+              ],
+            },
           },
         },
       ],
     },
 
     {
-      id: 'time-paused',
-      trigger: { type: 'time', autoplay: false },
+      id: "time-paused",
+      trigger: { type: "time", autoplay: false },
       tracks: [
         {
-          id: 'paused-track',
+          id: "paused-track",
           duration: 1,
-          keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } },
+          keyframes: {
+            opacity: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 1 },
+              ],
+            },
+          },
         },
       ],
     },
 
     {
-      id: 'manual-scrubber',
-      trigger: { type: 'manual' },
+      id: "manual-scrubber",
+      trigger: { type: "manual" },
       tracks: [
         {
-          id: 'needle',
+          id: "needle",
           duration: 1,
-          keyframes: { rotation: { stops: [{ p: 0, v: -90 }, { p: 1, v: 90 }] } },
+          keyframes: {
+            rotation: {
+              stops: [
+                { p: 0, v: -90 },
+                { p: 1, v: 90 },
+              ],
+            },
+          },
         },
       ],
     },
 
     {
-      id: 'sequence',
-      trigger: { type: 'time' },
+      id: "sequence",
+      trigger: { type: "time" },
       tracks: [
         {
-          id: 'film-strip',
+          id: "film-strip",
           duration: 1,
           keyframes: {
             imageSequence: {
-              frames: ['/seq/001.webp', '/seq/002.webp', '/seq/003.webp'],
-              stops: [{ p: 0, v: 0 }, { p: 1, v: 2 }],
+              frames: ["/seq/001.webp", "/seq/002.webp", "/seq/003.webp"],
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 2 },
+              ],
             },
           },
         },
@@ -119,11 +165,22 @@ export const v4Project = {
 
   tracks: [
     {
-      id: 'ball-exit-track',
+      id: "ball-exit-track",
       duration: 0.35,
       keyframes: {
-        scale: { stops: [{ p: 0, v: 1 }, { p: 0.35, v: 1.7 }, { p: 1, v: 0 }] },
-        opacity: { stops: [{ p: 0, v: 1 }, { p: 1, v: 0 }] },
+        scale: {
+          stops: [
+            { p: 0, v: 1 },
+            { p: 0.35, v: 1.7 },
+            { p: 1, v: 0 },
+          ],
+        },
+        opacity: {
+          stops: [
+            { p: 0, v: 1 },
+            { p: 1, v: 0 },
+          ],
+        },
       },
     },
   ],

@@ -45,6 +45,7 @@ clearCore() {
 ```
 
 **Files changed:**
+
 - [`src/lib/deferredSubscribe.js`](file:///d:/dev/motionpath/src/lib/deferredSubscribe.js)
 - [`src/lib/__tests__/deferredSubscribe.test.js`](file:///d:/dev/motionpath/src/lib/__tests__/deferredSubscribe.test.js) — test expectation updated to assert pending subscriptions are preserved and flushed after `setCore`
 
@@ -81,6 +82,7 @@ The `_gsap` property was stripped from a shallow copy before stringifying. The d
 ```
 
 **Files changed:**
+
 - [`src/hooks/useMotionSubscriber.js`](file:///d:/dev/motionpath/src/hooks/useMotionSubscriber.js)
 
 ---
@@ -89,13 +91,13 @@ The `_gsap` property was stripped from a shallow copy before stringifying. The d
 
 After confirming the animation worked, all temporary debug instrumentation was removed:
 
-| File | What was removed |
-|---|---|
-| [`src/lib/deferredSubscribe.js`](file:///d:/dev/motionpath/src/lib/deferredSubscribe.js) | All `console.log` debug lines |
-| [`src/hooks/useMotionSubscriber.js`](file:///d:/dev/motionpath/src/hooks/useMotionSubscriber.js) | Tick logger, mount/unmount logs, `_debugCount` variable |
-| [`src/hooks/useMotionProject.js`](file:///d:/dev/motionpath/src/hooks/useMotionProject.js) | `loadProject OK` success log |
-| [`src/lib/engineCore.js`](file:///d:/dev/motionpath/src/lib/engineCore.js) | Immediate-callback debug log |
-| [`src/components/Motorcycle/MotorcyclePage.jsx`](file:///d:/dev/motionpath/src/components/Motorcycle/MotorcyclePage.jsx) | Full debug overlay panel + console interceptor hook |
+| File                                                                                                                     | What was removed                                        |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| [`src/lib/deferredSubscribe.js`](file:///d:/dev/motionpath/src/lib/deferredSubscribe.js)                                 | All `console.log` debug lines                           |
+| [`src/hooks/useMotionSubscriber.js`](file:///d:/dev/motionpath/src/hooks/useMotionSubscriber.js)                         | Tick logger, mount/unmount logs, `_debugCount` variable |
+| [`src/hooks/useMotionProject.js`](file:///d:/dev/motionpath/src/hooks/useMotionProject.js)                               | `loadProject OK` success log                            |
+| [`src/lib/engineCore.js`](file:///d:/dev/motionpath/src/lib/engineCore.js)                                               | Immediate-callback debug log                            |
+| [`src/components/Motorcycle/MotorcyclePage.jsx`](file:///d:/dev/motionpath/src/components/Motorcycle/MotorcyclePage.jsx) | Full debug overlay panel + console interceptor hook     |
 
 ---
 

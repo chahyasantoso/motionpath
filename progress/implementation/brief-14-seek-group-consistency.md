@@ -39,7 +39,7 @@ Patch `instance.seek` the same way `play`/`pause` are patched, delegating to `co
 
 ```js
 // src/engines/ProductionEngine.js
-import { BaseEngine } from './BaseEngine.js';
+import { BaseEngine } from "./BaseEngine.js";
 
 export class ProductionEngine extends BaseEngine {
   _configForMount(motionId, config, groupSpec) {
@@ -67,7 +67,7 @@ export default productionEngine;
 
 ```js
 // src/engines/ProductionEngine.js
-import { BaseEngine } from './BaseEngine.js';
+import { BaseEngine } from "./BaseEngine.js";
 
 export class ProductionEngine extends BaseEngine {
   _configForMount(motionId, config, groupSpec) {
@@ -97,56 +97,76 @@ export default productionEngine;
 Add this test inside the existing `describe` block that contains `'play/pause on grouped instance controls master'` in `src/engines/__tests__/ProductionEngine.test.js` (same file, same nesting level — do not create a new top-level `describe`). Reuse the exact `timeGroupSchema` fixture already defined in that neighboring test rather than redefining it.
 
 ```js
-    it('seek on grouped instance controls master, not the member\'s own timeline', async () => {
-      validatorModule.validateProject.mockReturnValue([]);
-      const engine = createProductionEngine(mockDeps);
+it("seek on grouped instance controls master, not the member's own timeline", async () => {
+  validatorModule.validateProject.mockReturnValue([]);
+  const engine = createProductionEngine(mockDeps);
 
-      const timeGroupSchema = {
-        templates: [],
-        motions: [
+  const timeGroupSchema = {
+    templates: [],
+    motions: [
+      {
+        motionId: "tg-a",
+        driver: {
+          type: "timeline",
+          timelineId: "time-group",
+          trigger: { type: "time", duration: 1 },
+        },
+        tracks: [
           {
-            motionId: 'tg-a',
-            driver: {
-              type: 'timeline',
-              timelineId: 'time-group',
-              trigger: { type: 'time', duration: 1 }
+            id: "tg-track-a",
+            keyframes: {
+              x: {
+                stops: [
+                  { p: 0, v: 0 },
+                  { p: 1, v: 10 },
+                ],
+              },
             },
-            tracks: [
-              { id: 'tg-track-a', keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 10 }] } } }
-            ]
           },
+        ],
+      },
+      {
+        motionId: "tg-b",
+        driver: {
+          type: "timeline",
+          timelineId: "time-group",
+          primary: true,
+          trigger: { type: "time", duration: 1, repeat: 0 },
+        },
+        tracks: [
           {
-            motionId: 'tg-b',
-            driver: {
-              type: 'timeline',
-              timelineId: 'time-group',
-              primary: true,
-              trigger: { type: 'time', duration: 1, repeat: 0 }
+            id: "tg-track-b",
+            keyframes: {
+              y: {
+                stops: [
+                  { p: 0, v: 0 },
+                  { p: 1, v: 20 },
+                ],
+              },
             },
-            tracks: [
-              { id: 'tg-track-b', keyframes: { y: { stops: [{ p: 0, v: 0 }, { p: 1, v: 20 }] } } }
-            ]
-          }
-        ]
-      };
+          },
+        ],
+      },
+    ],
+  };
 
-      await engine.loadProject(timeGroupSchema);
+  await engine.loadProject(timeGroupSchema);
 
-      const instA = engine.mountInstance('tg-a');
-      const instB = engine.mountInstance('tg-b');
+  const instA = engine.mountInstance("tg-a");
+  const instB = engine.mountInstance("tg-b");
 
-      expect(typeof instA.seek).toBe('function');
-      expect(typeof instB.seek).toBe('function');
+  expect(typeof instA.seek).toBe("function");
+  expect(typeof instB.seek).toBe("function");
 
-      const memberOwnProgressSpy = vi.spyOn(instA.timeline, 'progress');
+  const memberOwnProgressSpy = vi.spyOn(instA.timeline, "progress");
 
-      instA.seek(0.5);
+  instA.seek(0.5);
 
-      // The member's own nested timeline must NOT have been driven directly —
-      // seek() on a grouped instance must go through the master, exactly like
-      // play()/pause() already do.
-      expect(memberOwnProgressSpy).not.toHaveBeenCalledWith(0.5);
-    });
+  // The member's own nested timeline must NOT have been driven directly —
+  // seek() on a grouped instance must go through the master, exactly like
+  // play()/pause() already do.
+  expect(memberOwnProgressSpy).not.toHaveBeenCalledWith(0.5);
+});
 ```
 
 ## Verification checklist

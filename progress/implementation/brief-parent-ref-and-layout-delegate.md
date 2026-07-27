@@ -2,11 +2,13 @@
 
 **File to edit:** `src/domain/instance/MotionInstance.js`
 **New files to create:**
+
 - `src/domain/instance/LayoutDelegate.js`
 - `src/domain/instance/GaplessLayoutDelegate.js`
 - `src/domain/instance/StaticLayoutDelegate.js`
 
 **Tests to edit/create:**
+
 - `src/domain/instance/__tests__/MotionInstance.test.js`
 - `src/domain/instance/__tests__/GaplessLayoutDelegate.test.js` (new)
 - `src/domain/instance/__tests__/StaticLayoutDelegate.test.js` (new)
@@ -35,7 +37,7 @@ exactly. Do not guess at surrounding code.
 4. Base class is named `LayoutDelegate` (not `ReflowLayoutDelegate` —
    rejected name, see non-goals). Default gap-closing implementation is
    `GaplessLayoutDelegate` (not `GapLayoutDelegate` — renamed to describe the
-   *result*: no gaps remain after reflow).
+   _result_: no gaps remain after reflow).
 5. `StaticLayoutDelegate extends GaplessLayoutDelegate`, overriding only
    `computeReflow` to always return `[]`. It inherits `computeSpawnDelay`
    unchanged — spawn placement (frontmost + stagger) is identical between the
@@ -44,7 +46,7 @@ exactly. Do not guess at surrounding code.
    `this.children` is spliced — `children` passed in still includes
    `removedChild`, exactly matching how `ordered` is built today.
 7. Delegate selection: `context.layoutDelegate ?? config.layoutDelegate ??
-   defaultGaplessLayoutDelegate` (a shared singleton export of
+defaultGaplessLayoutDelegate` (a shared singleton export of
    `GaplessLayoutDelegate`, since it is stateless). No schema field, no
    registry, no factory — this is a plain constructor-injected default.
 
@@ -53,7 +55,7 @@ exactly. Do not guess at surrounding code.
 - Do **not** name the base class `ReflowLayoutDelegate`. `StaticLayoutDelegate`
   never reflows anything, so a "reflow" name on the base contract is wrong.
   The method stays named `computeReflow` (a valid answer to that method can be
-  "no reflow needed," returning `[]`) — only the *class* name changes.
+  "no reflow needed," returning `[]`) — only the _class_ name changes.
 - Do **not** add a `dispose()`/teardown lifecycle hook to `LayoutDelegate`.
   Not needed by either shipped delegate.
 - Do **not** add a schema-level field (e.g. `driver.layout`) to select a
@@ -73,6 +75,7 @@ exactly. Do not guess at surrounding code.
 ## Change 1 — private fields: add `#parent`
 
 **WRONG (current):**
+
 ```js
   #subscribers = new Map(); // trackId -> Set<wrapper>
   #childListeners = new Set();
@@ -84,6 +87,7 @@ exactly. Do not guess at surrounding code.
 ```
 
 **CORRECT:**
+
 ```js
   #subscribers = new Map(); // trackId -> Set<wrapper>
   #childListeners = new Set();
@@ -109,81 +113,98 @@ the class (next to `requiredTriggerIds` / `isDestroyed` is fine):
 ## Change 3 — set `layoutDelegate` in constructor
 
 **WRONG (current):**
-```js
-    this.children = [];
-    this.tracksMap = new Map();
-    this.currentDelay = config.delay ?? undefined;
-    this.delayTween = null;
-    this.paddingCallback = null;
 
-    this.#deps = this.deps;
-    this.#onSubscriberChange = context.onSubscriberChange;
+```js
+this.children = [];
+this.tracksMap = new Map();
+this.currentDelay = config.delay ?? undefined;
+this.delayTween = null;
+this.paddingCallback = null;
+
+this.#deps = this.deps;
+this.#onSubscriberChange = context.onSubscriberChange;
 ```
 
 **CORRECT:**
-```js
-    this.children = [];
-    this.tracksMap = new Map();
-    this.currentDelay = config.delay ?? undefined;
-    this.delayTween = null;
-    this.paddingCallback = null;
-    this.layoutDelegate = context.layoutDelegate ?? config.layoutDelegate ?? defaultGaplessLayoutDelegate;
 
-    this.#deps = this.deps;
-    this.#onSubscriberChange = context.onSubscriberChange;
+```js
+this.children = [];
+this.tracksMap = new Map();
+this.currentDelay = config.delay ?? undefined;
+this.delayTween = null;
+this.paddingCallback = null;
+this.layoutDelegate =
+  context.layoutDelegate ??
+  config.layoutDelegate ??
+  defaultGaplessLayoutDelegate;
+
+this.#deps = this.deps;
+this.#onSubscriberChange = context.onSubscriberChange;
 ```
 
 Add the import at the top of the file, with the other imports:
+
 ```js
-import { defaultGaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
+import { defaultGaplessLayoutDelegate } from "./GaplessLayoutDelegate.js";
 ```
 
 ## Change 4 — `addChild`: set `parent`, delegate spawn placement
 
 **WRONG (current):**
+
 ```js
-    // Placement is derived from actual current sibling state, not a formula
-    // counted from a fixed origin — same principle removeChild's cascade
-    // already uses. A counter-based approach (tried in brief 15) fixes live
-    // count plateauing under churn, but goes stale the moment removeChild's
-    // cascade shifts the existing chain: the counter has no way to know that
-    // happened, so every removal-with-reflow before a spawn leaves a
-    // permanent extra stagger-width gap between the old chain and everything
-    // spawned after it. Anchoring to the real frontmost position is immune
-    // to both failure modes at once, and needs no reset bookkeeping — an
-    // empty children array naturally resolves to delay 0.
-    const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
-    const frontmostDelay = this.children.reduce((max, c) => Math.max(max, c.currentDelay ?? 0), -stagger);
-    const calculatedDelay = targetConfig.delay ?? (frontmostDelay + stagger);
+// Placement is derived from actual current sibling state, not a formula
+// counted from a fixed origin — same principle removeChild's cascade
+// already uses. A counter-based approach (tried in brief 15) fixes live
+// count plateauing under churn, but goes stale the moment removeChild's
+// cascade shifts the existing chain: the counter has no way to know that
+// happened, so every removal-with-reflow before a spawn leaves a
+// permanent extra stagger-width gap between the old chain and everything
+// spawned after it. Anchoring to the real frontmost position is immune
+// to both failure modes at once, and needs no reset bookkeeping — an
+// empty children array naturally resolves to delay 0.
+const stagger =
+  this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
+const frontmostDelay = this.children.reduce(
+  (max, c) => Math.max(max, c.currentDelay ?? 0),
+  -stagger,
+);
+const calculatedDelay = targetConfig.delay ?? frontmostDelay + stagger;
 
-    const child = this.#deps.mountInstance(targetMotionId, {
-      ...targetConfig,
-      delay: calculatedDelay,
-      parentId: this.id
-    });
+const child = this.#deps.mountInstance(targetMotionId, {
+  ...targetConfig,
+  delay: calculatedDelay,
+  parentId: this.id,
+});
 
-    this.children.push(child);
+this.children.push(child);
 ```
 
 **CORRECT:**
+
 ```js
-    // Placement math is delegated to this.layoutDelegate (default:
-    // GaplessLayoutDelegate) rather than hardcoded here. See
-    // LayoutDelegate.js for the contract and why the "frontmost + stagger"
-    // reasoning below now lives in GaplessLayoutDelegate.computeSpawnDelay
-    // instead of inline.
-    const stagger = this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
-    const calculatedDelay = targetConfig.delay ??
-      this.layoutDelegate.computeSpawnDelay(this.children, { stagger, schemaMotion: this.schemaMotion });
+// Placement math is delegated to this.layoutDelegate (default:
+// GaplessLayoutDelegate) rather than hardcoded here. See
+// LayoutDelegate.js for the contract and why the "frontmost + stagger"
+// reasoning below now lives in GaplessLayoutDelegate.computeSpawnDelay
+// instead of inline.
+const stagger =
+  this.schemaMotion.stagger ?? this.schemaMotion.driver?.stagger ?? 0;
+const calculatedDelay =
+  targetConfig.delay ??
+  this.layoutDelegate.computeSpawnDelay(this.children, {
+    stagger,
+    schemaMotion: this.schemaMotion,
+  });
 
-    const child = this.#deps.mountInstance(targetMotionId, {
-      ...targetConfig,
-      delay: calculatedDelay,
-      parentId: this.id
-    });
+const child = this.#deps.mountInstance(targetMotionId, {
+  ...targetConfig,
+  delay: calculatedDelay,
+  parentId: this.id,
+});
 
-    child.#parent = this;
-    this.children.push(child);
+child.#parent = this;
+this.children.push(child);
 ```
 
 Note the comment explaining the frontmost-vs-counter reasoning **moves into
@@ -193,6 +214,7 @@ it so the "why" isn't lost.
 ## Change 5 — `removeChild`: delegate reflow computation
 
 **WRONG (current):**
+
 ```js
   removeChild(child) {
     const idx = this.children.indexOf(child);
@@ -227,6 +249,7 @@ it so the "why" isn't lost.
 ```
 
 **CORRECT:**
+
 ```js
   removeChild(child) {
     const idx = this.children.indexOf(child);
@@ -278,7 +301,7 @@ export class LayoutDelegate {
    * @returns {number} delay for the new child
    */
   computeSpawnDelay(children, context) {
-    throw new Error('LayoutDelegate.computeSpawnDelay not implemented');
+    throw new Error("LayoutDelegate.computeSpawnDelay not implemented");
   }
 
   /**
@@ -288,7 +311,7 @@ export class LayoutDelegate {
    * @returns {{ child: MotionInstance, delay: number }[]} reflow targets, [] if none
    */
   computeReflow(children, removedChild, context) {
-    throw new Error('LayoutDelegate.computeReflow not implemented');
+    throw new Error("LayoutDelegate.computeReflow not implemented");
   }
 }
 ```
@@ -299,7 +322,7 @@ This is a **lossless extraction** — the logic and its reasoning comments come
 directly from the WRONG blocks in Changes 4 and 5 above, just relocated.
 
 ```js
-import { LayoutDelegate } from './LayoutDelegate.js';
+import { LayoutDelegate } from "./LayoutDelegate.js";
 
 /**
  * Default layout policy: new children append after the frontmost existing
@@ -319,7 +342,10 @@ export class GaplessLayoutDelegate extends LayoutDelegate {
     // it. Anchoring to the real frontmost position is immune to both
     // failure modes at once, and needs no reset bookkeeping — an empty
     // children array naturally resolves to delay 0.
-    const frontmostDelay = children.reduce((max, c) => Math.max(max, c.currentDelay ?? 0), -stagger);
+    const frontmostDelay = children.reduce(
+      (max, c) => Math.max(max, c.currentDelay ?? 0),
+      -stagger,
+    );
     return frontmostDelay + stagger;
   }
 
@@ -329,7 +355,9 @@ export class GaplessLayoutDelegate extends LayoutDelegate {
     // to auto-placed siblings. Source of truth is currentDelay (the settled
     // logical position), never timeline.startTime() live, which is actively
     // animating during an in-flight reflow and would give unstable targets.
-    const ordered = [...children].sort((a, b) => (a.currentDelay ?? 0) - (b.currentDelay ?? 0));
+    const ordered = [...children].sort(
+      (a, b) => (a.currentDelay ?? 0) - (b.currentDelay ?? 0),
+    );
     const removedRank = ordered.indexOf(removedChild);
 
     // Cascade only when removing from the middle of the chain (rank > 0).
@@ -342,7 +370,10 @@ export class GaplessLayoutDelegate extends LayoutDelegate {
 
     const targets = [];
     for (let k = removedRank + 1; k < ordered.length; k++) {
-      targets.push({ child: ordered[k], delay: ordered[k - 1].currentDelay ?? 0 });
+      targets.push({
+        child: ordered[k],
+        delay: ordered[k - 1].currentDelay ?? 0,
+      });
     }
     return targets;
   }
@@ -355,7 +386,7 @@ export const defaultGaplessLayoutDelegate = new GaplessLayoutDelegate();
 ## Change 8 — new file `StaticLayoutDelegate.js`
 
 ```js
-import { GaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
+import { GaplessLayoutDelegate } from "./GaplessLayoutDelegate.js";
 
 /**
  * Same spawn placement as GaplessLayoutDelegate (frontmost + stagger), but
@@ -384,6 +415,7 @@ export const defaultStaticLayoutDelegate = new StaticLayoutDelegate();
 ## Change 9 — `destroy()`: clear `#parent`
 
 **WRONG (current, end of `destroy()`):**
+
 ```js
     this.#pendingRemovals.forEach(child => {
       if (child.delayTween) child.delayTween.kill();
@@ -394,6 +426,7 @@ export const defaultStaticLayoutDelegate = new StaticLayoutDelegate();
 ```
 
 **CORRECT:**
+
 ```js
     this.#pendingRemovals.forEach(child => {
       if (child.delayTween) child.delayTween.kill();

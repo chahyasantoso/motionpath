@@ -15,8 +15,8 @@ Two hooks only. One loads a project once; one subscribes an element to broadcast
 ## 2. `useMotionProject(project)`
 
 ```js
-import { useEffect, useRef } from 'react';
-import { productionEngine } from '../lib/ProductionEngine';
+import { useEffect, useRef } from "react";
+import { productionEngine } from "../lib/ProductionEngine";
 
 export default function useMotionProject(project) {
   const projectRef = useRef(project);
@@ -26,8 +26,9 @@ export default function useMotionProject(project) {
     if (!projectRef.current) return;
     let cancelled = false;
 
-    productionEngine.loadProject(projectRef.current).catch(err => {
-      if (!cancelled) console.error('[useMotionProject] loadProject failed:', err);
+    productionEngine.loadProject(projectRef.current).catch((err) => {
+      if (!cancelled)
+        console.error("[useMotionProject] loadProject failed:", err);
     });
 
     return () => {
@@ -50,9 +51,9 @@ export default function useMotionProject(project) {
 Unchanged in shape and behavior from the current implementation — only the import target changes:
 
 ```js
-import { useEffect, useRef } from 'react';
-import { gsap } from 'gsap';
-import { productionEngine } from '../lib/ProductionEngine'; // was: motionEngine
+import { useEffect, useRef } from "react";
+import { gsap } from "gsap";
+import { productionEngine } from "../lib/ProductionEngine"; // was: motionEngine
 
 export default function useMotionSubscriber(elementId, ref, transformFn) {
   const transformFnRef = useRef(transformFn);
@@ -64,8 +65,13 @@ export default function useMotionSubscriber(elementId, ref, transformFn) {
     const unsubscribe = productionEngine.subscribe(elementId, (rawData) => {
       if (!ref.current) return;
       const activeTransformFn = transformFnRef.current;
-      if (typeof activeTransformFn === 'function') {
-        gsap.set(ref.current, activeTransformFn(rawData, (data) => productionEngine.compose(elementId, data)));
+      if (typeof activeTransformFn === "function") {
+        gsap.set(
+          ref.current,
+          activeTransformFn(rawData, (data) =>
+            productionEngine.compose(elementId, data),
+          ),
+        );
       } else {
         gsap.set(ref.current, productionEngine.compose(elementId, rawData));
       }
@@ -92,7 +98,7 @@ useMotionPlayer(iceCreamCardScene, containerRef);
 // after:
 const project = {
   schemaVersion: 1,
-  projectId: 'burst-page',
+  projectId: "burst-page",
   scenarios: [strawberryScene, iceCreamCardScene],
 };
 useMotionProject(project);
@@ -106,6 +112,7 @@ If `project` is assembled inline on every render, wrap it in `useMemo` keyed on 
 <section data-motion-id={strawberryScene.sceneId} className="burst-scene">
   <div data-motion-id="burst-stage" className="burst-stage">
 ```
+
 (matching `pin: '.burst-stage'` in the scenario becoming `pin: 'burst-stage'`, resolved via `data-motion-id` like every other element reference.)
 
 ---

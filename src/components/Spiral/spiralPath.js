@@ -1,6 +1,13 @@
-import { SPIRAL_CONFIG, BALL_SIZE, BALL_SPEED } from './spiralConfig.js';
+import { SPIRAL_CONFIG, BALL_SIZE, BALL_SPEED } from "./spiralConfig.js";
 
-export function generateSpiralPoints(cx, cy, outerR, innerR, turns, targetSegments = 200) {
+export function generateSpiralPoints(
+  cx,
+  cy,
+  outerR,
+  innerR,
+  turns,
+  targetSegments = 200,
+) {
   // 1. Generate high-resolution raw spiral points
   const rawSegments = 2000;
   const rawPoints = [];
@@ -32,20 +39,20 @@ export function generateSpiralPoints(cx, cy, outerR, innerR, turns, targetSegmen
 
   for (let i = 0; i <= targetSegments; i++) {
     const targetDist = i * step;
-    
+
     let idx = 0;
     while (idx < dists.length - 1 && dists[idx + 1] < targetDist) {
       idx++;
     }
-    
+
     const dStart = dists[idx];
     const dEnd = dists[idx + 1];
     const segmentLength = dEnd - dStart;
     const ratio = segmentLength > 0 ? (targetDist - dStart) / segmentLength : 0;
-    
+
     const pStart = rawPoints[idx];
     const pEnd = rawPoints[idx + 1];
-    
+
     uniformPoints.push({
       x: pStart.x + (pEnd.x - pStart.x) * ratio,
       y: pStart.y + (pEnd.y - pStart.y) * ratio,
@@ -66,9 +73,11 @@ export const calculatePathLength = (points) => {
 };
 
 export const spiralPathPoints = generateSpiralPoints(
-  SPIRAL_CONFIG.cx, SPIRAL_CONFIG.cy,
-  SPIRAL_CONFIG.outerR, SPIRAL_CONFIG.innerR,
-  SPIRAL_CONFIG.turns
+  SPIRAL_CONFIG.cx,
+  SPIRAL_CONFIG.cy,
+  SPIRAL_CONFIG.outerR,
+  SPIRAL_CONFIG.innerR,
+  SPIRAL_CONFIG.turns,
 );
 
 export const totalPathLength = calculatePathLength(spiralPathPoints);

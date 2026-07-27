@@ -16,6 +16,7 @@ grep -rn "instance\.id\b\|motion\.id\b" src/ --include=*.js --include=*.jsx
 ```
 
 Expected findings:
+
 - `Engine.#instances` is keyed by `motion.id`, which is set directly to `motionConfig.id` — the schema's motionId, identical on every mount call for the same motion.
 - `mountInstance` destroys and replaces whatever entry already exists for that key before building the new one.
 - `unmountInstance` has **zero callers** anywhere in the codebase (only its own definition matches).
@@ -28,6 +29,7 @@ If any of these don't match current source, stop and re-report actual findings b
 ## 1. Problem Statement
 
 `Engine.#instances` is a `Map<motionId, Motion>` — a singleton-per-schema-template cache. Every `mountInstance(motionId)` call:
+
 1. Checks for an existing entry under that exact `motionId` string.
 2. If found, `.destroy()`s it and deletes the entry.
 3. Builds a fresh `Motion`, storing it under the same `motionId` key.
@@ -45,14 +47,14 @@ Confirmed via direct comparison with v3: `MotionInstance` generates a globally u
 - **`Motion`'s constructor is unchanged.** It already just does `this.id = id` with no internal logic depending on what `id` means (confirmed: `this.id` is never read anywhere else inside `Motion.js`). The fix lives entirely in what `Engine.mountInstance` passes as `id` — no changes needed to `Motion.js` itself.
 - **`motion.motionId` (the schema id) is still recorded on the instance, just not as the map key** — set directly by `Engine.mountInstance` after construction (`motion.motionId = motionConfig.id`), for debugging/future reference (e.g. Feature Swarm Part B may want it). Not load-bearing anywhere today; purely additive, zero risk.
 - **`Engine.unmountInstance(motionId)` is deleted, not redesigned.** Zero callers exist (grepped, confirmed). Every current caller (`useMotionInstance`'s cleanup, `TowerDefensePage`'s enemy-death handling) already holds the instance reference directly and calls `.destroy()` on it. "Unmount by motionId" stops being a meaningful operation once a motionId can map to zero, one, or many live instances — there's no sensible single thing to unmount by that key alone.
-- **The standalone-track branch of `mountInstance` (the `trackConfig` fallback, for top-level schema `tracks[]` entries) is INTENTIONALLY left unchanged — still keyed by the track's own schema id.** This is a deliberate asymmetry, not an oversight: `Engine.getTrack(trackId)` is built and tested (`Engine.test.js`) around the contract "look up an already-mounted track later, by its schema id" — a singleton-per-schema-id model. No current use case needs multiple concurrent instances of the same *standalone track* mounted via this path (TowerDefense's enemies are MOTIONS with `trigger: {type: 'manual'}`, not standalone tracks, so they don't go through this branch at all). If that need ever appears, it should get the same unique-id treatment — but that would also mean `Engine.getTrack`'s "look it up again later by schema id" contract no longer holds for tracks, same as it doesn't for motions after this fix. Don't speculatively apply that change now without a concrete driver.
+- **The standalone-track branch of `mountInstance` (the `trackConfig` fallback, for top-level schema `tracks[]` entries) is INTENTIONALLY left unchanged — still keyed by the track's own schema id.** This is a deliberate asymmetry, not an oversight: `Engine.getTrack(trackId)` is built and tested (`Engine.test.js`) around the contract "look up an already-mounted track later, by its schema id" — a singleton-per-schema-id model. No current use case needs multiple concurrent instances of the same _standalone track_ mounted via this path (TowerDefense's enemies are MOTIONS with `trigger: {type: 'manual'}`, not standalone tracks, so they don't go through this branch at all). If that need ever appears, it should get the same unique-id treatment — but that would also mean `Engine.getTrack`'s "look it up again later by schema id" contract no longer holds for tracks, same as it doesn't for motions after this fix. Don't speculatively apply that change now without a concrete driver.
 
 ## 3. Non-Goals
 
 - Do NOT touch `Engine.getTrack` beyond what's already fixed (null-on-miss) — its "singleton lookup by schema id" contract for standalone tracks is intentionally preserved per the decision above.
 - Do NOT implement Feature Swarm Part B (per-instance trigger-ref resolution) in this brief — that's a separate, larger, deliberately-deferred piece of work with no current concrete driver.
 - Do NOT change `TowerDefensePage.jsx` to adopt the `Track`-direct alternative discussed separately (bypassing `Motion`/`Engine` entirely) — that's a different, not-yet-decided architectural direction for that demo specifically. This brief fixes the engine regardless of which direction TowerDefense ends up taking.
-- Do NOT add instance pooling or reuse across `mountInstance` calls — every call still builds fresh, matching the existing "remount rebuilds fresh" principle. This brief removes the *unrelated-instance-destroying* side effect, not the *build-fresh-every-time* behavior.
+- Do NOT add instance pooling or reuse across `mountInstance` calls — every call still builds fresh, matching the existing "remount rebuilds fresh" principle. This brief removes the _unrelated-instance-destroying_ side effect, not the _build-fresh-every-time_ behavior.
 - Do NOT rename or restructure `Motion`'s public API (`.id`, `.mount`, `.getTrack`, etc.) beyond adding the new `.motionId` property.
 
 ---
@@ -60,6 +62,7 @@ Confirmed via direct comparison with v3: `MotionInstance` generates a globally u
 ## 4. CORRECT / WRONG
 
 **WRONG (current):**
+
 ```js
 export class Engine {
   #triggerRefs = new TriggerRefRegistry();
@@ -128,6 +131,7 @@ export class Engine {
 ```
 
 **CORRECT:**
+
 ```js
 export class Engine {
   #triggerRefs = new TriggerRefRegistry();
@@ -211,7 +215,7 @@ Note: `#instances.delete(...)` on destroy is still handled correctly — `useMot
    ```
 2. **Unit test — the actual TowerDefense scenario, directly:** mount the same `motionId` twice without destroying the first (`type: 'manual'` trigger is enough, no DOM needed) — assert BOTH returned instances remain independently alive and functional afterward (e.g. both still respond to `.getTrack()`/`.mount()`/seeking without throwing, and neither's internal state was torn down by the other's creation).
 3. **Unit test — motionId no longer required to be unique per instance:** `mountInstance('same-id')` three times, assert three distinct object references come back, all simultaneously usable.
-4. **Regression test — single-instance case still works exactly as before:** `useMotionInstance`-style mount → unmount (via `.destroy()`) → remount still produces exactly one live instance at a time, matching current demo behavior. This exercises the *replacement* for the removed dedupe logic — cleanup now happens purely via the caller's own `.destroy()` call.
+4. **Regression test — single-instance case still works exactly as before:** `useMotionInstance`-style mount → unmount (via `.destroy()`) → remount still produces exactly one live instance at a time, matching current demo behavior. This exercises the _replacement_ for the removed dedupe logic — cleanup now happens purely via the caller's own `.destroy()` call.
 5. **Regression test — standalone track path unaffected:** re-run (or extend) `Engine.test.js`'s existing null-on-miss / cache-stability tests for the `trackConfig` branch — confirm still keyed by schema id, still returns the same cached object on repeat `getTrack` calls, unaffected by this change.
 6. **Full suite run** — `npx vitest run`, confirm no existing test relied on the old "second mountInstance call for the same motionId replaces the first" behavior. (Checked already: no current demo calls `mountInstance` twice for the same id outside TowerDefense's already-broken pattern — but re-confirm on whatever the actual working tree looks like when this lands, since other work may have landed in between.)
 7. **Full diff review for scope creep** — this brief touches only `Engine.js`. `Motion.js`, `Track.js`, and the standalone-track branch of `mountInstance` should show zero changes.

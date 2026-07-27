@@ -11,22 +11,33 @@ MotionPath is a data-first animation runtime built on GSAP. Projects are plain J
 ## Quick start
 
 ```js
-import { Engine } from './src/engines/Engine.js';
+import { Engine } from "./src/engines/Engine.js";
 
 const engine = new Engine();
 await engine.loadProject({
   schemaVersion: 4,
-  motions: [{
-    id: 'hero',
-    trigger: { type: 'time', autoplay: false },
-    tracks: [{
-      id: 'hero-track',
-      duration: 1,
-      keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } },
-    }],
-  }],
+  motions: [
+    {
+      id: "hero",
+      trigger: { type: "time", autoplay: false },
+      tracks: [
+        {
+          id: "hero-track",
+          duration: 1,
+          keyframes: {
+            opacity: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 1 },
+              ],
+            },
+          },
+        },
+      ],
+    },
+  ],
 });
-const motion = engine.mountInstance('hero');
+const motion = engine.mountInstance("hero");
 motion.play();
 // On teardown: engine.unmount(motion), or engine.destroy().
 ```

@@ -15,7 +15,7 @@
 export function motionStructureRule(schema) {
   const errors = [];
 
-  if (!schema || typeof schema !== 'object') {
+  if (!schema || typeof schema !== "object") {
     return errors;
   }
 
@@ -25,32 +25,32 @@ export function motionStructureRule(schema) {
 
   for (const [i, template] of templates.entries()) {
     const templatePath = `templates[${i}]`;
-    if (!template || typeof template !== 'object') {
+    if (!template || typeof template !== "object") {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
+        ruleId: "motion-structure",
+        severity: "error",
         message: `Template at index ${i} must be an object.`,
-        path: templatePath
+        path: templatePath,
       });
       continue;
     }
 
     const { templateId, driver, timelineId, primary, trigger } = template;
 
-    if (!templateId || typeof templateId !== 'string') {
+    if (!templateId || typeof templateId !== "string") {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'templateId is required and must be a string.',
-        path: `${templatePath}.templateId`
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "templateId is required and must be a string.",
+        path: `${templatePath}.templateId`,
       });
     } else {
       if (seenTemplateIds.has(templateId)) {
         errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
+          ruleId: "motion-structure",
+          severity: "error",
           message: `Duplicate templateId '${templateId}' found.`,
-          path: `${templatePath}.templateId`
+          path: `${templatePath}.templateId`,
         });
       }
       seenTemplateIds.add(templateId);
@@ -58,34 +58,34 @@ export function motionStructureRule(schema) {
 
     if (driver !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'Template forbids driver property.',
-        path: `${templatePath}.driver`
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "Template forbids driver property.",
+        path: `${templatePath}.driver`,
       });
     }
     if (timelineId !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'Template forbids timelineId property.',
-        path: `${templatePath}.timelineId`
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "Template forbids timelineId property.",
+        path: `${templatePath}.timelineId`,
       });
     }
     if (primary !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'Template forbids primary property.',
-        path: `${templatePath}.primary`
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "Template forbids primary property.",
+        path: `${templatePath}.primary`,
       });
     }
     if (trigger !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'Template forbids trigger property.',
-        path: `${templatePath}.trigger`
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "Template forbids trigger property.",
+        path: `${templatePath}.trigger`,
       });
     }
   }
@@ -94,45 +94,45 @@ export function motionStructureRule(schema) {
   const validateTracksArray = (tracks, pathPrefix, motionIdOrIdx) => {
     if (tracks === undefined || tracks === null) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
+        ruleId: "motion-structure",
+        severity: "error",
         message: `Motion "${motionIdOrIdx}": tracks must have at least 1 entry`,
-        path: pathPrefix
+        path: pathPrefix,
       });
     } else if (!Array.isArray(tracks)) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'tracks must be an array.',
-        path: pathPrefix
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "tracks must be an array.",
+        path: pathPrefix,
       });
     } else if (tracks.length < 1) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
+        ruleId: "motion-structure",
+        severity: "error",
         message: `Motion "${motionIdOrIdx}": tracks must have at least 1 entry`,
-        path: pathPrefix
+        path: pathPrefix,
       });
     } else {
       for (const [j, track] of tracks.entries()) {
-        if (!track || typeof track !== 'object') continue;
+        if (!track || typeof track !== "object") continue;
 
-        if (typeof track.id !== 'string' || track.id === '') {
+        if (typeof track.id !== "string" || track.id === "") {
           errors.push({
-            ruleId: 'motion-structure',
-            severity: 'error',
+            ruleId: "motion-structure",
+            severity: "error",
             message: `Motion "${motionIdOrIdx}": track.id is required and must be a non-empty string.`,
-            path: `${pathPrefix}[${j}].id`
+            path: `${pathPrefix}[${j}].id`,
           });
         }
 
         if (track.use !== undefined) {
           if (!seenTemplateIds.has(track.use)) {
             errors.push({
-              ruleId: 'motion-structure',
-              severity: 'error',
+              ruleId: "motion-structure",
+              severity: "error",
               message: `Track references non-existent templateId '${track.use}'.`,
-              path: `${pathPrefix}[${j}].use`
+              path: `${pathPrefix}[${j}].use`,
             });
           }
         }
@@ -146,36 +146,47 @@ export function motionStructureRule(schema) {
 
   for (const [i, motion] of motions.entries()) {
     const motionPath = `motions[${i}]`;
-    if (!motion || typeof motion !== 'object') {
+    if (!motion || typeof motion !== "object") {
       continue;
     }
 
-    const { id, motionId, driver, trigger, tracks, timelineId, primary, lifecycle, playback } = motion;
+    const {
+      id,
+      motionId,
+      driver,
+      trigger,
+      tracks,
+      timelineId,
+      primary,
+      lifecycle,
+      playback,
+    } = motion;
 
     // R-02: motionId is a v3 leftover. The runtime never reads it.
     if (motionId !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: '"motionId" is a v3 field, not valid in v4 -- rename it to "id". parseV4Project and Engine only read motion.id, so a motionId-only motion registers under the key `undefined` and can never be mounted.',
-        path: `${motionPath}.motionId`
+        ruleId: "motion-structure",
+        severity: "error",
+        message:
+          '"motionId" is a v3 field, not valid in v4 -- rename it to "id". parseV4Project and Engine only read motion.id, so a motionId-only motion registers under the key `undefined` and can never be mounted.',
+        path: `${motionPath}.motionId`,
       });
     }
 
-    if (typeof id !== 'string' || id === '') {
+    if (typeof id !== "string" || id === "") {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'motion.id is required and must be a non-empty string.',
-        path: `${motionPath}.id`
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "motion.id is required and must be a non-empty string.",
+        path: `${motionPath}.id`,
       });
     } else {
       if (seenMotionIds.has(id)) {
         errors.push({
-          ruleId: 'motion-structure',
-          severity: 'error',
+          ruleId: "motion-structure",
+          severity: "error",
           message: `Duplicate motion id '${id}' found.`,
-          path: `${motionPath}.id`
+          path: `${motionPath}.id`,
         });
       }
       seenMotionIds.add(id);
@@ -184,65 +195,67 @@ export function motionStructureRule(schema) {
     // Forbidden v2/v3 fields in v4
     if (driver !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: '"driver" is a v2/v3 field, not valid in v4 -- motions always have a trigger, no driver wrapper needed.',
-        path: `${motionPath}.driver`
+        ruleId: "motion-structure",
+        severity: "error",
+        message:
+          '"driver" is a v2/v3 field, not valid in v4 -- motions always have a trigger, no driver wrapper needed.',
+        path: `${motionPath}.driver`,
       });
     }
     if (timelineId !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: '"timelineId" is a v2/v3 field, not valid in v4 -- tracks under the same motion share a trigger automatically.',
-        path: `${motionPath}.timelineId`
+        ruleId: "motion-structure",
+        severity: "error",
+        message:
+          '"timelineId" is a v2/v3 field, not valid in v4 -- tracks under the same motion share a trigger automatically.',
+        path: `${motionPath}.timelineId`,
       });
     }
     if (primary !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
+        ruleId: "motion-structure",
+        severity: "error",
         message: '"primary" is a v2/v3 field, not valid in v4.',
-        path: `${motionPath}.primary`
+        path: `${motionPath}.primary`,
       });
     }
     if (lifecycle !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
+        ruleId: "motion-structure",
+        severity: "error",
         message: '"lifecycle" is a v2/v3 field, not valid in v4.',
-        path: `${motionPath}.lifecycle`
+        path: `${motionPath}.lifecycle`,
       });
     }
     if (playback !== undefined) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
+        ruleId: "motion-structure",
+        severity: "error",
         message: '"playback" is a v2/v3 field, not valid in v4.',
-        path: `${motionPath}.playback`
+        path: `${motionPath}.playback`,
       });
     }
 
     if (trigger === undefined || trigger === null) {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'trigger is required on every motion in v4.',
-        path: `${motionPath}.trigger`
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "trigger is required on every motion in v4.",
+        path: `${motionPath}.trigger`,
       });
-    } else if (typeof trigger !== 'object') {
+    } else if (typeof trigger !== "object") {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'trigger must be an object.',
-        path: `${motionPath}.trigger`
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "trigger must be an object.",
+        path: `${motionPath}.trigger`,
       });
-    } else if (!trigger.type || typeof trigger.type !== 'string') {
+    } else if (!trigger.type || typeof trigger.type !== "string") {
       errors.push({
-        ruleId: 'motion-structure',
-        severity: 'error',
-        message: 'trigger.type is required and must be a string.',
-        path: `${motionPath}.trigger.type`
+        ruleId: "motion-structure",
+        severity: "error",
+        message: "trigger.type is required and must be a string.",
+        path: `${motionPath}.trigger.type`,
       });
     }
 
@@ -251,7 +264,7 @@ export function motionStructureRule(schema) {
 
   // Validate top-level bare tracks if present
   if (Array.isArray(schema.tracks)) {
-    validateTracksArray(schema.tracks, 'tracks', 'top-level');
+    validateTracksArray(schema.tracks, "tracks", "top-level");
   }
 
   return errors;

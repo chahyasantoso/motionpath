@@ -55,6 +55,7 @@ nothing — no actual mount happens, nothing is returned. It has zero callers an
 `ProductionEngine.js` in the last pass; this one was missed.
 
 ### WRONG (current state — remove this entire method)
+
 ```js
 mountTimeline(motionId) {
   if (!_project) {
@@ -72,16 +73,18 @@ mountTimeline(motionId) {
 ```
 
 ### CORRECT
+
 Delete the method entirely. After deletion, check whether `getMotion` is still used
 elsewhere in `EditorEngine.js` (it is not, as of this brief being written) — if it is now
 unused, remove the import too:
 
 ```js
 // Only remove this import if grep confirms getMotion has no other call site left in this file
-import { getMotion } from '../domain/models.js';
+import { getMotion } from "../domain/models.js";
 ```
 
 ### Cleanup while you're in this area
+
 `src/engines/__tests__/resolveMotion.test.js` has a stale `describe()` label left over from
 when `mountTimeline` tests lived there:
 
@@ -107,16 +110,19 @@ destructured (`const { mountInstance } = engine`) or passed as a bare callback, 
 relying on call-site binding.
 
 ### WRONG (current)
+
 ```js
 export function createProductionEngine(deps = {}) {
   // ...existing setup unchanged...
 
   return {
-    async loadProject(schema, options = {}) { /* unchanged */ },
+    async loadProject(schema, options = {}) {
+      /* unchanged */
+    },
 
     mountInstance(motionId, config = {}) {
       if (!_project || !_core) {
-        throw new Error('mountInstance: project not loaded.');
+        throw new Error("mountInstance: project not loaded.");
       }
 
       const onSubscriberChange = (inst, hasSubscribers) => {
@@ -134,7 +140,7 @@ export function createProductionEngine(deps = {}) {
         mountInstance: (childMotionId, childConfig) => {
           return this.mountInstance(childMotionId, childConfig);
         },
-        onSubscriberChange
+        onSubscriberChange,
       });
 
       _instances.set(instance.id, instance);
@@ -142,25 +148,36 @@ export function createProductionEngine(deps = {}) {
       return instance;
     },
 
-    destroy() { /* unchanged */ },
-    resolveMotion(motionId, progress, overrides = {}) { /* unchanged */ },
-    registerTriggerRef(id, ref) { /* unchanged */ },
-    unregisterTriggerRef(id, ref) { /* unchanged */ }
+    destroy() {
+      /* unchanged */
+    },
+    resolveMotion(motionId, progress, overrides = {}) {
+      /* unchanged */
+    },
+    registerTriggerRef(id, ref) {
+      /* unchanged */
+    },
+    unregisterTriggerRef(id, ref) {
+      /* unchanged */
+    },
   };
 }
 ```
 
 ### CORRECT
+
 ```js
 export function createProductionEngine(deps = {}) {
   // ...existing setup unchanged...
 
   const engine = {
-    async loadProject(schema, options = {}) { /* unchanged */ },
+    async loadProject(schema, options = {}) {
+      /* unchanged */
+    },
 
     mountInstance(motionId, config = {}) {
       if (!_project || !_core) {
-        throw new Error('mountInstance: project not loaded.');
+        throw new Error("mountInstance: project not loaded.");
       }
 
       const onSubscriberChange = (inst, hasSubscribers) => {
@@ -178,7 +195,7 @@ export function createProductionEngine(deps = {}) {
         mountInstance: (childMotionId, childConfig) => {
           return engine.mountInstance(childMotionId, childConfig);
         },
-        onSubscriberChange
+        onSubscriberChange,
       });
 
       _instances.set(instance.id, instance);
@@ -186,10 +203,18 @@ export function createProductionEngine(deps = {}) {
       return instance;
     },
 
-    destroy() { /* unchanged */ },
-    resolveMotion(motionId, progress, overrides = {}) { /* unchanged */ },
-    registerTriggerRef(id, ref) { /* unchanged */ },
-    unregisterTriggerRef(id, ref) { /* unchanged */ }
+    destroy() {
+      /* unchanged */
+    },
+    resolveMotion(motionId, progress, overrides = {}) {
+      /* unchanged */
+    },
+    registerTriggerRef(id, ref) {
+      /* unchanged */
+    },
+    unregisterTriggerRef(id, ref) {
+      /* unchanged */
+    },
   };
 
   return engine;
@@ -216,6 +241,7 @@ where plugin-resolution logic can silently drift from `MotionInstance.compose()`
 does this correctly and simply.
 
 ### WRONG (current)
+
 ```js
 compose(trackId, rawData) {
   const trackBuild = buildResult.tracks.get(trackId);
@@ -249,6 +275,7 @@ compose(trackId, rawData) {
 ```
 
 ### CORRECT
+
 ```js
 compose(trackId, rawData) {
   const trackBuild = buildResult.tracks.get(trackId);
@@ -265,10 +292,11 @@ After this change, check whether `ALL_PLUGINS` is still used anywhere else in
 
 ```js
 // Only remove if grep confirms zero remaining usages in this file
-import { ALL_PLUGINS } from '../domain/plugins.js';
+import { ALL_PLUGINS } from "../domain/plugins.js";
 ```
 
 ### Required new test
+
 There is currently no test that directly exercises `editorEngineCore.compose()` with a
 multi-property filter track (e.g. `blur` + `brightness` together, which must compose into one
 merged `filter` object per the existing `filterGroupPlugin` contract). Add one, either as a new
@@ -278,7 +306,7 @@ this — check both files first and reuse existing fixture/schema helpers, don't
 whole new mock schema if one already exists that has a filter-property track):
 
 ```js
-it('compose() merges blur + brightness into one filter patch using cached trackPlugins', async () => {
+it("compose() merges blur + brightness into one filter patch using cached trackPlugins", async () => {
   // 1. build a project (via compileProject or buildProject directly) with a motion/track
   //    whose keyframes include both `blur` and `brightness`
   // 2. call core.compose(trackId) with no rawData override

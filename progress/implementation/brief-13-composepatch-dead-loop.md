@@ -16,7 +16,7 @@
 
 In practice, Loop 2 is unreachable in current usage: `rawData` is the track's proxy object, and every key in that proxy is written by `contribute()` from a plugin already present in `plugins` (the same list Loop 1 iterates). There's no code path today where `rawData` contains a key whose owning plugin isn't already in `plugins`. This is confirmed by grep: nothing in `BuildTrackTween.js` or `MotionInstance.js` writes extra untracked keys onto the proxy outside of what `plugins` already covers.
 
-So Loop 2 is simultaneously: dead code (YAGNI/DRY violation — duplicates Loop 1's logic for a case that can't occur), and a landmine (if it ever *does* become reachable through a future change, it silently violates the "always throw with context" rule).
+So Loop 2 is simultaneously: dead code (YAGNI/DRY violation — duplicates Loop 1's logic for a case that can't occur), and a landmine (if it ever _does_ become reachable through a future change, it silently violates the "always throw with context" rule).
 
 ## Locked decision
 
@@ -34,7 +34,7 @@ Delete Loop 2 entirely. `composeTrackPatch()` should have exactly one compose-an
 
 ```js
 // src/usecases/ComposeTrackPatch.js
-import { resolvePluginForKey } from '../domain/plugins.js';
+import { resolvePluginForKey } from "../domain/plugins.js";
 
 /**
  * ComposeTrackPatch use case.
@@ -47,26 +47,26 @@ import { resolvePluginForKey } from '../domain/plugins.js';
  * @param {string} [context] - human-readable identifier for error messages
  * @returns {object} The composed patch object
  */
-export function composeTrackPatch(plugins, rawData, trackConfig, context = '') {
+export function composeTrackPatch(plugins, rawData, trackConfig, context = "") {
   const patch = {};
 
   for (const plugin of plugins) {
-    if (typeof plugin.compose !== 'function') continue;
+    if (typeof plugin.compose !== "function") continue;
 
     let contribution;
     try {
       contribution = plugin.compose(rawData, trackConfig);
     } catch (e) {
       throw new Error(
-        `composePatch: plugin compose failed${context ? ` for ${context}` : ''}, ` +
-        `property key(s) [${plugin.keys?.join(', ') ?? '?'}]: ${e.message}`
+        `composePatch: plugin compose failed${context ? ` for ${context}` : ""}, ` +
+          `property key(s) [${plugin.keys?.join(", ") ?? "?"}]: ${e.message}`,
       );
     }
 
     if (!contribution) continue;
 
     for (const [k, v] of Object.entries(contribution)) {
-      if (k === 'filter' && typeof v === 'object' && v !== null) {
+      if (k === "filter" && typeof v === "object" && v !== null) {
         patch.filter = { ...(patch.filter || {}), ...v };
       } else {
         patch[k] = v;
@@ -79,10 +79,14 @@ export function composeTrackPatch(plugins, rawData, trackConfig, context = '') {
     if (patch[key] !== undefined) continue;
 
     const plugin = resolvePluginForKey(key);
-    if (plugin && typeof plugin.compose === 'function') {
+    if (plugin && typeof plugin.compose === "function") {
       const contribution = plugin.compose(rawData, trackConfig);
       if (contribution && contribution[key] !== undefined) {
-        if (key === 'filter' && typeof contribution.filter === 'object' && contribution.filter !== null) {
+        if (
+          key === "filter" &&
+          typeof contribution.filter === "object" &&
+          contribution.filter !== null
+        ) {
           patch.filter = { ...(patch.filter || {}), ...contribution.filter };
         } else {
           patch[key] = contribution[key];
@@ -119,26 +123,26 @@ export { composeTrackPatch as composePatch }; // Export alias for ease of migrat
  * @param {string} [context] - human-readable identifier for error messages
  * @returns {object} The composed patch object
  */
-export function composeTrackPatch(plugins, rawData, trackConfig, context = '') {
+export function composeTrackPatch(plugins, rawData, trackConfig, context = "") {
   const patch = {};
 
   for (const plugin of plugins) {
-    if (typeof plugin.compose !== 'function') continue;
+    if (typeof plugin.compose !== "function") continue;
 
     let contribution;
     try {
       contribution = plugin.compose(rawData, trackConfig);
     } catch (e) {
       throw new Error(
-        `composePatch: plugin compose failed${context ? ` for ${context}` : ''}, ` +
-        `property key(s) [${plugin.keys?.join(', ') ?? '?'}]: ${e.message}`
+        `composePatch: plugin compose failed${context ? ` for ${context}` : ""}, ` +
+          `property key(s) [${plugin.keys?.join(", ") ?? "?"}]: ${e.message}`,
       );
     }
 
     if (!contribution) continue;
 
     for (const [k, v] of Object.entries(contribution)) {
-      if (k === 'filter' && typeof v === 'object' && v !== null) {
+      if (k === "filter" && typeof v === "object" && v !== null) {
         patch.filter = { ...(patch.filter || {}), ...v };
       } else {
         patch[k] = v;

@@ -31,89 +31,95 @@ Delete `checkAndUnspawnCompletedBalls` and its call site. Rely solely on `Spiral
 ## WRONG (current code — `src/components/Spiral/SpiralPage.jsx`)
 
 ```jsx
-  // Auto-spawn: spawn a wave of 30 balls, then pause (using native requestAnimationFrame)
-  useEffect(() => {
-    if (!isLoaded || !containerInstance) return;
- 
-    let rafId;
- 
-    // unspawn: identify and remove balls that reach the black hole
-    const checkAndUnspawnCompletedBalls = () => {
-      ballInstancesMap.current.forEach((inst, id) => {
-        if (inst.timeline.progress() >= 0.999) {
-          handleAutoRemove(id, inst);
-        }
-      });
-    };
- 
-    // spawn: launch new balls based on progress spacing
-    const handleSpawningNewBalls = () => {
-      if (spawnedCount.current < 30) {
-        const lastId = ballCounter.current;
-        const lastInstance = ballInstancesMap.current.get(lastId);
-        if (!lastInstance || lastInstance.timeline.progress() >= MIN_SPAWN_PROGRESS) {
-          addBall();
-          spawnedCount.current += 1;
-        }
-      } else if (containerInstance.children.length === 0) {
-        spawnedCount.current = 0;
-        containerInstance.timeline.play(0);
+// Auto-spawn: spawn a wave of 30 balls, then pause (using native requestAnimationFrame)
+useEffect(() => {
+  if (!isLoaded || !containerInstance) return;
+
+  let rafId;
+
+  // unspawn: identify and remove balls that reach the black hole
+  const checkAndUnspawnCompletedBalls = () => {
+    ballInstancesMap.current.forEach((inst, id) => {
+      if (inst.timeline.progress() >= 0.999) {
+        handleAutoRemove(id, inst);
       }
-    };
- 
-    const tick = () => {
-      checkAndUnspawnCompletedBalls();
-      handleSpawningNewBalls();
-      rafId = requestAnimationFrame(tick);
-    };
- 
-    rafId = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(rafId);
-      ballInstancesMap.current.clear();
+    });
+  };
+
+  // spawn: launch new balls based on progress spacing
+  const handleSpawningNewBalls = () => {
+    if (spawnedCount.current < 30) {
+      const lastId = ballCounter.current;
+      const lastInstance = ballInstancesMap.current.get(lastId);
+      if (
+        !lastInstance ||
+        lastInstance.timeline.progress() >= MIN_SPAWN_PROGRESS
+      ) {
+        addBall();
+        spawnedCount.current += 1;
+      }
+    } else if (containerInstance.children.length === 0) {
       spawnedCount.current = 0;
-    };
-  }, [addBall, handleAutoRemove, isLoaded, containerInstance]);
+      containerInstance.timeline.play(0);
+    }
+  };
+
+  const tick = () => {
+    checkAndUnspawnCompletedBalls();
+    handleSpawningNewBalls();
+    rafId = requestAnimationFrame(tick);
+  };
+
+  rafId = requestAnimationFrame(tick);
+  return () => {
+    cancelAnimationFrame(rafId);
+    ballInstancesMap.current.clear();
+    spawnedCount.current = 0;
+  };
+}, [addBall, handleAutoRemove, isLoaded, containerInstance]);
 ```
 
 ## CORRECT
 
 ```jsx
-  // Auto-spawn: spawn a wave of 30 balls, then pause (using native requestAnimationFrame).
-  // Ball removal on completion is handled entirely by SpiralBall's onComplete callback
-  // (event-driven) — no polling needed here. See brief 17.
-  useEffect(() => {
-    if (!isLoaded || !containerInstance) return;
- 
-    let rafId;
- 
-    // spawn: launch new balls based on progress spacing
-    const handleSpawningNewBalls = () => {
-      if (spawnedCount.current < 30) {
-        const lastId = ballCounter.current;
-        const lastInstance = ballInstancesMap.current.get(lastId);
-        if (!lastInstance || lastInstance.timeline.progress() >= MIN_SPAWN_PROGRESS) {
-          addBall();
-          spawnedCount.current += 1;
-        }
-      } else if (containerInstance.children.length === 0) {
-        spawnedCount.current = 0;
-        containerInstance.timeline.play(0);
+// Auto-spawn: spawn a wave of 30 balls, then pause (using native requestAnimationFrame).
+// Ball removal on completion is handled entirely by SpiralBall's onComplete callback
+// (event-driven) — no polling needed here. See brief 17.
+useEffect(() => {
+  if (!isLoaded || !containerInstance) return;
+
+  let rafId;
+
+  // spawn: launch new balls based on progress spacing
+  const handleSpawningNewBalls = () => {
+    if (spawnedCount.current < 30) {
+      const lastId = ballCounter.current;
+      const lastInstance = ballInstancesMap.current.get(lastId);
+      if (
+        !lastInstance ||
+        lastInstance.timeline.progress() >= MIN_SPAWN_PROGRESS
+      ) {
+        addBall();
+        spawnedCount.current += 1;
       }
-    };
- 
-    const tick = () => {
-      handleSpawningNewBalls();
-      rafId = requestAnimationFrame(tick);
-    };
- 
-    rafId = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(rafId);
-      ballInstancesMap.current.clear();
+    } else if (containerInstance.children.length === 0) {
       spawnedCount.current = 0;
-    };
-  }, [addBall, isLoaded, containerInstance]);
+      containerInstance.timeline.play(0);
+    }
+  };
+
+  const tick = () => {
+    handleSpawningNewBalls();
+    rafId = requestAnimationFrame(tick);
+  };
+
+  rafId = requestAnimationFrame(tick);
+  return () => {
+    cancelAnimationFrame(rafId);
+    ballInstancesMap.current.clear();
+    spawnedCount.current = 0;
+  };
+}, [addBall, isLoaded, containerInstance]);
 ```
 
 Note the dependency array also drops `handleAutoRemove` — it's no longer referenced inside this particular `useEffect`'s closure once the polling function is gone (it's still used elsewhere, in the JSX passed to `<SpiralBall onAutoRemove={handleAutoRemove} />` — that reference is untouched).

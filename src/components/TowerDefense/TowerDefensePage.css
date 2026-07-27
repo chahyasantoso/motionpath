@@ -14,7 +14,7 @@
   min-height: 100vh;
   background-color: var(--bg-dark);
   color: #ffffff;
-  font-family: 'Outfit', 'Inter', sans-serif;
+  font-family: "Outfit", "Inter", sans-serif;
   padding: 100px 24px 40px 24px;
   display: flex;
   justify-content: center;
@@ -75,9 +75,9 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
   /* Tech grid background */
-  background-image: 
+  background-image:
     linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
   background-size: 30px 30px;
@@ -113,8 +113,12 @@
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .td-overlay h2 {
@@ -166,8 +170,12 @@
   box-shadow: 0 0 25px rgba(52, 199, 89, 0.6);
 }
 
-.text-red { color: var(--neon-pink); }
-.text-green { color: var(--neon-green); }
+.text-red {
+  color: var(--neon-pink);
+}
+.text-green {
+  color: var(--neon-green);
+}
 
 /* Game Entities placement */
 .td-tower-node {
@@ -278,7 +286,7 @@
   transform: translateX(-50%);
   width: 24px;
   height: 3px;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -300,7 +308,9 @@
   margin-top: -4px;
   background: #ffffff;
   border-radius: 50%;
-  box-shadow: 0 0 10px #ffffff, 0 0 20px var(--neon-blue);
+  box-shadow:
+    0 0 10px #ffffff,
+    0 0 20px var(--neon-blue);
   z-index: 30;
   pointer-events: none;
 }

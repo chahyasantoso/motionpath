@@ -1,4 +1,4 @@
-import { triggerDelegateRegistry } from '../../lib/TriggerDelegate.js';
+import { triggerDelegateRegistry } from "../../lib/TriggerDelegate.js";
 
 /**
  * Rule: trigger-shape
@@ -13,7 +13,7 @@ import { triggerDelegateRegistry } from '../../lib/TriggerDelegate.js';
 export function triggerShapeRule(motion, context, path) {
   const errors = [];
 
-  if (!motion || typeof motion !== 'object') {
+  if (!motion || typeof motion !== "object") {
     return errors; // handled by top-level or orchestrator checks, don't crash
   }
 
@@ -25,67 +25,74 @@ export function triggerShapeRule(motion, context, path) {
       ruleId: "trigger-shape",
       severity: "error",
       message: "motion trigger is required.",
-      path: triggerPath
+      path: triggerPath,
     });
     return errors;
   }
 
-  if (typeof trigger !== 'object') {
+  if (typeof trigger !== "object") {
     errors.push({
       ruleId: "trigger-shape",
       severity: "error",
       message: "motion trigger must be an object.",
-      path: triggerPath
+      path: triggerPath,
     });
     return errors;
   }
 
   const { type, scrub, endTrigger, repeat, yoyo, repeatDelay, delay } = trigger;
 
-  if (!type || typeof type !== 'string') {
+  if (!type || typeof type !== "string") {
     errors.push({
       ruleId: "trigger-shape",
       severity: "error",
       message: `trigger.type is required.`,
-      path: `${triggerPath}.type`
+      path: `${triggerPath}.type`,
     });
     return errors;
   }
 
   // Allow custom registered trigger types or built-in 'scroll' | 'time' | 'manual'
-  if (type !== 'scroll' && type !== 'time' && type !== 'manual' && !triggerDelegateRegistry.has(type)) {
+  if (
+    type !== "scroll" &&
+    type !== "time" &&
+    type !== "manual" &&
+    !triggerDelegateRegistry.has(type)
+  ) {
     errors.push({
       ruleId: "trigger-shape",
       severity: "error",
       message: `trigger.type must be a registered trigger type ('scroll', 'time', 'manual', etc.). Got: ${JSON.stringify(type)}.`,
-      path: `${triggerPath}.type`
+      path: `${triggerPath}.type`,
     });
     return errors;
   }
 
-  if (type === 'manual') {
+  if (type === "manual") {
     return errors;
   }
 
-  if (type === 'scroll') {
+  if (type === "scroll") {
     if (scrub === undefined || scrub === null) {
       errors.push({
         ruleId: "trigger-shape",
         severity: "error",
         message: "scroll trigger requires 'scrub' parameter.",
-        path: `${triggerPath}.scrub`
+        path: `${triggerPath}.scrub`,
       });
-    } else if (typeof scrub !== 'boolean' && typeof scrub !== 'number') {
+    } else if (typeof scrub !== "boolean" && typeof scrub !== "number") {
       errors.push({
         ruleId: "trigger-shape",
         severity: "error",
-        message: "scroll trigger 'scrub' parameter must be a boolean or a number.",
-        path: `${triggerPath}.scrub`
+        message:
+          "scroll trigger 'scrub' parameter must be a boolean or a number.",
+        path: `${triggerPath}.scrub`,
       });
     }
   }
 
-  const isScrub = type === 'scroll' && (scrub === true || typeof scrub === 'number');
+  const isScrub =
+    type === "scroll" && (scrub === true || typeof scrub === "number");
 
   // endTrigger present + NOT (type === "scroll" && scrub === true) -> error.
   if (endTrigger !== undefined && endTrigger !== null && !isScrub) {
@@ -93,7 +100,7 @@ export function triggerShapeRule(motion, context, path) {
       ruleId: "trigger-shape",
       severity: "error",
       message: "endTrigger is only valid on scroll triggers with scrub:true.",
-      path: `${triggerPath}.endTrigger`
+      path: `${triggerPath}.endTrigger`,
     });
   }
 
@@ -106,8 +113,9 @@ export function triggerShapeRule(motion, context, path) {
     errors.push({
       ruleId: "trigger-shape",
       severity: "error",
-      message: "repeat, yoyo, and repeatDelay are incompatible with scroll-scrub triggers.",
-      path: triggerPath
+      message:
+        "repeat, yoyo, and repeatDelay are incompatible with scroll-scrub triggers.",
+      path: triggerPath,
     });
   }
 
@@ -117,7 +125,7 @@ export function triggerShapeRule(motion, context, path) {
       ruleId: "trigger-shape",
       severity: "error",
       message: "delay is incompatible with scroll-scrub triggers.",
-      path: `${triggerPath}.delay`
+      path: `${triggerPath}.delay`,
     });
   }
 
@@ -128,8 +136,8 @@ export function triggerShapeRule(motion, context, path) {
         errors.push({
           ruleId: "trigger-shape",
           severity: "error",
-          message: `duration is incompatible with scroll-scrub triggers (found on track '${track.id || 'unknown'}').`,
-          path: `${path}.tracks[${idx}].duration`
+          message: `duration is incompatible with scroll-scrub triggers (found on track '${track.id || "unknown"}').`,
+          path: `${path}.tracks[${idx}].duration`,
         });
       }
     });

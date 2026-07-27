@@ -18,6 +18,7 @@ grep -rn "useMotionTrigger(" src/components/*/*.jsx
 ```
 
 Expected findings:
+
 - `Engine.#instances` still keyed by `motion.id` = schema `motionConfig.id` (unfixed as of this brief).
 - `mountInstance` still destroys-and-replaces on the same motionId.
 - `unmountInstance` has zero callers.
@@ -70,6 +71,7 @@ Both of those designs manage collisions in a shared global string-id namespace (
 ### 5.1 `Engine.js` — shared helper, `mountWithDelegate`, deleted `unmountInstance`
 
 **WRONG (current):**
+
 ```js
 export class Engine {
   #triggerRefs = new TriggerRefRegistry();
@@ -136,6 +138,7 @@ export class Engine {
 ```
 
 **CORRECT:**
+
 ```js
 export class Engine {
   #v4Project = null;
@@ -162,7 +165,8 @@ export class Engine {
     });
     motion.motionId = motionConfig.id; // schema id, for reference — not the map key
 
-    const stagger = typeof motionConfig.stagger === 'number' ? motionConfig.stagger : 0;
+    const stagger =
+      typeof motionConfig.stagger === "number" ? motionConfig.stagger : 0;
     const motionTracks = motionConfig.tracks || [];
     for (let i = 0; i < motionTracks.length; i++) {
       const track = createTrack(motionTracks[i], this.#v4Project.templates);
@@ -176,13 +180,16 @@ export class Engine {
   }
 
   mountInstance(motionId, config = {}) {
-    if (!this.#v4Project) throw new Error('mountInstance: project not loaded.');
+    if (!this.#v4Project) throw new Error("mountInstance: project not loaded.");
 
     const motionConfig = this.#v4Project.getMotionConfig(motionId);
     if (motionConfig) {
       const triggerType = motionConfig.trigger?.type;
       const factory = triggerDelegateRegistry.get(triggerType);
-      if (!factory) throw new Error(`Unknown trigger type "${triggerType}" on motion "${motionId}".`);
+      if (!factory)
+        throw new Error(
+          `Unknown trigger type "${triggerType}" on motion "${motionId}".`,
+        );
       const delegate = factory(motionConfig.trigger);
       return this.#mountMotionWithDelegate(motionConfig, delegate);
     }
@@ -196,7 +203,9 @@ export class Engine {
       return track;
     }
 
-    throw new Error(`mountInstance: motion or track "${motionId}" not found in project.`);
+    throw new Error(
+      `mountInstance: motion or track "${motionId}" not found in project.`,
+    );
   }
 
   // New — for useScrollMotion/useTimeMotion/useManualMotion. Caller has
@@ -204,9 +213,13 @@ export class Engine {
   // or no DOM dependency at all for time/manual) and just needs it wired
   // into a real Motion with its tracks built the same way mountInstance does.
   mountWithDelegate(motionId, delegate) {
-    if (!this.#v4Project) throw new Error('mountWithDelegate: project not loaded.');
+    if (!this.#v4Project)
+      throw new Error("mountWithDelegate: project not loaded.");
     const motionConfig = this.#v4Project.getMotionConfig(motionId);
-    if (!motionConfig) throw new Error(`mountWithDelegate: motion "${motionId}" not found in project.`);
+    if (!motionConfig)
+      throw new Error(
+        `mountWithDelegate: motion "${motionId}" not found in project.`,
+      );
     return this.#mountMotionWithDelegate(motionConfig, delegate);
   }
 
@@ -233,6 +246,7 @@ export class Engine {
 ### 5.2 `TriggerDelegate.js` — drop dead string-resolution paths
 
 **WRONG (current):**
+
 ```js
 export class ScrollTriggerDelegate {
   build(resolveElement) {
@@ -246,6 +260,7 @@ export class ScrollTriggerDelegate {
 ```
 
 **CORRECT:**
+
 ```js
 export class ScrollTriggerDelegate {
   build() {
@@ -276,6 +291,7 @@ export class ScrollTriggerDelegate {
   ...
 }
 ```
+
 Note the `pin: true` handling moved here — `useScrollMotion` (below) passes `config.trigger` through as the injected element and leaves `pin` as either `true`, a real element (role-string case), or `undefined`; this delegate resolves `pin: true` to "same as trigger" at build time, matching the Locked Decision's convention.
 
 `TimeTriggerDelegate.build()` and `ManualTriggerDelegate.build()` are unchanged — they never took a `resolveElement` parameter to begin with.
@@ -291,9 +307,9 @@ No other changes to `Motion.js` — confirmed nothing else inside it reads `reso
 ### 5.4 New hook: `src/hooks/useScrollMotion.js`
 
 ```js
-import { useEffect, useRef, useState } from 'react';
-import { engine } from '../engines/Engine.js';
-import { ScrollTriggerDelegate } from '../lib/TriggerDelegate.js';
+import { useEffect, useRef, useState } from "react";
+import { engine } from "../engines/Engine.js";
+import { ScrollTriggerDelegate } from "../lib/TriggerDelegate.js";
 
 export default function useScrollMotion(schema) {
   const config = schema.trigger;
@@ -308,7 +324,12 @@ export default function useScrollMotion(schema) {
     const delegate = new ScrollTriggerDelegate({
       ...config,
       trigger: triggerRef.current,
-      pin: config.pin === true ? true : (config.pin === 'pin' ? pinRef.current : undefined),
+      pin:
+        config.pin === true
+          ? true
+          : config.pin === "pin"
+            ? pinRef.current
+            : undefined,
       endTrigger: config.endTrigger ? endTriggerRef.current : undefined,
     });
 
@@ -324,7 +345,7 @@ export default function useScrollMotion(schema) {
 
   const refs = {
     trigger: triggerRef,
-    pin: config.pin === 'pin' ? pinRef : undefined,
+    pin: config.pin === "pin" ? pinRef : undefined,
     endTrigger: config.endTrigger ? endTriggerRef : undefined,
   };
 
@@ -335,7 +356,7 @@ export default function useScrollMotion(schema) {
 ### 5.5 New hook: `src/hooks/useTimeMotion.js`
 
 ```js
-import useMotionInstance from './useMotionInstance.js';
+import useMotionInstance from "./useMotionInstance.js";
 
 // Thin wrapper — TimeTriggerDelegate needs no DOM refs at all. Exists mainly
 // so call sites read consistently with useScrollMotion/useManualMotion, and
@@ -349,14 +370,17 @@ export default function useTimeMotion(motionId, config) {
 ### 5.6 New hook: `src/hooks/useManualMotion.js`
 
 ```js
-import { useCallback } from 'react';
-import useMotionInstance from './useMotionInstance.js';
+import { useCallback } from "react";
+import useMotionInstance from "./useMotionInstance.js";
 
 export default function useManualMotion(motionId, config) {
   const instance = useMotionInstance(motionId, config);
-  const seek = useCallback((p) => {
-    instance?.trigger?.progress(p);
-  }, [instance]);
+  const seek = useCallback(
+    (p) => {
+      instance?.trigger?.progress(p);
+    },
+    [instance],
+  );
   return { instance, seek };
 }
 ```
@@ -364,14 +388,17 @@ export default function useManualMotion(motionId, config) {
 ### 5.7 Migrate `DemoPage.jsx` — 3 scroll motions
 
 **WRONG (current, per motion, x3 — hero/carousel/helix):**
+
 ```js
 const containerRef = useRef(null);
 const stageRef = useRef(null);
-useMotionTrigger('hero-scroll-trigger', containerRef);
-useMotionTrigger('hero-stage-pin', stageRef);
-const instance = useMotionInstance(isLoaded ? 'hero-scrollytelling' : null);
+useMotionTrigger("hero-scroll-trigger", containerRef);
+useMotionTrigger("hero-stage-pin", stageRef);
+const instance = useMotionInstance(isLoaded ? "hero-scrollytelling" : null);
 ```
+
 Schema (unchanged shape, just showing the string ids being removed):
+
 ```js
 trigger: {
   type: 'scroll',
@@ -382,6 +409,7 @@ trigger: {
 ```
 
 **CORRECT:**
+
 ```js
 const { refs, instance } = useScrollMotion(scrollScene); // scrollScene = the hero motion's schema object
 return (
@@ -390,7 +418,9 @@ return (
   </section>
 );
 ```
+
 Schema:
+
 ```js
 trigger: {
   type: 'scroll',
@@ -398,6 +428,7 @@ trigger: {
   ...
 }
 ```
+
 Repeat for `carousel-storytelling` and `helix-storytelling` — same shape, each keeps its own `pin: 'pin'` (their stage is a distinct child element from the section, same as the current two-ref pattern already does).
 
 ### 5.8 Migrate `PasarMalamPage.jsx` — 1 scroll + 1 time motion
@@ -405,13 +436,22 @@ Repeat for `carousel-storytelling` and `helix-storytelling` — same shape, each
 Scroll motion (`pasar-malam-storytelling`) — same pattern as 5.7.
 
 Time motion (`lantern-bounce`) — currently:
+
 ```js
-const bounceInstance = useMotionInstance(isLoaded ? 'lantern-bounce' : null, BOUNCE_CONFIG);
+const bounceInstance = useMotionInstance(
+  isLoaded ? "lantern-bounce" : null,
+  BOUNCE_CONFIG,
+);
 useMotionTimelinePlayback(bounceInstance, bouncing);
 ```
+
 Becomes:
+
 ```js
-const { instance: bounceInstance } = useTimeMotion(isLoaded ? 'lantern-bounce' : null, BOUNCE_CONFIG);
+const { instance: bounceInstance } = useTimeMotion(
+  isLoaded ? "lantern-bounce" : null,
+  BOUNCE_CONFIG,
+);
 useMotionTimelinePlayback(bounceInstance, bouncing); // unchanged, already just calls .play()/.pause()
 ```
 

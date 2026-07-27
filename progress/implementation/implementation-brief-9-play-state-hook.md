@@ -32,7 +32,7 @@ scale as more independent toggles get added.
   start paused (the lantern case) still needs its paused state baked into
   the `loadProject()` call itself, or there's a one-frame flash of motion
   before an effect-driven pause can land. Keep that path; only the
-  *ongoing* control mechanism moves out.
+  _ongoing_ control mechanism moves out.
 - **No new try/catch-based race handling.** Route through the generalized
   deferred-call buffer described below instead — same underlying race
   `subscribe()` already has a tested solution for.
@@ -81,7 +81,7 @@ export function createDeferredCall() {
       return () => {
         entry.cancelled = true;
         if (entry.cleanup) entry.cleanup();
-        pending = pending.filter(e => e !== entry);
+        pending = pending.filter((e) => e !== entry);
       };
     },
   };
@@ -126,8 +126,8 @@ Symmetric to `useMotionSubscriber` — callable by any component at any
 depth, not just the page holding `useMotionProject`:
 
 ```js
-import { useEffect } from 'react';
-import { productionEngine } from '../lib/ProductionEngine';
+import { useEffect } from "react";
+import { productionEngine } from "../lib/ProductionEngine";
 
 /**
  * Ongoing play/pause control for a timelineId, independent of project
@@ -153,8 +153,8 @@ load-only `initialPlayStates` option, forwarded into `loadProject()`
 exactly as `playStates` is today, but explicitly non-reactive:
 
 ```js
-import { useEffect, useRef } from 'react';
-import { productionEngine } from '../lib/ProductionEngine';
+import { useEffect, useRef } from "react";
+import { productionEngine } from "../lib/ProductionEngine";
 
 /**
  * @param {Object} project
@@ -165,7 +165,10 @@ import { productionEngine } from '../lib/ProductionEngine';
  *   this after mount has no effect — use useMotionTimelinePlayback for
  *   ongoing control.
  */
-export default function useMotionProject(project, { initialPlayStates = {} } = {}) {
+export default function useMotionProject(
+  project,
+  { initialPlayStates = {} } = {},
+) {
   const projectRef = useRef(project);
   projectRef.current = project;
   const initialPlayStatesRef = useRef(initialPlayStates);
@@ -176,9 +179,12 @@ export default function useMotionProject(project, { initialPlayStates = {} } = {
     let cancelled = false;
 
     productionEngine
-      .loadProject(projectRef.current, { playStates: initialPlayStatesRef.current })
-      .catch(err => {
-        if (!cancelled) console.error('[useMotionProject] loadProject failed:', err);
+      .loadProject(projectRef.current, {
+        playStates: initialPlayStatesRef.current,
+      })
+      .catch((err) => {
+        if (!cancelled)
+          console.error("[useMotionProject] loadProject failed:", err);
       });
 
     return () => {
@@ -201,11 +207,13 @@ the lantern bounce's paused-until-scroll-threshold state) into
 
 ```js
 // Before
-useMotionProject(project, { 'lantern-bounce-tl': bouncing });
+useMotionProject(project, { "lantern-bounce-tl": bouncing });
 
 // After
-useMotionProject(project, { initialPlayStates: { 'lantern-bounce-tl': false } });
-useMotionTimelinePlayback('lantern-bounce-tl', bouncing);
+useMotionProject(project, {
+  initialPlayStates: { "lantern-bounce-tl": false },
+});
+useMotionTimelinePlayback("lantern-bounce-tl", bouncing);
 ```
 
 The scroll-threshold logic that computes `bouncing` doesn't change at all
@@ -216,7 +224,7 @@ The scroll-threshold logic that computes `bouncing` doesn't change at all
 1. Grep `useMotionProject.js` for `playTimer`/`pauseTimer` — zero results
    (that responsibility has fully moved to `useMotionTimelinePlayback`).
 2. Grep the codebase for the old positional `useMotionProject(project,
-   playStatesObject)` call shape — zero results; every caller uses the new
+playStatesObject)` call shape — zero results; every caller uses the new
    `{ initialPlayStates }` options shape.
 3. Behavioral test: `useMotionTimelinePlayback` called before the engine's
    `core` exists (mount race) — call gets buffered via the generalized

@@ -43,9 +43,9 @@ none of their internals or existing tests need to change.
 ## 1. New file: `src/lib/compileProject.js`
 
 ```js
-import { validateProject } from '../validators/index.js';
-import { buildProject } from './builder.js';
-import { createEngineCore } from './engineCore.js';
+import { validateProject } from "../validators/index.js";
+import { buildProject } from "./builder.js";
+import { createEngineCore } from "./engineCore.js";
 
 /**
  * Shared compile preamble used by both ProductionEngine and EditorEngine:
@@ -61,10 +61,10 @@ import { createEngineCore } from './engineCore.js';
  */
 export async function compileProject(schema, deps) {
   const errors = validateProject(schema) || [];
-  const hardErrors = errors.filter((e) => e.severity !== 'warning');
+  const hardErrors = errors.filter((e) => e.severity !== "warning");
   if (hardErrors.length > 0) {
     const err = new Error(
-      `MotionPath: schema validation failed with ${hardErrors.length} error(s).`
+      `MotionPath: schema validation failed with ${hardErrors.length} error(s).`,
     );
     err.validationErrors = errors;
     throw err;

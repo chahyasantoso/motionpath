@@ -81,7 +81,7 @@ Tests that verified the old behavior (checking `gsap.to` was called or that `del
 Two related bugs:
 
 **3a — `onSubscriberChange` fired after state teardown.**
-`destroy()` cleared the timeline, tracks, and children *before* calling `this.#onSubscriberChange(this, false)`. The engine's callback calls `this._core.unregisterActiveInstance(inst)`, which may inspect the instance. If anything in the engine's unregistration path touched the instance state (e.g. logging, checks), it would find an already-torn-down object.
+`destroy()` cleared the timeline, tracks, and children _before_ calling `this.#onSubscriberChange(this, false)`. The engine's callback calls `this._core.unregisterActiveInstance(inst)`, which may inspect the instance. If anything in the engine's unregistration path touched the instance state (e.g. logging, checks), it would find an already-torn-down object.
 
 ```js
 // BEFORE — notification fired last, after all state was gone
@@ -134,11 +134,11 @@ broadcast() {
 
 They are not duplicates. They queue against **different cores** with **independent lifecycles**:
 
-| | `BaseEngine.#deferredCall` | `EditorEngine.#deferredCall` |
-|---|---|---|
-| Core set by | `_core` (GSAP `EngineCore`) | `#trackIndex` (a `Map`) |
-| Flushed when | GSAP ticker is running | `loadProject` finishes indexing tracks |
-| Used for | `registerActiveInstance` bookkeeping | `subscribe(trackId, cb)` calls |
+|              | `BaseEngine.#deferredCall`           | `EditorEngine.#deferredCall`           |
+| ------------ | ------------------------------------ | -------------------------------------- |
+| Core set by  | `_core` (GSAP `EngineCore`)          | `#trackIndex` (a `Map`)                |
+| Flushed when | GSAP ticker is running               | `loadProject` finishes indexing tracks |
+| Used for     | `registerActiveInstance` bookkeeping | `subscribe(trackId, cb)` calls         |
 
 A `subscribe()` call from a React hook can arrive before `loadProject` completes. The `EditorEngine.#deferredCall` buffers it until the track index is ready. `BaseEngine`'s queue is unrelated — it gates GSAP tick registration. Flushing one implies nothing about the other.
 
@@ -159,7 +159,7 @@ No code change needed. Added a block comment in `EditorEngine` explaining the se
 
 ---
 
-## Issue 5 — `resolveMotion` accepted both raw schema and parsed domain model *(fixed in prior session)*
+## Issue 5 — `resolveMotion` accepted both raw schema and parsed domain model _(fixed in prior session)_
 
 ### Problem
 
@@ -167,10 +167,10 @@ No code change needed. Added a block comment in `EditorEngine` explaining the se
 
 ```js
 // BEFORE — dual input formats created ambiguity
-const isDomain = project && typeof project.motions?.get === 'function';
+const isDomain = project && typeof project.motions?.get === "function";
 const originalMotion = isDomain
   ? getMotion(project, motionId)
-  : (project?.motions || []).find(m => m.motionId === motionId);
+  : (project?.motions || []).find((m) => m.motionId === motionId);
 ```
 
 This meant callers could pass either format and get silently different behavior. The engine always had a parsed `_project` available; there was no reason to support the raw format.
@@ -181,8 +181,10 @@ Removed the `isDomain` branch. The resolver now requires a parsed domain model a
 
 ```js
 // AFTER — single accepted format
-if (!project || typeof project.motions?.get !== 'function') {
-  throw new Error('resolveMotion: expected a parsed MotionProject domain model.');
+if (!project || typeof project.motions?.get !== "function") {
+  throw new Error(
+    "resolveMotion: expected a parsed MotionProject domain model.",
+  );
 }
 ```
 
@@ -225,11 +227,11 @@ _cleanup() {
 
 ## Summary
 
-| # | Issue | Root cause | Fix type |
-|---|---|---|---|
-| 1 | Driver duplication | Timeline config ran before ownership check | Code fix |
-| 2 | Zero-duration tween waste | No early-exit for `duration === 0` | Code fix + test update |
-| 3 | Destroy race conditions | Wrong notification order + missing guard | Code fix |
-| 4 | Dual `#deferredCall` confusion | Undocumented intent | Documentation |
-| 5 | Resolver dual-format input | Legacy compatibility branch | Code fix (prior session) |
-| 6 | `#loadGeneration` double-increment | Increment in wrong place | Code fix |
+| #   | Issue                              | Root cause                                 | Fix type                 |
+| --- | ---------------------------------- | ------------------------------------------ | ------------------------ |
+| 1   | Driver duplication                 | Timeline config ran before ownership check | Code fix                 |
+| 2   | Zero-duration tween waste          | No early-exit for `duration === 0`         | Code fix + test update   |
+| 3   | Destroy race conditions            | Wrong notification order + missing guard   | Code fix                 |
+| 4   | Dual `#deferredCall` confusion     | Undocumented intent                        | Documentation            |
+| 5   | Resolver dual-format input         | Legacy compatibility branch                | Code fix (prior session) |
+| 6   | `#loadGeneration` double-increment | Increment in wrong place                   | Code fix                 |

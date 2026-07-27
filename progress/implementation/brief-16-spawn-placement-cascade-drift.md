@@ -17,13 +17,17 @@ Reproduced: 5 balls spawn evenly at delays `0, 0.1, 0.2, 0.3, 0.4` (stagger = 0.
 Delete the counter. Place new spawns relative to the **actual current position of the frontmost existing child** — the same "derive from observed sibling state, not a formula" principle brief 15 already applied to `removeChild`'s cascade, now applied symmetrically to `addChild`'s placement:
 
 ```js
-const frontmostDelay = this.children.reduce((max, c) => Math.max(max, c.currentDelay ?? 0), -stagger);
-const calculatedDelay = targetConfig.delay ?? (frontmostDelay + stagger);
+const frontmostDelay = this.children.reduce(
+  (max, c) => Math.max(max, c.currentDelay ?? 0),
+  -stagger,
+);
+const calculatedDelay = targetConfig.delay ?? frontmostDelay + stagger;
 ```
 
 When `this.children` is empty, `frontmostDelay` defaults to `-stagger`, so `calculatedDelay` naturally resolves to `0` — the "start fresh" case falls out for free, no separate reset bookkeeping required.
 
 This is strictly better than the counter it replaces:
+
 - Still immune to the original brief-15 bug (live count plateauing under churn) — this formula never counts alive children at all.
 - Additionally immune to this new gap bug — a spawn always anchors to reality, so it automatically absorbs however much any number of prior reflows has shifted the chain.
 - Simpler: no private counter field, no reset-on-empty logic needed anywhere.
@@ -183,73 +187,81 @@ This is strictly better than the counter it replaces:
 ### Replace these two tests (reference the removed counter/its reset behavior)
 
 **WRONG (delete both):**
+
 ```js
-    it('spawn placement uses a monotonic counter, immune to live-count plateauing under churn', () => {
-      const instance = createTestInstance('time-motion', {}, timelineSchema);
+it("spawn placement uses a monotonic counter, immune to live-count plateauing under churn", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
 
-      const a = instance.addChild('child-motion', {}); // spawn #0 -> delay 0
-      expect(a.currentDelay).toBe(0);
+  const a = instance.addChild("child-motion", {}); // spawn #0 -> delay 0
+  expect(a.currentDelay).toBe(0);
 
-      instance.removeChild(a); // live count drops back to 0, but spawn count must not reset mid-flight
+  instance.removeChild(a); // live count drops back to 0, but spawn count must not reset mid-flight
 
-      const b = instance.addChild('child-motion', {}); // spawn #1 -> delay 0.1, NOT 0
-      expect(b.currentDelay).toBeCloseTo(0.1);
-    });
+  const b = instance.addChild("child-motion", {}); // spawn #1 -> delay 0.1, NOT 0
+  expect(b.currentDelay).toBeCloseTo(0.1);
+});
 
-    it('resets the spawn counter once all children have been removed', async () => {
-      const schemaNoTransition = { ...timelineSchema, staggerTransition: { duration: 0 } };
-      const instance = createTestInstance('time-motion', {}, schemaNoTransition);
+it("resets the spawn counter once all children have been removed", async () => {
+  const schemaNoTransition = {
+    ...timelineSchema,
+    staggerTransition: { duration: 0 },
+  };
+  const instance = createTestInstance("time-motion", {}, schemaNoTransition);
 
-      const a = instance.addChild('child-motion', {}); // spawn #0
-      instance.removeChild(a);
-      await new Promise(resolve => setTimeout(resolve, 0));
+  const a = instance.addChild("child-motion", {}); // spawn #0
+  instance.removeChild(a);
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(instance.children).toHaveLength(0);
+  expect(instance.children).toHaveLength(0);
 
-      const b = instance.addChild('child-motion', {}); // wave cleared, should restart at 0
-      expect(b.currentDelay).toBe(0);
-    });
+  const b = instance.addChild("child-motion", {}); // wave cleared, should restart at 0
+  expect(b.currentDelay).toBe(0);
+});
 ```
 
 **CORRECT (replace with):**
+
 ```js
-    it('restarts placement at 0 after all children have been removed', async () => {
-      const schemaNoTransition = { ...timelineSchema, staggerTransition: { duration: 0 } };
-      const instance = createTestInstance('time-motion', {}, schemaNoTransition);
+it("restarts placement at 0 after all children have been removed", async () => {
+  const schemaNoTransition = {
+    ...timelineSchema,
+    staggerTransition: { duration: 0 },
+  };
+  const instance = createTestInstance("time-motion", {}, schemaNoTransition);
 
-      const a = instance.addChild('child-motion', {});
-      instance.removeChild(a);
-      await new Promise(resolve => setTimeout(resolve, 0));
+  const a = instance.addChild("child-motion", {});
+  instance.removeChild(a);
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(instance.children).toHaveLength(0);
+  expect(instance.children).toHaveLength(0);
 
-      const b = instance.addChild('child-motion', {});
-      expect(b.currentDelay).toBe(0); // nothing left in the queue, fresh start — no reset bookkeeping needed
-    });
+  const b = instance.addChild("child-motion", {});
+  expect(b.currentDelay).toBe(0); // nothing left in the queue, fresh start — no reset bookkeeping needed
+});
 
-    it('places a new spawn exactly one stagger after the reflowed chain, regardless of prior removals', () => {
-      const instance = createTestInstance('time-motion', {}, timelineSchema);
-      const c0 = instance.addChild('child-motion', {}); // delay 0
-      const c1 = instance.addChild('child-motion', {}); // delay 0.1
-      const c2 = instance.addChild('child-motion', {}); // delay 0.2
-      const c3 = instance.addChild('child-motion', {}); // delay 0.3
-      const c4 = instance.addChild('child-motion', {}); // delay 0.4
+it("places a new spawn exactly one stagger after the reflowed chain, regardless of prior removals", () => {
+  const instance = createTestInstance("time-motion", {}, timelineSchema);
+  const c0 = instance.addChild("child-motion", {}); // delay 0
+  const c1 = instance.addChild("child-motion", {}); // delay 0.1
+  const c2 = instance.addChild("child-motion", {}); // delay 0.2
+  const c3 = instance.addChild("child-motion", {}); // delay 0.3
+  const c4 = instance.addChild("child-motion", {}); // delay 0.4
 
-      instance.removeChild(c2); // triggers cascade: c3 -> 0.2, c4 -> 0.3
+  instance.removeChild(c2); // triggers cascade: c3 -> 0.2, c4 -> 0.3
 
-      // simulate the reflow having settled (what currentDelay becomes once
-      // the tween's onComplete fires)
-      c3.currentDelay = 0.2;
-      c4.currentDelay = 0.3;
+  // simulate the reflow having settled (what currentDelay becomes once
+  // the tween's onComplete fires)
+  c3.currentDelay = 0.2;
+  c4.currentDelay = 0.3;
 
-      const c5 = instance.addChild('child-motion', {});
+  const c5 = instance.addChild("child-motion", {});
 
-      // must be 0.4 — one clean stagger after the reflowed frontmost (0.3).
-      // A counter blind to the reflow would have produced 0.5 (brief 16's bug).
-      expect(c5.currentDelay).toBeCloseTo(0.4);
-      expect(c0.currentDelay).toBe(0); // untouched, unaffected by any of this
-      expect(c1.currentDelay).toBe(0.1); // untouched
-    });
+  // must be 0.4 — one clean stagger after the reflowed frontmost (0.3).
+  // A counter blind to the reflow would have produced 0.5 (brief 16's bug).
+  expect(c5.currentDelay).toBeCloseTo(0.4);
+  expect(c0.currentDelay).toBe(0); // untouched, unaffected by any of this
+  expect(c1.currentDelay).toBe(0.1); // untouched
+});
 ```
 
 **Leave unchanged** (still pass as-is with the new implementation): `'adds child and calculates stagger correctly'`, `'removes child and triggers delay updates on remaining children'`, `'cascades survivors onto the vacated predecessor slot, not a recomputed formula'`, `'reflows a manually-delayed child too — no more auto/manual distinction'`, all of the `'Reflow and Deferred Removal API'` and `'Composition and Stagger API'` tests not listed above.
@@ -284,7 +296,7 @@ npx vitest run
 
 ```js
 // scratch.mjs, run with: node scratch.mjs
-import { MotionInstance } from './src/domain/instance/MotionInstance.js';
+import { MotionInstance } from "./src/domain/instance/MotionInstance.js";
 // ... construct an instance with a real childSchema (see brief 15's repro script for
 // the full harness), spawn 5, remove index 2, wait for reflow's onComplete, spawn a
 // 6th, and confirm its currentDelay is 0.4, not 0.5.

@@ -1,247 +1,309 @@
-import { gsap } from 'gsap';
-import { useCallback, useRef, useState } from 'react';
-import useMotionProject from '../../hooks/useMotionProject';
-import useMotionSubscriber from '../../hooks/useMotionSubscriber';
-import useMotionTimelinePlayback from '../../hooks/useMotionTimelinePlayback';
-import useScrollMotion from '../../hooks/useScrollMotion';
-import useTimeMotion from '../../hooks/useTimeMotion';
-import useSmoothScroll from '../../hooks/useSmoothScroll';
-import './PasarMalamPage.css';
+import { gsap } from "gsap";
+import { useCallback, useRef, useState } from "react";
+import useMotionProject from "../../hooks/useMotionProject";
+import useMotionSubscriber from "../../hooks/useMotionSubscriber";
+import useMotionTimelinePlayback from "../../hooks/useMotionTimelinePlayback";
+import useScrollMotion from "../../hooks/useScrollMotion";
+import useTimeMotion from "../../hooks/useTimeMotion";
+import useSmoothScroll from "../../hooks/useSmoothScroll";
+import "./PasarMalamPage.css";
 
 // Generate paths for 192 static WebP frames
 const IMAGE_SEQUENCE_FRAMES = Array.from({ length: 192 }, (_, i) => {
-  return `/sequence/frame_${String(i + 1).padStart(4, '0')}.webp`;
+  return `/sequence/frame_${String(i + 1).padStart(4, "0")}.webp`;
 });
 
 // ─── Scene Data Config ──────────────────────────────────────────
 const pasarMalamScene = {
-  id: 'pasar-malam-storytelling',
+  id: "pasar-malam-storytelling",
   trigger: {
-    type: 'scroll',
+    type: "scroll",
     scrub: 0.5,
-    pin: 'pin',
-    start: 'top top',
-    end: 'bottom bottom'
+    pin: "pin",
+    start: "top top",
+    end: "bottom bottom",
   },
   tracks: [
     {
-      id: 'pasar-malam-bg',
+      id: "pasar-malam-bg",
       keyframes: {
         imageSequence: {
           frames: IMAGE_SEQUENCE_FRAMES,
           stops: [
-            { p: 0, v: 0, ease: 'none' },
-            { p: 1, v: 191 }
-          ]
-        }
-      }
+            { p: 0, v: 0, ease: "none" },
+            { p: 1, v: 191 },
+          ],
+        },
+      },
     },
     {
-      id: 'hero-title',
+      id: "hero-title",
       keyframes: {
         opacity: {
           stops: [
             { p: 0, v: 0 },
-            { p: 0.15, v: 1, ease: 'power2.out' },
+            { p: 0.15, v: 1, ease: "power2.out" },
             { p: 0.8, v: 1 },
-            { p: 1, v: 0, ease: 'power2.in' }
-          ]
+            { p: 1, v: 0, ease: "power2.in" },
+          ],
         },
         y: {
           stops: [
             { p: 0, v: 120 },
-            { p: 0.25, v: 0, ease: 'power2.out' },
+            { p: 0.25, v: 0, ease: "power2.out" },
             { p: 0.75, v: 0 },
-            { p: 1, v: -120, ease: 'power2.in' }
-          ]
+            { p: 1, v: -120, ease: "power2.in" },
+          ],
         },
         scaleX: {
           stops: [
             { p: 0, v: 1.25 },
-            { p: 0.25, v: 1, ease: 'power2.out' },
+            { p: 0.25, v: 1, ease: "power2.out" },
             { p: 0.75, v: 1 },
-            { p: 1, v: 0.8, ease: 'power2.in' }
-          ]
+            { p: 1, v: 0.8, ease: "power2.in" },
+          ],
         },
         scaleY: {
           stops: [
             { p: 0, v: 1.25 },
-            { p: 0.25, v: 1, ease: 'power2.out' },
+            { p: 0.25, v: 1, ease: "power2.out" },
             { p: 0.75, v: 1 },
-            { p: 1, v: 0.8, ease: 'power2.in' }
-          ]
-        }
-      }
+            { p: 1, v: 0.8, ease: "power2.in" },
+          ],
+        },
+      },
     },
     {
-      id: 'card-left',
+      id: "card-left",
       keyframes: {
         x: {
           stops: [
-            { p: 0, v: '-100vw' },
-            { p: 0.35, v: 0, ease: 'back.out(1.2)' },
+            { p: 0, v: "-100vw" },
+            { p: 0.35, v: 0, ease: "back.out(1.2)" },
             { p: 0.75, v: 0 },
-            { p: 1, v: '-100vw', ease: 'power2.in' }
-          ]
+            { p: 1, v: "-100vw", ease: "power2.in" },
+          ],
         },
         rotation: {
           stops: [
             { p: 0, v: -8 },
-            { p: 0.35, v: 0, ease: 'back.out(1.2)' },
+            { p: 0.35, v: 0, ease: "back.out(1.2)" },
             { p: 0.75, v: 0 },
-            { p: 1, v: -8, ease: 'power2.in' }
-          ]
+            { p: 1, v: -8, ease: "power2.in" },
+          ],
         },
         opacity: {
           stops: [
             { p: 0, v: 0 },
-            { p: 0.3, v: 1, ease: 'power2.out' },
+            { p: 0.3, v: 1, ease: "power2.out" },
             { p: 0.75, v: 1 },
-            { p: 1, v: 0, ease: 'power2.in' }
-          ]
-        }
-      }
+            { p: 1, v: 0, ease: "power2.in" },
+          ],
+        },
+      },
     },
     {
-      id: 'card-right',
+      id: "card-right",
       keyframes: {
         x: {
           stops: [
-            { p: 0, v: '100vw' },
-            { p: 0.42, v: 0, ease: 'back.out(1.2)' },
+            { p: 0, v: "100vw" },
+            { p: 0.42, v: 0, ease: "back.out(1.2)" },
             { p: 0.78, v: 0 },
-            { p: 1, v: '100vw', ease: 'power2.in' }
-          ]
+            { p: 1, v: "100vw", ease: "power2.in" },
+          ],
         },
         rotation: {
           stops: [
             { p: 0, v: 8 },
-            { p: 0.42, v: 0, ease: 'back.out(1.2)' },
+            { p: 0.42, v: 0, ease: "back.out(1.2)" },
             { p: 0.78, v: 0 },
-            { p: 1, v: 8, ease: 'power2.in' }
-          ]
+            { p: 1, v: 8, ease: "power2.in" },
+          ],
         },
         opacity: {
           stops: [
             { p: 0, v: 0 },
-            { p: 0.37, v: 1, ease: 'power2.out' },
+            { p: 0.37, v: 1, ease: "power2.out" },
             { p: 0.78, v: 1 },
-            { p: 1, v: 0, ease: 'power2.in' }
-          ]
-        }
-      }
+            { p: 1, v: 0, ease: "power2.in" },
+          ],
+        },
+      },
     },
     {
-      id: 'stats-card',
+      id: "stats-card",
       keyframes: {
         y: {
           stops: [
             { p: 0, v: 160 },
-            { p: 0.3, v: 0, ease: 'power2.out' },
+            { p: 0.3, v: 0, ease: "power2.out" },
             { p: 0.8, v: 0 },
-            { p: 1, v: 160, ease: 'power2.in' }
-          ]
+            { p: 1, v: 160, ease: "power2.in" },
+          ],
         },
         opacity: {
           stops: [
             { p: 0, v: 0 },
-            { p: 0.25, v: 1, ease: 'power2.out' },
+            { p: 0.25, v: 1, ease: "power2.out" },
             { p: 0.8, v: 1 },
-            { p: 1, v: 0, ease: 'power2.in' }
-          ]
+            { p: 1, v: 0, ease: "power2.in" },
+          ],
         },
-        '--neon-opacity': {
+        "--neon-opacity": {
           stops: [
             { p: 0, v: 1 },
             { p: 0.28, v: 1 },
-            { p: 0.29, v: 0.1, ease: 'none' },
-            { p: 0.31, v: 1, ease: 'none' },
+            { p: 0.29, v: 0.1, ease: "none" },
+            { p: 0.31, v: 1, ease: "none" },
             { p: 0.48, v: 1 },
-            { p: 0.49, v: 0.3, ease: 'none' },
-            { p: 0.51, v: 1, ease: 'none' },
+            { p: 0.49, v: 0.3, ease: "none" },
+            { p: 0.51, v: 1, ease: "none" },
             { p: 0.77, v: 1 },
-            { p: 0.79, v: 0.15, ease: 'none' },
-            { p: 0.81, v: 1, ease: 'none' }
-          ]
-        }
-      }
+            { p: 0.79, v: 0.15, ease: "none" },
+            { p: 0.81, v: 1, ease: "none" },
+          ],
+        },
+      },
     },
     {
-      id: 'lantern-1-wrap',
+      id: "lantern-1-wrap",
       keyframes: {
-        y:       { stops: [{ p: 0, v: -120 }, { p: 0.35, v: 0, ease: 'back.out(1.8)' }, { p: 1, v: 0 }] },
-        opacity: { stops: [{ p: 0, v: 0 }, { p: 0.25, v: 1, ease: 'power2.out' }, { p: 1, v: 1 }] }
-      }
+        y: {
+          stops: [
+            { p: 0, v: -120 },
+            { p: 0.35, v: 0, ease: "back.out(1.8)" },
+            { p: 1, v: 0 },
+          ],
+        },
+        opacity: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 0.25, v: 1, ease: "power2.out" },
+            { p: 1, v: 1 },
+          ],
+        },
+      },
     },
     {
-      id: 'lantern-2-wrap',
+      id: "lantern-2-wrap",
       keyframes: {
-        y:       { stops: [{ p: 0, v: -150 }, { p: 0.42, v: 0, ease: 'back.out(1.8)' }, { p: 1, v: 0 }] },
-        opacity: { stops: [{ p: 0, v: 0 }, { p: 0.30, v: 1, ease: 'power2.out' }, { p: 1, v: 1 }] }
-      }
+        y: {
+          stops: [
+            { p: 0, v: -150 },
+            { p: 0.42, v: 0, ease: "back.out(1.8)" },
+            { p: 1, v: 0 },
+          ],
+        },
+        opacity: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 0.3, v: 1, ease: "power2.out" },
+            { p: 1, v: 1 },
+          ],
+        },
+      },
     },
     {
-      id: 'lantern-3-wrap',
+      id: "lantern-3-wrap",
       keyframes: {
-        y:       { stops: [{ p: 0, v: -100 }, { p: 0.38, v: 0, ease: 'back.out(1.8)' }, { p: 1, v: 0 }] },
-        opacity: { stops: [{ p: 0, v: 0 }, { p: 0.28, v: 1, ease: 'power2.out' }, { p: 1, v: 1 }] }
-      }
-    }
-  ]
+        y: {
+          stops: [
+            { p: 0, v: -100 },
+            { p: 0.38, v: 0, ease: "back.out(1.8)" },
+            { p: 1, v: 0 },
+          ],
+        },
+        opacity: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 0.28, v: 1, ease: "power2.out" },
+            { p: 1, v: 1 },
+          ],
+        },
+      },
+    },
+  ],
 };
 
 const lanternBounceScene = {
-  id: 'lantern-bounce',
-  trigger: { type: 'time', duration: 1.2, repeat: -1, yoyo: true },
+  id: "lantern-bounce",
+  trigger: { type: "time", duration: 1.2, repeat: -1, yoyo: true },
   tracks: [
     {
-      id: 'lantern-1',
+      id: "lantern-1",
       keyframes: {
-        y: { stops: [{ p: 0, v: 0 }, { p: 1, v: -18, ease: 'power1.inOut' }] }
-      }
+        y: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: -18, ease: "power1.inOut" },
+          ],
+        },
+      },
     },
     {
-      id: 'lantern-2',
+      id: "lantern-2",
       keyframes: {
-        y: { stops: [{ p: 0, v: 0 }, { p: 1, v: -12, ease: 'power1.inOut' }] }
-      }
+        y: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: -12, ease: "power1.inOut" },
+          ],
+        },
+      },
     },
     {
-      id: 'lantern-3',
+      id: "lantern-3",
       keyframes: {
-        y: { stops: [{ p: 0, v: 0 }, { p: 1, v: -20, ease: 'power1.inOut' }] }
-      }
-    }
-  ]
+        y: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: -20, ease: "power1.inOut" },
+          ],
+        },
+      },
+    },
+  ],
 };
 
 const pmProject = {
   schemaVersion: 4,
-  projectId: 'pasar-malam-page',
+  projectId: "pasar-malam-page",
   perspective: 800,
-  motions: [pasarMalamScene, lanternBounceScene]
+  motions: [pasarMalamScene, lanternBounceScene],
 };
 
 // ─── Sub-Components ─────────────────────────────────────────────
 
 function BackgroundSequence({ instance }) {
   const ref = useRef(null);
-  useMotionSubscriber(instance, 'pasar-malam-bg', ref);
+  useMotionSubscriber(instance, "pasar-malam-bg", ref);
   return <div ref={ref} className="pm-bg-sequence" />;
 }
 
-function Lantern({ wrapInstance, bounceInstance, wrapId, innerId, assetUrl, className, onProgress }) {
+function Lantern({
+  wrapInstance,
+  bounceInstance,
+  wrapId,
+  innerId,
+  assetUrl,
+  className,
+  onProgress,
+}) {
   const wrapRef = useRef(null);
   const innerRef = useRef(null);
 
   // Outer wrapper: driven by scroll scenario (entry y + opacity)
   // Read scroll progress here to gate the bounce
-  const wrapTransform = useCallback((rawData, composeFn) => {
-    if (rawData.progress !== undefined) {
-      onProgress?.(rawData.progress);
-    }
-    return composeFn(rawData);
-  }, [onProgress]);
+  const wrapTransform = useCallback(
+    (rawData, composeFn) => {
+      if (rawData.progress !== undefined) {
+        onProgress?.(rawData.progress);
+      }
+      return composeFn(rawData);
+    },
+    [onProgress],
+  );
 
   useMotionSubscriber(wrapInstance, wrapId, wrapRef, wrapTransform);
 
@@ -249,10 +311,7 @@ function Lantern({ wrapInstance, bounceInstance, wrapId, innerId, assetUrl, clas
   useMotionSubscriber(bounceInstance, innerId, innerRef);
 
   return (
-    <div
-      ref={wrapRef}
-      className={`pm-lantern-wrap ${className}`}
-    >
+    <div ref={wrapRef} className={`pm-lantern-wrap ${className}`}>
       <div
         ref={innerRef}
         className="pm-lantern-inner"
@@ -272,11 +331,11 @@ function HeroTitle({ instance }) {
     const rotateX = scrollY * 0.15;
     return {
       ...composed,
-      rotateX
+      rotateX,
     };
   }, []);
 
-  useMotionSubscriber(instance, 'hero-title', ref, transform);
+  useMotionSubscriber(instance, "hero-title", ref, transform);
 
   return (
     <div ref={ref} className="pm-title-element">
@@ -288,31 +347,37 @@ function HeroTitle({ instance }) {
 
 function LeftCard({ instance }) {
   const ref = useRef(null);
-  useMotionSubscriber(instance, 'card-left', ref);
+  useMotionSubscriber(instance, "card-left", ref);
 
   return (
     <div ref={ref} className="pm-glass-card pm-card-left pm-interactive">
       <div className="pm-card-badge">Street Flavors</div>
       <h3>Nostalgic Tastes</h3>
-      <p>Follow the aroma of fresh Apam Balik, grilled Satay, and spun sugar floating under colorful string lights.</p>
+      <p>
+        Follow the aroma of fresh Apam Balik, grilled Satay, and spun sugar
+        floating under colorful string lights.
+      </p>
     </div>
   );
 }
 
 function RightCard({ instance }) {
   const ref = useRef(null);
-  useMotionSubscriber(instance, 'card-right', ref);
+  useMotionSubscriber(instance, "card-right", ref);
 
   return (
     <div ref={ref} className="pm-glass-card pm-card-right pm-interactive">
       <div className="pm-card-badge">Night Vibes</div>
       <h3>Carnival Thrills</h3>
-      <p>Hear the laughter and music from the Ferris Wheel while glowing neon games light up the tropical midnight sky.</p>
+      <p>
+        Hear the laughter and music from the Ferris Wheel while glowing neon
+        games light up the tropical midnight sky.
+      </p>
     </div>
   );
 }
 
-const easeOut = gsap.parseEase('power2.out');
+const easeOut = gsap.parseEase("power2.out");
 
 function StatsCard({ instance }) {
   const ref = useRef(null);
@@ -320,8 +385,8 @@ function StatsCard({ instance }) {
   const transform = useCallback((rawData, composeFn) => {
     if (ref.current) {
       const p = rawData.progress;
-      const stallsEl = ref.current.querySelector('.stalls-num');
-      const visitorsEl = ref.current.querySelector('.visitors-num');
+      const stallsEl = ref.current.querySelector(".stalls-num");
+      const visitorsEl = ref.current.querySelector(".visitors-num");
       if (stallsEl) {
         const t = easeOut(Math.min(1, p / 0.55));
         stallsEl.textContent = `${Math.round(t * 192)}+`;
@@ -334,7 +399,7 @@ function StatsCard({ instance }) {
     return composeFn(rawData);
   }, []);
 
-  useMotionSubscriber(instance, 'stats-card', ref, transform);
+  useMotionSubscriber(instance, "stats-card", ref, transform);
 
   return (
     <div ref={ref} className="pm-stats-card pm-interactive">
@@ -360,8 +425,13 @@ export default function PasarMalamPage() {
   const bouncingRef = useRef(false);
 
   const isLoaded = useMotionProject(pmProject);
-  const { refs, instance: storytellingInstance } = useScrollMotion(isLoaded ? pasarMalamScene : null);
-  const { instance: bounceInstance } = useTimeMotion(isLoaded ? 'lantern-bounce' : null, BOUNCE_CONFIG);
+  const { refs, instance: storytellingInstance } = useScrollMotion(
+    isLoaded ? pasarMalamScene : null,
+  );
+  const { instance: bounceInstance } = useTimeMotion(
+    isLoaded ? "lantern-bounce" : null,
+    BOUNCE_CONFIG,
+  );
 
   useMotionTimelinePlayback(bounceInstance, bouncing);
   useSmoothScroll();
@@ -383,28 +453,50 @@ export default function PasarMalamPage() {
         <div ref={refs.pin} className="pm-stage">
           <BackgroundSequence instance={storytellingInstance} />
           <div className="pm-overlay" />
-          
+
           {/* Ambient Floating Lanterns */}
           <div className="pm-lanterns-glow">
-            <Lantern wrapInstance={storytellingInstance} bounceInstance={bounceInstance} wrapId="lantern-1-wrap" innerId="lantern-1" assetUrl="/lanterns/lantern-red.svg"  className="pm-lantern-1" onProgress={onLanternProgress} />
-            <Lantern wrapInstance={storytellingInstance} bounceInstance={bounceInstance} wrapId="lantern-2-wrap" innerId="lantern-2" assetUrl="/lanterns/lantern-gold.svg" className="pm-lantern-2" />
-            <Lantern wrapInstance={storytellingInstance} bounceInstance={bounceInstance} wrapId="lantern-3-wrap" innerId="lantern-3" assetUrl="/lanterns/lantern-pink.svg" className="pm-lantern-3" />
+            <Lantern
+              wrapInstance={storytellingInstance}
+              bounceInstance={bounceInstance}
+              wrapId="lantern-1-wrap"
+              innerId="lantern-1"
+              assetUrl="/lanterns/lantern-red.svg"
+              className="pm-lantern-1"
+              onProgress={onLanternProgress}
+            />
+            <Lantern
+              wrapInstance={storytellingInstance}
+              bounceInstance={bounceInstance}
+              wrapId="lantern-2-wrap"
+              innerId="lantern-2"
+              assetUrl="/lanterns/lantern-gold.svg"
+              className="pm-lantern-2"
+            />
+            <Lantern
+              wrapInstance={storytellingInstance}
+              bounceInstance={bounceInstance}
+              wrapId="lantern-3-wrap"
+              innerId="lantern-3"
+              assetUrl="/lanterns/lantern-pink.svg"
+              className="pm-lantern-3"
+            />
           </div>
 
           <div className="pm-content-wrapper">
-          <HeroTitle instance={storytellingInstance} />
-          <LeftCard instance={storytellingInstance} />
-          <RightCard instance={storytellingInstance} />
-          <StatsCard instance={storytellingInstance} />
+            <HeroTitle instance={storytellingInstance} />
+            <LeftCard instance={storytellingInstance} />
+            <RightCard instance={storytellingInstance} />
+            <StatsCard instance={storytellingInstance} />
+          </div>
         </div>
-      </div>
 
-      {/* Hidden DOM preloader to keep all frames decoded in GPU memory */}
-      <div style={{ display: 'none' }}>
-        {IMAGE_SEQUENCE_FRAMES.map(src => (
-          <img key={src} src={src} alt="" />
-        ))}
-      </div>
+        {/* Hidden DOM preloader to keep all frames decoded in GPU memory */}
+        <div style={{ display: "none" }}>
+          {IMAGE_SEQUENCE_FRAMES.map((src) => (
+            <img key={src} src={src} alt="" />
+          ))}
+        </div>
       </section>
 
       {/* Second section to scroll past and trigger animations */}
@@ -412,7 +504,10 @@ export default function PasarMalamPage() {
         <div className="pm-footer-content">
           <h2>An Immersive Journey</h2>
           <p>
-            This storytelling experience showcases the smooth orchestration of WebP image sequences combined with flying glassmorphism and real-time DOM counters running completely outside of React's render loop for maximum performance.
+            This storytelling experience showcases the smooth orchestration of
+            WebP image sequences combined with flying glassmorphism and
+            real-time DOM counters running completely outside of React's render
+            loop for maximum performance.
           </p>
           <div className="pm-scroll-badge">Scroll Up to Replay</div>
         </div>

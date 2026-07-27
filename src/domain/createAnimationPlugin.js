@@ -15,7 +15,7 @@ export function createAnimationPlugin({
   contribute,
   compose,
   prepare,
-  stage = 'default',
+  stage = "default",
   priority = 0,
   outputs = {},
   internalKeys = [],
@@ -29,9 +29,9 @@ export function createAnimationPlugin({
     outputs,
     internalKeys,
     claimsKey: claimsKey || ((key) => keys.includes(key)),
-    ...(typeof load === 'function' ? { load } : {}),
+    ...(typeof load === "function" ? { load } : {}),
     contribute: contribute || (() => ({ percentPatch: {}, tweenVars: {} })),
     compose: compose || (() => ({})),
-    ...(typeof prepare === 'function' ? { prepare } : {}),
+    ...(typeof prepare === "function" ? { prepare } : {}),
   };
 }

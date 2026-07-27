@@ -10,12 +10,12 @@
  */
 export function imageSequenceRule(track, motion, context, path) {
   const errors = [];
-  if (!track || typeof track !== 'object') {
+  if (!track || typeof track !== "object") {
     return errors;
   }
 
   const keyframes = track.keyframes;
-  if (!keyframes || typeof keyframes !== 'object') {
+  if (!keyframes || typeof keyframes !== "object") {
     return errors;
   }
 
@@ -26,12 +26,12 @@ export function imageSequenceRule(track, motion, context, path) {
 
   const propPath = `${path}.keyframes.imageSequence`;
 
-  if (imageSequence === null || typeof imageSequence !== 'object') {
+  if (imageSequence === null || typeof imageSequence !== "object") {
     errors.push({
-      ruleId: 'image-sequence',
-      severity: 'error',
-      message: 'keyframes.imageSequence must be an object.',
-      path: propPath
+      ruleId: "image-sequence",
+      severity: "error",
+      message: "keyframes.imageSequence must be an object.",
+      path: propPath,
     });
     return errors;
   }
@@ -41,33 +41,33 @@ export function imageSequenceRule(track, motion, context, path) {
   // 1. Validate frames
   if (frames === undefined || frames === null) {
     errors.push({
-      ruleId: 'image-sequence',
-      severity: 'error',
-      message: 'imageSequence.frames is required.',
-      path: `${propPath}.frames`
+      ruleId: "image-sequence",
+      severity: "error",
+      message: "imageSequence.frames is required.",
+      path: `${propPath}.frames`,
     });
   } else if (!Array.isArray(frames)) {
     errors.push({
-      ruleId: 'image-sequence',
-      severity: 'error',
-      message: 'imageSequence.frames must be an array.',
-      path: `${propPath}.frames`
+      ruleId: "image-sequence",
+      severity: "error",
+      message: "imageSequence.frames must be an array.",
+      path: `${propPath}.frames`,
     });
   } else if (frames.length === 0) {
     errors.push({
-      ruleId: 'image-sequence',
-      severity: 'error',
-      message: 'imageSequence.frames must contain at least 1 image URL.',
-      path: `${propPath}.frames`
+      ruleId: "image-sequence",
+      severity: "error",
+      message: "imageSequence.frames must contain at least 1 image URL.",
+      path: `${propPath}.frames`,
     });
   } else {
     frames.forEach((frame, idx) => {
-      if (typeof frame !== 'string') {
+      if (typeof frame !== "string") {
         errors.push({
-          ruleId: 'image-sequence',
-          severity: 'error',
+          ruleId: "image-sequence",
+          severity: "error",
           message: `imageSequence.frames[${idx}] must be a string.`,
-          path: `${propPath}.frames[${idx}]`
+          path: `${propPath}.frames[${idx}]`,
         });
       }
     });
@@ -78,40 +78,43 @@ export function imageSequenceRule(track, motion, context, path) {
   if (stops !== undefined && stops !== null) {
     if (!Array.isArray(stops)) {
       errors.push({
-        ruleId: 'image-sequence',
-        severity: 'error',
-        message: 'imageSequence.stops must be an array.',
-        path: `${propPath}.stops`
+        ruleId: "image-sequence",
+        severity: "error",
+        message: "imageSequence.stops must be an array.",
+        path: `${propPath}.stops`,
       });
     } else {
-      const isFramesValid = Array.isArray(frames) && frames.length > 0 && frames.every(f => typeof f === 'string');
+      const isFramesValid =
+        Array.isArray(frames) &&
+        frames.length > 0 &&
+        frames.every((f) => typeof f === "string");
 
       stops.forEach((stop, idx) => {
-        if (!stop || typeof stop !== 'object') {
+        if (!stop || typeof stop !== "object") {
           return;
         }
-        if (typeof stop.p !== 'number') {
+        if (typeof stop.p !== "number") {
           errors.push({
-            ruleId: 'image-sequence',
-            severity: 'error',
+            ruleId: "image-sequence",
+            severity: "error",
             message: `imageSequence.stops[${idx}].p must be a number.`,
-            path: `${propPath}.stops[${idx}].p`
+            path: `${propPath}.stops[${idx}].p`,
           });
         }
-        if (typeof stop.v !== 'number') {
+        if (typeof stop.v !== "number") {
           errors.push({
-            ruleId: 'image-sequence',
-            severity: 'error',
+            ruleId: "image-sequence",
+            severity: "error",
             message: `imageSequence.stops[${idx}].v must be a number (frame index).`,
-            path: `${propPath}.stops[${idx}].v`
+            path: `${propPath}.stops[${idx}].v`,
           });
         } else if (isFramesValid) {
           if (stop.v < 0 || stop.v > frames.length - 1) {
             errors.push({
-              ruleId: 'image-sequence',
-              severity: 'error',
+              ruleId: "image-sequence",
+              severity: "error",
               message: `imageSequence.stops[${idx}].v must satisfy 0 <= v <= ${frames.length - 1} (frames.length - 1). Got: ${JSON.stringify(stop.v)}.`,
-              path: `${propPath}.stops[${idx}].v`
+              path: `${propPath}.stops[${idx}].v`,
             });
           }
         }

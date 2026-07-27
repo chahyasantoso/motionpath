@@ -19,7 +19,8 @@ export interface PathNode {
   ctrlZ?: number;
 }
 
-export type PathAnchor = 'center' | 'none' | { xPercent: number; yPercent: number };
+export type PathAnchor =
+  "center" | "none" | { xPercent: number; yPercent: number };
 
 export interface PathProperty {
   points: PathNode[];
@@ -31,7 +32,7 @@ export interface PathProperty {
 export type Keyframes = Record<string, AnimatedProperty | PathProperty>;
 
 export interface ScrollTrigger {
-  type: 'scroll';
+  type: "scroll";
   scrub: boolean | number;
   trigger?: string | Element;
   start?: string;
@@ -43,7 +44,7 @@ export interface ScrollTrigger {
 }
 
 export interface TimeTrigger {
-  type: 'time';
+  type: "time";
   repeat?: number;
   yoyo?: boolean;
   repeatDelay?: number;
@@ -52,7 +53,7 @@ export interface TimeTrigger {
 }
 
 export interface ManualTrigger {
-  type: 'manual';
+  type: "manual";
 }
 
 export type Trigger = ScrollTrigger | TimeTrigger | ManualTrigger;
@@ -95,7 +96,7 @@ export interface MotionProject {
 }
 
 export interface PluginOutput {
-  merge?: 'replace' | 'shallow' | 'append';
+  merge?: "replace" | "shallow" | "append";
   serialize?: (value: unknown) => unknown;
 }
 
@@ -110,11 +111,18 @@ export interface AnimationPlugin {
   claimsKey(key: string): boolean;
   load?(): Promise<void>;
   prepare?(track: MotionTrack): void | Promise<void>;
-  contribute(propKey: string, stops: Stop[], track: MotionTrack): {
+  contribute(
+    propKey: string,
+    stops: Stop[],
+    track: MotionTrack,
+  ): {
     percentPatch?: Record<string, Record<string, unknown>>;
     tweenVars?: Record<string, unknown>;
   };
-  compose(rawData: Record<string, unknown>, track: MotionTrack): Record<string, unknown>;
+  compose(
+    rawData: Record<string, unknown>,
+    track: MotionTrack,
+  ): Record<string, unknown>;
 }
 
 export interface Track {
@@ -125,9 +133,16 @@ export interface Track {
   progress(): number;
   progress(value: number): void;
   getSnapshot(): Record<string, unknown>;
-  compose(rawData?: Record<string, unknown>, context?: Map<Track, unknown>): Record<string, unknown>;
+  compose(
+    rawData?: Record<string, unknown>,
+    context?: Map<Track, unknown>,
+  ): Record<string, unknown>;
   subscribe(callback: (snapshot: Record<string, unknown>) => void): () => void;
-  setObserved(track: Track, mapFn?: (patch: Record<string, unknown>) => Record<string, unknown>, options?: { role?: 'input' | 'output' }): void;
+  setObserved(
+    track: Track,
+    mapFn?: (patch: Record<string, unknown>) => Record<string, unknown>,
+    options?: { role?: "input" | "output" },
+  ): void;
   removeObserved(track: Track): void;
   addChild(child: Track, options?: { stagger?: number }): void;
   removeChild(id: string): void;
@@ -164,10 +179,18 @@ export interface EngineOptions {
 
 export declare class Engine {
   constructor(options?: EngineOptions);
-  readonly validationReport: readonly { ruleId: string; severity: string; message: string; path?: string }[];
+  readonly validationReport: readonly {
+    ruleId: string;
+    severity: string;
+    message: string;
+    path?: string;
+  }[];
   readonly instanceCount: number;
   readonly templates: readonly MotionTemplate[];
-  loadProject(project: MotionProject, options?: { validate?: boolean }): Promise<void>;
+  loadProject(
+    project: MotionProject,
+    options?: { validate?: boolean },
+  ): Promise<void>;
   mountInstance(id: string): Motion | Track;
   mountWithDelegate(id: string, delegate: unknown): Motion;
   createTrackInstance(id: string, overrides?: Partial<MotionTrack>): Track;
@@ -179,6 +202,12 @@ export declare class Engine {
   destroy(): void;
 }
 
-export declare function registerPlugin(plugin: AnimationPlugin): AnimationPlugin;
-export declare function unregisterPlugin(pluginOrKey: AnimationPlugin | string): boolean;
-export declare function resolvePluginForKey(key: string): AnimationPlugin | undefined;
+export declare function registerPlugin(
+  plugin: AnimationPlugin,
+): AnimationPlugin;
+export declare function unregisterPlugin(
+  pluginOrKey: AnimationPlugin | string,
+): boolean;
+export declare function resolvePluginForKey(
+  key: string,
+): AnimationPlugin | undefined;

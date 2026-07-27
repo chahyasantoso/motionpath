@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { engine } from '../engines/Engine.js';
+import { useEffect, useRef, useState } from "react";
+import { engine } from "../engines/Engine.js";
 
 /**
  * React Hook to mount and manage a v4 Motion/Track.
@@ -25,7 +25,7 @@ export default function useMotionInstance(motionId, config) {
   ) {
     warnedConfigChangeRef.current = true;
     console.warn(
-      '[useMotionInstance] config is mount-time-only. Changing config after mount has no effect.'
+      "[useMotionInstance] config is mount-time-only. Changing config after mount has no effect.",
     );
   }
 
@@ -41,7 +41,7 @@ export default function useMotionInstance(motionId, config) {
       // New Engine instances deregister through unmount(). Keep the fallback
       // for lightweight test doubles and older consumers that only expose
       // destroy(), without weakening the production lifecycle path.
-      if (typeof engine.unmount === 'function') {
+      if (typeof engine.unmount === "function") {
         engine.unmount(inst);
       } else {
         inst.destroy?.();

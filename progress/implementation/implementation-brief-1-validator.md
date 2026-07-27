@@ -18,13 +18,13 @@ Runs once per project load, entirely synchronously, on plain JSON. No side effec
 
 ```ts
 interface ValidationError {
-  ruleId: string;        // e.g. "ease-collision", "timeline-primary-count"
+  ruleId: string; // e.g. "ease-collision", "timeline-primary-count"
   severity: "error" | "warning";
-  message: string;       // human-readable, specific enough to act on without re-reading this spec
-  path: string;          // JSON path to the offending node, e.g. "scenarios[2].elements[0].keyframes.x"
+  message: string; // human-readable, specific enough to act on without re-reading this spec
+  path: string; // JSON path to the offending node, e.g. "scenarios[2].elements[0].keyframes.x"
 }
 
-function validateProject(schema: unknown): ValidationError[]
+function validateProject(schema: unknown): ValidationError[];
 ```
 
 - Single exported entry point. Everything else (individual rule functions) is internal to the module — not exported, not part of the public contract. Callers only ever call `validateProject`.
@@ -43,7 +43,11 @@ Two buckets of small, independent rule functions, plus one thin orchestrator. Ea
 type ScenarioRule = (scenario: unknown, path: string) => ValidationError[];
 
 // Per-element rules: operate on one element + its parent scenario (for trigger-type context)
-type ElementRule = (element: unknown, scenario: unknown, path: string) => ValidationError[];
+type ElementRule = (
+  element: unknown,
+  scenario: unknown,
+  path: string,
+) => ValidationError[];
 
 // Cross-scenario rules: need the full scenarios array (group/uniqueness checks)
 type CrossScenarioRule = (scenarios: unknown[]) => ValidationError[];
@@ -74,13 +78,19 @@ type CrossScenarioRule = (scenarios: unknown[]) => ValidationError[];
 
 ```ts
 const scenarioRules: ScenarioRule[] = [
-  triggerShapeRule, easeCollisionRule, staggerShapeRule, perspectiveUsageRule,
+  triggerShapeRule,
+  easeCollisionRule,
+  staggerShapeRule,
+  perspectiveUsageRule,
 ];
 const elementRules: ElementRule[] = [
-  directionAmbiguityRule, pathXYExclusivityRule, pathShapeRule,
+  directionAmbiguityRule,
+  pathXYExclusivityRule,
+  pathShapeRule,
 ];
 const crossScenarioRules: CrossScenarioRule[] = [
-  timelineGroupRule, elementUniquenessRule,
+  timelineGroupRule,
+  elementUniquenessRule,
 ];
 
 export function validateProject(schema: unknown): ValidationError[] {
@@ -91,23 +101,33 @@ export function validateProject(schema: unknown): ValidationError[] {
 
   for (const [i, scenario] of schema.scenarios.entries()) {
     const scenarioPath = `scenarios[${i}]`;
-    for (const rule of scenarioRules) errors.push(...runSafely(rule, scenario, scenarioPath));
+    for (const rule of scenarioRules)
+      errors.push(...runSafely(rule, scenario, scenarioPath));
     for (const [j, element] of (scenario.elements ?? []).entries()) {
       const elementPath = `${scenarioPath}.elements[${j}]`;
-      for (const rule of elementRules) errors.push(...runSafely(rule, element, scenario, elementPath));
+      for (const rule of elementRules)
+        errors.push(...runSafely(rule, element, scenario, elementPath));
     }
   }
-  for (const rule of crossScenarioRules) errors.push(...runSafely(rule, schema.scenarios));
+  for (const rule of crossScenarioRules)
+    errors.push(...runSafely(rule, schema.scenarios));
 
   return errors;
 }
 
 // Wraps every rule call — one rule throwing must not kill the whole validation pass.
 function runSafely(rule, ...args) {
-  try { return rule(...args); }
-  catch (e) {
-    return [{ ruleId: "internal-error", severity: "error",
-              message: `Validator rule threw unexpectedly: ${e.message}`, path: String(args.at(-1)) }];
+  try {
+    return rule(...args);
+  } catch (e) {
+    return [
+      {
+        ruleId: "internal-error",
+        severity: "error",
+        message: `Validator rule threw unexpectedly: ${e.message}`,
+        path: String(args.at(-1)),
+      },
+    ];
   }
 }
 ```
@@ -121,11 +141,14 @@ This structure is the actual deliverable — a coding agent should follow this f
 Each rule below: **ID, severity, scope, logic, and concrete test cases.**
 
 ### 4.1 `schema-version` — error — top-level
+
 - `schema.schemaVersion` must be present and a positive integer.
 - Test: `{}` → error. `{ schemaVersion: "1" }` → error (string, not number). `{ schemaVersion: 1, ... }` → no error from this rule.
 
 ### 4.2 `trigger-shape` — error — per-scenario
+
 Bundles everything about trigger validity:
+
 - `scenario.trigger.type` must be exactly one of `"scroll"`, `"time"`.
 - If `type === "scroll"`: `scrub` must be boolean, present.
 - `endTrigger` present + NOT (`type === "scroll" && scrub === true`) → error.
@@ -139,6 +162,7 @@ Bundles everything about trigger validity:
   - `{ type: "scroll", scrub: true, delay: 1 }` → error.
 
 ### 4.3 `ease-collision` — error — per-scenario
+
 - For every pair of distinct keyframe properties on the same element, if two `stops` entries share the same literal `p` value but different `ease` values → error.
 - Test:
   - `x.stops = [{p:0.5, v:10, ease:"power1.in"}]`, `y.stops = [{p:0.5, v:20, ease:"power2.out"}]` → error (collision at `p:0.5`).
@@ -146,7 +170,9 @@ Bundles everything about trigger validity:
   - Different `p` values entirely → no error.
 
 ### 4.4 `direction-ambiguity` — error — per-element
+
 Applies per keyframe property on the element:
+
 - 2+ stops → `direction` ignored, never an error regardless of value.
 - 1 stop, `p ≈ 0` (within epsilon `0.001`), `direction` omitted → inferred `"from"`, no error.
 - 1 stop, `p ≈ 1`, `direction` omitted → inferred `"to"`, no error.
@@ -159,11 +185,14 @@ Applies per keyframe property on the element:
   - `{ stops: [{p:0},{p:1}], direction: "fromTo" }` → no error.
 
 ### 4.5 `path-xy-exclusivity` — error — per-element
+
 - `keyframes.path` and (`keyframes.x` or `keyframes.y`) both present on the same element → error.
 - Test: element with both `path` and `x` → error. Element with only `path` → no error. Element with `x`+`y` only → no error.
 
 ### 4.6 `path-shape` — error — per-element
+
 Only runs if `keyframes.path` is present:
+
 - `path.points.length >= 4` and `(points.length - 1) % 3 === 0` → else error (invalid Bézier chain).
 - Every `path.stops[].v` must satisfy `0 <= v <= 1` → else error.
 - Test:
@@ -171,17 +200,21 @@ Only runs if `keyframes.path` is present:
   - `stops: [{p:0, v:0}, {p:1, v:1.5}]` → error (`v` out of range).
 
 ### 4.7 `stagger-shape` — mixed — per-scenario
+
 - `scenario.stagger` present and negative → **error**.
 - `scenario.stagger` present, non-zero, and `elements.length < 2` → **warning** (no-op, not structurally wrong).
 - Test: `stagger: -0.1` → error. `stagger: 0.2` with 1 element → warning. `stagger: 0.2` with 3 elements → no error/warning.
 
 ### 4.8 `perspective-usage` — warning — per-scenario
+
 - If any element in the project uses `z`, `rotationX`, or `rotationY`, and top-level `schema.perspective` is absent → warning.
 - Note: this rule technically needs top-level `schema` access alongside the scenario — pass `schema.perspective` in as a second argument from the orchestrator (deviates slightly from the pure `ScenarioRule` signature; acceptable, document the exception inline in code rather than distorting the whole rule-type system for one field).
 - Test: element uses `rotationX`, top-level `perspective` absent → warning. Same element, `perspective: 800` present → no warning. Element uses only `x`/`y` → no warning regardless of `perspective`.
 
 ### 4.9 `timeline-group` — error — cross-scenario
+
 Group scenarios by `timelineId` (ignore scenarios with no `timelineId` — ungrouped is always valid):
+
 - All scenarios in a group must have the identical `trigger.type` (and identical `trigger.scrub` if type is `scroll`) → else error.
 - No scenario in a group may have `trigger.type === "scroll" && trigger.scrub === false` (observer can never be grouped) → else error.
 - Exactly one scenario per group must have `primary === true` → zero or 2+ → error.
@@ -192,6 +225,7 @@ Group scenarios by `timelineId` (ignore scenarios with no `timelineId` — ungro
   - Group with zero `primary:true` → error. Group with two → error.
 
 ### 4.10 `element-uniqueness` — error — cross-scenario
+
 - Group scenarios by `sceneId`. Within each group, collect all element `id`s across all scenarios sharing that `sceneId`. Any `id` appearing more than once → error.
 - Test: two scenarios, same `sceneId`, disjoint element ids → no error. Same `sceneId`, one element id repeated across both → error. Same element id, but different `sceneId` → no error (uniqueness is scoped per `sceneId`, not global).
 
@@ -242,26 +276,43 @@ export function pathShapeRule(element, scenario, context, path) {
   const pointsPath = `${path}.keyframes.path.points`;
 
   if (points.length < 2) {
-    errors.push({ ruleId: "path-shape", severity: "error",
-      message: "path.points needs at least 2 waypoints to form a path.", path: pointsPath });
+    errors.push({
+      ruleId: "path-shape",
+      severity: "error",
+      message: "path.points needs at least 2 waypoints to form a path.",
+      path: pointsPath,
+    });
     return errors;
   }
 
   points.forEach((pt, i) => {
     const ptPath = `${pointsPath}[${i}]`;
-    if (typeof pt?.x !== 'number' || typeof pt?.y !== 'number') {
-      errors.push({ ruleId: "path-shape", severity: "error",
-        message: "each path point requires numeric x and y.", path: ptPath });
+    if (typeof pt?.x !== "number" || typeof pt?.y !== "number") {
+      errors.push({
+        ruleId: "path-shape",
+        severity: "error",
+        message: "each path point requires numeric x and y.",
+        path: ptPath,
+      });
     }
     const hasCtrlX = pt?.ctrlX !== undefined;
     const hasCtrlY = pt?.ctrlY !== undefined;
     if (hasCtrlX !== hasCtrlY) {
-      errors.push({ ruleId: "path-shape", severity: "error",
-        message: "ctrlX and ctrlY must be provided together, or not at all.", path: ptPath });
+      errors.push({
+        ruleId: "path-shape",
+        severity: "error",
+        message: "ctrlX and ctrlY must be provided together, or not at all.",
+        path: ptPath,
+      });
     }
     if (i === 0 && (hasCtrlX || hasCtrlY)) {
-      errors.push({ ruleId: "path-shape", severity: "warning",
-        message: "ctrlX/ctrlY on the first path point have no effect (no preceding segment to curve).", path: ptPath });
+      errors.push({
+        ruleId: "path-shape",
+        severity: "warning",
+        message:
+          "ctrlX/ctrlY on the first path point have no effect (no preceding segment to curve).",
+        path: ptPath,
+      });
     }
   });
 
@@ -274,12 +325,12 @@ export function pathShapeRule(element, scenario, context, path) {
 **This supersedes the old `path.stops[].v` range check's neighbor logic only where it concerned `points`** — the `v ∈ [0,1]` check on `stops` is unaffected and stays exactly as originally specified; only the `points`-shape half of this rule changes.
 
 **Test cases (replacing the old cubic-chain test cases):**
+
 - `points: [{x:0,y:0}]` (length 1) → error.
 - `points: [{x:0,y:0},{x:10,y:10}]` → no error (minimum valid path).
 - `points: [{x:0,y:0},{x:10,y:10,ctrlX:5}]` (missing `ctrlY`) → error.
 - `points: [{x:0,y:0,ctrlX:1,ctrlY:1},{x:10,y:10}]` → warning (ctrl on first point is a no-op).
 - `points: [{x:"a",y:0},{x:1,y:1}]` → error (non-numeric `x`).
-
 
 ---
 
@@ -289,7 +340,7 @@ export function pathShapeRule(element, scenario, context, path) {
 
 ```js
 // WRONG — do not reintroduce this pattern anywhere in this module
-if (typeof context === 'string') {
+if (typeof context === "string") {
   path = context;
   context = undefined;
 }
@@ -300,9 +351,21 @@ This lets a rule be called either the old two-arg way or a new three-arg way, so
 **Corrected, final contract — no exceptions, no sniffing:**
 
 ```ts
-type ScenarioRule = (scenario: unknown, context: RuleContext, path: string) => ValidationError[];
-type ElementRule = (element: unknown, scenario: unknown, context: RuleContext, path: string) => ValidationError[];
-type CrossScenarioRule = (scenarios: unknown[], context: RuleContext) => ValidationError[];
+type ScenarioRule = (
+  scenario: unknown,
+  context: RuleContext,
+  path: string,
+) => ValidationError[];
+type ElementRule = (
+  element: unknown,
+  scenario: unknown,
+  context: RuleContext,
+  path: string,
+) => ValidationError[];
+type CrossScenarioRule = (
+  scenarios: unknown[],
+  context: RuleContext,
+) => ValidationError[];
 
 interface RuleContext {
   schema: unknown; // the full top-level project object, read-only
