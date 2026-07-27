@@ -1,23 +1,16 @@
 import { gsap } from 'gsap';
 
 const filterSuffixes = { blur: 'px', brightness: '', contrast: '', saturate: '' };
-
-function serializeFilter(filterValues) {
-  return Object.entries(filterValues)
-    .filter(([key, value]) => value !== undefined && filterSuffixes[key] !== undefined)
-    .map(([key, value]) => `${key}(${value}${filterSuffixes[key]})`)
-    .join(' ');
-}
-
+const lastApplied = new WeakMap();
+function serializeFilter(values) { return Object.entries(values).filter(([key, value]) => value !== undefined && filterSuffixes[key] !== undefined).map(([key, value]) => `${key}(${value}${filterSuffixes[key]})`).join(' '); }
+function normalizePatch(patch) { const normalized = { ...patch }; if (normalized.filter && typeof normalized.filter === 'object') normalized.filter = serializeFilter(normalized.filter); for (const key of Object.keys(normalized)) if (key.startsWith('_') || ['pathProgress', 'cubicPath', 'autoRotate', 'offset'].includes(key)) delete normalized[key]; return normalized; }
 export function domRenderer(target, patch) {
   if (!target || !patch) return;
-  const domPatch = { ...patch };
-  if (domPatch.filter && typeof domPatch.filter === 'object') domPatch.filter = serializeFilter(domPatch.filter);
-
-  // Plugin-owned proxy internals are never render output. Keep the legacy
-  // names as a compatibility guard for callers passing raw snapshots directly.
-  for (const key of Object.keys(domPatch)) {
-    if (key.startsWith('_') || ['pathProgress', 'cubicPath', 'autoRotate'].includes(key)) delete domPatch[key];
-  }
-  gsap.set(target, domPatch);
+  const next = normalizePatch(patch); const previous = lastApplied.get(target) || {}; const dirty = {};
+  for (const [key, value] of Object.entries(next)) if (!Object.is(previous[key], value)) dirty[key] = value;
+  for (const key of Object.keys(previous)) if (!(key in next)) dirty[key] = undefined;
+  if (Object.keys(dirty).length === 0) return;
+  lastApplied.set(target, { ...previous, ...next });
+  gsap.set(target, dirty);
 }
+export function clearRendererTarget(target) { if (target) lastApplied.delete(target); }
