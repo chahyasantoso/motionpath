@@ -5,6 +5,14 @@ function clamp01(val) {
   return Math.max(0, Math.min(1, Number(val) || 0));
 }
 
+const isDev = () => {
+  try {
+    return Boolean(import.meta.env?.DEV);
+  } catch {
+    return false;
+  }
+};
+
 export class AutonomousTimelineControls {
   #timeline;
 
@@ -95,10 +103,32 @@ export class TimeTriggerDelegate {
   }
 
   build() {
+    const cfg = this.#config;
+
+    // R-03: autoplay and delay were declared in types.js and shipped in demo
+    // schemas, but build() read neither -- EVERY time motion autoplayed and
+    // `autoplay: false` was a silent no-op. Both are honored now.
+    // Default stays `true` so existing schemas that omit it are unchanged.
+    const autoplay = cfg.autoplay ?? true;
+    const delay = typeof cfg.delay === 'number' ? cfg.delay : 0;
+
+    // `trigger.duration` has no coherent meaning on a master timeline whose
+    // length is derived from its children. Rather than silently swallowing it
+    // (the old behavior), say so out loud in dev. Promoting this to a hard
+    // validator error is a Phase 2 decision, once demo schemas are migrated.
+    if (isDev() && cfg.duration !== undefined) {
+      console.warn(
+        '[MotionPath] time trigger: `duration` is ignored. A time motion gets its length from the ' +
+        '`duration` on each of its tracks. Remove trigger.duration.'
+      );
+    }
+
     this.#timeline = gsap.timeline({
-      repeat: this.#config.repeat ?? 0,
-      yoyo: !!this.#config.yoyo,
-      repeatDelay: this.#config.repeatDelay ?? 0,
+      repeat: cfg.repeat ?? 0,
+      yoyo: !!cfg.yoyo,
+      repeatDelay: cfg.repeatDelay ?? 0,
+      delay,
+      paused: !autoplay,
     });
     this.#controls = new AutonomousTimelineControls(this.#timeline);
     return this.#timeline;
@@ -127,6 +157,14 @@ export class ManualTriggerDelegate {
     if (!this.#timeline) return 0;
     if (p === undefined) return this.#timeline.progress();
     this.#timeline.progress(clamp01(p));
+  }
+
+  // R-10 (partial): `seek` is the single playhead verb every other delegate
+  // exposes. Manual now answers to it too, so app code can stop branching on
+  // the concrete delegate class. `progress()` stays as the existing alias and
+  // will be deprecated in Phase 2 when the delegate contract is unified.
+  seek(p) {
+    return this.progress(p);
   }
 
   destroy() {

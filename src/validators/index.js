@@ -46,6 +46,17 @@ function isValidShape(schema) {
 }
 
 /**
+ * True when at least one ValidationError has severity 'error'.
+ * Warnings alone never block a load.
+ *
+ * @param {ValidationError[]} errors
+ * @returns {boolean}
+ */
+export function hasFatalErrors(errors) {
+  return Array.isArray(errors) && errors.some((e) => e && e.severity === 'error');
+}
+
+/**
  * Main project validation entry point. Runs synchronously on plain JSON,
  * catching all violations (collect-all) and never throwing runtime exceptions.
  *
@@ -108,6 +119,24 @@ export function validateProject(schema) {
     }
   }
 
+  // Run the SAME track rules over standalone (stampable) schema.tracks[].
+  // Before this, only motion-structure ever saw top-level tracks, so a
+  // stamping-only project was effectively unvalidated. Fixes R-01 (part 2).
+  //
+  // Standalone tracks have no owning motion. We pass a synthetic host that
+  // carries no trigger, so the motion-aware track rules stay inert instead of
+  // reading `undefined.trigger`.
+  if (Array.isArray(schema.tracks)) {
+    for (const [k, track] of schema.tracks.entries()) {
+      const trackPath = `tracks[${k}]`;
+      const resolvedTrack = runSafelyValue(() => resolveTrack(track, schema.templates), null);
+      const standaloneHost = { id: null, trigger: undefined, tracks: [resolvedTrack] };
+      for (const rule of trackRules) {
+        errors.push(...runSafely(rule, resolvedTrack, standaloneHost, context, trackPath));
+      }
+    }
+  }
+
   // Run cross-motion rules (CrossMotionRule signature: (motions, context) => errors)
   for (const rule of crossMotionRules) {
     errors.push(...runSafely(rule, schema.motions, context));
@@ -130,5 +159,14 @@ function runSafely(rule, ...args) {
       message: `Validator rule threw unexpectedly: ${e.message}`,
       path: String(args.at(-1))
     }];
+  }
+}
+
+/** Same collect-all discipline, for non-rule helpers that may throw. */
+function runSafelyValue(fn, fallback) {
+  try {
+    return fn();
+  } catch {
+    return fallback;
   }
 }

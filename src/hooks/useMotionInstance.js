@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { engine } from '../engines/Engine.js';
 
 /**
- * React Hook to mount and manage a MotionInstance or v4 Motion/Track.
- * Automatically destroys/unmounts the instance when the component unmounts.
- * 
+ * React Hook to mount and manage a v4 Motion/Track.
+ * Automatically unmounts the instance THROUGH the engine when the component
+ * unmounts, so the engine's instance registry stays accurate (R-04).
+ *
  * NOTE: The `config` parameter is mount-time-only. Changing `config` after the
  * component has mounted does not trigger a remount or update the running instance.
  *
@@ -30,15 +31,20 @@ export default function useMotionInstance(motionId, config) {
 
   useEffect(() => {
     if (!motionId) return undefined;
-    
+
     const inst = engine.mountInstance(motionId, initialConfigRef.current);
     if (!inst) return undefined;
-    
+
     setInstance(inst);
 
     return () => {
-      if (typeof inst.destroy === 'function') {
-        inst.destroy();
+      // New Engine instances deregister through unmount(). Keep the fallback
+      // for lightweight test doubles and older consumers that only expose
+      // destroy(), without weakening the production lifecycle path.
+      if (typeof engine.unmount === 'function') {
+        engine.unmount(inst);
+      } else {
+        inst.destroy?.();
       }
       setInstance(null);
     };

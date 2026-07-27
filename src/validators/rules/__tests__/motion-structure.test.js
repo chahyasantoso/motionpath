@@ -35,24 +35,24 @@ describe('motion-structure rule', () => {
     expect(errors[0].message).toContain("Duplicate templateId 't1'");
   });
 
-  it('should error on duplicate motionIds', () => {
+  it('should error on duplicate motion ids', () => {
     const schema = {
       motions: [
-        { motionId: 'm1', trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] },
-        { motionId: 'm1', trigger: { type: 'time' }, tracks: [{ id: 'tr2' }] }
+        { id: 'm1', trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] },
+        { id: 'm1', trigger: { type: 'time' }, tracks: [{ id: 'tr2' }] }
       ]
     };
     const errors = motionStructureRule(schema);
     expect(errors).toHaveLength(1);
-    expect(errors[0].path).toBe('motions[1].motionId');
-    expect(errors[0].message).toContain("Duplicate motionId 'm1'");
+    expect(errors[0].path).toBe('motions[1].id');
+    expect(errors[0].message).toContain("Duplicate motion id 'm1'");
   });
 
   it('should error if driver or other forbidden fields are present on motion', () => {
     const schema = {
       motions: [
         {
-          motionId: 'm1',
+          id: 'm1',
           trigger: { type: 'time' },
           driver: { type: 'timeline' },
           timelineId: 'tl1',
@@ -72,10 +72,51 @@ describe('motion-structure rule', () => {
     expect(paths).toContain('motions[0].playback');
   });
 
+  // --- R-02: id is the ONE authoritative motion identifier -------------------
+
+  it('rejects motionId as a v3 field and still demands id', () => {
+    const schema = {
+      motions: [
+        { motionId: 'legacy', trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] }
+      ]
+    };
+    const errors = motionStructureRule(schema);
+    const paths = errors.map(e => e.path);
+
+    // The old rule computed `effectiveId = id ?? motionId`, so this schema
+    // PASSED validation and then registered under the key `undefined`.
+    expect(paths).toContain('motions[0].motionId');
+    expect(paths).toContain('motions[0].id');
+    expect(errors.find(e => e.path === 'motions[0].motionId').message)
+      .toContain('rename it to "id"');
+  });
+
+  it('rejects motionId even when a valid id is also present', () => {
+    const schema = {
+      motions: [
+        { id: 'm1', motionId: 'm1', trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] }
+      ]
+    };
+    const errors = motionStructureRule(schema);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].path).toBe('motions[0].motionId');
+  });
+
+  it('accepts a motion identified only by id', () => {
+    const schema = {
+      motions: [
+        { id: 'm1', trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] }
+      ]
+    };
+    expect(motionStructureRule(schema)).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------
+
   it('should error if trigger is missing on motion', () => {
     const schema = {
       motions: [
-        { motionId: 'm1', tracks: [{ id: 'tr1' }] }
+        { id: 'm1', tracks: [{ id: 'tr1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -87,7 +128,7 @@ describe('motion-structure rule', () => {
   it('should error if trigger is not an object', () => {
     const schema = {
       motions: [
-        { motionId: 'm1', trigger: 'not-an-object', tracks: [{ id: 'tr1' }] }
+        { id: 'm1', trigger: 'not-an-object', tracks: [{ id: 'tr1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -99,7 +140,7 @@ describe('motion-structure rule', () => {
   it('should error if trigger.type is invalid', () => {
     const schema = {
       motions: [
-        { motionId: 'm1', trigger: { type: 123 }, tracks: [{ id: 'tr1' }] }
+        { id: 'm1', trigger: { type: 123 }, tracks: [{ id: 'tr1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -111,19 +152,19 @@ describe('motion-structure rule', () => {
   it('should error if tracks is missing or empty', () => {
     const schema1 = {
       motions: [
-        { motionId: 'm1', trigger: { type: 'time' }, tracks: [] }
+        { id: 'm1', trigger: { type: 'time' }, tracks: [] }
       ]
     };
     const schema2 = {
       motions: [
-        { motionId: 'm1', trigger: { type: 'time' } }
+        { id: 'm1', trigger: { type: 'time' } }
       ]
     };
     expect(motionStructureRule(schema1)[0].path).toBe('motions[0].tracks');
     expect(motionStructureRule(schema2)[0].path).toBe('motions[0].tracks');
   });
 
-  it('should error on missing motionId', () => {
+  it('should error on missing id', () => {
     const schema = {
       motions: [
         { trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] }
@@ -131,27 +172,27 @@ describe('motion-structure rule', () => {
     };
     const errors = motionStructureRule(schema);
     expect(errors).toHaveLength(1);
-    expect(errors[0].path).toBe('motions[0].motionId');
-    expect(errors[0].message).toContain('motionId is required');
+    expect(errors[0].path).toBe('motions[0].id');
+    expect(errors[0].message).toContain('motion.id is required');
   });
 
-  it('should error on empty string motionId', () => {
+  it('should error on empty string id', () => {
     const schema = {
       motions: [
-        { motionId: '', trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] }
+        { id: '', trigger: { type: 'time' }, tracks: [{ id: 'tr1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
     expect(errors).toHaveLength(1);
-    expect(errors[0].path).toBe('motions[0].motionId');
-    expect(errors[0].message).toContain('motionId is required');
+    expect(errors[0].path).toBe('motions[0].id');
+    expect(errors[0].message).toContain('motion.id is required');
   });
 
   it('should error on missing track.id', () => {
     const schema = {
       templates: [{ templateId: 't1' }],
       motions: [
-        { motionId: 'm1', trigger: { type: 'time' }, tracks: [{ use: 't1' }] }
+        { id: 'm1', trigger: { type: 'time' }, tracks: [{ use: 't1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -164,7 +205,7 @@ describe('motion-structure rule', () => {
     const schema = {
       templates: [{ templateId: 't1' }],
       motions: [
-        { motionId: 'm1', trigger: { type: 'time' }, tracks: [{ id: '', use: 't1' }] }
+        { id: 'm1', trigger: { type: 'time' }, tracks: [{ id: '', use: 't1' }] }
       ]
     };
     const errors = motionStructureRule(schema);
@@ -178,7 +219,7 @@ describe('motion-structure rule', () => {
       templates: [{ templateId: 't1' }],
       motions: [
         {
-          motionId: 'm1',
+          id: 'm1',
           trigger: { type: 'time' },
           tracks: [{ id: 'tr1', use: 'non-existent' }]
         }

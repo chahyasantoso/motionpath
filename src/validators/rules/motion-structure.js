@@ -1,7 +1,13 @@
 /**
  * Rule: motion-structure
- * Performs structural validation for templates, motions, drivers/triggers, and track template references.
- * Validates the v4 motion shape. v2/v3 fields (driver, timelineId, primary, lifecycle, playback) are explicitly forbidden with a dedicated error each.
+ * Performs structural validation for templates, motions, triggers, and track template references.
+ * Validates the v4 motion shape. v2/v3 fields (driver, timelineId, primary, lifecycle, playback,
+ * motionId) are explicitly forbidden with a dedicated error each.
+ *
+ * R-02: `id` is the ONE authoritative motion identifier. The runtime
+ * (parseV4Project + Engine) only ever reads `motion.id`, so accepting
+ * `motionId` here used to let a schema validate and then register under the
+ * key `undefined`. `motionId` is now a forbidden v3 field like the rest.
  *
  * @param {unknown} schema - Full project schema
  * @returns {ValidationError[]}
@@ -144,26 +150,35 @@ export function motionStructureRule(schema) {
       continue;
     }
 
-    const { id, motionId, driver, trigger, stagger, tracks, timelineId, primary, lifecycle, playback } = motion;
-    const effectiveId = id ?? motionId;
+    const { id, motionId, driver, trigger, tracks, timelineId, primary, lifecycle, playback } = motion;
 
-    if (typeof effectiveId !== 'string' || effectiveId === '') {
+    // R-02: motionId is a v3 leftover. The runtime never reads it.
+    if (motionId !== undefined) {
       errors.push({
         ruleId: 'motion-structure',
         severity: 'error',
-        message: 'motionId is required and must be a non-empty string.',
-        path: `${motionPath}.${id !== undefined ? 'id' : 'motionId'}`
+        message: '"motionId" is a v3 field, not valid in v4 -- rename it to "id". parseV4Project and Engine only read motion.id, so a motionId-only motion registers under the key `undefined` and can never be mounted.',
+        path: `${motionPath}.motionId`
+      });
+    }
+
+    if (typeof id !== 'string' || id === '') {
+      errors.push({
+        ruleId: 'motion-structure',
+        severity: 'error',
+        message: 'motion.id is required and must be a non-empty string.',
+        path: `${motionPath}.id`
       });
     } else {
-      if (seenMotionIds.has(effectiveId)) {
+      if (seenMotionIds.has(id)) {
         errors.push({
           ruleId: 'motion-structure',
           severity: 'error',
-          message: `Duplicate motionId '${effectiveId}' found.`,
-          path: `${motionPath}.${id !== undefined ? 'id' : 'motionId'}`
+          message: `Duplicate motion id '${id}' found.`,
+          path: `${motionPath}.id`
         });
       }
-      seenMotionIds.add(effectiveId);
+      seenMotionIds.add(id);
     }
 
     // Forbidden v2/v3 fields in v4
@@ -171,7 +186,7 @@ export function motionStructureRule(schema) {
       errors.push({
         ruleId: 'motion-structure',
         severity: 'error',
-        message: '"driver" is a v2/v3 field, not valid in v4 — motions always have a trigger, no driver wrapper needed.',
+        message: '"driver" is a v2/v3 field, not valid in v4 -- motions always have a trigger, no driver wrapper needed.',
         path: `${motionPath}.driver`
       });
     }
@@ -179,7 +194,7 @@ export function motionStructureRule(schema) {
       errors.push({
         ruleId: 'motion-structure',
         severity: 'error',
-        message: '"timelineId" is a v2/v3 field, not valid in v4 — tracks under the same motion share a trigger automatically.',
+        message: '"timelineId" is a v2/v3 field, not valid in v4 -- tracks under the same motion share a trigger automatically.',
         path: `${motionPath}.timelineId`
       });
     }
@@ -231,7 +246,7 @@ export function motionStructureRule(schema) {
       });
     }
 
-    validateTracksArray(tracks, `${motionPath}.tracks`, effectiveId || i);
+    validateTracksArray(tracks, `${motionPath}.tracks`, id || i);
   }
 
   // Validate top-level bare tracks if present

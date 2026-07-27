@@ -6,7 +6,7 @@ import { ScrollTriggerDelegate } from '../lib/TriggerDelegate.js';
  * Mounts a scroll-triggered motion using component-local DOM refs instead of
  * the old string-id + TriggerRefRegistry indirection. Every call builds its
  * own delegate from its own refs, so multiple concurrent instances of the
- * same schema motion never collide on a shared id namespace — there IS no
+ * same schema motion never collide on a shared id namespace -- there IS no
  * shared namespace.
  *
  * @param {Object|null} schema - the motion's schema object (e.g. scrollScene),
@@ -15,7 +15,7 @@ import { ScrollTriggerDelegate } from '../lib/TriggerDelegate.js';
  * @returns {{ refs: { trigger: RefObject, pin?: RefObject, endTrigger?: RefObject }, instance: Object|null }}
  */
 export default function useScrollMotion(schema) {
-  // Refs created unconditionally, every render, regardless of `schema` —
+  // Refs created unconditionally, every render, regardless of `schema` --
   // Rules of Hooks: the set of refs this hook allocates can't depend on a
   // value that might change across renders.
   const triggerRef = useRef(null);
@@ -39,7 +39,8 @@ export default function useScrollMotion(schema) {
     setInstance(motion);
 
     return () => {
-      motion.destroy();
+      // Deregister as well as destroy -- see R-04.
+      engine.unmount(motion);
       setInstance(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
