@@ -1,5 +1,8 @@
 import { gsap } from "gsap";
+// Imported for its side effect: gsap/ScrollTrigger self-registers with the
+// core on import, which is what makes `gsap.timeline({ scrollTrigger })` work.
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+void ScrollTrigger;
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
 }
@@ -34,7 +37,7 @@ export class ScrollTriggerDelegate {
   constructor(config = {}) {
     this.#config = config;
   }
-  build() {
+  buildTimelineVars() {
     const c = this.#config;
     const trigger = c.trigger;
     const scrollTrigger = {
@@ -52,17 +55,19 @@ export class ScrollTriggerDelegate {
     // A scrubbed timeline's playhead IS the scroll position, so repeat/yoyo/
     // repeatDelay/delay are meaningless there and trigger-shape rejects them
     // outright. On a non-scrub (toggleActions) scroll motion they are legal
-    // authored fields -- previously they were accepted by the validator and
-    // then silently dropped here, which is the one thing the system guide
-    // says a trigger must never do. Apply them.
+    // authored fields -- they used to be accepted by the validator and then
+    // silently dropped here, which is the one thing the system guide says a
+    // trigger must never do. Apply them.
     if (!isScrubbedScrollConfig(c)) {
       vars.repeat = c.repeat ?? 0;
       vars.yoyo = !!c.yoyo;
       vars.repeatDelay = c.repeatDelay ?? 0;
       if (typeof c.delay === "number") vars.delay = c.delay;
     }
-
-    this.#timeline = gsap.timeline(vars);
+    return vars;
+  }
+  build() {
+    this.#timeline = gsap.timeline(this.buildTimelineVars());
     this.#controls = new AutonomousTimelineControls(this.#timeline);
     return this.#timeline;
   }
@@ -176,7 +181,3 @@ export const triggerDelegateRegistry = createTriggerDelegateRegistry();
 export function registerTriggerDelegate(type, factory) {
   triggerDelegateRegistry.set(type, factory);
 }
-
-// Keep ScrollTrigger imported and registered for consumers that build a
-// ScrollTriggerDelegate directly.
-gsap.registerPlugin(ScrollTrigger);
