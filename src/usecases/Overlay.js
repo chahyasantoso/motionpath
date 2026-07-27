@@ -54,11 +54,10 @@ export class Overlay {
 
   destroy() {
     if (this.#destroyed) return;
+    const overlay = this.#overlay;
     this.#destroyed = true;
     this.replace();
-    this.#overlay?.destroy?.();
-    this.#source = null;
-    this.#overlay = null;
+    overlay?.destroy?.();
   }
 
   #assertAlive() { if (this.#destroyed) throw new Error('Overlay is destroyed.'); }
