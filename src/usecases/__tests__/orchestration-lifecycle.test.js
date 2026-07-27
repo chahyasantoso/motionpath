@@ -16,15 +16,17 @@ describe('orchestration lifecycle contracts', () => {
     expect(factory).not.toHaveBeenCalled();
   });
 
-  it('Overlay replacement invalidates stale completion', async () => {
-    const source = { subscribe: vi.fn(() => () => {}), setObserved: vi.fn(), removeObserved: vi.fn() };
-    const first = { progress: vi.fn(), subscribe: vi.fn((cb) => { first.done = cb; return () => {}; }), destroy: vi.fn() };
-    const second = { progress: vi.fn(), subscribe: vi.fn((cb) => { second.done = cb; return () => {}; }), destroy: vi.fn() };
+  it('Overlay replacement invalidates stale completion', () => {
+    const source = { setObserved: vi.fn(), removeObserved: vi.fn() };
+    const first = { destroy: vi.fn() };
+    const second = { destroy: vi.fn() };
     const overlay = new Overlay();
     overlay.attach(source, first, () => ({}));
     overlay.attach(source, second, () => ({}));
-    first.done?.();
+    expect(source.removeObserved).toHaveBeenCalledWith(first);
+    expect(first.destroy).not.toHaveBeenCalled();
     expect(second.destroy).not.toHaveBeenCalled();
     overlay.destroy();
+    expect(second.destroy).toHaveBeenCalledTimes(1);
   });
 });
