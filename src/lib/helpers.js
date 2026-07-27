@@ -1,5 +1,4 @@
 import { gsap } from 'gsap';
-import { domRenderer } from '../renderers/domRenderer.js';
 import { mergePatches } from '../usecases/mergePatches.js';
 import { EventBus } from './eventBus.js';
 
@@ -9,13 +8,8 @@ export { mergePatches };
 export function autoPlay(track, durationSeconds, vars = {}) { return gsap.to(track, { progress: 1, duration: durationSeconds, ...vars }); }
 export const eventBus = new EventBus();
 export function playOnEvent(track, eventName, vars = {}) { return eventBus.on(eventName, (payload) => { if (payload?.id !== track.id) return; gsap.to(track, { progress: 0, duration: 0 }); gsap.to(track, { progress: 1, ...vars }); }); }
-export function switchToTrack(el, fromTrack, unsubscribeFrom, toTrack, vars = {}) {
-  const frozenPosition = fromTrack.compose(fromTrack.getSnapshot());
-  unsubscribeFrom?.();
-  const unsub = toTrack.subscribe((raw) => domRenderer(el, mergePatches(frozenPosition, toTrack.compose(raw))));
-  gsap.to(toTrack, { progress: 1, ...vars });
-  return unsub;
-}
+// `switchToTrack` moved to hooks/switchToTrack.js — it is DOM-aware, and
+// importing renderers/ from lib/ pointed an inner layer at an outer one.
 export function applyAnchor(patch, anchor) {
   if (!anchor) return patch;
   const result = { ...patch, ...anchor };

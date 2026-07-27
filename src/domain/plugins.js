@@ -17,17 +17,24 @@ export { pathPlugin, cssVarPlugin, imageSequencePlugin, fkPlugin };
 
 export function createPluginRegistry(initialPlugins = ALL_PLUGINS) {
   const exact = new Map(); const predicates = []; const plugins = []; const loadPromises = new Map();
+  // Union of every registered plugin's private proxy state. Renderers read this
+  // instead of hardcoding another module's internals.
+  const internalKeySet = new Set();
+  const rebuildInternalKeys = () => { internalKeySet.clear(); for (const plugin of plugins) for (const key of plugin.internalKeys || []) internalKeySet.add(key); };
   const register = (plugin) => {
     if (!plugin || typeof plugin.claimsKey !== 'function') throw new TypeError('registerPlugin() expects a plugin with claimsKey().');
     if (plugins.includes(plugin)) return plugin;
     for (const key of plugin.keys || []) { const prior = exact.get(key); if (prior && prior !== plugin) throw new Error(`Plugin key collision for "${key}".`); }
-    plugins.push(plugin); for (const key of plugin.keys || []) exact.set(key, plugin); if (!(plugin.keys || []).length || plugin.claimsWildcard) predicates.push(plugin); return plugin;
+    plugins.push(plugin); for (const key of plugin.keys || []) exact.set(key, plugin); if (!(plugin.keys || []).length || plugin.claimsWildcard) predicates.push(plugin);
+    for (const key of plugin.internalKeys || []) internalKeySet.add(key);
+    return plugin;
   };
   initialPlugins.forEach(register);
   return {
     get plugins() { return plugins; },
+    get internalKeys() { return internalKeySet; },
     register,
-    unregister(pluginOrKey) { const plugin = typeof pluginOrKey === 'string' ? exact.get(pluginOrKey) : pluginOrKey; if (!plugin || !plugins.includes(plugin)) return false; plugins.splice(plugins.indexOf(plugin), 1); for (const key of plugin.keys || []) if (exact.get(key) === plugin) exact.delete(key); const index = predicates.indexOf(plugin); if (index >= 0) predicates.splice(index, 1); loadPromises.delete(plugin); return true; },
+    unregister(pluginOrKey) { const plugin = typeof pluginOrKey === 'string' ? exact.get(pluginOrKey) : pluginOrKey; if (!plugin || !plugins.includes(plugin)) return false; plugins.splice(plugins.indexOf(plugin), 1); for (const key of plugin.keys || []) if (exact.get(key) === plugin) exact.delete(key); const index = predicates.indexOf(plugin); if (index >= 0) predicates.splice(index, 1); loadPromises.delete(plugin); rebuildInternalKeys(); return true; },
     resolve(key) { return exact.get(key) ?? predicates.find((plugin) => plugin.claimsKey(key)); },
     ensureLoaded(plugin) { if (!plugin?.lazy) return Promise.resolve(); if (!loadPromises.has(plugin)) loadPromises.set(plugin, typeof plugin.load === 'function' ? plugin.load() : Promise.resolve()); return loadPromises.get(plugin); },
   };
@@ -38,4 +45,6 @@ export function registerPlugin(plugin) { return defaultRegistry.register(plugin)
 export function unregisterPlugin(pluginOrKey) { return defaultRegistry.unregister(pluginOrKey); }
 export function resolvePluginForKey(key) { return typeof key === 'string' ? defaultRegistry.resolve(key) : undefined; }
 export function ensureLoaded(plugin) { return defaultRegistry.ensureLoaded(plugin); }
+/** Live set of private proxy keys that must never reach a renderer. */
+export function getInternalKeys() { return defaultRegistry.internalKeys; }
 export function _resetLoadPromises() { defaultRegistry.plugins; }

@@ -2,6 +2,7 @@ import { composePatch } from '../usecases/ComposeTrackPatch.js';
 import { mergePatches } from '../usecases/mergePatches.js';
 import { defaultGaplessLayoutDelegate } from './GaplessLayoutDelegate.js';
 import { eventBus as defaultEventBus } from './eventBus.js';
+import { logger } from './logger.js';
 
 function clamp01(val) { return Math.max(0, Math.min(1, Number(val) || 0)); }
 const COMPOSING = Symbol('composing');
@@ -38,5 +39,12 @@ export class Track {
   getChild(id) { return this.#children.get(id) ?? null; }
   addChild(child, opts = {}) { if (child.#parent) throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`); if (this.#children.has(child.id)) throw new Error(`Track "${this.#id}" already has a child with id "${child.id}".`); child.#parent = this; const stagger = opts.stagger ?? 0; child.#staggerOffset = stagger; const spawnOffset = this.#layoutDelegate.computeSpawnOffset(Array.from(this.#children.values()), { stagger }); child.#currentOffset = spawnOffset; this.#children.set(child.id, child); if (this.#host) this.#host._mountChild(child, spawnOffset); this.#eventBus.emit('child:spawned', { id: child.id, parentId: this.#id }); }
   removeChild(id) { const child = this.#children.get(id); if (!child) return; const siblings = Array.from(this.#children.values()); this.#children.delete(id); child.#parent = null; if (this.#host) this.#host._unmountChild(child); for (const target of this.#layoutDelegate.computeReflow(siblings, child, {})) { target.child.#currentOffset = target.offset; if (this.#host) this.#host._reflowChild(target.child, target.offset); } this.#eventBus.emit('child:removing', { id: child.id, parentId: this.#id }); }
-  destroy() { this.#subscribers.clear(); this.#observed.clear(); try { this.#interpolationTimeline?.kill(); } catch {} }
+  destroy() {
+    this.#subscribers.clear();
+    this.#observed.clear();
+    // Teardown must never throw at the caller, but a failure here is real and
+    // used to vanish into `catch {}`. Report it instead of hiding it.
+    try { this.#interpolationTimeline?.kill(); }
+    catch (e) { logger.warn(`track "${this.#id}"`, 'failed to kill the interpolation timeline during destroy()', e); }
+  }
 }
