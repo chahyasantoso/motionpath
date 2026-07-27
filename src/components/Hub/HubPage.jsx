@@ -15,7 +15,7 @@ const DEMOS = [
     features: [
       "2D Bezier Path Guide",
       "Helix Spiral projection",
-      "Engine-level Stagger offset",
+      "Per-card child Tracks with stagger",
     ],
   },
   {
@@ -29,8 +29,8 @@ const DEMOS = [
       "A multi-scene orchestration combining scroll-scrubbed 3D Z-depth strawberry particle explosion with scroll-observer triggered centerpiece content.",
     features: [
       "3D Z-Depth coordinates",
-      "Scroll observer auto-play",
-      "GSAP-driven viewport triggers",
+      "Two motions, one shared trigger element",
+      "Depth-of-field composed per frame",
     ],
   },
   {
@@ -45,7 +45,7 @@ const DEMOS = [
     features: [
       "Path-aligned autoRotate",
       "Infinite looping timeline",
-      "Staggered parallax effects",
+      "Per-track durations across four scenes",
     ],
   },
   {
@@ -56,11 +56,11 @@ const DEMOS = [
     icon: "🏮",
     color: "glow-red",
     description:
-      "An immersive night market journey. Scans through an optimized 30-frame image sequence with scroll-linked interpolation, custom overlay text, and ambient lantern floating.",
+      "An immersive night market journey. Scans through an optimized 192-frame image sequence with scroll-linked interpolation, custom overlay text, and ambient lantern floating.",
     features: [
       "Scroll-scrubbed image frames",
       "Smooth wheel scrolling hook",
-      "Ambient play/pause toggles",
+      "Threshold-gated ambient loop",
     ],
   },
   {
@@ -71,25 +71,25 @@ const DEMOS = [
     icon: "👁️",
     color: "glow-purple",
     description:
-      "The same night market experience, powered by a scroll observer trigger that triggers state-based animations and transitions when sections cross the viewport.",
+      "The same night market stage, with the ambient loop handed to a toggleActions scroll observer instead of a React state gate. Zero re-renders, zero threshold bookkeeping.",
     features: [
       "ScrollTrigger toggleActions",
-      "Viewport entry triggers",
-      "Separated timeline controller",
+      "Self-parking repeat/yoyo loop",
+      "No React state in the scroll path",
     ],
   },
   {
     id: "tower-defense",
     title: "Tower Defense Game",
-    badge: "Delegate / Overrides Game Loop",
+    badge: "Manual Trigger / Game Loop",
     path: "/tower-defense",
     icon: "🗼",
     color: "glow-amber",
     description:
-      "A pure, V2 resolveMotion-powered game loop tower defense. Enemies follow S-curves synchronously while energy projectile arcs are dynamically resolved and updated via overrides.",
+      "A game loop driven entirely by manual-trigger motions. Enemies follow S-curve lane paths seeked frame by frame, while energy projectile arcs are resolved on demand.",
     features: [
+      "Manual triggers seeked by the controller",
       "Tween-cached coordinate lookup",
-      "Dynamic coordinate overrides",
       "Time-triggered autonomous pulse",
     ],
   },
@@ -133,7 +133,7 @@ export default function HubPage() {
 
       {/* Hero Header */}
       <header className="hub-hero">
-        <div className="hub-hero-badge">MOTIONPATH ENGINE V2</div>
+        <div className="hub-hero-badge">MOTIONPATH ENGINE V4</div>
         <h1 className="hub-title">
           Declarative <span className="gradient-text">Fluid Motion</span>
         </h1>
@@ -155,7 +155,7 @@ export default function HubPage() {
         <div className="spec-card">
           <h3>🛡️ Strict Validation</h3>
           <p>
-            A multi-phase validator catches layout errors, stagger
+            A collect-all validator catches layout errors, stagger
             misconfigurations, and ease collisions before runtime execution.
           </p>
         </div>
