@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "npx --yes typescript@5.8.3 --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "gsap": "^3.12.5",
