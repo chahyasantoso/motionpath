@@ -4,7 +4,7 @@ import { Overlay } from '../Overlay.js';
 
 describe('orchestration lifecycle contracts', () => {
   it('Spawner stops scheduling after destroy and never spawns again', () => {
-    const clock = { add: vi.fn(), remove: vi.fn() };
+    const clock = { add: vi.fn(), remove: vi.fn(), subscribe: vi.fn(() => () => {}) };
     const factory = vi.fn();
     const spawner = new Spawner({ clock, interval: 0, maxAlive: 2, waveSize: 2, factory });
     spawner.start();
