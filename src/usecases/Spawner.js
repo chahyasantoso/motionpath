@@ -37,10 +37,24 @@ export class Spawner {
     if (this.#state === 'destroyed') throw new Error('Spawner is destroyed.');
     if (this.#state === 'running') return;
     this.#state = 'running';
+    this.#subscribe();
+  }
+
+  #subscribe() {
+    this.#unsubscribe?.();
     this.#unsubscribe = this.#clock.subscribe((delta = 0) => this.#tick(delta));
   }
 
-  pause() { if (this.#state === 'running') this.#state = 'idle'; }
+  pause() {
+    if (this.#state !== 'running') return;
+    // A pause must remove the listener, not merely make its callback a no-op.
+    // Otherwise every resume adds another live subscription and one clock tick
+    // can spawn multiple entities (the exact bug this regression caught).
+    this.#unsubscribe?.();
+    this.#unsubscribe = null;
+    this.#state = 'idle';
+  }
+
   resume() { if (this.#state === 'idle') this.start(); }
 
   notifyRemoved(count = 1) {
