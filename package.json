@@ -7,7 +7,7 @@
     "dev": "vite",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "npx --yes typescript@5.8.3 --noEmit -p tsconfig.json"
+    "typecheck": "npm exec --yes --package=typescript@5.8.3 -- tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "gsap": "^3.12.5",
