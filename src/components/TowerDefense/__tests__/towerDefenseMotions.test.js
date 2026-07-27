@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateProject } from '../../../../validators/index.js';
+import { validateProject } from '../../../validators/index.js';
 import { towerDefenseProject } from '../towerDefenseMotions.js';
 
 describe('TowerDefense v4 migration', () => {
