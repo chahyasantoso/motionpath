@@ -1,86 +1,14 @@
 import { gsap } from 'gsap';
-import { resolvePluginForKey } from '../domain/plugins.js';
-
-const STAGE_ORDER = new Map([
-  ['base', 10], ['filter', 20], ['media', 30], ['transform', 40], ['override', 50], ['default', 100],
-]);
-
-function sortPlugins(plugins) {
-  return plugins
-    .map((plugin, index) => ({ plugin, index }))
-    .sort((a, b) => {
-      const stageA = STAGE_ORDER.get(a.plugin.stage) ?? 100;
-      const stageB = STAGE_ORDER.get(b.plugin.stage) ?? 100;
-      return stageA - stageB || (a.plugin.priority ?? 0) - (b.plugin.priority ?? 0) || a.index - b.index;
-    })
-    .map(({ plugin }) => plugin);
-}
-
-function assertOutputCompatibility(trackId, plugins) {
-  const owners = new Map();
-  for (const plugin of plugins) {
-    for (const key of Object.keys(plugin.outputs || {})) {
-      const previous = owners.get(key);
-      if (previous && previous !== plugin) {
-        throw new Error(
-          `Output collision on track "${trackId}" for "${key}": ` +
-          `plugins "${previous.keys?.join(', ') ?? '?'}" and "${plugin.keys?.join(', ') ?? '?'}" ` +
-          'both emit this render property. Split the properties into separate tracks or use an explicit observation mapping.'
-        );
-      }
-      owners.set(key, plugin);
-    }
-  }
-}
-
-export function buildTrackTween(trackId, keyframes, duration, trackConfig) {
-  const propKeys = Object.keys(keyframes || {});
-  const sharedKeyframes = {};
-  const sharedTweenVars = {};
-  const discoveredPlugins = [];
-  const proxy = {};
-
-  for (const propKey of propKeys) {
-    const plugin = resolvePluginForKey(propKey);
-    if (!plugin) throw new Error(`No plugin found for key "${propKey}" on track "${trackId}".`);
-    if (!discoveredPlugins.includes(plugin)) discoveredPlugins.push(plugin);
-  }
-
-  const resolvedPlugins = sortPlugins(discoveredPlugins);
-  assertOutputCompatibility(trackId, resolvedPlugins);
-
-  // Compilation order is now authored by plugin metadata, not Object.keys().
-  for (const propKey of propKeys) {
-    const plugin = resolvePluginForKey(propKey);
-    const propConfig = keyframes[propKey];
-    const contribution = plugin.contribute(propKey, propConfig?.stops || [], trackConfig);
-    const percentPatch = contribution?.percentPatch || {};
-    const tweenVars = contribution?.tweenVars || {};
-
-    for (const percentKey of Object.keys(percentPatch)) {
-      const existing = sharedKeyframes[percentKey];
-      const incoming = percentPatch[percentKey];
-      if (existing?.ease !== undefined && incoming?.ease !== undefined && existing.ease !== incoming.ease) {
-        throw new Error(
-          `Ease collision on track "${trackId}" at percent "${percentKey}" ` +
-          `(contributed by property "${propKey}"): different eases found ("${existing.ease}" vs "${incoming.ease}").`
-        );
-      }
-      sharedKeyframes[percentKey] = { ...(existing ?? {}), ...incoming };
-    }
-
-    for (const key of Object.keys(tweenVars)) {
-      if (key in sharedTweenVars && sharedTweenVars[key] !== tweenVars[key]) {
-        throw new Error(`tweenVars collision on track "${trackId}": key "${key}" contributed twice with different values.`);
-      }
-      sharedTweenVars[key] = tweenVars[key];
-    }
-  }
-
-  const mergedZero = sharedKeyframes['0%'] ?? {};
-  for (const [key, value] of Object.entries(mergedZero)) if (key !== 'ease') proxy[key] = value;
-
-  const tween = gsap.to(proxy, { keyframes: sharedKeyframes, ...sharedTweenVars, duration, paused: true });
-  return { proxy, tween, resolvedPlugins };
+import { resolvePluginForKey as defaultResolvePlugin } from '../domain/plugins.js';
+const STAGE_ORDER = new Map([['base', 10], ['filter', 20], ['media', 30], ['transform', 40], ['override', 50], ['default', 100]]);
+function sortPlugins(plugins) { return plugins.map((plugin, index) => ({ plugin, index })).sort((a, b) => (STAGE_ORDER.get(a.plugin.stage) ?? 100) - (STAGE_ORDER.get(b.plugin.stage) ?? 100) || (a.plugin.priority ?? 0) - (b.plugin.priority ?? 0) || a.index - b.index).map(({ plugin }) => plugin); }
+function assertOutputCompatibility(trackId, plugins) { const owners = new Map(); for (const plugin of plugins) for (const key of Object.keys(plugin.outputs || {})) { const previous = owners.get(key); if (previous && previous !== plugin) throw new Error(`Output collision on track "${trackId}" for "${key}".`); owners.set(key, plugin); } }
+export function buildTrackTween(trackId, keyframes, duration, trackConfig, resolvePlugin = defaultResolvePlugin) {
+  const propKeys = Object.keys(keyframes || {}); const sharedKeyframes = {}; const sharedTweenVars = {}; const discovered = []; const proxy = {};
+  for (const key of propKeys) { const plugin = resolvePlugin(key); if (!plugin) throw new Error(`No plugin found for key "${key}" on track "${trackId}".`); if (!discovered.includes(plugin)) discovered.push(plugin); }
+  const resolvedPlugins = sortPlugins(discovered); assertOutputCompatibility(trackId, resolvedPlugins);
+  for (const propKey of propKeys) { const plugin = resolvePlugin(propKey); const contribution = plugin.contribute(propKey, keyframes[propKey]?.stops || [], trackConfig); for (const percentKey of Object.keys(contribution?.percentPatch || {})) { const existing = sharedKeyframes[percentKey]; const incoming = contribution.percentPatch[percentKey]; if (existing?.ease !== undefined && incoming?.ease !== undefined && existing.ease !== incoming.ease) throw new Error(`Ease collision on track "${trackId}" at percent "${percentKey}".`); sharedKeyframes[percentKey] = { ...(existing || {}), ...incoming }; } for (const key of Object.keys(contribution?.tweenVars || {})) { if (key in sharedTweenVars && sharedTweenVars[key] !== contribution.tweenVars[key]) throw new Error(`tweenVars collision on track "${trackId}": key "${key}".`); sharedTweenVars[key] = contribution.tweenVars[key]; } }
+  for (const [key, value] of Object.entries(sharedKeyframes['0%'] || {})) if (key !== 'ease') proxy[key] = value;
+  return { proxy, tween: gsap.to(proxy, { keyframes: sharedKeyframes, ...sharedTweenVars, duration, paused: true }), resolvedPlugins };
 }
 export { buildTrackTween as buildTrackTweenSync };
