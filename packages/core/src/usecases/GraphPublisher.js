@@ -16,13 +16,8 @@ export class GraphPublisher {
     this.#publish = publish;
   }
 
-  markDirty(trackId) {
-    if (this.#tracks.has(trackId)) this.#dirty.add(trackId);
-  }
-
-  markAllDirty() {
-    for (const id of this.#order) if (this.#tracks.has(id)) this.#dirty.add(id);
-  }
+  markDirty(trackId) { if (this.#tracks.has(trackId)) this.#dirty.add(trackId); }
+  markAllDirty() { for (const id of this.#order) if (this.#tracks.has(id)) this.#dirty.add(id); }
 
   flush() {
     if (this.#dirty.size === 0) return 0;
@@ -31,13 +26,11 @@ export class GraphPublisher {
     const composed = new Map();
     let published = 0;
     for (const id of this.#order) {
-      if (!dirty.has(id)) continue;
       const track = this.#tracks.get(id);
       if (!track) continue;
       const patch = track.compose(undefined, composed);
       composed.set(id, patch);
-      this.#publish(id, patch);
-      published += 1;
+      if (dirty.has(id)) { this.#publish(id, patch); published += 1; }
     }
     return published;
   }
