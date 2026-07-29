@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 const root = process.cwd();
@@ -11,7 +11,6 @@ const moves = [
   ["src/hooks", "packages/react/src/hooks"],
 ];
 const extensions = new Set([".js", ".jsx", ".ts", ".tsx", ".css"]);
-
 const absolute = (path) => join(root, path);
 
 async function isScaffoldBridge(path) {
@@ -35,19 +34,14 @@ async function moveFile(source, target) {
 
 async function moveTree(source, target) {
   const from = absolute(source);
-  const to = absolute(target);
   if (!existsSync(from)) return { moved: 0, skipped: 1 };
-  const entries = await (await import("node:fs/promises")).readdir(from, { withFileTypes: true });
+  const entries = await readdir(from, { withFileTypes: true });
   let moved = 0;
   for (const entry of entries) {
     const childSource = `${source}/${entry.name}`;
     const childTarget = `${target}/${entry.name}`;
-    if (entry.isDirectory()) {
-      const result = await moveTree(childSource, childTarget);
-      moved += result.moved;
-    } else if ((await moveFile(childSource, childTarget)) === "moved") {
-      moved += 1;
-    }
+    if (entry.isDirectory()) moved += (await moveTree(childSource, childTarget)).moved;
+    else if ((await moveFile(childSource, childTarget)) === "moved") moved += 1;
   }
   if (existsSync(from)) await rm(from, { recursive: true, force: true });
   return { moved, skipped: 0 };
@@ -56,13 +50,12 @@ async function moveTree(source, target) {
 async function moveEntry(source, target) {
   const from = absolute(source);
   if (!existsSync(from)) return { moved: 0, skipped: 1 };
-  const stat = (await import("node:fs/promises")).stat;
   if ((await stat(from)).isDirectory()) return moveTree(source, target);
   return { moved: (await moveFile(source, target)) === "moved" ? 1 : 0, skipped: 0 };
 }
 
 async function walk(directory) {
-  const entries = await (await import("node:fs/promises")).readdir(directory, { withFileTypes: true });
+  const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
     const path = join(directory, entry.name);
@@ -86,9 +79,6 @@ for (const [source, target] of moves) moved += (await moveEntry(source, target))
 for (const base of ["apps/demo/src", "packages/react/src"]) {
   const directory = absolute(base);
   if (!existsSync(directory)) continue;
-  for (const file of await walk(directory)) {
-    const next = rewriteImports(await readFile(file, "utf8"));
-    await writeFile(file, next);
-  }
+  for (const file of await walk(directory)) await writeFile(file, rewriteImports(await readFile(file, "utf8")));
 }
 console.log(`Moved ${moved} files. Safe to rerun: existing scaffold bridges are replaced; non-scaffold files are protected.`);
