@@ -12,7 +12,8 @@
     "typecheck": "npm exec --yes --package=typescript@5.8.3 -- tsc --noEmit -p tsconfig.json",
     "pack:check": "npm pack --dry-run",
     "format": "prettier . --write",
-    "reorg:physical": "node scripts/physical-reorg.mjs"
+    "reorg:physical": "node scripts/physical-reorg.mjs",
+    "benchmark:rig": "node performance/rig-graph-benchmark.mjs"
   },
   "dependencies": {
     "gsap": "^3.12.5",
