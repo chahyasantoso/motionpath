@@ -2,19 +2,19 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 
+const packagePath = (name, subpath = "") =>
+  fileURLToPath(new URL(`./packages/${name}/src/${subpath}`, import.meta.url));
+
+const resolveAliases = {
+  "@motionpath/core/": packagePath("core"),
+  "@motionpath/react/": packagePath("react", "hooks/"),
+};
+
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    alias: {
-      "@motionpath/core": fileURLToPath(new URL("./packages/core/src", import.meta.url)),
-      "@motionpath/react": fileURLToPath(new URL("./packages/react/src", import.meta.url)),
-    },
-  },
+  resolve: { alias: resolveAliases },
   test: {
     globals: true,
-    alias: {
-      "@motionpath/core": fileURLToPath(new URL("./packages/core/src", import.meta.url)),
-      "@motionpath/react": fileURLToPath(new URL("./packages/react/src", import.meta.url)),
-    },
+    alias: resolveAliases,
   },
 });
