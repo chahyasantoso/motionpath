@@ -75,6 +75,7 @@ export class Motion {
   #initialTracks = [];
   #masterTimeline;
   #staggerTransition;
+  #destroyed = false;
   constructor({ id, triggerDelegate, staggerTransition }) {
     this.id = id;
     this.#triggerDelegate = triggerDelegate;
@@ -82,14 +83,15 @@ export class Motion {
   }
   init() {
     if (this.#active) this.destroy();
+    this.#destroyed = false;
     this.#active = true;
     this.#masterTimeline = this.#triggerDelegate.build();
     this.#group = new TrackGroup(this.#masterTimeline, this.#staggerTransition);
     for (const { track, position } of this.#initialTracks)
       this.#group.mount(track, position);
-    // Timeline duration is derived from real child placement. `stagger` is seconds.
   }
   mount(track, position) {
+    if (this.#destroyed) throw new Error(`Motion "${this.id}" is destroyed.`);
     if (!this.#initialTracks.some((t) => t.track.id === track.id))
       this.#initialTracks.push({ track, position });
     if (this.#active) this.#group.mount(track, position);
@@ -99,6 +101,7 @@ export class Motion {
       (t) => t.track.id !== track.id,
     );
     if (this.#active) this.#group.unmount(track);
+    track.destroy?.();
   }
   getTrack(trackId) {
     if (this.#active) return this.#group.getTrack(trackId);
@@ -121,11 +124,14 @@ export class Motion {
     this.#triggerDelegate.onComplete(cb);
   }
   destroy() {
-    if (!this.#active) return;
+    if (this.#destroyed) return;
+    this.#destroyed = true;
     if (this.#group) {
       this.#group.destroy();
       this.#group = null;
     }
+    for (const { track } of this.#initialTracks) track.destroy?.();
+    this.#initialTracks = [];
     this.#triggerDelegate.destroy();
     this.#masterTimeline = null;
     this.#active = false;
