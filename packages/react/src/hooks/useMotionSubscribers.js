@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
-import { domRenderer, clearRendererTarget } from "../../../../packages/core/src/adapters/domRenderer.js";
-import { applyAnchor } from "../../../../packages/core/src/lib/helpers.js";
+import { domRenderer, clearRendererTarget } from "@motionpath/core/adapters/domRenderer.js";
+import { applyAnchor } from "@motionpath/core/lib/helpers.js";
 
 function sourcesSignature(sources) { return sources.map((s) => `${s.instance?.id ?? ""}:${s.track?.id ?? s.trackId ?? ""}`).join("|"); }
 function subscribeToSource(source, getTransformFn, getAnchor, onPatch) {

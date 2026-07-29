@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { engine } from "@motionpath/core/engines/Engine";
-import { domRenderer } from "../../renderers/domRenderer.js";
-import { gsapTickerClock } from "@motionpath/core/gsapTickerClock.js";
+import { domRenderer } from "@motionpath/core/adapters/domRenderer.js";
+import { gsapTickerClock } from "@motionpath/core/lib/gsapTickerClock.js";
 import { LANE_1_POINTS, LANE_2_POINTS } from "./towerDefenseMotions.js";
 
 const TOWER_RANGE = 180;

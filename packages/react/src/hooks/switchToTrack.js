@@ -1,5 +1,5 @@
 import { gsap } from "gsap";
-import { domRenderer } from "../renderers/domRenderer.js";
+import { domRenderer } from "@motionpath/core/adapters/domRenderer.js";
 import { mergePatches } from "@motionpath/core/mergePatches.js";
 
 /**

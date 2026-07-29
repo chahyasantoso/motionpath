@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getPointOnCubicPath } from "../pathMath.js";
+import { getPointOnCubicPath } from "../pathUtils.js";
 
 describe("pathMath utilities", () => {
   it("handles empty or null cubic path", () => {

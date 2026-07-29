@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { composeWorld } from "../fkMath.js";
+import { composeWorld } from "../../math/fkMath.js";
 
 describe("composeWorld", () => {
   it("translates in the parent frame when parent has no rotation", () => {
