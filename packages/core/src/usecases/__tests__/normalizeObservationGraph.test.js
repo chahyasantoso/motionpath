@@ -45,8 +45,8 @@ describe("observation graph normalization", () => {
     expect(graph.nodes.map((node) => node.id)).toEqual(["parent", "child"]);
     expect(graph.edges).toHaveLength(1);
     expect(graph.errors.map((error) => error.ruleId)).toEqual([
-      "track-observations-duplicate-edge",
       "track-observations-duplicate-node",
+      "track-observations-duplicate-edge",
     ]);
   });
 
