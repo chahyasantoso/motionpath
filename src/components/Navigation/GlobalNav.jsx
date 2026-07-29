@@ -43,6 +43,14 @@ export default function GlobalNav() {
             Burst
           </NavLink>
           <NavLink
+            to="/walker"
+            className={({ isActive }) =>
+              isActive ? "nav-link active" : "nav-link"
+            }
+          >
+            FK Walker
+          </NavLink>
+          <NavLink
             to="/moto"
             className={({ isActive }) =>
               isActive ? "nav-link active" : "nav-link"
@@ -123,6 +131,9 @@ export default function GlobalNav() {
           </NavLink>
           <NavLink to="/burst" className="drawer-link" onClick={closeMenu}>
             🍓 Strawberry Burst
+          </NavLink>
+          <NavLink to="/walker" className="drawer-link" onClick={closeMenu}>
+            🚶 FK Walk Cycle
           </NavLink>
           <NavLink to="/moto" className="drawer-link" onClick={closeMenu}>
             🏍️ Motorcycle Ride
