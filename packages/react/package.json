@@ -1,17 +1,20 @@
 {
   "name": "@motionpath/react",
-  "version": "0.0.0-v4.1",
+  "version": "0.0.0-v4.2",
   "private": true,
   "type": "module",
-  "types": "../../src/types/motionpath.d.ts",
+  "types": "./src/types/motionpath.d.ts",
   "exports": {
+    ".": "./src/index.js",
     "./useMotionProject": "./src/hooks/useMotionProject.js",
     "./useMotionInstance": "./src/hooks/useMotionInstance.js",
     "./useMotionSubscriber": "./src/hooks/useMotionSubscriber.js",
     "./useMotionSubscribers": "./src/hooks/useMotionSubscribers.js",
     "./useScrollMotion": "./src/hooks/useScrollMotion.js",
     "./useManualMotion": "./src/hooks/useManualMotion.js",
-    "./useTimeMotion": "./src/hooks/useTimeMotion.js"
+    "./useTimeMotion": "./src/hooks/useTimeMotion.js",
+    "./useMotionTimelinePlayback": "./src/hooks/useMotionTimelinePlayback.js",
+    "./useSmoothScroll": "./src/hooks/useSmoothScroll.js"
   },
-  "dependencies": { "@motionpath/core": "0.0.0-v4.1", "react": ">=19" }
+  "dependencies": { "@motionpath/core": "0.0.0-v4.2", "react": ">=19" }
 }
