@@ -25,6 +25,10 @@ async function moveFile(source, target) {
   if (!existsSync(from)) return "skipped";
   await mkdir(dirname(to), { recursive: true });
   if (existsSync(to)) {
+    if ((await readFile(from, "utf8")) === (await readFile(to, "utf8"))) {
+      await rm(from);
+      return "deduplicated";
+    }
     if (!(await isScaffoldBridge(to))) throw new Error(`Refusing to overwrite non-scaffold file ${target}`);
     await rm(to);
   }
@@ -81,4 +85,4 @@ for (const base of ["apps/demo/src", "packages/react/src"]) {
   if (!existsSync(directory)) continue;
   for (const file of await walk(directory)) await writeFile(file, rewriteImports(await readFile(file, "utf8")));
 }
-console.log(`Moved ${moved} files. Safe to rerun: existing scaffold bridges are replaced; non-scaffold files are protected.`);
+console.log(`Moved ${moved} files. Safe to rerun: identical files are deduplicated, scaffold bridges are replaced, and non-scaffold files are protected.`);
