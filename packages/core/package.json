@@ -5,20 +5,12 @@
   "type": "module",
   "types": "./src/types/motionpath.d.ts",
   "exports": {
-    ".": {
-      "types": "./src/types/motionpath.d.ts",
-      "import": "./src/index.js",
-      "default": "./src/index.js"
-    },
-    "./contract": {
-      "types": "./src/types/runtimeContracts.ts",
-      "import": "./src/contract/v4.js",
-      "default": "./src/contract/v4.js"
-    },
+    ".": { "types": "./src/types/motionpath.d.ts", "import": "./src/index.js", "default": "./src/index.js" },
+    "./contract": { "types": "./src/types/runtimeContracts.ts", "import": "./src/contract/v4.js", "default": "./src/contract/v4.js" },
     "./adapters/gsap": "./src/adapters/gsapPlatform.js",
-    "./adapters/dom": "./src/adapters/domRenderer.js"
+    "./adapters/dom": "./src/adapters/domRenderer.js",
+    "./engines/Engine": "./src/engines/Engine.js",
+    "./validators": "./src/validators/index.js"
   },
-  "dependencies": {
-    "gsap": "^3.12.5"
-  }
+  "dependencies": { "gsap": "^3.12.5" }
 }
