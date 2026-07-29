@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 const coreRoots = ["domain", "engines", "errors", "lib", "usecases", "validators"];
 const forbidden = [
   /from\s+["'](?:react|react-dom|react-router-dom)(?:["']|\/)/,
-  /from\s+["'][^"']*\.jsx?["']/,
+  /from\s+["'][^"']+\.jsx["']/,
   /document\./,
   /window\./,
   /\bHTMLElement\b/,
