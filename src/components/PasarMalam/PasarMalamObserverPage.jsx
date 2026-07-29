@@ -1,312 +1,16 @@
 import { gsap } from "gsap";
 import { useCallback, useRef } from "react";
 import useMotionProject from "../../hooks/useMotionProject";
-import useMotionInstance from "../../hooks/useMotionInstance";
 import useMotionSubscriber from "../../hooks/useMotionSubscriber";
-import useMotionTrigger from "../../hooks/useMotionTrigger";
+import useScrollMotion from "../../hooks/useScrollMotion";
 import useSmoothScroll from "../../hooks/useSmoothScroll";
+import {
+  IMAGE_SEQUENCE_FRAMES,
+  lanternBounceObserverScene,
+  pmObserverProject,
+  pmoStorytellingScene,
+} from "./pasarMalamObserverMotions.js";
 import "./PasarMalamPage.css";
-
-// Generate paths for 192 static WebP frames
-const IMAGE_SEQUENCE_FRAMES = Array.from({ length: 192 }, (_, i) => {
-  return `/sequence/frame_${String(i + 1).padStart(4, "0")}.webp`;
-});
-
-// ─── Scene Data Config ──────────────────────────────────────────
-const pasarMalamScene = {
-  motionId: "pasar-malam-storytelling",
-  driver: {
-    type: "timeline",
-    sectionId: "pasar-malam-storytelling",
-    trigger: {
-      type: "scroll",
-      scrub: 0.5,
-      pin: "pm-stage",
-      start: "top top",
-      end: "bottom bottom",
-    },
-  },
-  tracks: [
-    {
-      id: "pasar-malam-bg",
-      keyframes: {
-        imageSequence: {
-          frames: IMAGE_SEQUENCE_FRAMES,
-          stops: [
-            { p: 0, v: 0, ease: "none" },
-            { p: 1, v: 191 },
-          ],
-        },
-      },
-    },
-    {
-      id: "hero-title",
-      keyframes: {
-        opacity: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 0.15, v: 1, ease: "power2.out" },
-            { p: 0.8, v: 1 },
-            { p: 1, v: 0, ease: "power2.in" },
-          ],
-        },
-        y: {
-          stops: [
-            { p: 0, v: 120 },
-            { p: 0.25, v: 0, ease: "power2.out" },
-            { p: 0.75, v: 0 },
-            { p: 1, v: -120, ease: "power2.in" },
-          ],
-        },
-        scaleX: {
-          stops: [
-            { p: 0, v: 1.25 },
-            { p: 0.25, v: 1, ease: "power2.out" },
-            { p: 0.75, v: 1 },
-            { p: 1, v: 0.8, ease: "power2.in" },
-          ],
-        },
-        scaleY: {
-          stops: [
-            { p: 0, v: 1.25 },
-            { p: 0.25, v: 1, ease: "power2.out" },
-            { p: 0.75, v: 1 },
-            { p: 1, v: 0.8, ease: "power2.in" },
-          ],
-        },
-      },
-    },
-    {
-      id: "card-left",
-      keyframes: {
-        x: {
-          stops: [
-            { p: 0, v: "-100vw" },
-            { p: 0.35, v: 0, ease: "back.out(1.2)" },
-            { p: 0.75, v: 0 },
-            { p: 1, v: "-100vw", ease: "power2.in" },
-          ],
-        },
-        rotation: {
-          stops: [
-            { p: 0, v: -8 },
-            { p: 0.35, v: 0, ease: "back.out(1.2)" },
-            { p: 0.75, v: 0 },
-            { p: 1, v: -8, ease: "power2.in" },
-          ],
-        },
-        opacity: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 0.3, v: 1, ease: "power2.out" },
-            { p: 0.75, v: 1 },
-            { p: 1, v: 0, ease: "power2.in" },
-          ],
-        },
-      },
-    },
-    {
-      id: "card-right",
-      keyframes: {
-        x: {
-          stops: [
-            { p: 0, v: "100vw" },
-            { p: 0.42, v: 0, ease: "back.out(1.2)" },
-            { p: 0.78, v: 0 },
-            { p: 1, v: "100vw", ease: "power2.in" },
-          ],
-        },
-        rotation: {
-          stops: [
-            { p: 0, v: 8 },
-            { p: 0.42, v: 0, ease: "back.out(1.2)" },
-            { p: 0.78, v: 0 },
-            { p: 1, v: 8, ease: "power2.in" },
-          ],
-        },
-        opacity: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 0.37, v: 1, ease: "power2.out" },
-            { p: 0.78, v: 1 },
-            { p: 1, v: 0, ease: "power2.in" },
-          ],
-        },
-      },
-    },
-    {
-      id: "stats-card",
-      keyframes: {
-        y: {
-          stops: [
-            { p: 0, v: 160 },
-            { p: 0.3, v: 0, ease: "power2.out" },
-            { p: 0.8, v: 0 },
-            { p: 1, v: 160, ease: "power2.in" },
-          ],
-        },
-        opacity: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 0.25, v: 1, ease: "power2.out" },
-            { p: 0.8, v: 1 },
-            { p: 1, v: 0, ease: "power2.in" },
-          ],
-        },
-        "--neon-opacity": {
-          stops: [
-            { p: 0, v: 1 },
-            { p: 0.28, v: 1 },
-            { p: 0.29, v: 0.1, ease: "none" },
-            { p: 0.31, v: 1, ease: "none" },
-            { p: 0.48, v: 1 },
-            { p: 0.49, v: 0.3, ease: "none" },
-            { p: 0.51, v: 1, ease: "none" },
-            { p: 0.77, v: 1 },
-            { p: 0.79, v: 0.15, ease: "none" },
-            { p: 0.81, v: 1, ease: "none" },
-          ],
-        },
-      },
-    },
-  ],
-};
-
-const lanternScene = {
-  motionId: "lantern-scene",
-  driver: {
-    type: "timeline",
-    sectionId: "lantern-scene",
-    trigger: {
-      type: "scroll",
-      scrub: 0.5,
-      trigger: "pasar-malam-storytelling", // same section as the main scene
-      start: "top top",
-      end: "bottom bottom",
-    },
-  },
-  tracks: [
-    {
-      id: "lantern-1-wrap",
-      keyframes: {
-        y: {
-          stops: [
-            { p: 0, v: -120 },
-            { p: 0.35, v: 0, ease: "back.out(1.8)" },
-            { p: 1, v: 0 },
-          ],
-        },
-        opacity: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 0.25, v: 1, ease: "power2.out" },
-            { p: 1, v: 1 },
-          ],
-        },
-      },
-    },
-    {
-      id: "lantern-2-wrap",
-      keyframes: {
-        y: {
-          stops: [
-            { p: 0, v: -150 },
-            { p: 0.42, v: 0, ease: "back.out(1.8)" },
-            { p: 1, v: 0 },
-          ],
-        },
-        opacity: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 0.3, v: 1, ease: "power2.out" },
-            { p: 1, v: 1 },
-          ],
-        },
-      },
-    },
-    {
-      id: "lantern-3-wrap",
-      keyframes: {
-        y: {
-          stops: [
-            { p: 0, v: -100 },
-            { p: 0.38, v: 0, ease: "back.out(1.8)" },
-            { p: 1, v: 0 },
-          ],
-        },
-        opacity: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 0.28, v: 1, ease: "power2.out" },
-            { p: 1, v: 1 },
-          ],
-        },
-      },
-    },
-  ],
-};
-
-// Pure scrollytelling observer. No timelineId/grouping is needed.
-// ScrollTrigger naturally handles toggleActions to play/pause the infinite bounce loop.
-const lanternBounceObserverScene = {
-  motionId: "lantern-bounce-observer",
-  driver: {
-    type: "timeline",
-    sectionId: "lantern-bounce-observer",
-    trigger: {
-      type: "scroll",
-      scrub: false,
-      trigger: "pasar-malam-storytelling",
-      start: "50% top", // triggers past 50% scroll progress (50% from top of hero section)
-      toggleActions: "play pause resume pause",
-      duration: 1.2,
-      repeat: -1,
-      yoyo: true,
-    },
-  },
-  tracks: [
-    {
-      id: "lantern-1",
-      keyframes: {
-        y: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 1, v: -18, ease: "power1.inOut" },
-          ],
-        },
-      },
-    },
-    {
-      id: "lantern-2",
-      keyframes: {
-        y: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 1, v: -12, ease: "power1.inOut" },
-          ],
-        },
-      },
-    },
-    {
-      id: "lantern-3",
-      keyframes: {
-        y: {
-          stops: [
-            { p: 0, v: 0 },
-            { p: 1, v: -20, ease: "power1.inOut" },
-          ],
-        },
-      },
-    },
-  ],
-};
-
-const pmObserverProject = {
-  schemaVersion: 2,
-  projectId: "pasar-malam-observer-page",
-  perspective: 800,
-  motions: [pasarMalamScene, lanternScene, lanternBounceObserverScene],
-};
 
 // ─── Sub-Components ─────────────────────────────────────────────
 
@@ -327,10 +31,11 @@ function Lantern({
   const wrapRef = useRef(null);
   const innerRef = useRef(null);
 
-  // Outer wrapper: entry animation
+  // Outer wrapper: scrubbed entry animation
   useMotionSubscriber(wrapInstance, wrapId, wrapRef);
 
-  // Inner element: observer-driven bounce
+  // Inner element: observer-driven bounce. No progress gate, no React state —
+  // ScrollTrigger's toggleActions plays and parks the loop on its own.
   useMotionSubscriber(bounceInstance, innerId, innerRef);
 
   return (
@@ -441,20 +146,19 @@ function StatsCard({ instance }) {
 // ─── Main Page Export ───────────────────────────────────────────
 
 export default function PasarMalamObserverPage() {
-  const storytellingRef = useRef(null);
+  // Both motions observe the same hero section, so the page owns the refs.
+  const heroRef = useRef(null);
   const stageRef = useRef(null);
 
-  useMotionTrigger("pasar-malam-storytelling", storytellingRef);
-  useMotionTrigger("pm-stage", stageRef);
-
-  // Pure observer-driven approach. No local React state and no hook wiring required.
   const isLoaded = useMotionProject(pmObserverProject);
-  const storytellingInstance = useMotionInstance(
-    isLoaded ? "pasar-malam-storytelling" : null,
+
+  const { instance: storytellingInstance } = useScrollMotion(
+    isLoaded ? pmoStorytellingScene : null,
+    { trigger: heroRef, pin: stageRef },
   );
-  const lanternInstance = useMotionInstance(isLoaded ? "lantern-scene" : null);
-  const bounceInstance = useMotionInstance(
-    isLoaded ? "lantern-bounce-observer" : null,
+  const { instance: bounceInstance } = useScrollMotion(
+    isLoaded ? lanternBounceObserverScene : null,
+    { trigger: heroRef },
   );
 
   useSmoothScroll();
@@ -462,7 +166,7 @@ export default function PasarMalamObserverPage() {
   return (
     <div className="pm-container">
       {/* Scroll storytelling stage */}
-      <section ref={storytellingRef} className="pm-hero-section">
+      <section ref={heroRef} className="pm-hero-section">
         <div ref={stageRef} className="pm-stage">
           <BackgroundSequence instance={storytellingInstance} />
           <div className="pm-overlay" />
@@ -470,7 +174,7 @@ export default function PasarMalamObserverPage() {
           {/* Ambient Floating Lanterns */}
           <div className="pm-lanterns-glow">
             <Lantern
-              wrapInstance={lanternInstance}
+              wrapInstance={storytellingInstance}
               bounceInstance={bounceInstance}
               wrapId="lantern-1-wrap"
               innerId="lantern-1"
@@ -478,7 +182,7 @@ export default function PasarMalamObserverPage() {
               className="pm-lantern-1"
             />
             <Lantern
-              wrapInstance={lanternInstance}
+              wrapInstance={storytellingInstance}
               bounceInstance={bounceInstance}
               wrapId="lantern-2-wrap"
               innerId="lantern-2"
@@ -486,7 +190,7 @@ export default function PasarMalamObserverPage() {
               className="pm-lantern-2"
             />
             <Lantern
-              wrapInstance={lanternInstance}
+              wrapInstance={storytellingInstance}
               bounceInstance={bounceInstance}
               wrapId="lantern-3-wrap"
               innerId="lantern-3"
@@ -497,12 +201,9 @@ export default function PasarMalamObserverPage() {
 
           <div className="pm-content-wrapper">
             <HeroTitle instance={storytellingInstance} />
-
-            <div className="pm-cards-grid">
-              <LeftCard instance={storytellingInstance} />
-              <RightCard instance={storytellingInstance} />
-              <StatsCard instance={storytellingInstance} />
-            </div>
+            <LeftCard instance={storytellingInstance} />
+            <RightCard instance={storytellingInstance} />
+            <StatsCard instance={storytellingInstance} />
           </div>
         </div>
 
@@ -516,9 +217,9 @@ export default function PasarMalamObserverPage() {
 
       {/* Spacer Section for scrolling past */}
       <section className="pm-scroll-indicator-section">
-        <div className="pm-indicator-content">
+        <div className="pm-footer-content">
           <h2>Scroll Down to Explore More</h2>
-          <div className="pm-scroll-line" />
+          <div className="pm-scroll-badge">Observer driven</div>
         </div>
       </section>
     </div>

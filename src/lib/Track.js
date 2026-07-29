@@ -24,6 +24,7 @@ export class Track {
   #staggerOffset = 0;
   #layoutDelegate;
   #observed = new Map();
+  #groupHost = null;
   constructor({
     id,
     interpolationTimeline,
@@ -176,11 +177,32 @@ export class Track {
     }
     this.#eventBus.emit("child:removing", { id: child.id, parentId: this.#id });
   }
+  _attachGroupHost(groupHost) {
+    if (this.#groupHost) throw new Error(`Track "${this.#id}" is already a group host.`);
+    this.#groupHost = groupHost;
+  }
+  play() {
+    this.#groupHost?.timeline.play();
+  }
+  pause() {
+    this.#groupHost?.timeline.pause();
+  }
+  seek(progress) {
+    if (!this.#groupHost) return this.progress(progress);
+    if (progress === undefined) return this.#groupHost.timeline.progress();
+    this.#groupHost.timeline.progress(clamp01(progress));
+  }
+  reverse() {
+    this.#groupHost?.timeline.reverse();
+  }
   destroy() {
     this.#subscribers.clear();
     this.#observed.clear();
-    // Teardown must never throw at the caller, but a failure here is real and
-    // used to vanish into `catch {}`. Report it instead of hiding it.
+    if (this.#groupHost) {
+      this.#groupHost.group.destroy();
+      this.#groupHost.timeline.kill();
+      this.#groupHost = null;
+    }
     try {
       this.#interpolationTimeline?.kill();
     } catch (e) {

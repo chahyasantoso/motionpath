@@ -7,79 +7,19 @@ import useScrollMotion from "../../hooks/useScrollMotion";
 import useSmoothScroll from "../../hooks/useSmoothScroll";
 import { createTrack } from "../../lib/createTrack.js";
 import { buildMotionPath } from "../../utils/pathUtils";
+import { project3DTo2D, projectPathNodes3DTo2D } from "../../utils/projection3d";
 import {
-  project3DTo2D,
-  projectPathNodes3DTo2D,
-  shapeGenerators,
-} from "../../utils/projection3d";
+  HELIX_CONFIG,
+  demoProject,
+  dynamicCarouselScene,
+  dynamicHelixScene,
+  scrollScene,
+} from "./demoMotions.js";
 import "./DemoPage.css";
 
 // Prevent editor auto-cleanup from removing unused React import
 const _dummyReactRef = React;
 
-// ─── Scene Data ────────────────────────────────────────────────
-const scrollScene = {
-  id: "hero-scrollytelling",
-  trigger: {
-    type: "scroll",
-    pin: "pin",
-    scrub: 1,
-    start: "top top",
-    end: "bottom bottom",
-  },
-  tracks: [
-    {
-      id: "rocket-track",
-      keyframes: {
-        path: {
-          points: [
-            { x: 50, y: 300 },
-            { x: 400, y: 100, ctrlX: 200, ctrlY: -50 },
-            { x: 900, y: 350, ctrlX: 700, ctrlY: 500 },
-          ],
-          stops: [
-            { p: 0, v: 0 },
-            { p: 1, v: 1 },
-          ],
-          autoRotate: true,
-        },
-      },
-    },
-    {
-      id: "cloud",
-      keyframes: {
-        path: {
-          points: [
-            { x: -100, y: 80 },
-            { x: 1100, y: 80 },
-          ],
-          stops: [
-            { p: 0, v: 0 },
-            { p: 1, v: 1 },
-          ],
-        },
-      },
-    },
-  ],
-};
-
-// ─── 3D Helix Path Generator Configs ───────────────────────────
-const HELIX_CONFIG = {
-  cx: 640,
-  cy: 100,
-  radius: 220,
-  height: 520,
-  turns: 3.0,
-  tiltDeg: 0,
-};
-
-const helixPathNodes = shapeGenerators.helix({
-  radius: HELIX_CONFIG.radius,
-  height: HELIX_CONFIG.height,
-  turns: HELIX_CONFIG.turns,
-});
-
-const helixPathPoints = helixPathNodes;
 const MOCK_CARDS = [
   {
     id: 1,
@@ -130,81 +70,6 @@ const MOCK_CARDS = [
     desc: "Scaling up to unlimited items on custom paths without duplicating nodes.",
   },
 ];
-
-const dynamicCarouselScene = {
-  id: "carousel-storytelling",
-  trigger: {
-    type: "scroll",
-    pin: "pin",
-    scrub: 1.2,
-    start: "top top",
-    end: "bottom bottom",
-  },
-  stagger: 0.1,
-  staggerTransition: { duration: 0.4, ease: "power3.out" },
-  tracks: [
-    {
-      id: "carousel-card-track",
-      keyframes: {
-        path: {
-          points: [
-            { x: -350, y: 400 },
-            { x: 300, y: 150, ctrlX: -20, ctrlY: 100 },
-            { x: 950, y: 500, ctrlX: 620, ctrlY: 200 },
-            { x: 1600, y: 200, ctrlX: 1280, ctrlY: 800 },
-            { x: 2200, y: 400, ctrlX: 1920, ctrlY: -400 },
-          ],
-          stops: [
-            { p: 0, v: 0 },
-            { p: 1, v: 1 },
-          ],
-          autoRotate: true,
-        },
-        opacity: {
-          stops: [
-            { p: 0.0, v: 0 },
-            { p: 0.15, v: 1 },
-            { p: 0.85, v: 1 },
-            { p: 1.0, v: 0 },
-          ],
-        },
-      },
-    },
-  ],
-};
-
-const dynamicHelixScene = {
-  id: "helix-storytelling",
-  trigger: {
-    type: "scroll",
-    pin: "pin",
-    scrub: 1.2,
-    start: "top top",
-    end: "bottom bottom",
-  },
-  stagger: 0.16,
-  tracks: [
-    {
-      id: "helix-card-track",
-      keyframes: {
-        path: {
-          points: helixPathPoints,
-          stops: [
-            { p: 0, v: 0 },
-            { p: 1, v: 1 },
-          ],
-        },
-      },
-    },
-  ],
-};
-
-const project = {
-  schemaVersion: 2,
-  projectId: "demo-page",
-  perspective: 1200,
-  motions: [scrollScene, dynamicCarouselScene, dynamicHelixScene],
-};
 
 // ─── Animated Elements ─────────────────────────────────────────
 
@@ -672,7 +537,7 @@ function HelixDemo({ isLoaded }) {
 }
 
 export default function DemoPage() {
-  const isLoaded = useMotionProject(project);
+  const isLoaded = useMotionProject(demoProject);
   useSmoothScroll();
 
   return (

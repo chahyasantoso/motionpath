@@ -1,232 +1,10 @@
 import React, { useCallback, useRef } from "react";
 import useMotionProject from "../../hooks/useMotionProject";
-import useMotionInstance from "../../hooks/useMotionInstance";
 import useMotionSubscriber from "../../hooks/useMotionSubscriber";
+import useTimeMotion from "../../hooks/useTimeMotion";
 import { buildMotionPath } from "../../utils/pathUtils";
+import { motorcycleProject, roadNodes, shadowNodes } from "./motorcycleMotions";
 import "./MotorcyclePage.css";
-
-// ─── Path Data ────────────────────────────────────────────────────
-// S-curve road: viewport-relative coords (0..1280 x 0..600)
-const roadNodes = [
-  { x: -80, y: 500 },
-  { x: 280, y: 360, ctrlX: 60, ctrlY: 560 },
-  { x: 640, y: 240, ctrlX: 480, ctrlY: 180 },
-  { x: 960, y: 140, ctrlX: 800, ctrlY: 310 },
-  { x: 1380, y: 70, ctrlX: 1120, ctrlY: 30 },
-];
-
-// Shadow is offset 22px below the main path
-const shadowNodes = roadNodes.map((n) => ({
-  ...n,
-  y: n.y + 22,
-  ...(n.ctrlY !== undefined ? { ctrlY: n.ctrlY + 22 } : {}),
-}));
-
-// Cloud paths (independent, slower visual layers)
-const cloudANodes = [
-  { x: -240, y: 90 },
-  { x: 1400, y: 80 },
-];
-
-const cloudBNodes = [
-  { x: -240, y: 140 },
-  { x: 1400, y: 120 },
-];
-
-// Speed streak paths (horizontal, bottom half)
-const streakANodes = [
-  { x: -400, y: 510 },
-  { x: 1400, y: 510 },
-];
-
-const streakBNodes = [
-  { x: -400, y: 470 },
-  { x: 1400, y: 470 },
-];
-
-// ─── Project Schema ───────────────────────────────────────────────
-const RIDE_DURATION = 5; // seconds end-to-end
-
-const project = {
-  schemaVersion: 2,
-  projectId: "motorcycle-page",
-  motions: [
-    // Main bike along the S-curve
-    {
-      motionId: "moto-bike-scene",
-      driver: {
-        type: "timeline",
-        trigger: {
-          type: "time",
-          duration: RIDE_DURATION,
-          repeat: -1,
-          yoyo: false,
-        },
-      },
-      tracks: [
-        {
-          id: "moto-bike",
-          keyframes: {
-            path: {
-              points: roadNodes,
-              stops: [
-                { p: 0, v: 0 },
-                { p: 1, v: 1 },
-              ],
-              autoRotate: true,
-            },
-            opacity: {
-              stops: [
-                { p: 0.0, v: 0 },
-                { p: 0.04, v: 1 },
-                { p: 0.92, v: 1 },
-                { p: 1.0, v: 0 },
-              ],
-            },
-          },
-        },
-      ],
-    },
-    // Shadow — same path, offset, slight lag via stagger
-    {
-      motionId: "moto-shadow-scene",
-      driver: {
-        type: "timeline",
-        trigger: {
-          type: "time",
-          duration: RIDE_DURATION,
-          repeat: -1,
-          yoyo: false,
-        },
-      },
-      tracks: [
-        {
-          id: "moto-shadow",
-          keyframes: {
-            path: {
-              points: shadowNodes,
-              stops: [
-                { p: 0, v: 0 },
-                { p: 1, v: 1 },
-              ],
-              autoRotate: true,
-            },
-            opacity: {
-              stops: [
-                { p: 0.0, v: 0 },
-                { p: 0.05, v: 0.35 },
-                { p: 0.92, v: 0.35 },
-                { p: 1.0, v: 0 },
-              ],
-            },
-          },
-        },
-      ],
-    },
-    // Clouds
-    {
-      motionId: "moto-clouds-scene",
-      driver: {
-        type: "timeline",
-        trigger: {
-          type: "time",
-          duration: RIDE_DURATION * 1.8,
-          repeat: -1,
-          yoyo: false,
-        },
-      },
-      tracks: [
-        {
-          id: "moto-cloud-a",
-          keyframes: {
-            path: {
-              points: cloudANodes,
-              stops: [
-                { p: 0, v: 0 },
-                { p: 1, v: 1 },
-              ],
-            },
-          },
-        },
-        {
-          id: "moto-cloud-b",
-          keyframes: {
-            path: {
-              points: cloudBNodes,
-              stops: [
-                { p: 0, v: 0.22 },
-                { p: 1, v: 1 },
-              ],
-            },
-            opacity: {
-              stops: [
-                { p: 0.0, v: 0 },
-                { p: 0.24, v: 0.55 },
-                { p: 0.85, v: 0.55 },
-                { p: 1.0, v: 0 },
-              ],
-            },
-          },
-        },
-      ],
-    },
-    // Speed streaks
-    {
-      motionId: "moto-streaks-scene",
-      driver: {
-        type: "timeline",
-        trigger: {
-          type: "time",
-          duration: RIDE_DURATION * 0.9,
-          repeat: -1,
-          yoyo: false,
-        },
-      },
-      tracks: [
-        {
-          id: "moto-streak-a",
-          keyframes: {
-            path: {
-              points: streakANodes,
-              stops: [
-                { p: 0, v: 0 },
-                { p: 1, v: 1 },
-              ],
-            },
-            opacity: {
-              stops: [
-                { p: 0.0, v: 0 },
-                { p: 0.05, v: 0.55 },
-                { p: 0.88, v: 0.55 },
-                { p: 1.0, v: 0 },
-              ],
-            },
-          },
-        },
-        {
-          id: "moto-streak-b",
-          keyframes: {
-            path: {
-              points: streakBNodes,
-              stops: [
-                { p: 0, v: 0 },
-                { p: 1, v: 1 },
-              ],
-            },
-            opacity: {
-              stops: [
-                { p: 0.0, v: 0 },
-                { p: 0.08, v: 0.35 },
-                { p: 0.88, v: 0.35 },
-                { p: 1.0, v: 0 },
-              ],
-            },
-          },
-        },
-      ],
-    },
-  ],
-};
 
 // ─── Subscriber Components ─────────────────────────────────────────
 
@@ -253,7 +31,16 @@ function BikeShadow({ instance }) {
     const composed = composeFn(rawData);
     const t = rawData.pathProgress ?? 0;
     const scale = 0.5 + t * 0.4;
-    return { ...composed, scale, scaleY: 0.28, skewX: -18, blur: 2 };
+    // `blur` is not a CSS property GSAP understands on its own; the filter
+    // plugin only owns that key when `blur` is an authored keyframe. A
+    // subscriber adding it ad hoc has to emit real CSS.
+    return {
+      ...composed,
+      scale,
+      scaleY: 0.28,
+      skewX: -18,
+      filter: "blur(2px)",
+    };
   }, []);
   useMotionSubscriber(instance, "moto-shadow", ref, transform);
   return (
@@ -263,10 +50,10 @@ function BikeShadow({ instance }) {
   );
 }
 
-function MotoCloud({ instance, elementId, label }) {
+function MotoCloud({ instance, trackId, label }) {
   const ref = useRef(null);
   const transform = useCallback((rawData, composeFn) => composeFn(rawData), []);
-  useMotionSubscriber(instance, elementId, ref, transform);
+  useMotionSubscriber(instance, trackId, ref, transform);
   return (
     <div ref={ref} className="moto-element moto-cloud">
       {label}
@@ -274,26 +61,28 @@ function MotoCloud({ instance, elementId, label }) {
   );
 }
 
-function Streak({ instance, elementId, className }) {
+function Streak({ instance, trackId, className }) {
   const ref = useRef(null);
   const transform = useCallback((rawData, composeFn) => composeFn(rawData), []);
-  useMotionSubscriber(instance, elementId, ref, transform);
+  useMotionSubscriber(instance, trackId, ref, transform);
   return <div ref={ref} className={`moto-element moto-streak ${className}`} />;
 }
 
 // ─── Page ──────────────────────────────────────────────────────────
 
 export default function MotorcyclePage() {
-  const isLoaded = useMotionProject(project);
+  const isLoaded = useMotionProject(motorcycleProject);
 
-  const bikeInstance = useMotionInstance(isLoaded ? "moto-bike-scene" : null);
-  const shadowInstance = useMotionInstance(
+  const { instance: bikeInstance } = useTimeMotion(
+    isLoaded ? "moto-bike-scene" : null,
+  );
+  const { instance: shadowInstance } = useTimeMotion(
     isLoaded ? "moto-shadow-scene" : null,
   );
-  const cloudsInstance = useMotionInstance(
+  const { instance: cloudsInstance } = useTimeMotion(
     isLoaded ? "moto-clouds-scene" : null,
   );
-  const streaksInstance = useMotionInstance(
+  const { instance: streaksInstance } = useTimeMotion(
     isLoaded ? "moto-streaks-scene" : null,
   );
 
@@ -334,24 +123,16 @@ export default function MotorcyclePage() {
         {/* Animated elements */}
         <Streak
           instance={streaksInstance}
-          elementId="moto-streak-a"
+          trackId="moto-streak-a"
           className="streak-a"
         />
         <Streak
           instance={streaksInstance}
-          elementId="moto-streak-b"
+          trackId="moto-streak-b"
           className="streak-b"
         />
-        <MotoCloud
-          instance={cloudsInstance}
-          elementId="moto-cloud-a"
-          label="☁️"
-        />
-        <MotoCloud
-          instance={cloudsInstance}
-          elementId="moto-cloud-b"
-          label="☁️"
-        />
+        <MotoCloud instance={cloudsInstance} trackId="moto-cloud-a" label="☁️" />
+        <MotoCloud instance={cloudsInstance} trackId="moto-cloud-b" label="☁️" />
         <BikeShadow instance={shadowInstance} />
         <Bike instance={bikeInstance} />
 
@@ -372,7 +153,7 @@ export default function MotorcyclePage() {
       </div>
 
       <footer className="moto-footer">
-        Built with <code>useMotionProject</code> +{" "}
+        Built with <code>useMotionProject</code> + <code>useTimeMotion</code> +{" "}
         <code>useMotionSubscriber</code>
       </footer>
     </div>
