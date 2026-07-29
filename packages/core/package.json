@@ -3,13 +3,20 @@
   "version": "0.0.0-v4.1",
   "private": true,
   "type": "module",
-  "types": "../../src/types/motionpath.d.ts",
+  "types": "./src/types/motionpath.d.ts",
   "exports": {
     ".": {
-      "types": "../../src/types/motionpath.d.ts",
-      "default": "../../src/engines/Engine.js"
+      "types": "./src/types/motionpath.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
     },
-    "./contract": "../../src/types/runtimeContracts.ts"
+    "./contract": {
+      "types": "./src/types/runtimeContracts.ts",
+      "import": "./src/contract/v4.js",
+      "default": "./src/contract/v4.js"
+    },
+    "./adapters/gsap": "./src/adapters/gsapPlatform.js",
+    "./adapters/dom": "./src/adapters/domRenderer.js"
   },
   "dependencies": {
     "gsap": "^3.12.5"
