@@ -1,13 +1,13 @@
 /**
  * Functional plugin factory.
  *
- * `priority` controls deterministic composition order. `outputs` declares
- * render keys emitted by compose(), while `internalKeys` identifies proxy
- * state that must never reach a renderer. `prepare` is an optional async
- * preflight hook run by parseV4Project before the project is returned.
+ * `keys` are authored keyframe properties contributed by the plugin.
+ * `inputs` are composed values consumed from observations or other runtime
+ * composition sources. They are not authored animation properties.
  */
 export function createAnimationPlugin({
   keys = [],
+  inputs = [],
   lazy = false,
   claimsKey,
   claimsWildcard = false,
@@ -22,6 +22,7 @@ export function createAnimationPlugin({
 } = {}) {
   return {
     keys,
+    inputs,
     lazy,
     claimsWildcard,
     stage,

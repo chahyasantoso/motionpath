@@ -4,6 +4,7 @@ import { toPercentKey } from "../../usecases/toPercentKey.js";
 
 export const fkPlugin = createAnimationPlugin({
   keys: ["boneLength"],
+  inputs: ["parentWorld"],
   stage: "transform",
   priority: 50,
   outputs: {
@@ -11,16 +12,16 @@ export const fkPlugin = createAnimationPlugin({
     y: { merge: "replace" },
     rotation: { merge: "replace" },
   },
-  claimsKey(k) {
-    return k === "boneLength" || k === "parentWorld";
-  },
+  // claimsKey describes authored properties only. `parentWorld` is a declared
+  // runtime input, not a second authored key pretending to be keyframe data.
+  claimsKey: (key) => key === "boneLength",
   contribute(propKey, stops) {
     if (propKey !== "boneLength") return { percentPatch: {}, tweenVars: {} };
     const percentPatch = {};
-    stops.forEach((s) => {
-      const pctKey = toPercentKey(s.p);
-      percentPatch[pctKey] = { boneLength: s.v };
-      if (s.ease) percentPatch[pctKey].ease = s.ease;
+    stops.forEach((stop) => {
+      const pctKey = toPercentKey(stop.p);
+      percentPatch[pctKey] = { boneLength: stop.v };
+      if (stop.ease) percentPatch[pctKey].ease = stop.ease;
     });
     return { percentPatch, tweenVars: {} };
   },
