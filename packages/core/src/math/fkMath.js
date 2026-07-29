@@ -1,0 +1,2 @@
+/** 2D affine world-transform accumulation for forward kinematics. */
+export function composeWorld(parentWorld, local) { const rad = ((parentWorld.rotation ?? 0) * Math.PI) / 180; const cos = Math.cos(rad); const sin = Math.sin(rad); return { x: (parentWorld.x ?? 0) + ((local.x ?? 0) * cos - (local.y ?? 0) * sin), y: (parentWorld.y ?? 0) + ((local.x ?? 0) * sin + (local.y ?? 0) * cos), rotation: (parentWorld.rotation ?? 0) + (local.rotation ?? 0) }; }
