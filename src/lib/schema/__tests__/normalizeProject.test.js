@@ -34,18 +34,34 @@ describe("normalizeProject", () => {
     expect(authored.motions[0].tracks[0].duration).toBeUndefined();
   });
 
-  it("does not mutate authored keyframe overrides", () => {
+  it("does not mutate authored keyframe overrides while merging templates", () => {
     const input = {
       ...authored,
       motions: [
         {
           ...authored.motions[0],
-          tracks: [{ id: "hero-track", use: "fade", keyframes: { x: { stops: [{ p: 0, v: 1 }, { p: 1, v: 2 }] } } }],
+          tracks: [
+            {
+              id: "hero-track",
+              use: "fade",
+              keyframes: {
+                x: { stops: [{ p: 0, v: 1 }, { p: 1, v: 2 }] },
+              },
+            },
+          ],
         },
       ],
     };
     const normalized = normalizeProject(input);
-    expect(normalized.motions[0].tracks[0].keyframes).toEqual(input.motions[0].tracks[0].keyframes);
-    expect(normalized.motions[0].tracks[0].keyframes).not.toBe(input.motions[0].tracks[0].keyframes);
+    expect(normalized.motions[0].tracks[0].keyframes).toEqual({
+      opacity: authored.templates[0].keyframes.opacity,
+      x: input.motions[0].tracks[0].keyframes.x,
+    });
+    expect(normalized.motions[0].tracks[0].keyframes).not.toBe(
+      input.motions[0].tracks[0].keyframes,
+    );
+    expect(input.motions[0].tracks[0].keyframes).toEqual({
+      x: { stops: [{ p: 0, v: 1 }, { p: 1, v: 2 }] },
+    });
   });
 });
