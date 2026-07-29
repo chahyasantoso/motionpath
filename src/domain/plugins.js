@@ -10,7 +10,17 @@ const simpleKeys = ["x", "y", "z", "rotation", "rotationX", "rotationY", "rotate
 const colorKeys = ["backgroundColor", "color", "borderColor"];
 const simplePlugins = Object.fromEntries(simpleKeys.map((key) => [key, createSimplePropertyPlugin(key)]));
 const colorPlugins = Object.fromEntries(colorKeys.map((key) => [key, createColorPropertyPlugin(key)]));
-function unsupported(name, key) { return { keys: [key], lazy: true, claimsKey: (k) => k === key, load: () => Promise.reject(new Error(`[MotionPath] Plugin '${name}' for key '${key}' is not implemented.`)), contribute: () => { throw new Error(`[MotionPath] Plugin '${name}' for key '${key}' is not implemented.`); } }; }
+function unsupported(name, key) {
+  const message = `[MotionPath] Plugin '${name}' for key '${key}' is not implemented.`;
+  return {
+    keys: [key],
+    lazy: true,
+    claimsKey: (k) => k === key,
+    load: () => Promise.reject(new Error(message)),
+    contribute: () => { throw new Error(message); },
+    compose: () => { throw new Error(message); },
+  };
+}
 export const splitTextPlugin = unsupported("splitText", "splitText");
 export const morphSvgPlugin = unsupported("morphSVG", "morphSVG");
 export const drawSvgPlugin = unsupported("drawSVG", "drawSVG");
