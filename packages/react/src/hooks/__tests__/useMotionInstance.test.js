@@ -2,9 +2,9 @@
 import { renderHook } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import useMotionInstance from "../useMotionInstance";
-import { engine } from "@motionpath/core/engines/Engine";
+import { engine } from "../../../../../packages/core/src/engines/Engine.js";
 
-vi.mock("@motionpath/core/engines/Engine", () => {
+vi.mock("../../../../../packages/core/src/engines/Engine.js", () => {
   const mockInstance = { id: "mock-inst", motionId: "my-motion", destroy: vi.fn() };
   return { engine: { mountInstance: vi.fn(() => mockInstance), unmount: vi.fn() } };
 });
@@ -18,7 +18,6 @@ describe("useMotionInstance", () => {
     rerender({ motionId: "my-motion" });
     expect(engine.mountInstance).toHaveBeenCalledTimes(1);
     unmount();
-    const inst = engine.mountInstance.mock.results[0].value;
-    expect(engine.unmount).toHaveBeenCalledWith(inst);
+    expect(engine.unmount).toHaveBeenCalledWith(engine.mountInstance.mock.results[0].value);
   });
 });
