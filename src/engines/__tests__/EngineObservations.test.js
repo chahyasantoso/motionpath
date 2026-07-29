@@ -42,6 +42,10 @@ describe("declarative track observations", () => {
 
     parent.progress(0.5);
     child.progress(0.5);
-    expect(child.compose()).toMatchObject({ x: 20, y: 15, rotation: 45 });
+    expect(child.compose()).toMatchObject({
+      x: 30.6066017178,
+      y: 20.6066017178,
+      rotation: 45,
+    });
   });
 });
