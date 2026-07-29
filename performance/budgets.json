@@ -1,0 +1,6 @@
+{
+  "compileMs": { "small": 25, "medium": 100, "large": 500 },
+  "composeMsPerFrame": 2,
+  "maxDomWritesPerFrame": 4,
+  "mountUnmountIterations": 100
+}
