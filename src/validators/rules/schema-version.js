@@ -1,4 +1,6 @@
-export const CURRENT_SCHEMA_VERSION = 4;
+import { CURRENT_SCHEMA_VERSION } from "../../contract/v4.js";
+
+export { CURRENT_SCHEMA_VERSION };
 export const SUPPORTED_SCHEMA_VERSIONS = [CURRENT_SCHEMA_VERSION];
 
 /**
@@ -28,7 +30,7 @@ export function schemaVersionRule(schema, path = "$") {
     errors.push({
       ruleId: "schema-version",
       severity: "error",
-      message: `schemaVersion must be 4. Got: ${JSON.stringify(schemaVersion)}.`,
+      message: `schemaVersion must be ${CURRENT_SCHEMA_VERSION}. Got: ${JSON.stringify(schemaVersion)}.`,
       path,
     });
   return errors;
