@@ -7,4 +7,5 @@ export { resolveTrack, resolveTrackKeyframes } from "./usecases/ResolveTrack.js"
 export { mergePatches } from "./usecases/mergePatches.js";
 export { Overlay } from "./usecases/Overlay.js";
 export { Spawner } from "./usecases/Spawner.js";
+export { GraphPublisher } from "./usecases/GraphPublisher.js";
 export { normalizeObservationGraph, topologicalTrackOrder } from "./usecases/normalizeObservationGraph.js";
