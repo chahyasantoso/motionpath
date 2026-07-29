@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { engine } from "../../../../packages/core/src/engines/Engine.js";
+import { engine } from "@motionpath/core/engines/Engine";
 export default function useMotionProject(project) {
   const [isLoaded, setIsLoaded] = useState(false);
   const projectRef = useRef(project);
