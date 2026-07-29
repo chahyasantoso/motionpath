@@ -20,7 +20,9 @@ export interface PathNode {
 }
 
 export type PathAnchor =
-  "center" | "none" | { xPercent: number; yPercent: number };
+  | "center"
+  | "none"
+  | { xPercent: number; yPercent: number };
 
 export interface PathProperty {
   points: PathNode[];
@@ -148,6 +150,10 @@ export interface Track {
   removeChild(id: string): void;
   getChild(id: string): Track | null;
   destroy(): void;
+  play?(): void;
+  pause?(): void;
+  seek?(progress?: number): number | void;
+  reverse?(): void;
 }
 
 export interface Motion {
@@ -194,6 +200,11 @@ export declare class Engine {
   mountInstance(id: string): Motion | Track;
   mountWithDelegate(id: string, delegate: unknown): Motion;
   createTrackInstance(id: string, overrides?: Partial<MotionTrack>): Track;
+  createGroupHost(options: {
+    id: string;
+    staggerTransition?: StaggerTransition;
+    autoplay?: boolean;
+  }): Track;
   adopt<T extends Motion | Track>(object: T): T;
   unmount(object: Motion | Track): boolean;
   isOwned(object: Motion | Track): boolean;

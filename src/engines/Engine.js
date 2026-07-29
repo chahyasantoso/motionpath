@@ -1,8 +1,10 @@
+import { gsap } from "gsap";
 import { parseV4Project } from "../lib/schema/parseV4Project.js";
 import {
   triggerDelegateRegistry,
   createTriggerDelegateRegistry,
 } from "../lib/TriggerDelegate.js";
+import { TrackGroup } from "../lib/Motion.js";
 import { createPluginRegistry } from "../domain/plugins.js";
 import { createTrack } from "../lib/createTrack.js";
 import { Motion } from "../lib/Motion.js";
@@ -53,6 +55,12 @@ export class Engine {
     this.#handles.set(object, handle);
     return handle;
   }
+  #trackOptions() {
+    return {
+      eventBus: this.#eventBus,
+      resolvePluginForKey: (key) => this.#plugins.resolve(key),
+    };
+  }
   #mountMotion(config, delegate) {
     const motion = new Motion({
       id: `motion-${this.#instanceCounter + 1}`,
@@ -63,10 +71,7 @@ export class Engine {
     const stagger = typeof config.stagger === "number" ? config.stagger : 0;
     (config.tracks || []).forEach((track, index) =>
       motion.mount(
-        createTrack(track, this.#v4Project.templates, {
-          eventBus: this.#eventBus,
-          resolvePluginForKey: (key) => this.#plugins.resolve(key),
-        }),
+        createTrack(track, this.#v4Project.templates, this.#trackOptions()),
         index * stagger,
       ),
     );
@@ -87,10 +92,7 @@ export class Engine {
     }
     const track = this.#v4Project.getTrackConfig(id);
     if (track) {
-      const runtime = createTrack(track, this.#v4Project.templates, {
-        eventBus: this.#eventBus,
-        resolvePluginForKey: (key) => this.#plugins.resolve(key),
-      });
+      const runtime = createTrack(track, this.#v4Project.templates, this.#trackOptions());
       this.#register(runtime, "track");
       return runtime;
     }
@@ -104,7 +106,7 @@ export class Engine {
     const config = this.#v4Project.getMotionConfig(id);
     if (!config)
       throw new Error(
-        `mountWithDelegate: motion "${id}" not found in project.`,
+        `mountWithDelegate: motion "${id}" not found in project.",
       );
     return this.#mountMotion(config, delegate);
   }
@@ -114,14 +116,28 @@ export class Engine {
     const config = this.#v4Project.getTrackConfig(id);
     if (!config)
       throw new Error(
-        `createTrackInstance: track "${id}" not found in project.`,
+        `createTrackInstance: track "${id}" not found in project.",
       );
     return this.adopt(
-      createTrack({ ...config, ...overrides }, this.#v4Project.templates, {
-        eventBus: this.#eventBus,
-        resolvePluginForKey: (key) => this.#plugins.resolve(key),
-      }),
+      createTrack({ ...config, ...overrides }, this.#v4Project.templates, this.#trackOptions()),
     );
+  }
+  createGroupHost({ id, staggerTransition = {}, autoplay = true } = {}) {
+    if (!this.#v4Project)
+      throw new Error("createGroupHost: project not loaded.");
+    if (typeof id !== "string" || id.length === 0)
+      throw new TypeError("createGroupHost: id must be a non-empty string.");
+    const timeline = gsap.timeline({ paused: !autoplay });
+    const group = new TrackGroup(timeline, staggerTransition);
+    const hostTrack = createTrack(
+      { id, duration: 1, keyframes: {} },
+      this.#v4Project.templates,
+      this.#trackOptions(),
+    );
+    group.mount(hostTrack, 0);
+    hostTrack._attachGroupHost({ group, timeline });
+    this.#register(hostTrack, "group-host");
+    return hostTrack;
   }
   adopt(object) {
     if (!object || this.#handles.has(object)) return object;
