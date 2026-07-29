@@ -6,6 +6,7 @@ import { motorcycleProject } from "../Motorcycle/motorcycleMotions.js";
 import { pmProject } from "../PasarMalam/pasarMalamMotions.js";
 import { pmObserverProject } from "../PasarMalam/pasarMalamObserverMotions.js";
 import { towerDefenseProject } from "../TowerDefense/towerDefenseMotions.js";
+import { walkerProject } from "../Walker/walkerMotions.js";
 
 // Every project a demo page hands to Engine.loadProject(). loadProject is the
 // trust boundary and throws on the first fatal violation, so an unmigrated
@@ -18,6 +19,7 @@ const DEMO_PROJECTS = [
   ["PasarMalam", pmProject],
   ["PasarMalamObserver", pmObserverProject],
   ["TowerDefense", towerDefenseProject],
+  ["Walker", walkerProject],
 ];
 
 const FORBIDDEN_MOTION_FIELDS = [
