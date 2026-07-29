@@ -1,6 +1,6 @@
 {
   "name": "@motionpath/core",
-  "version": "0.0.0-v4.1",
+  "version": "0.0.0-v4.2",
   "private": true,
   "type": "module",
   "types": "./src/types/motionpath.d.ts",
@@ -10,6 +10,9 @@
     "./adapters/gsap": "./src/adapters/gsapPlatform.js",
     "./adapters/dom": "./src/adapters/domRenderer.js",
     "./engines/Engine": "./src/engines/Engine.js",
+    "./lib/*": "./src/lib/*",
+    "./math/*": "./src/math/*",
+    "./usecases/*": "./src/usecases/*",
     "./validators": "./src/validators/index.js"
   },
   "dependencies": { "gsap": "^3.12.5" }
