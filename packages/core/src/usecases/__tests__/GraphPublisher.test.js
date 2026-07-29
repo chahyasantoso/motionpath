@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GraphPublisher } from "../GraphPublisher.js";
 
 describe("GraphPublisher", () => {
-  it("publishes dirty nodes once in compiled order", () => {
+  it("publishes dirty nodes once in compiled order with parent context", () => {
     const calls = [];
     const tracks = new Map([
       ["parent", { compose: () => ({ x: 1 }) }],
@@ -12,7 +12,7 @@ describe("GraphPublisher", () => {
     publisher.markDirty("child");
     publisher.markDirty("child");
     expect(publisher.flush()).toBe(1);
-    expect(calls).toEqual([["child", { parent: undefined }]]);
+    expect(calls).toEqual([["child", { parent: { x: 1 } }]]);
   });
 
   it("flushes all graph nodes in order and coalesces the next frame", () => {
