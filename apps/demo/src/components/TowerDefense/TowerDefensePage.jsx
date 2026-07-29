@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { buildMotionPath } from "@motionpath/core/math/pathUtils.js";
 import useMotionProject from "@motionpath/react/useMotionProject.js";
 import useMotionInstance from "@motionpath/react/useMotionInstance.js";
-import { domRenderer } from "@motionpath/core/adapters/dom";
+import { domRenderer } from "@motionpath/core/adapters/domRenderer.js";
 import { useTowerDefenseController } from "./useTowerDefenseController.js";
 import { towerDefenseProject, LANE_1_POINTS, LANE_2_POINTS } from "./towerDefenseMotions.js";
 import "./TowerDefensePage.css";
