@@ -7,8 +7,4 @@ export { resolveTrack, resolveTrackKeyframes } from "./usecases/ResolveTrack.js"
 export { mergePatches } from "./usecases/mergePatches.js";
 export { Overlay } from "./usecases/Overlay.js";
 export { Spawner } from "./usecases/Spawner.js";
-export { Engine, engine } from "./engines/Engine.js";
-export { Track, } from "./lib/Track.js";
-export { Motion, TrackGroup } from "./lib/Motion.js";
-export { createTrack } from "./lib/createTrack.js";
-export * from "./validators/index.js";
+export { normalizeObservationGraph, topologicalTrackOrder } from "./usecases/normalizeObservationGraph.js";
