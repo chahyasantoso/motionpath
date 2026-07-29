@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join, relative, sep } from "node:path";
+import { cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 const root = process.cwd();
 const moves = [
@@ -12,13 +12,53 @@ const moves = [
 ];
 const extensions = new Set([".js", ".jsx", ".ts", ".tsx", ".css"]);
 
-async function move(source, target) {
-  const from = join(root, source);
-  const to = join(root, target);
-  if (!existsSync(from)) return;
+const absolute = (path) => join(root, path);
+
+async function isScaffoldBridge(path) {
+  if (!existsSync(path)) return false;
+  const text = await readFile(path, "utf8");
+  return /export\s+\{\s*default\s*\}\s+from\s+["']\.\.\/.+["'];?/.test(text) || /^@import\s+url\(["']\.\.\/.+["']\);?\s*$/m.test(text);
+}
+
+async function moveFile(source, target) {
+  const from = absolute(source);
+  const to = absolute(target);
+  if (!existsSync(from)) return "skipped";
   await mkdir(dirname(to), { recursive: true });
-  if (existsSync(to)) throw new Error(`Refusing to overwrite ${target}`);
+  if (existsSync(to)) {
+    if (!(await isScaffoldBridge(to))) throw new Error(`Refusing to overwrite non-scaffold file ${target}`);
+    await rm(to);
+  }
   await rename(from, to);
+  return "moved";
+}
+
+async function moveTree(source, target) {
+  const from = absolute(source);
+  const to = absolute(target);
+  if (!existsSync(from)) return { moved: 0, skipped: 1 };
+  const entries = await (await import("node:fs/promises")).readdir(from, { withFileTypes: true });
+  let moved = 0;
+  for (const entry of entries) {
+    const childSource = `${source}/${entry.name}`;
+    const childTarget = `${target}/${entry.name}`;
+    if (entry.isDirectory()) {
+      const result = await moveTree(childSource, childTarget);
+      moved += result.moved;
+    } else if ((await moveFile(childSource, childTarget)) === "moved") {
+      moved += 1;
+    }
+  }
+  if (existsSync(from)) await rm(from, { recursive: true, force: true });
+  return { moved, skipped: 0 };
+}
+
+async function moveEntry(source, target) {
+  const from = absolute(source);
+  if (!existsSync(from)) return { moved: 0, skipped: 1 };
+  const stat = (await import("node:fs/promises")).stat;
+  if ((await stat(from)).isDirectory()) return moveTree(source, target);
+  return { moved: (await moveFile(source, target)) === "moved" ? 1 : 0, skipped: 0 };
 }
 
 async function walk(directory) {
@@ -41,13 +81,14 @@ function rewriteImports(content) {
     .replaceAll(/from ["'](?:\.\.\/)+usecases\/([^"']+)["']/g, 'from "@motionpath/core/$1"');
 }
 
-for (const [source, target] of moves) await move(source, target);
+let moved = 0;
+for (const [source, target] of moves) moved += (await moveEntry(source, target)).moved;
 for (const base of ["apps/demo/src", "packages/react/src"]) {
-  const directory = join(root, base);
+  const directory = absolute(base);
   if (!existsSync(directory)) continue;
   for (const file of await walk(directory)) {
     const next = rewriteImports(await readFile(file, "utf8"));
     await writeFile(file, next);
   }
 }
-console.log(`Moved ${moves.length} legacy roots into packages/core, packages/react, and apps/demo.`);
+console.log(`Moved ${moved} files. Safe to rerun: existing scaffold bridges are replaced; non-scaffold files are protected.`);
