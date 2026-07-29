@@ -5,6 +5,7 @@ MotionPath is a data-first animation runtime built on GSAP. Projects are plain J
 ## Documentation
 
 - [MotionPath v4 System Guide](docs/MOTIONPATH-V4-SYSTEM-GUIDE.md): human and AI onboarding, schema rules, lifecycle, architecture diagrams, plugin contracts, composition, rendering, orchestration, and debugging.
+- [Forward kinematics and observations](docs/FORWARD-KINEMATICS.md): the formal `plugin.keys` / `plugin.inputs` / `track.observes` contract.
 - [Public v4 TypeScript declarations](src/types/motionpath.d.ts): the typed schema and runtime API contract.
 - [Executable validators](src/validators/): the runtime schema truth source.
 
