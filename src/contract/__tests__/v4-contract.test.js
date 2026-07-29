@@ -7,6 +7,10 @@ import {
   SUPPORTED_TRIGGER_TYPES,
 } from "../v4.js";
 
+const animatedOpacity = {
+  opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
+};
+
 const fixtures = [
   {
     name: "manual motion with template and observation metadata",
@@ -21,7 +25,7 @@ const fixtures = [
             {
               id: "source",
               use: "fade",
-              keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } },
+              keyframes: animatedOpacity,
             },
             {
               id: "child",
@@ -37,14 +41,26 @@ const fixtures = [
     name: "time motion",
     schema: {
       schemaVersion: 4,
-      motions: [{ id: "time-motion", trigger: { type: "time", autoplay: false }, tracks: [] }],
+      motions: [
+        {
+          id: "time-motion",
+          trigger: { type: "time", autoplay: false },
+          tracks: [{ id: "time-track", keyframes: animatedOpacity }],
+        },
+      ],
     },
   },
   {
     name: "scrubbed scroll motion",
     schema: {
       schemaVersion: 4,
-      motions: [{ id: "scroll-motion", trigger: { type: "scroll", scrub: true }, tracks: [] }],
+      motions: [
+        {
+          id: "scroll-motion",
+          trigger: { type: "scroll", scrub: true },
+          tracks: [{ id: "scroll-track", keyframes: animatedOpacity }],
+        },
+      ],
     },
   },
 ];
@@ -58,7 +74,9 @@ describe("v4 canonical contract", () => {
 
   for (const fixture of fixtures) {
     it(`validates and parses: ${fixture.name}`, async () => {
-      expect(validateProject(fixture.schema).filter((error) => error.severity === "error")).toEqual([]);
+      expect(
+        validateProject(fixture.schema).filter((error) => error.severity === "error"),
+      ).toEqual([]);
       await expect(parseV4Project(fixture.schema)).resolves.toMatchObject({
         getMotionConfig: expect.any(Function),
       });
@@ -67,6 +85,8 @@ describe("v4 canonical contract", () => {
 
   it("rejects unsupported schema versions with the canonical version", () => {
     const errors = validateProject({ schemaVersion: 3, motions: [] });
-    expect(errors.find((error) => error.ruleId === "schema-version").message).toContain("must be 4");
+    expect(errors.find((error) => error.ruleId === "schema-version").message).toContain(
+      "must be 4",
+    );
   });
 });
