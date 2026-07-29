@@ -11,3 +11,7 @@ Required scenarios:
 - DOM renderer dirty-write counts
 - repeated mount/unmount cycles
 - time, manual, and scroll browser smoke paths
+
+## Rig graph benchmark
+
+Run `npm run benchmark:rig` to measure the normalized graph and batched publisher across 14-track Walker-sized, 50-track, and 250-track chains. The command emits JSON with graph normalization time, composition time per frame, and published writes per frame so CI or a browser runner can compare results against `budgets.json`.
