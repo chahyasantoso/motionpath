@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { validateObservationGraph, validateProject } from "../index.js";
 
+const opacity = { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] };
+
 describe("rig graph validation", () => {
   it("converts graph IR errors into fatal diagnostics", () => {
     const errors = validateObservationGraph({
@@ -22,8 +24,8 @@ describe("rig graph validation", () => {
         id: "cycle",
         trigger: { type: "manual" },
         tracks: [
-          { id: "a", keyframes: {}, observes: [{ source: "b" }] },
-          { id: "b", keyframes: {}, observes: [{ source: "a" }] },
+          { id: "a", keyframes: { opacity }, observes: [{ source: "b" }] },
+          { id: "b", keyframes: { opacity }, observes: [{ source: "a" }] },
         ],
       }],
     });
