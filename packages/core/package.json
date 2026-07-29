@@ -1,0 +1,17 @@
+{
+  "name": "@motionpath/core",
+  "version": "0.0.0-v4.1",
+  "private": true,
+  "type": "module",
+  "types": "../../src/types/motionpath.d.ts",
+  "exports": {
+    ".": {
+      "types": "../../src/types/motionpath.d.ts",
+      "default": "../../src/engines/Engine.js"
+    },
+    "./contract": "../../src/types/runtimeContracts.ts"
+  },
+  "dependencies": {
+    "gsap": "^3.12.5"
+  }
+}
