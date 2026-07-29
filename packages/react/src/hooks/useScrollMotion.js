@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { engine } from "../../../../packages/core/src/engines/Engine.js";
-import { ScrollTriggerDelegate } from "../../../../packages/core/src/lib/TriggerDelegate.js";
+import { engine } from "@motionpath/core/engines/Engine";
+import { ScrollTriggerDelegate } from "@motionpath/core/lib/TriggerDelegate.js";
 const NO_SHARED_REFS = Object.freeze({});
 export default function useScrollMotion(schema, sharedRefs = NO_SHARED_REFS) {
   const ownTriggerRef = useRef(null); const ownPinRef = useRef(null); const ownEndTriggerRef = useRef(null); const [instance, setInstance] = useState(null);
