@@ -27,8 +27,16 @@ export class Engine {
       throw new MotionPathValidationError(errors, {
         projectId: schema?.projectId,
       });
-    this.destroy();
-    this.#v4Project = await parseV4Project(schema, this.#dependencies);
+
+    // Compile the candidate before touching the active project. A parser or
+    // plugin failure must not destroy a working project already in memory.
+    const candidate = await parseV4Project(schema, this.#dependencies);
+    const previousInstances = this.#instances;
+    this.#instances = new Map();
+    this.#handles = new WeakMap();
+    this.#v4Project = candidate;
+    for (const object of previousInstances.values()) object?.destroy?.();
+    this.#dependencies.eventBus.clear();
   }
 
   get validationReport() {
