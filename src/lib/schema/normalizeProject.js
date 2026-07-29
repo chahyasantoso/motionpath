@@ -13,6 +13,7 @@ function normalizeTrack(track, templates) {
   }
   return freeze({
     ...resolved,
+    __normalized: true,
     keyframes: { ...(resolved.keyframes || {}) },
   });
 }
