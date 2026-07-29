@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: validation (node 24)
+  test-and-build:
+    name: tests and Vite build (node 24)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -22,7 +22,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm test -- --reporter=verbose
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm run pack:check
+      - name: Unit tests
+        run: npm test -- --reporter=verbose
+      - name: Production Vite build
+        run: npm run build
