@@ -4,12 +4,16 @@ import { resolvePluginForKey as defaultResolvePlugin } from "../domain/plugins.j
 import { Track } from "./Track.js";
 
 export function createTrack(config, templates = [], options = {}) {
-  const resolvedTrack = resolveTrack(config, templates);
+  const resolvedTrack = config?.__normalized
+    ? config
+    : resolveTrack(config, templates);
   if (!resolvedTrack)
     throw new Error("createTrack: invalid track configuration.");
   const plugins = options.dependencies?.plugins;
   const resolver =
-    options.resolvePluginForKey || plugins?.resolve?.bind(plugins) || defaultResolvePlugin;
+    options.resolvePluginForKey ||
+    plugins?.resolve?.bind(plugins) ||
+    defaultResolvePlugin;
   const built = buildTrackTweenSync(
     resolvedTrack.id,
     resolvedTrack.keyframes || {},
