@@ -23,9 +23,9 @@ apps/
     main.jsx
 ```
 
-## Current extraction status
+## Extraction status
 
-The repository already has package manifests and empty package roots, but the implementation still lives under the legacy `src/` tree. That mismatch is the incomplete part of the plan. This document is the source-of-truth map while the physical move lands in small, reviewable slices.
+Slice 1 is now physical: canonical contract constants, runtime/public types, the GSAP platform adapter, and the DOM renderer live under `packages/core/src`. The legacy runtime remains intentionally intact while each next slice updates imports and removes its source path, keeping every PR buildable.
 
 | Current path | Target path | Rule |
 | --- | --- | --- |
@@ -45,5 +45,5 @@ The repository already has package manifests and empty package roots, but the im
 - Keep co-located `__tests__` and `integration/fixtures` beside the implementation they verify.
 - Fold `contract` into core; it is not a fourth runtime package.
 - Do not create a parallel implementation in old and new paths. Move a file, update all imports, then delete the old path in the same PR.
-- Keep `packages/*` and `apps/*` in root workspaces so package-level checks run from the root.
-- The architecture boundary test must scan `packages/core/src`, not merely the legacy `src` folders, once extraction lands.
+- Keep `packages/*` and `apps/*` in root workspaces only when the lockfile is updated in the same change.
+- The architecture boundary test scans both legacy and extracted roots during the migration, then becomes package-only after the final move.
