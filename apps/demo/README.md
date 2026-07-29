@@ -1,11 +1,3 @@
-# MotionPath demo application
+# MotionPath demo app
 
-This directory is the target home for routes, scenes, assets, and visual fixtures during the v4.1 package extraction.
-
-Dependency direction:
-
-```text
-apps/demo -> @motionpath/react -> @motionpath/core
-```
-
-The core runtime must not import from this application boundary.
+The demo app is the only home for routes, scene components, CSS, and visual fixtures. New demos belong under `apps/demo/src/components`; the legacy root `src/components` is being migrated in the v4.1 extraction.
