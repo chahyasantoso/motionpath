@@ -1,62 +1,31 @@
 # MotionPath v4
 
-MotionPath is a data-first animation runtime built on GSAP. Projects are plain JSON, tracks animate plain proxy objects, and subscribers render composed patches directly to DOM without React state updates in the frame loop.
+MotionPath is a data-first animation runtime built on GSAP. Projects are plain JSON, tracks animate plain proxy objects, and subscribers render composed patches directly to the DOM without React state updates in the frame loop.
 
 ## Documentation
 
-- [MotionPath v4 System Guide](docs/MOTIONPATH-V4-SYSTEM-GUIDE.md): human and AI onboarding, schema rules, lifecycle, architecture diagrams, plugin contracts, composition, rendering, orchestration, and debugging.
-- [Forward kinematics and observations](docs/FORWARD-KINEMATICS.md): the formal `plugin.keys` / `plugin.inputs` / `track.observes` contract.
-- [Public v4 TypeScript declarations](src/types/motionpath.d.ts): the typed schema and runtime API contract.
-- [Executable validators](src/validators/): the runtime schema truth source.
+- [API reference](docs/API-REFERENCE.md): human and AI reference for Engine, schema, plugins, observations, React hooks, and package boundaries.
+- [System guide](docs/MOTIONPATH-V4-SYSTEM-GUIDE.md): lifecycle, architecture, validation, composition, rendering, orchestration, and debugging.
+- [Architecture map](docs/ARCHITECTURE.md): package layout and extraction status.
+- [Forward kinematics](docs/FORWARD-KINEMATICS.md): plugin inputs, observations, and the FK walker.
+- [Public declarations](src/types/motionpath.d.ts): typed schema and runtime API contract.
 
 ## Quick start
 
 ```js
-import { Engine } from "./src/engines/Engine.js";
+import { Engine } from "@motionpath/core";
 
 const engine = new Engine();
 await engine.loadProject({
   schemaVersion: 4,
-  motions: [
-    {
-      id: "hero",
-      trigger: { type: "time", autoplay: false },
-      tracks: [
-        {
-          id: "hero-track",
-          duration: 1,
-          keyframes: {
-            opacity: {
-              stops: [
-                { p: 0, v: 0 },
-                { p: 1, v: 1 },
-              ],
-            },
-          },
-        },
-      ],
-    },
-  ],
+  motions: [{
+    id: "hero",
+    trigger: { type: "manual" },
+    tracks: [{ id: "hero-track", keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }],
+  }],
 });
 const motion = engine.mountInstance("hero");
-motion.play();
-// On teardown: engine.unmount(motion), or engine.destroy().
+motion.seek(1);
 ```
 
-## v4 invariants
-
-- Use `id`, never `motionId`, in authored schema.
-- `stagger` is measured in seconds.
-- Keep the domain and use cases DOM-free.
-- Use `Motion.play/pause/seek/reverse`, not concrete trigger delegates.
-- Use `Spawner` and `Overlay` for orchestration instead of component-owned RAF loops.
-- Run `npm test` and `npm run typecheck` before merging.
-
-## Tests
-
-```bash
-npm test
-npm run typecheck
-```
-
-CI runs both commands on Node 20 and 22 for pushes and pull requests targeting `v4` or `main`.
+Run `npm test`, `npm run typecheck`, `npm run build`, and `npm run pack:check` before merging.
