@@ -5,9 +5,11 @@
   "types": "src/types/motionpath.d.ts",
   "scripts": {
     "dev": "vite",
+    "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "npm exec --yes --package=typescript@5.8.3 -- tsc --noEmit -p tsconfig.json",
+    "pack:check": "npm pack --dry-run",
     "format": "prettier . --write"
   },
   "dependencies": {
