@@ -1,7 +1,11 @@
 # MotionPath architecture and folder map
 
-The target package layout is established. The last mechanical step is now reproducible with `npm run reorg:physical`.
+## v4.2 baseline
 
-That command moves `src/components` and root app files into `apps/demo/src`, moves `src/hooks` into `packages/react/src/hooks`, rewrites legacy relative imports to package imports, and refuses to overwrite an existing destination. Run it once from the repository root, then run `npm test`, `npm run typecheck`, `npm run build`, and `npm run pack:check` before merging the resulting physical move.
+`v4.2` is the clean foundation branch. The package layout is authoritative: `packages/core` owns runtime/domain/usecases/validators/adapters/types/contract, `packages/react` owns hooks, and `apps/demo` owns routes/scenes/CSS.
 
-Core remains the owner of runtime, validators, plugins, adapters, types, and contract. React owns hooks. Demo owns routes, scenes, CSS, and fixtures. Keep co-located tests and `integration/fixtures` beside the implementation they verify.
+The legacy `src` tree is now scheduled for deletion. No compatibility bridges are allowed in v4.2. The next cleanup PR must replace bridge files with real package implementations, update all imports and build entrypoints, then delete `src` runtime files while keeping only co-located tests and integration fixtures in their new owners.
+
+## v4.2 feature direction
+
+The next runtime feature is observation-graph normalization for FK and other mechanics. See `docs/V4.2-RIG-GRAPH-PLAN.md`.
