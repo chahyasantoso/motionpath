@@ -5,7 +5,7 @@ import {
   TimeTriggerDelegate,
   ManualTriggerDelegate,
 } from "../../lib/TriggerDelegate.js";
-import { domRenderer } from "../../renderers/domRenderer.js";
+import { domRenderer } from "../../adapters/domRenderer.js";
 import { v4Project } from "../fixtures/v4-project.js";
 
 let engine;

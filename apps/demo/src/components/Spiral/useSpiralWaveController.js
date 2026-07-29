@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { engine } from "@motionpath/core/engines/Engine";
-import { gsapTickerClock } from "@motionpath/core/gsapTickerClock.js";
-import { Overlay } from "@motionpath/core/Overlay.js";
-import { Spawner } from "@motionpath/core/Spawner.js";
+import { gsapTickerClock } from "@motionpath/core/lib/gsapTickerClock.js";
+import { Overlay } from "@motionpath/core/usecases/Overlay.js";
+import { Spawner } from "@motionpath/core/usecases/Spawner.js";
 import { createBallVm } from "./createBallVm.js";
 import { BALL_COLORS } from "./spiralConfig.js";
 import {

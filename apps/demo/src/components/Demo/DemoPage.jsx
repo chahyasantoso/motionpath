@@ -1,16 +1,15 @@
 import { gsap } from "gsap";
 import React, { useCallback, useEffect, useRef } from "react";
-import useMotionProject from "../../../../../packages/react/src/hooks/useMotionProject.js";
-import useMotionSubscriber from "../../../../../packages/react/src/hooks/useMotionSubscriber.js";
-import useMotionSubscribers from "../../../../../packages/react/src/hooks/useMotionSubscribers.js";
-import useScrollMotion from "../../../../../packages/react/src/hooks/useScrollMotion.js";
-import useSmoothScroll from "../../../../../packages/react/src/hooks/useSmoothScroll.js";
-import { createTrack } from "../../../../../packages/core/src/lib/createTrack.js";
-import { buildMotionPath } from "../../../../../packages/core/src/math/pathUtils.js";
-import { project3DTo2D, projectPathNodes3DTo2D } from "../../../../../packages/core/src/math/projection3d.js";
+import useMotionProject from "@motionpath/react/useMotionProject";
+import useMotionSubscriber from "@motionpath/react/useMotionSubscriber";
+import useMotionSubscribers from "@motionpath/react/useMotionSubscribers";
+import useScrollMotion from "@motionpath/react/useScrollMotion";
+import useSmoothScroll from "@motionpath/react/useSmoothScroll";
+import { createTrack } from "@motionpath/core/lib/createTrack.js";
+import { buildMotionPath } from "@motionpath/core/math/pathUtils.js";
+import { project3DTo2D, projectPathNodes3DTo2D } from "@motionpath/core/math/projection3d.js";
 import { HELIX_CONFIG, demoProject, dynamicCarouselScene, dynamicHelixScene, scrollScene } from "./demoMotions.js";
 import "./DemoPage.css";
-
 const _dummyReactRef = React;
 const MOCK_CARDS = [
   { id: 1, badge: "01 / IMAGINATION", title: "Fluid Motion Engine", desc: "Harnessing the power of GSAP Pub/Sub for sub-millisecond DOM updates." },
@@ -22,7 +21,6 @@ const MOCK_CARDS = [
   { id: 7, badge: "07 / AWWWARDS", title: "Storytelling Layouts", desc: "Create immersive cinematic scrollytelling experiences that engage users." },
   { id: 8, badge: "08 / ANTIGRAVITY", title: "Endless Horizons", desc: "Scaling up to unlimited items on custom paths without duplicating nodes." },
 ];
-
 function Rocket({ instance, offset = 0 }) { const ref = useRef(null); const transform = useCallback((rawData, composeFn) => { const progress = Math.max(0, Math.min(1, (rawData.pathProgress ?? 0) + offset)); const composed = composeFn({ ...rawData, pathProgress: progress }); return { ...composed, scale: 0.8 + progress * 0.5, opacity: 0.4 + progress * 0.6 }; }, [offset]); useMotionSubscriber(instance, "rocket-track", ref, transform); return <div ref={ref} className="element rocket">🚀</div>; }
 function Cloud({ instance }) { const ref = useRef(null); const transform = useCallback((rawData, composeFn) => composeFn(rawData), []); useMotionSubscriber(instance, "cloud", ref, transform); return <div ref={ref} className="element cloud">☁️</div>; }
 function useChildTrack(parentTrack, trackId, keyframes, stagger) { const [track, setTrack] = React.useState(null); useEffect(() => { if (!parentTrack) return undefined; const childTrack = createTrack({ id: trackId, keyframes }); parentTrack.addChild(childTrack, { stagger }); setTrack(childTrack); return () => parentTrack.removeChild(trackId); }, [parentTrack, trackId]); return track; }

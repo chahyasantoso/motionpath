@@ -8,5 +8,5 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["src/types/**/*.d.ts", "src/types/**/*.test-d.ts"]
+  "include": ["packages/**/src/types/**/*.d.ts", "packages/**/src/types/**/*.test-d.ts"]
 }

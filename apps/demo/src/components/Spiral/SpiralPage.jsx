@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import useMotionProject from "@motionpath/react/useMotionProject";
 import useSmoothScroll from "@motionpath/react/useSmoothScroll";
-import { buildMotionPath } from "../../utils/pathUtils";
+import { buildMotionPath } from "@motionpath/core/math/pathUtils.js";
 import SpiralBall from "./SpiralBall.jsx";
 import { BALL_SIZE, SPIRAL_CONFIG } from "./spiralConfig.js";
 import { createSpiralProject } from "./spiralMotions.js";
