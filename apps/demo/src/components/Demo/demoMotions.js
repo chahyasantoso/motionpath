@@ -1,4 +1,4 @@
-import { shapeGenerators } from "../../../../packages/core/src/math/projection3d.js";
+import { shapeGenerators } from "../../../../../packages/core/src/math/projection3d.js";
 
 export const HELIX_CONFIG = { cx: 640, cy: 100, radius: 220, height: 520, turns: 3.0, tiltDeg: 0 };
 export const helixPathPoints = shapeGenerators.helix({ radius: HELIX_CONFIG.radius, height: HELIX_CONFIG.height, turns: HELIX_CONFIG.turns });
