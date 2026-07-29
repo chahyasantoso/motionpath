@@ -4,14 +4,26 @@
  */
 export function normalizeObservationGraph(motion) {
   const tracks = Array.isArray(motion?.tracks) ? motion.tracks : [];
-  const nodes = tracks.filter(Boolean).map((track, index) => ({
-    id: track.id,
-    index,
-  }));
-  const ids = new Set(nodes.map((node) => node.id));
-  const edges = [];
+  const nodes = [];
+  const nodeIndexes = new Map();
   const errors = [];
 
+  tracks.forEach((track, index) => {
+    const id = track?.id;
+    if (typeof id !== "string" || id.length === 0) {
+      errors.push({ ruleId: "track-observations", path: `tracks[${index}].id`, message: "Track id must be a non-empty string." });
+      return;
+    }
+    if (nodeIndexes.has(id)) {
+      errors.push({ ruleId: "track-observations-duplicate-node", path: `tracks[${index}].id`, message: `Track '${id}' is declared more than once.` });
+      return;
+    }
+    nodeIndexes.set(id, index);
+    nodes.push({ id, index });
+  });
+
+  const edges = [];
+  const edgeKeys = new Set();
   tracks.forEach((track, trackIndex) => {
     for (const [edgeIndex, edge] of (track?.observes || []).entries()) {
       const path = `tracks[${trackIndex}].observes[${edgeIndex}]`;
@@ -20,26 +32,44 @@ export function normalizeObservationGraph(motion) {
         continue;
       }
       const role = edge.role ?? "output";
-      if (!ids.has(track.id)) errors.push({ ruleId: "track-observations", path: `${path}.target`, message: `Unknown target track '${track.id}'.` });
-      if (typeof edge.source !== "string" || !ids.has(edge.source)) {
+      const targetNode = track?.id;
+      if (!nodeIndexes.has(targetNode)) {
+        errors.push({ ruleId: "track-observations", path: `${path}.target`, message: `Unknown target track '${targetNode}'.` });
+        continue;
+      }
+      if (typeof edge.source !== "string" || !nodeIndexes.has(edge.source)) {
         errors.push({ ruleId: "track-observations", path: `${path}.source`, message: `Unknown source track '${edge.source}'.` });
         continue;
       }
-      if (edge.source === track.id) {
-        errors.push({ ruleId: "track-observations-cycle", path: `${path}.source`, message: `Track '${track.id}' cannot observe itself.` });
+      if (edge.source === targetNode) {
+        errors.push({ ruleId: "track-observations-cycle", path: `${path}.source`, message: `Track '${targetNode}' cannot observe itself.` });
         continue;
       }
-      if (role !== "input" && role !== "output") errors.push({ ruleId: "track-observations", path: `${path}.role`, message: "Observation role must be 'input' or 'output'." });
-      if (role === "input" && (typeof edge.target !== "string" || edge.target.length === 0)) errors.push({ ruleId: "track-observations", path: `${path}.target`, message: "Input observations require a non-empty target." });
-      if (role === "output" && edge.target !== undefined) errors.push({ ruleId: "track-observations", path: `${path}.target`, message: "Output observations cannot define target." });
-      edges.push({ source: edge.source, target: track.id, role, input: role === "input" ? edge.target : undefined, path });
+      if (role !== "input" && role !== "output") {
+        errors.push({ ruleId: "track-observations", path: `${path}.role`, message: "Observation role must be 'input' or 'output'." });
+        continue;
+      }
+      if (role === "input" && (typeof edge.target !== "string" || edge.target.length === 0)) {
+        errors.push({ ruleId: "track-observations", path: `${path}.target`, message: "Input observations require a non-empty target." });
+        continue;
+      }
+      if (role === "output" && edge.target !== undefined) {
+        errors.push({ ruleId: "track-observations", path: `${path}.target`, message: "Output observations cannot define target." });
+        continue;
+      }
+      const key = `${edge.source}${targetNode}${role}${edge.target ?? ""}`;
+      if (edgeKeys.has(key)) {
+        errors.push({ ruleId: "track-observations-duplicate-edge", path, message: `Duplicate observation edge from '${edge.source}' to '${targetNode}'.` });
+        continue;
+      }
+      edgeKeys.add(key);
+      edges.push({ source: edge.source, target: targetNode, role, input: role === "input" ? edge.target : undefined, path });
     }
   });
 
   const outgoing = new Map(nodes.map((node) => [node.id, []]));
   const indegree = new Map(nodes.map((node) => [node.id, 0]));
   for (const edge of edges) {
-    if (!outgoing.has(edge.source) || !outgoing.has(edge.target)) continue;
     outgoing.get(edge.source).push(edge);
     indegree.set(edge.target, indegree.get(edge.target) + 1);
   }
@@ -50,7 +80,11 @@ export function normalizeObservationGraph(motion) {
     order.push(id);
     for (const edge of outgoing.get(id)) {
       indegree.set(edge.target, indegree.get(edge.target) - 1);
-      if (indegree.get(edge.target) === 0) queue.push(edge.target);
+      if (indegree.get(edge.target) === 0) {
+        const insertAt = queue.findIndex((queuedId) => nodeIndexes.get(queuedId) > nodeIndexes.get(edge.target));
+        if (insertAt === -1) queue.push(edge.target);
+        else queue.splice(insertAt, 0, edge.target);
+      }
     }
   }
   if (order.length !== nodes.length) errors.push({ ruleId: "track-observations-cycle", path: "tracks", message: "Observation graph contains a cycle." });
