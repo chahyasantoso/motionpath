@@ -2,6 +2,8 @@
   "name": "motionpath",
   "version": "1.0.0",
   "type": "module",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
   "types": "src/types/motionpath.d.ts",
   "scripts": {
     "dev": "vite",
