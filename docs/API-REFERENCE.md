@@ -6,16 +6,14 @@ This is the compact reference for humans and AI agents. The executable contract 
 
 | Package | Owns | Must not import |
 | --- | --- | --- |
-| `@motionpath/core` | schema, validators, plugins, Engine, Motion, Track, composition, adapters | React, JSX, demo components |
+| `@motionpath/core` | schema, graph IR, validators, plugins, Engine, Motion, Track, composition, publishers, adapters | React, JSX, demo components |
 | `@motionpath/react` | React hooks and subscriber bindings | demo scenes |
 | `apps/demo` | routes, scenes, visual components, CSS, fixtures | private core internals |
-
-During the v4.1 extraction, the source tree is still being migrated from `src/*`; use the package map in `docs/ARCHITECTURE.md` when adding files.
 
 ## Core runtime
 
 ```js
-import { Engine } from "@motionpath/core";
+import { Engine, normalizeObservationGraph, topologicalTrackOrder, GraphPublisher } from "@motionpath/core";
 
 const engine = new Engine();
 await engine.loadProject(project);
@@ -23,7 +21,6 @@ const motion = engine.mountInstance("hero");
 motion.play();
 motion.pause();
 motion.seek(0.5);
-motion.reverse();
 engine.unmount(motion);
 engine.destroy();
 ```
@@ -39,17 +36,15 @@ engine.destroy();
 - `unmount(object)`: destroys only objects owned by this Engine.
 - `destroy()`: idempotently releases mounted instances, subscriptions, observations, and timelines.
 
-### `Motion`
+### `Motion` and `Track`
 
-Public controls are trigger-neutral: `play()`, `pause()`, `seek(progress)`, `reverse()`, and `onComplete(callback)`. Do not reach through a concrete trigger delegate.
+`Motion.graphOrder` exposes the compiled parent-before-child IDs. `Motion.composeGraph()` returns a map of composed patches in that order. `Track.compose(rawData?)` remains renderer-neutral and `Track.subscribe(callback)` returns a disposer.
 
-### `Track`
+### Observation graph APIs
 
-- `progress()` reads progress; `progress(value)` seeks a track.
-- `compose(rawData?)` returns a renderer-neutral patch.
-- `subscribe(callback)` returns a disposer.
-- `setObserved(source, mapFn, { role })` wires an imperative dependency.
-- `destroy()` is safe to call repeatedly.
+- `normalizeObservationGraph(motion)`: returns frozen JSON-safe `{ nodes, edges, order, errors }`.
+- `topologicalTrackOrder(graph)`: returns a copy of the stable compiled order.
+- `GraphPublisher`: collects dirty track IDs and publishes each dirty patch once per flush, while composing parents first for shared context.
 
 ## Schema
 
@@ -70,24 +65,6 @@ const project = {
 };
 ```
 
-Trigger rules: scroll triggers require `scrub`; scroll-scrub motions cannot define track durations, repeats, yoyo, or delay. Time triggers own duration through track definitions and support repeat/yoyo/repeatDelay/delay/autoplay. Manual triggers are controlled by the caller.
-
-## Plugins
-
-A plugin declares authored keys, runtime inputs, composition, output merge behavior, and optionally a lazy loader.
-
-```js
-const plugin = createAnimationPlugin({
-  keys: ["boneLength"],
-  inputs: ["parentWorld"],
-  claimsKey: (key) => key === "boneLength",
-  contribute(key, stops) { return { percentPatch: {}, tweenVars: {} }; },
-  compose(raw) { return { x: raw.boneLength ?? 0 }; }
-});
-```
-
-`keys` are authored keyframe fields. `inputs` are runtime values. `claimsKey` must not claim inputs. Registry registration validates keys, inputs, internal keys, stages, priorities, lifecycle functions, and collisions before mutation.
-
 ## Observations and FK
 
 Use JSON-safe edges for authored dependencies:
@@ -96,7 +73,7 @@ Use JSON-safe edges for authored dependencies:
 observes: [{ source: "shoulder", role: "input", target: "parentWorld" }]
 ```
 
-Input edges wrap the source patch under `target`; output edges merge the source patch over the target patch. Cycles, missing sources, duplicate edges, invalid roles, and invalid targets fail validation before mounting. See `docs/FORWARD-KINEMATICS.md` and the React `/walker` demo for the complete FK example.
+Input edges wrap the source patch under `target`; output edges merge the source patch over the target patch. Cycles, missing sources, duplicate edges, invalid roles, and invalid targets are diagnosed by the graph IR. See `docs/RIG-GRAPH-GUIDE.md`, `docs/RIG-GRAPH-ARCHITECTURE.md`, and the React `/walker` demo.
 
 ## React integration
 
@@ -108,10 +85,6 @@ import useMotionSubscriber from "@motionpath/react/useMotionSubscriber";
 
 `useMotionProject(project)` loads and cleans up the shared Engine. `useScrollMotion(schema, sharedRefs?)` returns `{ refs, instance }`; pass `refs.trigger` and `refs.pin` to real DOM elements. `useMotionSubscriber(instance, trackId, ref, transform?)` streams composed patches to the DOM without React state updates in the frame loop.
 
-## Renderer contract
-
-A renderer consumes complete patches. Plugin-owned `internalKeys` and framework keys are filtered before rendering. DOM rendering is an adapter concern; do not import it into core domain logic. Subscriber cleanup must dispose the subscription and clear renderer cache.
-
 ## AI implementation rules
 
 1. Read the schema validator before inventing fields.
@@ -119,13 +92,13 @@ A renderer consumes complete patches. Plugin-owned `internalKeys` and framework 
 3. Keep React, JSX, DOM, and demo imports outside core.
 4. Prefer Engine/Motion/Track public methods over private delegates.
 5. Add a focused regression test before changing runtime behavior.
-6. Run `npm test`, `npm run typecheck`, `npm run build`, and `npm run pack:check`.
+6. Run `npm test`, `npm run build`, `npm run benchmark:rig` and `npm run pack:check`.
 7. For folder moves, update imports, package exports, tests, and docs in one change; never leave a second shadow implementation.
 
 ## API sources
 
-- Type declarations: `src/types/motionpath.d.ts`
-- Validators: `src/validators/index.js`
-- Runtime entry: `src/engines/Engine.js`
-- React hooks: `src/hooks/`
-- Reference FK demo: `src/components/Walker/`
+- Type declarations: `packages/core/src/types/` and package export maps
+- Validators: `packages/core/src/validators/index.js`
+- Runtime entry: `packages/core/src/engines/Engine.js`
+- React hooks: `packages/react/src/hooks/`
+- Reference FK demo: `apps/demo/src/components/Walker/`
