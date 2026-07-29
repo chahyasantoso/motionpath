@@ -13,16 +13,17 @@ import { motionStructureRule } from "./rules/motion-structure.js";
 import { stopShapeRule } from "./rules/stop-shape.js";
 import { trackObservationsRule } from "./rules/track-observations.js";
 import { resolveTrack } from "../usecases/ResolveTrack.js";
+import { normalizeObservationGraph } from "../usecases/normalizeObservationGraph.js";
 
 const motionRules = [triggerShapeRule, easeCollisionRule, staggerShapeRule, perspectiveUsageRule];
 const trackRules = [stopCountRule, stopShapeRule, stopSequenceRule, pathXYExclusivityRule, pathShapeRule, imageSequenceRule];
 const crossMotionRules = [elementUniquenessRule];
 
-function isValidShape(schema) {
-  return schema !== null && typeof schema === "object" && Array.isArray(schema.motions);
-}
-export function hasFatalErrors(errors) {
-  return Array.isArray(errors) && errors.some((e) => e && e.severity === "error");
+function isValidShape(schema) { return schema !== null && typeof schema === "object" && Array.isArray(schema.motions); }
+export function hasFatalErrors(errors) { return Array.isArray(errors) && errors.some((e) => e && e.severity === "error"); }
+export function validateObservationGraph(motion) {
+  const graph = normalizeObservationGraph(motion);
+  return graph.errors.map((error) => ({ ...error, severity: "error" }));
 }
 export function validateProject(schema) {
   const errors = [];
@@ -37,8 +38,7 @@ export function validateProject(schema) {
   for (const [i, motion] of schema.motions.entries()) {
     const motionPath = `motions[${i}]`;
     const resolvedTracks = [];
-    if (motion && typeof motion === "object" && Array.isArray(motion.tracks))
-      for (const track of motion.tracks) resolvedTracks.push(resolveTrack(track, schema.templates));
+    if (motion && typeof motion === "object" && Array.isArray(motion.tracks)) for (const track of motion.tracks) resolvedTracks.push(resolveTrack(track, schema.templates));
     const resolvedMotion = motion && typeof motion === "object" ? { ...motion, tracks: resolvedTracks } : motion;
     for (const rule of motionRules) errors.push(...runSafely(rule, resolvedMotion, context, motionPath));
     if (motion && typeof motion === "object" && Array.isArray(motion.tracks)) {
@@ -57,7 +57,5 @@ export function validateProject(schema) {
   for (const rule of crossMotionRules) errors.push(...runSafely(rule, schema.motions, context));
   return errors;
 }
-function runSafely(rule, ...args) {
-  try { return rule(...args); } catch (e) { return [{ ruleId: "internal-error", severity: "error", message: `Validator rule threw unexpectedly: ${e.message}`, path: String(args.at(-1)) }]; }
-}
+function runSafely(rule, ...args) { try { return rule(...args); } catch (e) { return [{ ruleId: "internal-error", severity: "error", message: `Validator rule threw unexpectedly: ${e.message}`, path: String(args.at(-1)) }]; } }
 function runSafelyValue(fn, fallback) { try { return fn(); } catch { return fallback; } }
