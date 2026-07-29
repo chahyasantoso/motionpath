@@ -11,7 +11,9 @@ const moves = [
   ["src/hooks", "packages/react/src/hooks"],
 ];
 const extensions = new Set([".js", ".jsx", ".ts", ".tsx", ".css"]);
+const existingTargetIsMigrationDestination = new Set(["apps/demo/src/App.jsx", "apps/demo/src/App.css", "apps/demo/src/main.jsx"]);
 const absolute = (path) => join(root, path);
+const normalized = (text) => text.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
 
 async function isScaffoldBridge(path) {
   if (!existsSync(path)) return false;
@@ -25,12 +27,22 @@ async function moveFile(source, target) {
   if (!existsSync(from)) return "skipped";
   await mkdir(dirname(to), { recursive: true });
   if (existsSync(to)) {
-    if ((await readFile(from, "utf8")) === (await readFile(to, "utf8"))) {
+    const sourceText = await readFile(from, "utf8");
+    const targetText = await readFile(to, "utf8");
+    if (normalized(sourceText) === normalized(targetText)) {
       await rm(from);
       return "deduplicated";
     }
-    if (!(await isScaffoldBridge(to))) throw new Error(`Refusing to overwrite non-scaffold file ${target}`);
-    await rm(to);
+    if (await isScaffoldBridge(to)) {
+      await rm(to);
+    } else if (existingTargetIsMigrationDestination.has(target)) {
+      // PR #47 may have already materialized the destination. Keep the app
+      // copy as canonical and remove only the legacy duplicate.
+      await rm(from);
+      return "kept-destination";
+    } else {
+      throw new Error(`Refusing to overwrite non-scaffold file ${target}`);
+    }
   }
   await rename(from, to);
   return "moved";
@@ -85,4 +97,4 @@ for (const base of ["apps/demo/src", "packages/react/src"]) {
   if (!existsSync(directory)) continue;
   for (const file of await walk(directory)) await writeFile(file, rewriteImports(await readFile(file, "utf8")));
 }
-console.log(`Moved ${moved} files. Safe to rerun: identical files are deduplicated, scaffold bridges are replaced, and non-scaffold files are protected.`);
+console.log(`Moved ${moved} files. Safe to rerun: identical files deduplicate, app destinations win, bridges are replaced, and real conflicts remain protected.`);
