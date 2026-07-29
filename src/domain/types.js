@@ -12,12 +12,12 @@
  * @typedef {{ type: 'time', repeat?: number, yoyo?: boolean, repeatDelay?: number, delay?: number, autoplay?: boolean }} TimeTrigger
  * @typedef {{ type: 'manual' }} ManualTrigger
  * @typedef {ScrollTrigger|TimeTrigger|ManualTrigger} Trigger
- *
+ * @typedef {{ source: string, role?: 'input'|'output', target?: string }} TrackObservation
  * @typedef {{ templateId: string, duration?: number, transformOrigin?: string, keyframes?: Keyframes }} MotionTemplate
- * @typedef {{ id: string, use?: string, duration?: number, transformOrigin?: string, keyframes?: Keyframes }} MotionTrack
+ * @typedef {{ id: string, use?: string, duration?: number, transformOrigin?: string, observes?: TrackObservation[], keyframes?: Keyframes }} MotionTrack
  * @typedef {{ id: string, trigger: Trigger, stagger?: number, staggerTransition?: {duration?: number, ease?: string}, tracks: MotionTrack[] }} MotionDefinition
  * @typedef {{ schemaVersion: 4, projectId?: string, perspective?: number, templates?: MotionTemplate[], motions: MotionDefinition[], tracks?: MotionTrack[] }} MotionProject
  *
- * @typedef {{ keys: string[], lazy?: boolean, claimsKey: (key: string) => boolean, load?: () => Promise<void>, prepare?: (track: MotionTrack) => void|Promise<void>, contribute: (propKey: string, stops: Stop[], track: MotionTrack) => {percentPatch?: Object, tweenVars?: Object}, compose: (rawData: Object, track: MotionTrack) => Object, stage?: string, priority?: number, outputs?: Object, internalKeys?: string[] }} AnimationPlugin
+ * @typedef {{ keys: string[], inputs?: string[], lazy?: boolean, claimsWildcard?: boolean, claimsKey: (key: string) => boolean, load?: () => Promise<void>, prepare?: (track: MotionTrack) => void|Promise<void>, contribute: (propKey: string, stops: Stop[], track: MotionTrack) => {percentPatch?: Object, tweenVars?: Object}, compose: (rawData: Object, track: MotionTrack) => Object, stage?: string, priority?: number, outputs?: Object, internalKeys?: string[] }} AnimationPlugin
  */
 export {};
