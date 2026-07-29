@@ -3,19 +3,15 @@
 ## Target boundary
 
 ```text
-packages/core/src/
-  domain/ engines/ errors/ lib/ usecases/ validators/ adapters/ types/ contract/
-packages/react/src/hooks/
-apps/demo/src/
-  components/ App.jsx App.css main.jsx
+packages/core/src/       runtime, validators, plugins, adapters, types, contract
+packages/react/src/      React hooks and subscriber bindings
+apps/demo/src/           routes, scenes, visual components, CSS, fixtures
 ```
 
-## Extraction status
+## Current status
 
-The core and React package boundaries are wired and merged. The final application slice now establishes `apps/demo` as the authoritative app entry boundary with package metadata and Vite-compatible entry files.
+The package boundaries are established and merged through PR #47. The remaining work is a mechanical physical relocation of the legacy implementation: `src/components` to `apps/demo/src/components`, `src/hooks` to `packages/react/src/hooks`, and root app files to `apps/demo/src`.
 
-The existing scene implementation remains in legacy `src/components` behind a temporary compatibility bridge; the next cleanup is a physical move of those scenes and CSS, followed by deleting the bridge and switching root build config to the app workspace.
+The extracted package roots now have boundary tests, and no new runtime code should land in legacy `src/*`. Keep co-located tests and `integration/fixtures` with the implementation they verify.
 
-Import direction stays one-way: `apps/demo -> @motionpath/react -> @motionpath/core`.
-
-Keep co-located tests and `integration/fixtures` beside the implementation they verify.
+Import direction: `apps/demo -> @motionpath/react -> @motionpath/core`. Core must not import React, JSX, router, demo components, or DOM globals.
