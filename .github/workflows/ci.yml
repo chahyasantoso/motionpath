@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [v4, main]
+    branches: [v4, v4.1, main]
   pull_request:
-    branches: [v4, main]
+    branches: [v4, v4.1, main]
   workflow_dispatch:
 
 concurrency:
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   test:
-    name: vitest (node ${{ matrix.node }})
+    name: validation (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -39,3 +39,9 @@ jobs:
 
       - name: Check published declarations
         run: npm run typecheck
+
+      - name: Build application
+        run: npm run build
+
+      - name: Check package contents
+        run: npm run pack:check
