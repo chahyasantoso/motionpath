@@ -5,14 +5,13 @@
   "type": "module",
   "types": "../../src/types/motionpath.d.ts",
   "exports": {
-    ".": {
-      "types": "../../src/types/motionpath.d.ts",
-      "default": "../../src/hooks/useMotionInstance.js"
-    },
-    "./subscribers": "../../src/hooks/useMotionSubscribers.js"
+    "./useMotionProject": "./src/hooks/useMotionProject.js",
+    "./useMotionInstance": "./src/hooks/useMotionInstance.js",
+    "./useMotionSubscriber": "./src/hooks/useMotionSubscriber.js",
+    "./useMotionSubscribers": "./src/hooks/useMotionSubscribers.js",
+    "./useScrollMotion": "./src/hooks/useScrollMotion.js",
+    "./useManualMotion": "./src/hooks/useManualMotion.js",
+    "./useTimeMotion": "./src/hooks/useTimeMotion.js"
   },
-  "dependencies": {
-    "@motionpath/core": "0.0.0-v4.1",
-    "react": ">=19"
-  }
+  "dependencies": { "@motionpath/core": "0.0.0-v4.1", "react": ">=19" }
 }
