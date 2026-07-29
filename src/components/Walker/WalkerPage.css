@@ -1,0 +1,189 @@
+/* ─── FK Walk Cycle Scene ───────────────────────────────────── */
+.walk-scene {
+  position: relative;
+  height: 320vh; /* tall container so the gait has room to scrub */
+  background: var(--bg, #0b0d16);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.walk-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6rem;
+}
+
+/* World origin for every composed patch: the rig box's top-left corner. */
+.walk-rig {
+  position: relative;
+  width: 760px;
+  height: 300px;
+  transform-origin: 50% 50%;
+}
+
+.fk-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--ground);
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.22),
+    transparent
+  );
+}
+
+.fk-bone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 16px;
+  margin-top: -8px; /* centre line on the joint, so the pivot is exact */
+  border-radius: 999px;
+  will-change: transform;
+}
+
+.fk-bone.fk-core {
+  height: 24px;
+  margin-top: -12px;
+  z-index: 2;
+  background: linear-gradient(90deg, #7c5cff, #4ea8ff);
+  box-shadow: 0 10px 28px rgba(124, 92, 255, 0.35);
+}
+
+.fk-bone.fk-near {
+  z-index: 3;
+  background: linear-gradient(90deg, #ffb347, #ff6b6b);
+  box-shadow: 0 8px 20px rgba(255, 107, 107, 0.3);
+}
+
+.fk-bone.fk-far {
+  height: 13px;
+  margin-top: -6.5px;
+  z-index: 1;
+  opacity: 0.62;
+  background: linear-gradient(
+    90deg,
+    rgba(140, 158, 208, 0.9),
+    rgba(96, 116, 170, 0.8)
+  );
+}
+
+.fk-joint {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  border-radius: 50%;
+  background: var(--bg, #0b0d16);
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  will-change: transform;
+}
+
+.fk-head {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 52% 52% 46% 46%;
+  background: linear-gradient(160deg, #ffffff, #c8d4ff);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 9px;
+  will-change: transform;
+}
+
+.fk-eye {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10142a;
+}
+
+.fk-shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 104px;
+  height: 18px;
+  margin: -9px 0 0 -52px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.6),
+    transparent 70%
+  );
+}
+
+/* ─── Chrome ────────────────────────────────────────────────── */
+.walk-readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  max-width: 760px;
+}
+
+.walk-chip {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cdd5f0;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.walk-rail {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8b93b0);
+}
+
+.fk-rail-line {
+  position: relative;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.fk-rail-dot {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: #ffb347;
+  box-shadow: 0 0 14px rgba(255, 179, 71, 0.7);
+}
+
+@media (max-width: 900px) {
+  .walk-rig {
+    transform: scale(0.58);
+  }
+  .walk-readout {
+    max-width: 92vw;
+  }
+}
