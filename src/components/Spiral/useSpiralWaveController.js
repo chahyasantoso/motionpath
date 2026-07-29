@@ -12,9 +12,14 @@ import {
 } from "./spiralPath.js";
 
 const WAVE_SIZE = 30;
+const GROUP_HOST_OPTIONS = {
+  staggerTransition: { duration: 0.55, ease: "power2.out" },
+  autoplay: true,
+};
 
-export function useSpiralWaveController({ isLoaded, containerInstance }) {
+export function useSpiralWaveController({ isLoaded }) {
   const [ballVms, setBallVms] = useState([]);
+  const [hostTrack, setHostTrack] = useState(null);
   const ballVmsRef = useRef([]);
   const ballCounterRef = useRef(0);
   const spawnerRef = useRef(null);
@@ -67,14 +72,13 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
           disposeOverlay(current);
           const latest = getBallVm(ballId);
           if (!latest) return;
-          const parentTrack = containerInstance?.getTrack("keepalive");
-          parentTrack?.removeChild(latest.ballTrack.id);
+          hostTrack?.removeChild(latest.ballTrack.id);
           spawnerRef.current?.notifyRemoved(1);
           removeBallVm(ballId);
         })
         .catch(() => {});
     },
-    [containerInstance, disposeOverlay, getBallVm, removeBallVm, updateBallVm],
+    [disposeOverlay, getBallVm, hostTrack, removeBallVm, updateBallVm],
   );
 
   const startEntrance = useCallback(
@@ -108,9 +112,7 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
   );
 
   const spawnBall = useCallback(() => {
-    if (!containerInstance) return null;
-    const parentTrack = containerInstance.getTrack("keepalive");
-    if (!parentTrack) return null;
+    if (!hostTrack) return null;
     const id = ++ballCounterRef.current;
     const color = BALL_COLORS[id % BALL_COLORS.length];
     const ballTrack = engine.createTrackInstance("ball-track", {
@@ -121,7 +123,7 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
     vm.onClick = () => startExit(id);
     ballVmsRef.current = [...ballVmsRef.current, vm];
     setBallVms([...ballVmsRef.current]);
-    parentTrack.addChild(ballTrack, { stagger: SPAWN_INTERVAL_MS / 1000 });
+    hostTrack.addChild(ballTrack, { stagger: SPAWN_INTERVAL_MS / 1000 });
     startEntrance(id);
     const unsub = ballTrack.subscribe((snapshot) => {
       if (snapshot.progress >= 1) {
@@ -131,12 +133,23 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
       }
     });
     return vm;
-  }, [containerInstance, getBallVm, startEntrance, startExit]);
+  }, [getBallVm, hostTrack, startEntrance, startExit]);
 
   useEffect(() => {
-    if (!isLoaded || !containerInstance) return undefined;
-    const parentTrack = containerInstance.getTrack("keepalive");
-    if (!parentTrack) return undefined;
+    if (!isLoaded) return undefined;
+    const host = engine.createGroupHost({
+      id: `spiral-parent-${Date.now()}`,
+      ...GROUP_HOST_OPTIONS,
+    });
+    setHostTrack(host);
+    return () => {
+      engine.unmount(host);
+      setHostTrack(null);
+    };
+  }, [isLoaded]);
+
+  useEffect(() => {
+    if (!hostTrack) return undefined;
     const spawner = new Spawner({
       clock: gsapTickerClock,
       interval: 0,
@@ -148,10 +161,10 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
       },
       factory: () => spawnBall(),
       onComplete: () => {
-        if (parentTrack.childCount === 0) {
+        if (hostTrack.childCount === 0) {
           spawner.resetWave();
-          containerInstance.seek(0);
-          containerInstance.play();
+          hostTrack.seek(0);
+          hostTrack.play();
           spawner.start();
         }
       },
@@ -163,13 +176,13 @@ export function useSpiralWaveController({ isLoaded, containerInstance }) {
       spawnerRef.current = null;
       for (const vm of ballVmsRef.current) {
         disposeOverlay(vm);
-        parentTrack.removeChild(vm.ballTrack.id);
+        hostTrack.removeChild(vm.ballTrack.id);
         engine.unmount(vm.ballTrack);
       }
       ballVmsRef.current = [];
       setBallVms([]);
     };
-  }, [containerInstance, disposeOverlay, isLoaded, spawnBall]);
+  }, [disposeOverlay, hostTrack, isLoaded, spawnBall]);
 
   return { ballVms };
 }

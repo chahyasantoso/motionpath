@@ -92,7 +92,11 @@ export class Engine {
     }
     const track = this.#v4Project.getTrackConfig(id);
     if (track) {
-      const runtime = createTrack(track, this.#v4Project.templates, this.#trackOptions());
+      const runtime = createTrack(
+        track,
+        this.#v4Project.templates,
+        this.#trackOptions(),
+      );
       this.#register(runtime, "track");
       return runtime;
     }
@@ -106,7 +110,7 @@ export class Engine {
     const config = this.#v4Project.getMotionConfig(id);
     if (!config)
       throw new Error(
-        `mountWithDelegate: motion "${id}" not found in project.",
+        `mountWithDelegate: motion "${id}" not found in project.`,
       );
     return this.#mountMotion(config, delegate);
   }
@@ -116,10 +120,14 @@ export class Engine {
     const config = this.#v4Project.getTrackConfig(id);
     if (!config)
       throw new Error(
-        `createTrackInstance: track "${id}" not found in project.",
+        `createTrackInstance: track "${id}" not found in project.`,
       );
     return this.adopt(
-      createTrack({ ...config, ...overrides }, this.#v4Project.templates, this.#trackOptions()),
+      createTrack(
+        { ...config, ...overrides },
+        this.#v4Project.templates,
+        this.#trackOptions(),
+      ),
     );
   }
   createGroupHost({ id, staggerTransition = {}, autoplay = true } = {}) {

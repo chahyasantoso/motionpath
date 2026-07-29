@@ -1,29 +1,3 @@
-export function createSpiralContainerScene({ spawnIntervalMs }) {
-  return {
-    id: "spiral-container",
-    stagger: spawnIntervalMs / 1000,
-    staggerTransition: { duration: 0.55, ease: "power2.out" },
-    trigger: { type: "time", autoplay: true },
-    tracks: [
-      {
-        // Runtime host for dynamically spawned balls. It is intentionally
-        // invisible; Track.addChild needs a mounted parent timeline so the
-        // Motion owns and schedules each child.
-        id: "keepalive",
-        duration: 1,
-        keyframes: {
-          opacity: {
-            stops: [
-              { p: 0, v: 0 },
-              { p: 1, v: 0 },
-            ],
-          },
-        },
-      },
-    ],
-  };
-}
-
 export function createSpiralBallScene({
   spiralPathPoints,
   ballTravelSeconds,
@@ -124,16 +98,12 @@ export function createSpiralProject({
   spiralPathPoints,
   ballTravelSeconds,
   ballSize,
-  spawnIntervalMs,
 }) {
   return {
     schemaVersion: 4,
     projectId: "spiral-zuma-page",
     perspective: 1200,
-    motions: [
-      createSpiralContainerScene({ spawnIntervalMs }),
-      createSpiralBallScene({ spiralPathPoints, ballTravelSeconds, ballSize }),
-    ],
+    motions: [createSpiralBallScene({ spiralPathPoints, ballTravelSeconds, ballSize })],
     tracks: createSpiralTransitionTracks({ ballSize }),
   };
 }

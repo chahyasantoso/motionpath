@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import useMotionInstance from "../../hooks/useMotionInstance";
 import useMotionProject from "../../hooks/useMotionProject";
 import useSmoothScroll from "../../hooks/useSmoothScroll";
 import { buildMotionPath } from "../../utils/pathUtils";
@@ -29,13 +28,7 @@ export default function SpiralPage() {
   const isLoaded = useMotionProject(project);
   useSmoothScroll();
 
-  const containerInstance = useMotionInstance(
-    isLoaded ? "spiral-container" : null,
-  );
-  // Note: layoutDelegate (Gapless vs Static) is a construction-time option on the
-  // 'spiral-container' track config in spiralMotions.js, not a mount-time hook option —
-  // this hook's config bag isn't threaded to track construction. See LayoutDelegate.js.
-  const vm = useSpiralPageViewModel({ isLoaded, containerInstance });
+  const vm = useSpiralPageViewModel({ isLoaded });
 
   return (
     <div className="app zuma-app">
@@ -78,8 +71,6 @@ export default function SpiralPage() {
                 <stop offset="100%" stopColor="#7c5cff" stopOpacity="0" />
               </radialGradient>
             </defs>
-
-            {/* Spiral path guide */}
             <path
               d={buildMotionPath(vm.spiralPathPoints)}
               fill="none"
@@ -87,8 +78,6 @@ export default function SpiralPage() {
               strokeWidth="2"
               strokeDasharray="8 6"
             />
-
-            {/* Black hole — ambient glow */}
             <circle
               cx={SPIRAL_CONFIG.cx}
               cy={SPIRAL_CONFIG.cy}
@@ -101,8 +90,6 @@ export default function SpiralPage() {
               r={55}
               fill="url(#hole-core)"
             />
-
-            {/* Event horizon rings */}
             <circle
               cx={SPIRAL_CONFIG.cx}
               cy={SPIRAL_CONFIG.cy}
@@ -127,8 +114,6 @@ export default function SpiralPage() {
               stroke="rgba(124,92,255,0.40)"
               strokeWidth="2"
             />
-
-            {/* Singularity */}
             <circle
               cx={SPIRAL_CONFIG.cx}
               cy={SPIRAL_CONFIG.cy}
