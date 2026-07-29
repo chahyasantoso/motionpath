@@ -40,7 +40,6 @@ export function validateProject(schema) {
     const resolvedTracks = [];
     if (motion && typeof motion === "object" && Array.isArray(motion.tracks)) for (const track of motion.tracks) resolvedTracks.push(resolveTrack(track, schema.templates));
     const resolvedMotion = motion && typeof motion === "object" ? { ...motion, tracks: resolvedTracks } : motion;
-    errors.push(...runSafely(validateObservationGraph, resolvedMotion).map((error) => ({ ...error, path: `${motionPath}.${error.path}` })));
     for (const rule of motionRules) errors.push(...runSafely(rule, resolvedMotion, context, motionPath));
     if (motion && typeof motion === "object" && Array.isArray(motion.tracks)) {
       for (const [j] of motion.tracks.entries()) {
