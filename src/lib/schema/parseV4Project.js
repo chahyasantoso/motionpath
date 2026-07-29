@@ -3,9 +3,16 @@ import { resolvePluginForKey, ensureLoaded } from "../../domain/plugins.js";
 import { triggerDelegateRegistry } from "../TriggerDelegate.js";
 
 export async function parseV4Project(schema = {}, deps = {}) {
-  const resolvePlugin = deps.resolvePluginForKey || resolvePluginForKey;
-  const loadPlugin = deps.ensureLoaded || ensureLoaded;
-  const delegates = deps.triggerDelegateRegistry || triggerDelegateRegistry;
+  const runtime = deps.plugins ? deps : deps.dependencies || {};
+  const resolvePlugin =
+    runtime.plugins?.resolve?.bind(runtime.plugins) ||
+    deps.resolvePluginForKey ||
+    resolvePluginForKey;
+  const loadPlugin =
+    runtime.plugins?.ensureLoaded?.bind(runtime.plugins) ||
+    deps.ensureLoaded ||
+    ensureLoaded;
+  const delegates = runtime.triggerDelegates || deps.triggerDelegateRegistry || triggerDelegateRegistry;
   const templates = schema.templates || [];
   const motionConfigsMap = new Map();
   const trackConfigsMap = new Map();
