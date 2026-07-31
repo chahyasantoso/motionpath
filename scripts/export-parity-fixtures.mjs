@@ -1,4 +1,3 @@
-import { writeFile } from "node:fs/promises";
 import { Engine } from "../packages/core/src/engines/Engine.js";
 
 const samples = [0, 0.25, 0.5, 0.75, 1];
@@ -50,7 +49,9 @@ async function exportFixtures() {
     id: "easing",
     duration: 1,
     keyframes: {
-      value: { stops: stops([[0, 0], [1, 100]], "power2.in") },
+      // `value` is not a registered v4 plugin key. Use x as the neutral
+      // numeric channel so this case exercises easing without inventing API.
+      x: { stops: stops([[0, 0], [1, 100]], "power2.in") },
     },
   }]);
 
