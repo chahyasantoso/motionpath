@@ -14,13 +14,17 @@ export class GraphPublisher {
   #publishPending = new Set();
   #cache = new Map();
   #hooks = new Map();
+  #retryState = new Map();
+  #flushNumber = 0;
+  #retry;
   #publish;
   #strict;
 
-  constructor({ graph, order, tracks = new Map(), publish, strict = true } = {}) {
+  constructor({ graph, order, tracks = new Map(), publish, strict = true, retry } = {}) {
     if (typeof publish !== "function") throw new TypeError("GraphPublisher requires a publish callback.");
     this.#publish = publish;
     this.#strict = strict;
+    this.#retry = this.#normalizeRetry(retry);
     this.#tracks = tracks instanceof Map ? tracks : new Map(tracks);
     for (const [id, track] of this.#tracks) if (!track || track.id !== id) throw new Error(`Track registration mismatch for '${id}'.`);
     if (graph) this.#adoptGraph(graph.nodes?.map(({ id }) => ({ id })) ?? [], graph.edges ?? [], topologicalTrackOrder(graph, { strict: true }));
@@ -41,10 +45,20 @@ export class GraphPublisher {
 
   markAllDirty() { for (const id of this.#tracks.keys()) this.#marked.add(id); }
 
+  resetRetry(trackId) {
+    if (!this.#tracks.has(trackId)) {
+      if (this.#strict) throw new Error(`Unknown track id '${trackId}'.`);
+      return;
+    }
+    this.#retryState.delete(trackId);
+    this.#publishPending.add(trackId);
+  }
+
   flush() {
+    this.#flushNumber += 1;
     if (this.#marked.size === 0 && this.#publishPending.size === 0 && this.#isWarm()) return 0;
     const marked = new Set(this.#marked);
-    const retrying = new Set(this.#publishPending);
+    const retrying = new Set([...this.#publishPending].filter((id) => this.#canRetry(id)));
     const changed = new Set();
     const blocked = new Set();
     const failures = [];
@@ -61,7 +75,8 @@ export class GraphPublisher {
         continue;
       }
       const stateChanged = marked.has(id) || upstream.some((sourceId) => changed.has(sourceId));
-      const needsCompose = stateChanged || retrying.has(id) || !this.#cache.has(id);
+      const shouldRetry = retrying.has(id);
+      const needsCompose = stateChanged || shouldRetry || !this.#cache.has(id);
       if (!needsCompose) {
         composed.set(id, this.#cache.get(id));
         continue;
@@ -78,7 +93,7 @@ export class GraphPublisher {
       }
       this.#cache.set(id, patch);
       composed.set(id, patch);
-      if (!stateChanged && !retrying.has(id)) continue;
+      if (!stateChanged && !shouldRetry) continue;
 
       // A publish retry is not a state change. It must not force valid,
       // unchanged downstream patches to republish.
@@ -88,15 +103,16 @@ export class GraphPublisher {
         published += 1;
         this.#marked.delete(id);
         this.#publishPending.delete(id);
+        this.#retryState.delete(id);
       } catch (error) {
         failures.push(error);
-        this.#publishPending.add(id);
-        this.#marked.delete(id);
+        this.#recordPublishFailure(id);
       }
     }
 
     for (const id of [...this.#marked]) if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#marked.delete(id);
     for (const id of [...this.#publishPending]) if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#publishPending.delete(id);
+    for (const id of [...this.#retryState.keys()]) if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#retryState.delete(id);
     if (failures.length) throw new AggregateError(failures, "GraphPublisher flush failed.");
     return published;
   }
@@ -109,9 +125,7 @@ export class GraphPublisher {
     const invalidationSeeds = new Set();
     const previousIds = new Set(previousTracks.keys());
 
-    for (const [id, track] of nextTracks) {
-      if (!previousTracks.has(id) || previousTracks.get(id) !== track) invalidationSeeds.add(id);
-    }
+    for (const [id, track] of nextTracks) if (!previousTracks.has(id) || previousTracks.get(id) !== track) invalidationSeeds.add(id);
     for (const id of previousIds) if (!nextTracks.has(id)) invalidationSeeds.add(id);
 
     const edgeKey = (edge) => `${edge.source}${edge.target}${edge.role ?? "output"}${edge.input ?? ""}`;
@@ -130,11 +144,13 @@ export class GraphPublisher {
       this.#cache.delete(id);
       this.#marked.delete(id);
       this.#publishPending.delete(id);
+      this.#retryState.delete(id);
     }
     for (const id of invalidationSeeds) {
       if (!this.#tracks.has(id)) continue;
       this.#cache.delete(id);
       this.#publishPending.delete(id);
+      this.#retryState.delete(id);
       this.#marked.add(id);
     }
     this.#markDownstream(invalidationSeeds);
@@ -183,10 +199,30 @@ export class GraphPublisher {
     this.#cache.delete(id);
     this.#marked.delete(id);
     this.#publishPending.delete(id);
+    this.#retryState.delete(id);
   }
 
-  destroy() { this.#detachHooks(); this.#cache.clear(); this.#marked.clear(); this.#publishPending.clear(); }
+  destroy() { this.#detachHooks(); this.#cache.clear(); this.#marked.clear(); this.#publishPending.clear(); this.#retryState.clear(); }
   #isWarm() { for (const [id, track] of this.#tracks) { if (track?.isDestroyed) continue; if (!this.#cache.has(id)) return false; } return true; }
+  #canRetry(id) { const state = this.#retryState.get(id); return !state || state.nextRetryFlush <= this.#flushNumber; }
+  #recordPublishFailure(id) {
+    const previous = this.#retryState.get(id);
+    const attempts = (previous?.attempts ?? 0) + 1;
+    const exhausted = attempts >= this.#retry.maxAttempts;
+    this.#retryState.set(id, { attempts, exhausted });
+    if (!exhausted) this.#publishPending.add(id);
+    else if (this.#retry.onExhausted === "drop") this.#publishPending.delete(id);
+    else this.#publishPending.delete(id);
+  }
+  #normalizeRetry(retry = {}) {
+    const maxAttempts = retry.maxAttempts === undefined ? Infinity : Number(retry.maxAttempts);
+    const backoff = retry.backoff === undefined ? 0 : Number(retry.backoff);
+    const onExhausted = retry.onExhausted ?? "retain";
+    if (!(maxAttempts > 0) || !Number.isInteger(maxAttempts) && maxAttempts !== Infinity) throw new TypeError("retry.maxAttempts must be a positive integer or Infinity.");
+    if (!(backoff >= 0) || !Number.isInteger(backoff)) throw new TypeError("retry.backoff must be a non-negative integer.");
+    if (onExhausted !== "retain" && onExhausted !== "drop") throw new TypeError("retry.onExhausted must be 'retain' or 'drop'.");
+    return { maxAttempts, backoff, onExhausted };
+  }
   #markDownstream(seeds) {
     const queue = [...seeds].filter((id) => this.#tracks.has(id));
     const seen = new Set(queue);
@@ -197,13 +233,13 @@ export class GraphPublisher {
         seen.add(targetId);
         this.#cache.delete(targetId);
         this.#publishPending.delete(targetId);
+        this.#retryState.delete(targetId);
         this.#marked.add(targetId);
         queue.push(targetId);
       }
     }
   }
   #adoptGraph(nodes, edges, order) { this.#order = [...order]; this.#edges = edges.map((edge) => ({ source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.input })); this.#upstream = new Map(nodes.map(({ id }) => [id, []])); for (const id of this.#order) if (!this.#upstream.has(id)) this.#upstream.set(id, []); for (const edge of this.#edges) { if (!this.#upstream.has(edge.target)) throw new Error(`Graph edge targets unknown track '${edge.target}'.`); this.#upstream.get(edge.target).push(edge.source); } }
-
   #graphGuard = (observer, source) => {
     if (!this.#tracks.has(observer.id) || !this.#tracks.has(source.id)) return;
     const seen = new Set();
@@ -216,7 +252,6 @@ export class GraphPublisher {
       for (const edge of current.observedEdges ?? []) queue.push(edge.source);
     }
   };
-
   #attachHooks() {
     for (const [id, track] of this.#tracks) {
       if (this.#hooks.has(id)) continue;
