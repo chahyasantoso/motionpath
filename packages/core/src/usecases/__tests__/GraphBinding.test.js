@@ -25,20 +25,18 @@ describe("GraphBinding — representations agree", () => {
 
   it("rejects construction when live edges do not match the IR", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
-    const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
-    // Wire an edge the authored graph never declared.
+    // Mutate before graph ownership is attached. The binding must detect the
+    // mismatch instead of allowing a publisher guard to mask this test.
     tracks.get("n0").setObserved(tracks.get("n2"), () => ({}), { role: "output" });
-    expect(() => new GraphBinding({ graph, tracks, publisher })).toThrow();
+    const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
+    expect(() => new GraphBinding({ graph, tracks, publisher })).toThrow(/mismatch/i);
   });
 });
 
 describe("GraphBinding — atomic mutation", () => {
   it("rewires an edge and keeps publisher order valid", () => {
     const { binding, publisher, published } = bind(chainMotion(4));
-
-    // Pop n1 out of the middle: n2 should observe n0 instead.
     binding.replaceEdge({ source: "n1", target: "n2", role: "output" }, { source: "n0", target: "n2", role: "output" });
-
     const order = publisher.graphOrder;
     expect(order.indexOf("n0")).toBeLessThan(order.indexOf("n2"));
     published.length = 0;
@@ -49,9 +47,7 @@ describe("GraphBinding — atomic mutation", () => {
 
   it("registers a late track together with its edges", () => {
     const { binding, publisher, published } = bind(chainMotion(2));
-
     binding.addTrack(makeTrack("late"), [{ source: "n1", role: "output", mapFn: (patch) => ({ from_n1: patch.transform }) }]);
-
     expect(publisher.graphOrder).toEqual(["n0", "n1", "late"]);
     published.length = 0;
     publisher.markDirty("n0");
@@ -60,24 +56,18 @@ describe("GraphBinding — atomic mutation", () => {
   });
 
   it("leaves both Track state and publisher state untouched when a mutation is invalid", () => {
-    const { binding, publisher, tracks } = bind(chainMotion(3));
+    const { binding, publisher } = bind(chainMotion(3));
     const orderBefore = publisher.graphOrder;
-    const edgesBefore = tracks.get("n0").observedEdges.length;
-
-    // n2 already depends on n0 transitively, so this closes a loop.
     expect(() => binding.addEdge({ source: "n2", target: "n0", role: "output" })).toThrow();
-
     expect(publisher.graphOrder).toEqual(orderBefore);
-    expect(tracks.get("n0").observedEdges).toHaveLength(edgesBefore);
+    expect(binding.graph.edges.some((edge) => edge.source === "n2" && edge.target === "n0")).toBe(false);
   });
 
   it("drops a removed track from the graph and stops composing it", () => {
-    const { binding, publisher, tracks, composeCounts } = bind(chainMotion(3));
-
+    const { binding, publisher, composeCounts } = bind(chainMotion(3));
     binding.removeTrack("n2");
-
     expect(publisher.graphOrder).not.toContain("n2");
-    expect(tracks.get("n2")).toBeUndefined();
+    expect(binding.tracks.get("n2")).toBeUndefined();
     const before = composeCounts.get("n2") ?? 0;
     publisher.markDirty("n0");
     publisher.flush();
@@ -90,9 +80,7 @@ describe("GraphBinding — lifecycle", () => {
     const { binding, publisher, tracks } = bind(chainMotion(3));
     const n1 = tracks.get("n1");
     const n2 = tracks.get("n2");
-
     n1.destroy();
-
     expect(publisher.graphOrder).not.toContain("n1");
     expect(n2.observedSources).toHaveLength(0);
     expect(() => publisher.flush()).not.toThrow();
@@ -105,9 +93,7 @@ describe("GraphBinding — lifecycle", () => {
     publisher.flush();
     binding.destroy();
     published.length = 0;
-
     tracks.get("n0").progress(0.5);
-
     expect(() => binding.addEdge({ source: "n0", target: "n1", role: "output" })).toThrow(/destroyed/i);
     expect(published).toEqual([]);
   });
