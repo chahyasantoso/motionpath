@@ -43,6 +43,21 @@ describe("GraphBinding — atomic mutation", () => {
     expect(published).toContain("n2");
   });
 
+  it("preserves an unrelated warm cache entry after a targeted edge mutation", () => {
+    const { binding, publisher, composeCounts } = bind(diamondMotion());
+    publisher.markAllDirty();
+    publisher.flush();
+    const warmed = new Map(composeCounts);
+
+    binding.removeEdge({ source: "a", target: "b", role: "output" });
+    publisher.flush();
+
+    expect(composeCounts.get("a")).toBe(warmed.get("a"));
+    expect(composeCounts.get("c")).toBe(warmed.get("c"));
+    expect(composeCounts.get("b")).toBe(warmed.get("b") + 1);
+    expect(composeCounts.get("d")).toBe(warmed.get("d") + 1);
+  });
+
   it("registers a late track together with its edges", () => {
     const { binding, publisher, published } = bind(chainMotion(2));
     binding.addTrack(makeTrack("late"), [{ source: "n1", role: "output", mapFn: (patch) => ({ from_n1: patch.transform }) }]);
