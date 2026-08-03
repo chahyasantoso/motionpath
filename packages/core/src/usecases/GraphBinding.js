@@ -1,7 +1,15 @@
 import { observationEdgeEquals, observationEdgeKey } from "./observationEdge.js";
 import { normalizeObservationGraph, topologicalTrackOrder } from "./normalizeObservationGraph.js";
 
-/** Keeps live Track edges and GraphPublisher metadata in sync. */
+/**
+ * The bridge between live Track edges and GraphPublisher metadata.
+ *
+ * Before this existed there were four graph representations (authored schema,
+ * normalized IR, mounted Track references, publisher order) and nothing kept
+ * them in agreement after a runtime mutation. Track owns edge lifecycle,
+ * GraphPublisher owns scheduling, and GraphBinding owns the transaction that
+ * moves both at once or neither at all.
+ */
 export class GraphBinding {
   #tracks;
   #publisher;
@@ -10,10 +18,12 @@ export class GraphBinding {
   #destroyed = false;
 
   constructor({ graph, tracks = new Map(), publisher } = {}) {
-    if (!publisher || typeof publisher.applyGraph !== "function") throw new TypeError("GraphBinding requires a graph-aware publisher.");
-    this.#tracks = new Map(tracks);
+    if (!publisher || typeof publisher.applyGraph !== "function") {
+      throw new TypeError("GraphBinding requires a graph-aware publisher.");
+    }
+    this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks);
     this.#publisher = publisher;
-    this.#graph = this.#validateGraph(graph);
+    this.#graph = this.#freeze(graph);
     this.#assertTrackGraphMatches();
     this.#syncPublisher();
     this.#subscribe();
@@ -22,58 +32,84 @@ export class GraphBinding {
   get graph() { return this.#graph; }
   get tracks() { return new Map(this.#tracks); }
 
+  /** Atomic pop-and-rewire: validate the whole candidate graph, then commit. */
   replaceEdge(oldEdge, newEdge) {
     this.#assertAlive();
-    const observer = this.#tracks.get(oldEdge.target);
+    const observer = this.#tracks.get(oldEdge.target ?? newEdge.target);
     const oldSource = this.#tracks.get(oldEdge.source);
     const newSource = this.#tracks.get(newEdge.source);
     if (!observer || !oldSource || !newSource) throw new Error("replaceEdge references an unknown track.");
-    const candidate = this.#candidateGraph((graph) => {
-      graph.edges = graph.edges.filter((edge) => !observationEdgeEquals(edge, oldEdge));
-      graph.edges.push({ ...newEdge, input: newEdge.role === "input" ? newEdge.target : undefined });
+
+    const candidate = this.#candidateGraph((edges) => [
+      ...edges.filter((edge) => !observationEdgeEquals(edge, { ...oldEdge, target: observer.id })),
+      this.#normalizeEdge({ ...newEdge, target: observer.id }),
+    ]);
+
+    observer.replaceObserved(oldSource, newSource, newEdge.mapFn, {
+      role: newEdge.role ?? oldEdge.role,
+      target: (newEdge.role ?? oldEdge.role) === "input" ? newEdge.input ?? newEdge.target : undefined,
     });
-    observer.replaceObserved(oldSource, newSource, undefined, { role: oldEdge.role, target: newEdge.role === "input" ? newEdge.target : undefined });
     this.#commit(candidate);
   }
 
-  addTrack(track, { observes = [] } = {}) {
+  addEdge(edge) {
     this.#assertAlive();
-    if (!track?.id || this.#tracks.has(track.id)) throw new Error(`Duplicate track id '${track?.id}'.`);
-    const candidate = this.#candidateGraph((graph) => {
-      graph.nodes.push({ id: track.id, index: graph.nodes.length });
-      for (const edge of observes) graph.edges.push({ ...edge, target: track.id });
-    });
+    const observer = this.#tracks.get(edge.target);
+    const source = this.#tracks.get(edge.source);
+    if (!observer || !source) throw new Error("addEdge references an unknown track.");
+    const candidate = this.#candidateGraph((edges) => [...edges, this.#normalizeEdge(edge)]);
+    observer.setObserved(source, edge.mapFn ?? null, { role: edge.role ?? "output", target: edge.role === "input" ? edge.input ?? edge.target : undefined });
+    this.#commit(candidate);
+  }
+
+  removeEdge(edge) {
+    this.#assertAlive();
+    const observer = this.#tracks.get(edge.target);
+    const source = this.#tracks.get(edge.source);
+    if (!observer || !source) return;
+    const candidate = this.#candidateGraph((edges) => edges.filter((existing) => !observationEdgeEquals(existing, this.#normalizeEdge(edge))));
+    observer.removeObserved(source, { role: edge.role, target: edge.input });
+    this.#commit(candidate);
+  }
+
+  /** `observes` accepts an array or `{ observes }`, since both read naturally. */
+  addTrack(track, observesOrOptions = []) {
+    this.#assertAlive();
+    const observes = Array.isArray(observesOrOptions) ? observesOrOptions : observesOrOptions.observes ?? [];
+    if (!track?.id) throw new TypeError("addTrack requires a Track with an id.");
+    if (this.#tracks.has(track.id)) throw new Error(`Duplicate track id '${track.id}'.`);
+
+    const candidate = this.#candidateGraph(
+      (edges) => [...edges, ...observes.map((edge) => this.#normalizeEdge({ ...edge, target: track.id }))],
+      (nodes) => [...nodes, { id: track.id }],
+    );
+
     this.#tracks.set(track.id, track);
     try {
       for (const edge of observes) {
         const source = this.#tracks.get(edge.source);
         if (!source) throw new Error(`Unknown source track '${edge.source}'.`);
-        track.setObserved(source, edge.mapFn ?? null, { role: edge.role, target: edge.target });
+        track.setObserved(source, edge.mapFn ?? null, { role: edge.role ?? "output", target: edge.role === "input" ? edge.input ?? edge.target : undefined });
       }
       this.#commit(candidate);
+      this.#subscribeTrack(track);
     } catch (error) {
-      track.destroy?.();
       this.#tracks.delete(track.id);
       throw error;
     }
   }
 
   removeTrack(id) {
-    this.#assertAlive();
+    if (this.#destroyed) return;
     if (!this.#tracks.has(id)) return;
-    const candidate = this.#candidateGraph((graph) => {
-      graph.nodes = graph.nodes.filter((node) => node.id !== id);
-      graph.edges = graph.edges.filter((edge) => edge.source !== id && edge.target !== id);
-    });
     const track = this.#tracks.get(id);
+    const candidate = this.#candidateGraph(
+      (edges) => edges.filter((edge) => edge.source !== id && edge.target !== id),
+      (nodes) => nodes.filter((node) => node.id !== id),
+    );
     this.#tracks.delete(id);
-    try {
-      track.destroy?.();
-      this.#commit(candidate);
-    } catch (error) {
-      this.#tracks.set(id, track);
-      throw error;
-    }
+    if (!track.isDestroyed) track.destroy?.();
+    this.#commit(candidate);
   }
 
   destroy() {
@@ -83,40 +119,69 @@ export class GraphBinding {
     this.#unsubscribers = [];
   }
 
-  #validateGraph(graph) {
+  #normalizeEdge(edge) {
+    const role = edge.role ?? "output";
+    return { source: edge.source, target: edge.target, role, input: role === "input" ? edge.input ?? edge.target : undefined };
+  }
+
+  #freeze(graph) {
     if (!graph || graph.errors?.length) throw new Error("GraphBinding requires a valid normalized graph.");
-    topologicalTrackOrder(graph);
-    return { nodes: graph.nodes.map((node) => ({ ...node })), edges: graph.edges.map((edge) => ({ ...edge })), order: [...graph.order], errors: [], valid: true };
+    topologicalTrackOrder(graph, { strict: true });
+    return Object.freeze({
+      valid: true,
+      nodes: graph.nodes.map((node) => ({ ...node })),
+      edges: graph.edges.map(({ source, target, role, input }) => ({ source, target, role, input })),
+      order: [...graph.order],
+      errors: [],
+    });
   }
 
   #assertTrackGraphMatches() {
-    const actual = [];
-    for (const track of this.#tracks.values()) for (const edge of track.observedEdges ?? []) actual.push({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input });
-    const expected = this.#graph.edges.map(({ source, target, role, input }) => ({ source, target, role, input }));
-    const same = actual.length === expected.length && actual.every((edge) => expected.some((candidate) => candidate.source === edge.source && candidate.target === edge.target && observationEdgeKey(candidate.source, candidate.role, candidate.input) === observationEdgeKey(edge.source, edge.role, edge.input)));
-    if (!same) throw new Error("GraphBinding found a mismatch between normalized edges and live Track edges.");
+    const live = [];
+    for (const track of this.#tracks.values()) {
+      for (const edge of track.observedEdges ?? []) {
+        live.push({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input });
+      }
+    }
+    const declared = this.#graph.edges;
+    const key = (edge) => `${observationEdgeKey(edge.source, edge.role, edge.input)}->${edge.target}`;
+    const declaredKeys = new Set(declared.map(key));
+    const mismatched = live.length !== declared.length || live.some((edge) => !declaredKeys.has(key(edge)));
+    if (mismatched) {
+      throw new Error(`GraphBinding found ${live.length} live observation edges but ${declared.length} declared edges. Live Track wiring and the normalized graph must agree.`);
+    }
   }
 
-  #candidateGraph(mutator) {
-    const graph = { nodes: this.#graph.nodes.map((node) => ({ ...node })), edges: this.#graph.edges.map((edge) => ({ ...edge })) };
-    mutator(graph);
-    const normalized = normalizeObservationGraph({ tracks: graph.nodes.map((node) => ({ id: node.id, observes: graph.edges.filter((edge) => edge.target === node.id).map((edge) => ({ source: edge.source, role: edge.role, target: edge.role === "input" ? edge.input : undefined })) })) });
-    if (normalized.errors.length) throw new Error(normalized.errors.map((error) => error.message).join("; "));
+  #candidateGraph(edgeMutator, nodeMutator = (nodes) => nodes) {
+    const nodes = nodeMutator(this.#graph.nodes.map((node) => ({ id: node.id })));
+    const edges = edgeMutator(this.#graph.edges.map((edge) => ({ ...edge })));
+    const normalized = normalizeObservationGraph({
+      tracks: nodes.map((node) => ({
+        id: node.id,
+        observes: edges
+          .filter((edge) => edge.target === node.id)
+          .map((edge) => ({ source: edge.source, role: edge.role, target: edge.role === "input" ? edge.input : undefined })),
+      })),
+    });
+    if (!normalized.valid) throw new Error(`Rejected graph mutation: ${normalized.errors.map((error) => error.message).join("; ")}`);
     return normalized;
   }
 
-  #commit(graph) { this.#graph = this.#validateGraph(graph); this.#syncPublisher(); }
+  #commit(graph) {
+    this.#graph = this.#freeze(graph);
+    this.#syncPublisher();
+  }
+
   #syncPublisher() { this.#publisher.applyGraph(this.#graph, this.#tracks); }
 
-  #subscribe() {
-    for (const track of this.#tracks.values()) {
-      const unsubscribe = track.onLifecycle?.((event) => {
-        if (this.#destroyed) return;
-        if (event.type === "invalidated") this.#publisher.markDirty(event.track.id);
-        if (event.type === "destroyed") this.removeTrack(event.track.id);
-      });
-      if (unsubscribe) this.#unsubscribers.push(unsubscribe);
-    }
+  #subscribe() { for (const track of this.#tracks.values()) this.#subscribeTrack(track); }
+
+  #subscribeTrack(track) {
+    const unsubscribe = track.onLifecycle?.((event) => {
+      if (this.#destroyed) return;
+      if (event.type === "destroyed") this.removeTrack(event.track.id);
+    });
+    if (unsubscribe) this.#unsubscribers.push(unsubscribe);
   }
 
   #assertAlive() { if (this.#destroyed) throw new Error("GraphBinding is destroyed."); }
