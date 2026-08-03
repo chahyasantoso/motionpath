@@ -1,3 +1,5 @@
+import { observationEdgeKey } from "./observationEdge.js";
+
 /**
  * Normalize a motion's declarative observation edges into an immutable graph IR.
  * The graph is JSON-safe and contains no Track instances or plugin functions.
@@ -57,28 +59,29 @@ export function normalizeObservationGraph(motion) {
         errors.push({ ruleId: "track-observations", path: `${path}.target`, message: "Output observations cannot define target." });
         continue;
       }
-      const key = `${edge.source}${targetNode}${role}${edge.target ?? ""}`;
+      const input = role === "input" ? edge.target : undefined;
+      const key = observationEdgeKey(edge.source, role, input) + "" + targetNode;
       if (edgeKeys.has(key)) {
         errors.push({ ruleId: "track-observations-duplicate-edge", path, message: `Duplicate observation edge from '${edge.source}' to '${targetNode}'.` });
         continue;
       }
       edgeKeys.add(key);
-      edges.push({ source: edge.source, target: targetNode, role, input: role === "input" ? edge.target : undefined, path });
+      edges.push({ source: edge.source, target: targetNode, role, input, path });
     }
   });
 
   const outgoing = new Map(nodes.map((node) => [node.id, []]));
   const indegree = new Map(nodes.map((node) => [node.id, 0]));
   for (const edge of edges) {
-    outgoing.get(edge.source).push(edge);
-    indegree.set(edge.target, indegree.get(edge.target) + 1);
+    outgoing.get(edge.source)?.push(edge);
+    if (indegree.has(edge.target)) indegree.set(edge.target, indegree.get(edge.target) + 1);
   }
   const queue = nodes.filter((node) => indegree.get(node.id) === 0).map((node) => node.id);
   const order = [];
   while (queue.length) {
     const id = queue.shift();
     order.push(id);
-    for (const edge of outgoing.get(id)) {
+    for (const edge of outgoing.get(id) ?? []) {
       indegree.set(edge.target, indegree.get(edge.target) - 1);
       if (indegree.get(edge.target) === 0) {
         const insertAt = queue.findIndex((queuedId) => nodeIndexes.get(queuedId) > nodeIndexes.get(edge.target));
@@ -90,6 +93,7 @@ export function normalizeObservationGraph(motion) {
   if (order.length !== nodes.length) errors.push({ ruleId: "track-observations-cycle", path: "tracks", message: "Observation graph contains a cycle." });
 
   return Object.freeze({
+    valid: errors.length === 0,
     nodes: Object.freeze(nodes.map((node) => Object.freeze(node))),
     edges: Object.freeze(edges.map((edge) => Object.freeze(edge))),
     order: Object.freeze(order),
@@ -97,6 +101,10 @@ export function normalizeObservationGraph(motion) {
   });
 }
 
-export function topologicalTrackOrder(graph) {
-  return graph?.order ? [...graph.order] : [];
+export function topologicalTrackOrder(graph, { strict = true } = {}) {
+  if (!graph || !Array.isArray(graph.order)) return [];
+  if (strict && graph.errors?.length) {
+    throw new Error(`Cannot use invalid observation graph: ${graph.errors.map((error) => error.message).join("; ")}`);
+  }
+  return [...graph.order];
 }
