@@ -1,14 +1,25 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - master
+      - v4
+      - v4.1
+      - v4.2
+      - 'feat/**'
+      - 'test/**'
   pull_request:
-    branches: [v4, v4.1, v4.2, main]
+    branches: [master, v4, v4.1, v4.2, main]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   unit-tests:
@@ -24,6 +35,19 @@ jobs:
       - run: npm ci
       - run: npm test -- --reporter=verbose
 
+  typecheck:
+    name: typecheck (node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
   vite-build:
     name: Vite production build (node 24)
     runs-on: ubuntu-latest
@@ -36,6 +60,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  package-check:
+    name: package dry run (node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run pack:check
 
   rig-benchmark:
     name: rig graph benchmark (node 24)

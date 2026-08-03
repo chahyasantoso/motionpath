@@ -1,37 +1,225 @@
+import { buildTopologicalOrder, topologicalTrackOrder } from "./normalizeObservationGraph.js";
+
 /**
- * Collects dirty graph nodes and publishes composed patches once per flush.
- * The publisher is framework-agnostic: callers decide how patches reach DOM,
- * canvas, or another renderer.
+ * Composes and publishes a validated observation graph in topological order.
+ *
+ * Ownership split: `Track` owns per-call memoization and local edges, this
+ * class owns cross-flush scheduling, dependency propagation and the persistent
+ * patch cache.
  */
 export class GraphPublisher {
-  #order;
-  #tracks;
-  #dirty = new Set();
+  #order = [];
+  #tracks = new Map();
+  #upstream = new Map();
+  #edges = [];
+  #marked = new Set();
+  #cache = new Map();
+  #hooks = new Map();
   #publish;
+  #strict;
 
-  constructor({ order = [], tracks = new Map(), publish } = {}) {
+  constructor({ graph, order, tracks = new Map(), publish, strict = true } = {}) {
     if (typeof publish !== "function") throw new TypeError("GraphPublisher requires a publish callback.");
-    this.#order = [...order];
-    this.#tracks = tracks;
     this.#publish = publish;
+    this.#strict = strict;
+    this.#tracks = tracks instanceof Map ? tracks : new Map(tracks);
+    for (const [id, track] of this.#tracks) {
+      if (!track || track.id !== id) throw new Error(`Track registration mismatch for '${id}'.`);
+    }
+    if (graph) this.#adoptGraph(graph.nodes?.map(({ id }) => ({ id })) ?? [], graph.edges ?? [], topologicalTrackOrder(graph, { strict: true }));
+    else this.#adoptGraph([...this.#tracks.keys()].map((id) => ({ id })), [], [...(order ?? [])]);
+    this.#attachHooks();
   }
 
-  markDirty(trackId) { if (this.#tracks.has(trackId)) this.#dirty.add(trackId); }
-  markAllDirty() { for (const id of this.#order) if (this.#tracks.has(id)) this.#dirty.add(id); }
+  get graphOrder() { return [...this.#order]; }
+  get trackCount() { return this.#tracks.size; }
 
+  markDirty(trackId) {
+    if (!this.#tracks.has(trackId)) {
+      if (this.#strict) throw new Error(`Unknown track id '${trackId}'.`);
+      return;
+    }
+    this.#marked.add(trackId);
+  }
+
+  markAllDirty() { for (const id of this.#tracks.keys()) this.#marked.add(id); }
+
+  /**
+   * One forward pass over topological order. A node is *changed* when it was
+   * marked or an upstream node changed; it is *composed* when it changed or has
+   * no cached patch. Warming a cold cache deliberately does not count as a
+   * change, otherwise marking a sink would republish every ancestor.
+   */
   flush() {
-    if (this.#dirty.size === 0) return 0;
-    const dirty = this.#dirty;
-    this.#dirty = new Set();
+    if (this.#marked.size === 0 && this.#isWarm()) return 0;
+    const marked = new Set(this.#marked);
+    const changed = new Set();
+    const blocked = new Set();
+    const failures = [];
     const composed = new Map();
     let published = 0;
+
     for (const id of this.#order) {
       const track = this.#tracks.get(id);
-      if (!track) continue;
-      const patch = track.compose(undefined, composed);
+      if (!track || track.isDestroyed) continue;
+      const upstream = this.#upstream.get(id) ?? [];
+      if (upstream.some((sourceId) => blocked.has(sourceId))) {
+        blocked.add(id);
+        this.#marked.add(id);
+        continue;
+      }
+      const isChanged = marked.has(id) || upstream.some((sourceId) => changed.has(sourceId));
+      if (!isChanged && this.#cache.has(id)) {
+        composed.set(id, this.#cache.get(id));
+        continue;
+      }
+      let patch;
+      try {
+        patch = track.compose(undefined, composed);
+      } catch (error) {
+        // A compose failure means downstream would read stale upstream state,
+        // so block the subtree instead of publishing something wrong.
+        failures.push(error);
+        blocked.add(id);
+        this.#marked.add(id);
+        continue;
+      }
+      this.#cache.set(id, patch);
       composed.set(id, patch);
-      if (dirty.has(id)) { this.#publish(id, patch); published += 1; }
+      if (!isChanged) continue;
+      changed.add(id);
+      try {
+        this.#publish(id, patch);
+        published += 1;
+        this.#marked.delete(id);
+      } catch (error) {
+        // A publish failure is renderer-local: the patch is valid, so dependents
+        // still flow. Only this node stays pending.
+        failures.push(error);
+        this.#marked.add(id);
+      }
     }
+
+    for (const id of [...this.#marked]) {
+      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#marked.delete(id);
+    }
+    if (failures.length) throw new AggregateError(failures, "GraphPublisher flush failed.");
     return published;
   }
+
+  applyGraph(graph, tracks = this.#tracks) {
+    const order = topologicalTrackOrder(graph, { strict: true });
+    this.#detachHooks();
+    this.#tracks = tracks instanceof Map ? tracks : new Map(tracks);
+    this.#adoptGraph(graph.nodes?.map(({ id }) => ({ id })) ?? [], graph.edges ?? [], order);
+    this.#attachHooks();
+    this.#cache.clear();
+    this.#marked = new Set(this.#tracks.keys());
+  }
+
+  addTrack(idOrTrack, trackOrOptions, maybeOptions) {
+    const idFirst = typeof idOrTrack === "string";
+    const track = idFirst ? trackOrOptions : idOrTrack;
+    const id = idFirst ? idOrTrack : track?.id;
+    const options = (idFirst ? maybeOptions : trackOrOptions) ?? {};
+    if (!track || typeof track.compose !== "function") throw new TypeError("addTrack requires a Track.");
+    if (track.id !== id) throw new Error(`Track id '${track.id}' does not match registration id '${id}'.`);
+    if (this.#tracks.has(id)) throw new Error(`Duplicate track id '${id}'.`);
+
+    const nodes = [...this.#order.map((existing) => ({ id: existing })), { id }];
+    const edges = [...this.#edges, ...(options.observes ?? []).map((edge) => ({ ...edge, target: id }))];
+    const order = buildTopologicalOrder(nodes, edges);
+    this.#tracks.set(id, track);
+    this.#adoptGraph(nodes, edges, order);
+    this.#attachHooks();
+    this.#marked.add(id);
+  }
+
+  addEdge(edge) {
+    const edges = [...this.#edges, { source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.role === "input" ? edge.target : undefined }];
+    const nodes = this.#order.map((id) => ({ id }));
+    this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges));
+    this.#marked.add(edge.target);
+    this.#cache.delete(edge.target);
+  }
+
+  removeEdge(edge) {
+    const edges = this.#edges.filter((existing) => !(existing.source === edge.source && existing.target === edge.target && (edge.role === undefined || existing.role === edge.role)));
+    const nodes = this.#order.map((id) => ({ id }));
+    this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges));
+    this.#marked.add(edge.target);
+    this.#cache.delete(edge.target);
+  }
+
+  removeTrack(id) {
+    if (!this.#tracks.has(id)) return;
+    this.#detachHook(id);
+    this.#tracks.delete(id);
+    const nodes = this.#order.filter((existing) => existing !== id).map((existing) => ({ id: existing }));
+    const edges = this.#edges.filter((edge) => edge.source !== id && edge.target !== id);
+    this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges));
+    this.#cache.delete(id);
+    this.#marked.delete(id);
+  }
+
+  destroy() { this.#detachHooks(); this.#cache.clear(); this.#marked.clear(); }
+
+  #isWarm() {
+    for (const [id, track] of this.#tracks) {
+      if (track?.isDestroyed) continue;
+      if (!this.#cache.has(id)) return false;
+    }
+    return true;
+  }
+
+  #adoptGraph(nodes, edges, order) {
+    this.#order = [...order];
+    this.#edges = edges.map((edge) => ({ source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.input }));
+    this.#upstream = new Map(nodes.map(({ id }) => [id, []]));
+    for (const id of this.#order) if (!this.#upstream.has(id)) this.#upstream.set(id, []);
+    for (const edge of this.#edges) {
+      if (!this.#upstream.has(edge.target)) throw new Error(`Graph edge targets unknown track '${edge.target}'.`);
+      this.#upstream.get(edge.target).push(edge.source);
+    }
+  }
+
+  /**
+   * Cycle rejection is scoped to graph membership. Standalone tracks stay
+   * permissive because mutual observation is a supported, tested feature; the
+   * DAG requirement comes from this class needing a topological order.
+   */
+  #graphGuard = (observer, source) => {
+    if (!this.#tracks.has(observer.id) || !this.#tracks.has(source.id)) return;
+    const seen = new Set();
+    const queue = [source];
+    while (queue.length) {
+      const current = queue.shift();
+      if (current === observer) {
+        throw new Error(`Observing "${source.id}" from "${observer.id}" would create a cycle.`);
+      }
+      if (seen.has(current.id)) continue;
+      seen.add(current.id);
+      for (const edge of current.observedEdges ?? []) queue.push(edge.source);
+    }
+  };
+
+  #attachHooks() {
+    for (const [id, track] of this.#tracks) {
+      if (this.#hooks.has(id)) continue;
+      track._setGraphGuard?.(this.#graphGuard);
+      const unsubscribe = track.onLifecycle?.((event) => {
+        if (event.type === "invalidated") this.markDirty(id);
+        if (event.type === "destroyed") this.removeTrack(id);
+      });
+      this.#hooks.set(id, unsubscribe ?? (() => {}));
+    }
+  }
+
+  #detachHook(id) {
+    this.#hooks.get(id)?.();
+    this.#hooks.delete(id);
+    this.#tracks.get(id)?._setGraphGuard?.(null);
+  }
+
+  #detachHooks() { for (const id of [...this.#hooks.keys()]) this.#detachHook(id); }
 }
