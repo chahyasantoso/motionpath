@@ -2,7 +2,13 @@
 
 ## Goal
 
-Add a second Spiral demo that behaves like the existing `/spiral` Zuma scene while making the runtime dependency graph visible and real. The existing demo remains the behavioral reference and is not rewritten in this work.
+Add a second Spiral demo that behaves like the existing `/spiral` Zuma scene while making the runtime dependency graph visible and real. The existing `/spiral` demo remains the behavioral reference and is not rewritten.
+
+## Current state
+
+PR [#74](https://github.com/chahyasantoso/motionpath/pull/74) is open as a work in progress. The model, route, controller, per-ball graph identities, navigation entry, and contract test are implemented. All CI entries are green on the latest commit.
+
+The current slice is not yet a full parity sign-off: browser verification and focused spawn/remove/reflow parity tests are still pending.
 
 ## Behavioral parity
 
@@ -17,22 +23,26 @@ The new route must preserve the original scene's contract:
 
 ## Graph model
 
-Each spawned ball is a graph root with explicit renderer-neutral dependencies:
+Each spawned ball has unique graph IDs and explicit renderer-neutral dependencies:
 
 ```text
-ball-path -> ball-entrance
-ball-path -> ball-exit
+ball-N-path -> ball-N-entrance
+ball-N-path -> ball-N-exit
 ```
 
-The path track owns `pathProgress`, position, base opacity, and size. Entrance and exit tracks own only transition values. Their edges use `role: "output"`, and the final published patch is composed by `GraphPublisher` in topological order. Overlay lifecycle becomes a graph mutation through `GraphBinding`, not an untracked `setObserved` call.
+The path track owns authored `path` progress, position, base opacity, and size. `pathProgress` is the path plugin's synthetic runtime field, not an authored schema key. Entrance and exit tracks own transition values. Their edges use `role: "output"`, and GraphPublisher composes the graph in topological order. Runtime graph ownership is established through GraphBinding.
 
-## Implementation slices
+## Implemented slices
 
-1. **Model and contract:** add graph-specific motion definitions and tests proving IDs, roles, acyclic order, and transition ownership. This PR starts here.
-2. **Runtime adapter:** add a small `useGraphSpiralController` that creates one `GraphBinding`/`GraphPublisher` per spawned ball, reuses the existing `Spawner`, and keeps the current `Overlay` timing semantics.
-3. **View and route:** reuse Spiral geometry/CSS, add `GraphSpiralPage`, `/spiral-graph`, and navigation labels that distinguish the reference from the graph demo.
-4. **Parity tests:** compare spawn/remove/reflow transitions against the existing controller contract, plus graph invalidation tests for base progress and overlay replacement.
-5. **CI/demo verification:** run unit tests, build, package check, benchmark, and manually verify both routes. The original `/spiral` must remain unchanged.
+1. **Model and contract:** complete. Graph-specific motion definitions, stable normalized order, explicit edge identity, and transition ownership tests are in place.
+2. **Runtime adapter:** implemented in `useGraphSpiralController`. It creates real Engine tracks, wires a GraphBinding and GraphPublisher per ball, reuses Spawner and the existing group-host reflow, and cleans up tracks on removal.
+3. **View and route:** implemented as `GraphSpiralPage`, `GraphSpiralBall`, `/spiral-graph`, and a distinct navigation label. Existing `/spiral` is untouched.
+
+## Next slices
+
+4. **Parity tests:** add focused tests for spawn, click-to-pop, auto-removal, wave reset, overlay replacement, and publisher invalidation after path progress changes.
+5. **Browser verification:** manually compare `/spiral` and `/spiral-graph` for spacing, reflow, transition timing, cleanup, and wave restart. Fix only Graph Spiral issues; do not rewrite the reference route.
+6. **CI/demo verification:** keep the five standard checks green and document the manual verification result before merging #74.
 
 ## Non-goals
 
@@ -50,3 +60,4 @@ The path track owns `pathProgress`, position, base opacity, and size. Entrance a
 - A base progress change republishes the base and downstream transition nodes only.
 - Replacing an overlay is atomic and leaves no reverse observer dangling.
 - Removing a ball destroys its tracks and clears publisher state.
+- Browser parity is checked before merging.
