@@ -8,5 +8,6 @@ export { mergePatches } from "./usecases/mergePatches.js";
 export { Overlay } from "./usecases/Overlay.js";
 export { Spawner } from "./usecases/Spawner.js";
 export { GraphPublisher } from "./usecases/GraphPublisher.js";
+export { GraphBinding } from "./usecases/GraphBinding.js";
 export { normalizeObservationGraph, topologicalTrackOrder } from "./usecases/normalizeObservationGraph.js";
 export { observationEdgeKey, observationEdgeEquals } from "./usecases/observationEdge.js";
