@@ -1,5 +1,7 @@
 # Rig graph normalization in MotionPath v4.2
 
+> Graph normalization landed in v4.2. Publishing semantics were corrected in v4.3: see `docs/V4.3-GRAPH-CORRECTNESS-PLAN.md`. The authoring rules below are unchanged.
+
 ## The short version
 
 A rig graph is a map of which animation tracks depend on which other tracks. In a walking character, the knee depends on the thigh, the shin depends on the knee, and the foot depends on the shin.
@@ -58,7 +60,7 @@ An output edge has no `target` and merges the source patch over the target patch
 observes: [{ source: "overlay", role: "output" }]
 ```
 
-Use input edges for data that a plugin consumes. Use output edges for a composed patch that should be merged into another result.
+Use input edges for data that a plugin consumes. Use output edges for a composed patch that should be merged into another result. Role and target are part of an edge's identity, so one source can legally provide both an input and an output edge to the same observer.
 
 ## What happens at runtime
 
@@ -66,10 +68,11 @@ Use input edges for data that a plugin consumes. Use output edges for a composed
 2. Validation exposes graph errors with stable rule IDs and paths.
 3. The Engine mounts tracks and wires authored observations.
 4. Motion carries the compiled `graphOrder`.
-5. `composeGraph()` composes in that order with a shared context.
-6. `GraphPublisher` can collect dirty tracks and publish them once per flush.
+5. `composeGraph()` composes in that order with a per-call context, so a shared ancestor is composed once per call.
+6. `GraphPublisher` schedules the actual publishing: a dirty track and everything downstream of it are recomposed and published once per flush, idle tracks keep their cached patch, and a failing track does not abort the rest of the frame.
+7. `GraphBinding` handles any graph change after mount, moving live Track wiring and publisher order together or rejecting the change outright.
 
-The existing React hooks still work. This feature does not add a second clock, a requestAnimationFrame loop, or React state updates for every frame.
+You mark one track dirty. You do not enumerate its dependents; the publisher does that. The existing React hooks still work, and this feature does not add a second clock, a requestAnimationFrame loop, or React state updates for every frame.
 
 ## AI-friendly checklist
 
@@ -81,6 +84,7 @@ When creating or editing a rig:
 - Use `role: "output"` only when you intentionally merge a source patch.
 - Prefer local bone angles such as `boneRotation` over colliding with output keys such as `rotation`.
 - Keep the graph acyclic.
+- Change a mounted rig through `GraphBinding`, never by editing Track edges and publisher state separately.
 - Run `npm test`, `npm run build`, and `npm run benchmark:rig`.
 
 ## Reference implementation
@@ -92,3 +96,4 @@ See also:
 - [Visual architecture report](./RIG-GRAPH-ARCHITECTURE.md)
 - [Forward kinematics](./FORWARD-KINEMATICS.md)
 - [Phase plan](./V4.2-RIG-GRAPH-PLAN.md)
+- [Graph correctness plan](./V4.3-GRAPH-CORRECTNESS-PLAN.md)
