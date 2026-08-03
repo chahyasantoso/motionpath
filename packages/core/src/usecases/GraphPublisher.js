@@ -31,7 +31,6 @@ export class GraphPublisher {
   markDirty(trackId) { if (!this.#tracks.has(trackId)) { if (this.#strict) throw new Error(`Unknown track id '${trackId}'.`); return; } this.#marked.add(trackId); }
   markAllDirty() { for (const id of this.#tracks.keys()) this.#marked.add(id); }
   resetRetry(trackId) { if (!this.#tracks.has(trackId)) { if (this.#strict) throw new Error(`Unknown track id '${trackId}'.`); return; } this.#retryState.delete(trackId); this.#publishPending.add(trackId); }
-
   flush() {
     this.#flushNumber += 1;
     if (this.#marked.size === 0 && this.#publishPending.size === 0 && this.#isWarm()) return 0;
@@ -64,7 +63,13 @@ export class GraphPublisher {
         this.#marked.delete(id);
         this.#publishPending.delete(id);
         this.#retryState.delete(id);
-      } catch (error) { failures.push(error); this.#recordPublishFailure(id); }
+      } catch (error) {
+        failures.push(error);
+        // The patch is valid. Keep retry state separate from state invalidation,
+        // otherwise a retry falsely propagates to unchanged dependents.
+        this.#marked.delete(id);
+        this.#recordPublishFailure(id);
+      }
     }
     for (const id of [...this.#marked]) if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#marked.delete(id);
     for (const id of [...this.#publishPending]) if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#publishPending.delete(id);
@@ -72,7 +77,6 @@ export class GraphPublisher {
     if (failures.length) throw new AggregateError(failures, "GraphPublisher flush failed.");
     return published;
   }
-
   applyGraph(graph, tracks = this.#tracks) {
     const order = topologicalTrackOrder(graph, { strict: true });
     const nextTracks = tracks instanceof Map ? tracks : new Map(tracks);
@@ -93,7 +97,6 @@ export class GraphPublisher {
     for (const id of invalidationSeeds) { if (!this.#tracks.has(id)) continue; this.#cache.delete(id); this.#publishPending.delete(id); this.#retryState.delete(id); this.#marked.add(id); }
     this.#markDownstream(invalidationSeeds);
   }
-
   addTrack(idOrTrack, trackOrOptions, maybeOptions) { const idFirst = typeof idOrTrack === "string"; const track = idFirst ? trackOrOptions : idOrTrack; const id = idFirst ? idOrTrack : track?.id; const options = (idFirst ? maybeOptions : trackOrOptions) ?? {}; if (!track || typeof track.compose !== "function") throw new TypeError("addTrack requires a Track."); if (track.id !== id) throw new Error(`Track id '${track.id}' does not match registration id '${id}'.`); if (this.#tracks.has(id)) throw new Error(`Duplicate track id '${id}'.`); const nodes = [...this.#order.map((existing) => ({ id: existing })), { id }]; const edges = [...this.#edges, ...(options.observes ?? []).map((edge) => ({ ...edge, target: id }))]; const order = buildTopologicalOrder(nodes, edges); this.#tracks.set(id, track); this.#adoptGraph(nodes, edges, order); this.#attachHooks(); this.#marked.add(id); }
   addEdge(edge) { const edges = [...this.#edges, { source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.role === "input" ? edge.target : undefined }]; const nodes = this.#order.map((id) => ({ id })); this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges)); this.#marked.add(edge.target); this.#cache.delete(edge.target); }
   removeEdge(edge) { const edges = this.#edges.filter((existing) => !(existing.source === edge.source && existing.target === edge.target && (edge.role === undefined || existing.role === edge.role))); const nodes = this.#order.map((id) => ({ id })); this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges)); this.#marked.add(edge.target); this.#cache.delete(edge.target); }
