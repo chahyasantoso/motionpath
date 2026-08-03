@@ -120,8 +120,13 @@ describe("GraphPublisher — failure isolation (D3)", () => {
     published.length = 0;
     publisher.flush();
 
-    // n2 failed, so n2 and everything downstream of it are still pending.
-    expect(published).toEqual(["n2", "n3", "n4", "n5"]);
+    // n2 COMPOSED fine and only its publish threw, so n3-n5 above already
+    // rendered against a current n2 patch. A repaint failure is not a state
+    // change: only n2 is stale, so only n2 retries. See the failure-semantics
+    // section of docs/V4.3-GRAPH-CORRECTNESS-PLAN.md. A compose failure is the
+    // other case and does block the closure; GraphPublisher.incremental.test.js
+    // covers it.
+    expect(published).toEqual(["n2"]);
   });
 
   it("surfaces the original error inside the AggregateError", () => {
