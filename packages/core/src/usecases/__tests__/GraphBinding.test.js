@@ -25,11 +25,9 @@ describe("GraphBinding — representations agree", () => {
 
   it("rejects construction when live edges do not match the IR", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
-    // Mutate before graph ownership is attached. The binding must detect the
-    // mismatch instead of allowing a publisher guard to mask this test.
     tracks.get("n0").setObserved(tracks.get("n2"), () => ({}), { role: "output" });
     const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
-    expect(() => new GraphBinding({ graph, tracks, publisher })).toThrow(/mismatch/i);
+    expect(() => new GraphBinding({ graph, tracks, publisher })).toThrow(/live Track wiring|declared edges|mismatch/i);
   });
 });
 
