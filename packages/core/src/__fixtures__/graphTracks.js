@@ -55,20 +55,20 @@ export function makeTrack(id, options = {}) {
  * per-track plugin-invocation counter so tests can assert compose counts
  * rather than spying on compose() itself.
  *
- * `onCompose` runs inside the real plugin compose call, after the counter is
- * bumped. Throwing from it is how a test simulates a compose failure for one
- * node: the error surfaces through Track.compose exactly like a genuine plugin
- * fault, so failure semantics are exercised on real tracks.
+ * `onCompose` runs inside the plugin's compose, after the counter is bumped.
+ * A hook that throws therefore surfaces as a real composePatch failure, which
+ * is the only honest way to exercise compose-failure semantics: faking it at
+ * the Track boundary is exactly the shortcut that hid the original bug.
  *
  * @param {{ tracks: Array<object> }} motion
- * @param {{ onCompose?: (id: string) => void }} [hooks]
+ * @param {{ onCompose?: (id: string) => void }} [options]
  */
-export function buildRealGraph(motion, { onCompose } = {}) {
+export function buildRealGraph(motion, options = {}) {
   const graph = normalizeObservationGraph(motion);
   const composeCounts = new Map();
   const bump = (id) => {
     composeCounts.set(id, (composeCounts.get(id) ?? 0) + 1);
-    onCompose?.(id);
+    options.onCompose?.(id);
   };
 
   const tracks = new Map();
@@ -114,10 +114,10 @@ export function chainMotion(count) {
 }
 
 /**
- * a0 -> a1 and b0 -> b1, with no edge between the two chains. Used to prove a
- * failure in one branch cannot stall an unrelated branch in the same flush.
+ * Two disconnected chains, a0 -> a1 and b0 -> b1, with no shared ancestor.
+ * Used to prove that a failure in one branch cannot leak into the other.
  */
-export function parallelChainsMotion() {
+export function independentChainsMotion() {
   return {
     tracks: [
       { id: "a0" },
