@@ -54,11 +54,22 @@ export function makeTrack(id, options = {}) {
  * Returns the IR, the id -> Track map the publisher expects, and a live
  * per-track plugin-invocation counter so tests can assert compose counts
  * rather than spying on compose() itself.
+ *
+ * `onCompose` runs inside the real plugin compose call, after the counter is
+ * bumped. Throwing from it is how a test simulates a compose failure for one
+ * node: the error surfaces through Track.compose exactly like a genuine plugin
+ * fault, so failure semantics are exercised on real tracks.
+ *
+ * @param {{ tracks: Array<object> }} motion
+ * @param {{ onCompose?: (id: string) => void }} [hooks]
  */
-export function buildRealGraph(motion) {
+export function buildRealGraph(motion, { onCompose } = {}) {
   const graph = normalizeObservationGraph(motion);
   const composeCounts = new Map();
-  const bump = (id) => composeCounts.set(id, (composeCounts.get(id) ?? 0) + 1);
+  const bump = (id) => {
+    composeCounts.set(id, (composeCounts.get(id) ?? 0) + 1);
+    onCompose?.(id);
+  };
 
   const tracks = new Map();
   for (const config of motion.tracks) {
@@ -99,6 +110,21 @@ export function chainMotion(count) {
       id: `n${i}`,
       ...(i === 0 ? {} : { observes: [{ source: `n${i - 1}` }] }),
     })),
+  };
+}
+
+/**
+ * a0 -> a1 and b0 -> b1, with no edge between the two chains. Used to prove a
+ * failure in one branch cannot stall an unrelated branch in the same flush.
+ */
+export function parallelChainsMotion() {
+  return {
+    tracks: [
+      { id: "a0" },
+      { id: "a1", observes: [{ source: "a0" }] },
+      { id: "b0" },
+      { id: "b1", observes: [{ source: "b0" }] },
+    ],
   };
 }
 
