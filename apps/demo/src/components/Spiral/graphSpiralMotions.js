@@ -1,9 +1,6 @@
 /**
  * Graph-specific motion definitions for the second Spiral demo.
- *
- * The original Spiral keeps the authored schema deliberately small because its
- * overlays are runtime-only. This model makes the runtime dependency contract
- * explicit without changing the existing project's schema or behavior.
+ * The original Spiral remains the behavioral reference and is untouched.
  */
 export function createGraphSpiralBallMotion({ ballSize, ballTravelSeconds }) {
   return {
@@ -12,7 +9,10 @@ export function createGraphSpiralBallMotion({ ballSize, ballTravelSeconds }) {
         id: "ball-path",
         duration: ballTravelSeconds,
         keyframes: {
-          pathProgress: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1, ease: "none" }] },
+          path: {
+            points: [],
+            stops: [{ p: 0, v: 0 }, { p: 1, v: 1, ease: "none" }],
+          },
           opacity: { stops: [{ p: 0, v: 0 }, { p: 0.05, v: 1 }, { p: 0.88, v: 1 }, { p: 1, v: 0 }] },
           "--ball-size": { stops: [{ p: 0, v: `${ballSize}px` }, { p: 1, v: `${ballSize}px` }] },
         },
@@ -38,6 +38,18 @@ export function createGraphSpiralBallMotion({ ballSize, ballTravelSeconds }) {
         },
       },
     ],
+  };
+}
+
+export function createGraphSpiralProject({ spiralPathPoints, ballSize, ballTravelSeconds }) {
+  const motion = createGraphSpiralBallMotion({ ballSize, ballTravelSeconds });
+  motion.tracks.find((track) => track.id === "ball-path").keyframes.path.points = spiralPathPoints;
+  return {
+    schemaVersion: 4,
+    projectId: "graph-spiral-page",
+    perspective: 1200,
+    motions: [],
+    tracks: motion.tracks,
   };
 }
 
