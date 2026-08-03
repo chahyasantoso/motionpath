@@ -54,11 +54,22 @@ export function makeTrack(id, options = {}) {
  * Returns the IR, the id -> Track map the publisher expects, and a live
  * per-track plugin-invocation counter so tests can assert compose counts
  * rather than spying on compose() itself.
+ *
+ * `onCompose` runs inside the plugin's compose, after the counter is bumped.
+ * A hook that throws therefore surfaces as a real composePatch failure, which
+ * is the only honest way to exercise compose-failure semantics: faking it at
+ * the Track boundary is exactly the shortcut that hid the original bug.
+ *
+ * @param {{ tracks: Array<object> }} motion
+ * @param {{ onCompose?: (id: string) => void }} [options]
  */
-export function buildRealGraph(motion) {
+export function buildRealGraph(motion, options = {}) {
   const graph = normalizeObservationGraph(motion);
   const composeCounts = new Map();
-  const bump = (id) => composeCounts.set(id, (composeCounts.get(id) ?? 0) + 1);
+  const bump = (id) => {
+    composeCounts.set(id, (composeCounts.get(id) ?? 0) + 1);
+    options.onCompose?.(id);
+  };
 
   const tracks = new Map();
   for (const config of motion.tracks) {
@@ -99,6 +110,21 @@ export function chainMotion(count) {
       id: `n${i}`,
       ...(i === 0 ? {} : { observes: [{ source: `n${i - 1}` }] }),
     })),
+  };
+}
+
+/**
+ * Two disconnected chains, a0 -> a1 and b0 -> b1, with no shared ancestor.
+ * Used to prove that a failure in one branch cannot leak into the other.
+ */
+export function independentChainsMotion() {
+  return {
+    tracks: [
+      { id: "a0" },
+      { id: "a1", observes: [{ source: "a0" }] },
+      { id: "b0" },
+      { id: "b1", observes: [{ source: "b0" }] },
+    ],
   };
 }
 
