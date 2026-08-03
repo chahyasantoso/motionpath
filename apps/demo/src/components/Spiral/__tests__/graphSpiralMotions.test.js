@@ -21,7 +21,13 @@ describe("graph Spiral motion model", () => {
     const entrance = motion.tracks.find((track) => track.id === "ball-entrance");
     const exit = motion.tracks.find((track) => track.id === "ball-exit");
 
-    expect(path.keyframes.pathProgress).toBeTruthy();
+    // `pathProgress` is the path plugin's synthetic runtime field. The authored
+    // schema key is `path`, which produces pathProgress during composition.
+    expect(path.keyframes.path).toBeTruthy();
+    expect(path.keyframes.path.stops).toEqual([
+      { p: 0, v: 0 },
+      { p: 1, v: 1, ease: "none" },
+    ]);
     expect(entrance.keyframes.scale).toBeTruthy();
     expect(exit.keyframes.scale).toBeTruthy();
     expect(entrance.observes).toEqual([{ source: "ball-path", role: "output" }]);
