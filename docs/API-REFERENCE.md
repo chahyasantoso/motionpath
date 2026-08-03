@@ -62,7 +62,20 @@ A destroyed Track throws from `compose()` and `getSnapshot()`, and destroying a 
 - `GraphBinding`: the only managed mutation boundary. `addEdge`, `removeEdge`, `replaceEdge`, `addTrack`, and `removeTrack` validate a candidate graph, move live Track wiring and publisher metadata together, and leave the previous graph intact when a mutation is rejected. Standalone `setObserved()` stays available for unbound Tracks.
 - `GraphPublisher`: owns scheduling. `markDirty(id)` is O(1) and strict about unknown ids; `markAllDirty()` marks everything; `flush()` makes one forward pass over topological order.
 
-`flush()` publishes the marked nodes **and their full downstream closure**, because a dependent's composed output changes when its source does. Idle nodes keep their cached patch instead of recomposing. A compose failure blocks that node's downstream closure and stays pending for the next flush; a publish failure retries only the failed node, since its patch is valid and its dependents already rendered correct data. Independent branches keep going, and errors surface as one `AggregateError` after the pass. See the failure-semantics section of `docs/V4.3-GRAPH-CORRECTNESS-PLAN.md`.
+`flush()` publishes the marked nodes **and their full downstream closure**, because a dependent's composed output changes when its source does. Idle nodes keep their cached patch instead of recomposing. A compose failure blocks that node's downstream closure and stays pending for the next flush; a publish failure retries only the failed node, since its patch is valid and its dependents already rendered correct data. Independent branches keep going, and errors surface as one `AggregateError` after the pass.
+
+Publish retries are configurable per publisher:
+
+```js
+const publisher = new GraphPublisher({
+  graph,
+  tracks,
+  publish,
+  retry: { maxAttempts: 3, backoff: 2, onExhausted: "retain" },
+});
+```
+
+`maxAttempts` counts failed publish calls per node, `backoff` skips complete flushes between attempts, and the backward-compatible defaults are `Infinity` attempts and zero backoff. Exhaustion retains the valid cached patch and stops retrying; `resetRetry(id)` re-arms a node after renderer recovery. Compose failures never consume this budget. `onExhausted: "drop"` is available when bounded work matters more than eventual repaint. See `docs/V4.3-GRAPH-CORRECTNESS-PLAN.md` for the full failure contract.
 
 ## Schema
 
