@@ -103,13 +103,41 @@ export class GraphPublisher {
 
   applyGraph(graph, tracks = this.#tracks) {
     const order = topologicalTrackOrder(graph, { strict: true });
+    const nextTracks = tracks instanceof Map ? tracks : new Map(tracks);
+    const previousTracks = this.#tracks;
+    const previousEdges = this.#edges;
+    const invalidationSeeds = new Set();
+    const previousIds = new Set(previousTracks.keys());
+
+    for (const [id, track] of nextTracks) {
+      if (!previousTracks.has(id) || previousTracks.get(id) !== track) invalidationSeeds.add(id);
+    }
+    for (const id of previousIds) if (!nextTracks.has(id)) invalidationSeeds.add(id);
+
+    const edgeKey = (edge) => `${edge.source}${edge.target}${edge.role ?? "output"}${edge.input ?? ""}`;
+    const previousEdgeKeys = new Map(previousEdges.map((edge) => [edgeKey(edge), edge]));
+    const nextEdges = graph.edges ?? [];
+    const nextEdgeKeys = new Map(nextEdges.map((edge) => [edgeKey(edge), edge]));
+    for (const [key, edge] of previousEdgeKeys) if (!nextEdgeKeys.has(key)) invalidationSeeds.add(edge.target);
+    for (const [key, edge] of nextEdgeKeys) if (!previousEdgeKeys.has(key)) invalidationSeeds.add(edge.target);
+
     this.#detachHooks();
-    this.#tracks = tracks instanceof Map ? tracks : new Map(tracks);
-    this.#adoptGraph(graph.nodes?.map(({ id }) => ({ id })) ?? [], graph.edges ?? [], order);
+    this.#tracks = nextTracks;
+    this.#adoptGraph(graph.nodes?.map(({ id }) => ({ id })) ?? [], nextEdges, order);
     this.#attachHooks();
-    this.#cache.clear();
-    this.#publishPending.clear();
-    this.#marked = new Set(this.#tracks.keys());
+
+    for (const id of previousIds) if (!this.#tracks.has(id)) {
+      this.#cache.delete(id);
+      this.#marked.delete(id);
+      this.#publishPending.delete(id);
+    }
+    for (const id of invalidationSeeds) {
+      if (!this.#tracks.has(id)) continue;
+      this.#cache.delete(id);
+      this.#publishPending.delete(id);
+      this.#marked.add(id);
+    }
+    this.#markDownstream(invalidationSeeds);
   }
 
   addTrack(idOrTrack, trackOrOptions, maybeOptions) {
@@ -159,6 +187,21 @@ export class GraphPublisher {
 
   destroy() { this.#detachHooks(); this.#cache.clear(); this.#marked.clear(); this.#publishPending.clear(); }
   #isWarm() { for (const [id, track] of this.#tracks) { if (track?.isDestroyed) continue; if (!this.#cache.has(id)) return false; } return true; }
+  #markDownstream(seeds) {
+    const queue = [...seeds].filter((id) => this.#tracks.has(id));
+    const seen = new Set(queue);
+    while (queue.length) {
+      const sourceId = queue.shift();
+      for (const [targetId, upstream] of this.#upstream) {
+        if (!upstream.includes(sourceId) || seen.has(targetId)) continue;
+        seen.add(targetId);
+        this.#cache.delete(targetId);
+        this.#publishPending.delete(targetId);
+        this.#marked.add(targetId);
+        queue.push(targetId);
+      }
+    }
+  }
   #adoptGraph(nodes, edges, order) { this.#order = [...order]; this.#edges = edges.map((edge) => ({ source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.input })); this.#upstream = new Map(nodes.map(({ id }) => [id, []])); for (const id of this.#order) if (!this.#upstream.has(id)) this.#upstream.set(id, []); for (const edge of this.#edges) { if (!this.#upstream.has(edge.target)) throw new Error(`Graph edge targets unknown track '${edge.target}'.`); this.#upstream.get(edge.target).push(edge.source); } }
 
   #graphGuard = (observer, source) => {
