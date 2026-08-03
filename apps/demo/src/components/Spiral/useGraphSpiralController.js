@@ -14,16 +14,14 @@ const WAVE_SIZE = 30;
 const GROUP_HOST_OPTIONS = { staggerTransition: { duration: 0.55, ease: "power2.out" }, autoplay: true };
 
 function makeGraphBall(id) {
-  const motion = createGraphSpiralBallMotion({ ballSize: BALL_SIZE, ballTravelSeconds: BALL_TRAVEL_SECONDS });
+  const prefix = `graph-ball-${id}`;
+  const motion = createGraphSpiralBallMotion({ ballSize: BALL_SIZE, ballTravelSeconds: BALL_TRAVEL_SECONDS, idPrefix: prefix });
   const graph = normalizeObservationGraph(motion);
-  const path = engine.createTrackInstance("ball-path", { id: `graph-ball-path-${id}`, duration: BALL_TRAVEL_SECONDS });
-  const entrance = engine.createTrackInstance("ball-entrance", { id: `graph-ball-entrance-${id}`, duration: 0.35 });
-  const exit = engine.createTrackInstance("ball-exit", { id: `graph-ball-exit-${id}`, duration: 0.35 });
-  const tracks = new Map([
-    ["ball-path", path],
-    ["ball-entrance", entrance],
-    ["ball-exit", exit],
-  ]);
+  const [pathConfig, entranceConfig, exitConfig] = motion.tracks;
+  const path = engine.createTrackInstance("ball-path", { id: pathConfig.id, duration: BALL_TRAVEL_SECONDS });
+  const entrance = engine.createTrackInstance("ball-entrance", { id: entranceConfig.id, duration: 0.35 });
+  const exit = engine.createTrackInstance("ball-exit", { id: exitConfig.id, duration: 0.35 });
+  const tracks = new Map([[path.id, path], [entrance.id, entrance], [exit.id, exit]]);
   entrance.setObserved(path, (patch) => patch, { role: "output" });
   exit.setObserved(path, (patch) => patch, { role: "output" });
   const published = new Map();
@@ -39,65 +37,12 @@ export function useGraphSpiralController({ isLoaded }) {
   const hostRef = useRef(null);
   const spawnerRef = useRef(null);
   const counterRef = useRef(0);
-
-  const sync = useCallback(() => setBallVms(ballsRef.current.map((ball) => ({ ...ball, renderTrack: ball.status === "exiting" ? ball.exit : ball.entrance })) ), []);
-  const dispose = useCallback((ball) => {
-    ball.binding.destroy();
-    engine.unmount(ball.path);
-    engine.unmount(ball.entrance);
-    engine.unmount(ball.exit);
-  }, []);
-  const remove = useCallback((ball) => {
-    hostRef.current?.removeChild(ball.path.id);
-    dispose(ball);
-    ballsRef.current = ballsRef.current.filter((item) => item !== ball);
-    sync();
-    spawnerRef.current?.notifyRemoved(1);
-  }, [dispose, sync]);
-  const exit = useCallback((ball) => {
-    if (!ball || ball.status === "exiting") return;
-    ball.status = "exiting";
-    ball.isClickable = false;
-    sync();
-    gsap.to(ball.exit, { progress: 1, duration: 0.35, ease: "none", onComplete: () => remove(ball) });
-  }, [remove, sync]);
-  const entrance = useCallback((ball) => {
-    gsap.to(ball.entrance, { progress: 1, duration: 0.35, ease: "none", onComplete: () => { if (ball.status !== "spawning") return; ball.status = "active"; ball.isClickable = true; sync(); } });
-  }, [sync]);
-  const spawn = useCallback(() => {
-    if (!hostRef.current) return null;
-    const id = ++counterRef.current;
-    const ball = makeGraphBall(id);
-    ball.color = BALL_COLORS[id % BALL_COLORS.length];
-    ball.onClick = () => exit(ball);
-    ballsRef.current.push(ball);
-    hostRef.current.addChild(ball.path, { stagger: SPAWN_INTERVAL_MS / 1000 });
-    sync();
-    entrance(ball);
-    const unsubscribe = ball.path.subscribe((snapshot) => {
-      if (snapshot.progress >= 1) { unsubscribe(); if (ball.status === "active") exit(ball); }
-    });
-    return ball;
-  }, [entrance, exit, sync]);
-
-  useEffect(() => {
-    if (!isLoaded) return undefined;
-    const host = engine.createGroupHost({ id: `graph-spiral-parent-${Date.now()}`, ...GROUP_HOST_OPTIONS });
-    hostRef.current = host;
-    const spawner = new Spawner({
-      clock: gsapTickerClock,
-      interval: 0,
-      maxAlive: WAVE_SIZE,
-      waveSize: WAVE_SIZE,
-      canSpawn: () => { const last = ballsRef.current.at(-1); return !last || last.path.progress() >= MIN_SPAWN_PROGRESS; },
-      factory: spawn,
-      onComplete: () => { if (host.childCount === 0) { spawner.resetWave(); host.seek(0); host.play(); spawner.start(); } },
-    });
-    hostRef.current = host;
-    spawnerRef.current = spawner;
-    spawner.start();
-    return () => { spawner.destroy(); spawnerRef.current = null; for (const ball of ballsRef.current) { host.removeChild(ball.path.id); dispose(ball); } ballsRef.current = []; engine.unmount(host); hostRef.current = null; setBallVms([]); };
-  }, [dispose, isLoaded, spawn]);
-
+  const sync = useCallback(() => setBallVms(ballsRef.current.map((ball) => ({ ...ball, renderTrack: ball.status === "exiting" ? ball.exit : ball.entrance }))), []);
+  const dispose = useCallback((ball) => { ball.binding.destroy(); engine.unmount(ball.path); engine.unmount(ball.entrance); engine.unmount(ball.exit); }, []);
+  const remove = useCallback((ball) => { hostRef.current?.removeChild(ball.path.id); dispose(ball); ballsRef.current = ballsRef.current.filter((item) => item !== ball); sync(); spawnerRef.current?.notifyRemoved(1); }, [dispose, sync]);
+  const exit = useCallback((ball) => { if (!ball || ball.status === "exiting") return; ball.status = "exiting"; ball.isClickable = false; sync(); gsap.to(ball.exit, { progress: 1, duration: 0.35, ease: "none", onComplete: () => remove(ball) }); }, [remove, sync]);
+  const entrance = useCallback((ball) => { gsap.to(ball.entrance, { progress: 1, duration: 0.35, ease: "none", onComplete: () => { if (ball.status !== "spawning") return; ball.status = "active"; ball.isClickable = true; sync(); } }); }, [sync]);
+  const spawn = useCallback(() => { if (!hostRef.current) return null; const id = ++counterRef.current; const ball = makeGraphBall(id); ball.color = BALL_COLORS[id % BALL_COLORS.length]; ball.onClick = () => exit(ball); ballsRef.current.push(ball); hostRef.current.addChild(ball.path, { stagger: SPAWN_INTERVAL_MS / 1000 }); sync(); entrance(ball); const unsubscribe = ball.path.subscribe((snapshot) => { if (snapshot.progress >= 1) { unsubscribe(); if (ball.status === "active") exit(ball); } }); return ball; }, [entrance, exit, sync]);
+  useEffect(() => { if (!isLoaded) return undefined; const host = engine.createGroupHost({ id: `graph-spiral-parent-${Date.now()}`, ...GROUP_HOST_OPTIONS }); hostRef.current = host; const spawner = new Spawner({ clock: gsapTickerClock, interval: 0, maxAlive: WAVE_SIZE, waveSize: WAVE_SIZE, canSpawn: () => { const last = ballsRef.current.at(-1); return !last || last.path.progress() >= MIN_SPAWN_PROGRESS; }, factory: spawn, onComplete: () => { if (host.childCount === 0) { spawner.resetWave(); host.seek(0); host.play(); spawner.start(); } } }); spawnerRef.current = spawner; spawner.start(); return () => { spawner.destroy(); spawnerRef.current = null; for (const ball of ballsRef.current) { host.removeChild(ball.path.id); dispose(ball); } ballsRef.current = []; engine.unmount(host); hostRef.current = null; setBallVms([]); }; }, [dispose, isLoaded, spawn]);
   return { ballVms };
 }

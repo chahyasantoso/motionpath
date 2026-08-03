@@ -1,26 +1,23 @@
-/**
- * Graph-specific motion definitions for the second Spiral demo.
- * The original Spiral remains the behavioral reference and is untouched.
- */
-export function createGraphSpiralBallMotion({ ballSize, ballTravelSeconds }) {
+/** Graph-specific motion definitions for the second Spiral demo. */
+export function createGraphSpiralBallMotion({ ballSize, ballTravelSeconds, idPrefix = "ball" }) {
+  const pathId = `${idPrefix}-path`;
+  const entranceId = `${idPrefix}-entrance`;
+  const exitId = `${idPrefix}-exit`;
   return {
     tracks: [
       {
-        id: "ball-path",
+        id: pathId,
         duration: ballTravelSeconds,
         keyframes: {
-          path: {
-            points: [],
-            stops: [{ p: 0, v: 0 }, { p: 1, v: 1, ease: "none" }],
-          },
+          path: { points: [], stops: [{ p: 0, v: 0 }, { p: 1, v: 1, ease: "none" }] },
           opacity: { stops: [{ p: 0, v: 0 }, { p: 0.05, v: 1 }, { p: 0.88, v: 1 }, { p: 1, v: 0 }] },
           "--ball-size": { stops: [{ p: 0, v: `${ballSize}px` }, { p: 1, v: `${ballSize}px` }] },
         },
       },
       {
-        id: "ball-entrance",
+        id: entranceId,
         duration: 0.35,
-        observes: [{ source: "ball-path", role: "output" }],
+        observes: [{ source: pathId, role: "output" }],
         keyframes: {
           scale: { stops: [{ p: 0, v: 1 }, { p: 0.35, v: 1.7 }, { p: 1, v: 1 }] },
           opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
@@ -28,9 +25,9 @@ export function createGraphSpiralBallMotion({ ballSize, ballTravelSeconds }) {
         },
       },
       {
-        id: "ball-exit",
+        id: exitId,
         duration: 0.35,
-        observes: [{ source: "ball-path", role: "output" }],
+        observes: [{ source: pathId, role: "output" }],
         keyframes: {
           scale: { stops: [{ p: 0, v: 1 }, { p: 0.35, v: 1.7 }, { p: 1, v: 0 }] },
           opacity: { stops: [{ p: 0, v: 1 }, { p: 0.5, v: 0.9 }, { p: 1, v: 0 }] },
@@ -44,17 +41,9 @@ export function createGraphSpiralBallMotion({ ballSize, ballTravelSeconds }) {
 export function createGraphSpiralProject({ spiralPathPoints, ballSize, ballTravelSeconds }) {
   const motion = createGraphSpiralBallMotion({ ballSize, ballTravelSeconds });
   motion.tracks.find((track) => track.id === "ball-path").keyframes.path.points = spiralPathPoints;
-  return {
-    schemaVersion: 4,
-    projectId: "graph-spiral-page",
-    perspective: 1200,
-    motions: [],
-    tracks: motion.tracks,
-  };
+  return { schemaVersion: 4, projectId: "graph-spiral-page", perspective: 1200, motions: [], tracks: motion.tracks };
 }
 
 export function graphSpiralEdgeKeys(motion) {
-  return motion.tracks.flatMap((track) =>
-    (track.observes ?? []).map((edge) => `${edge.source}->${track.id}:${edge.role ?? "output"}`),
-  );
+  return motion.tracks.flatMap((track) => (track.observes ?? []).map((edge) => `${edge.source}->${track.id}:${edge.role ?? "output"}`));
 }
