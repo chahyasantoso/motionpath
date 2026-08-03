@@ -54,6 +54,22 @@ function expectTopological(order, graph, label) {
   }
 }
 
+/** Convert the normalized IR into the fixture shape used by the naive oracle. */
+function graphMotion(graph) {
+  return {
+    tracks: graph.nodes.map(({ id }) => ({
+      id,
+      observes: graph.edges
+        .filter((edge) => edge.target === id)
+        .map(({ source, role, input }) => ({
+          source,
+          role,
+          ...(role === "input" ? { target: input } : {}),
+        })),
+    })),
+  };
+}
+
 describe("GraphPublisher — invalidation fuzz", () => {
   it("publish set always equals the transitive downstream closure of the marks", () => {
     for (let seed = 1; seed <= ITERATIONS; seed += 1) {
@@ -254,14 +270,17 @@ describe("GraphBinding — mutation agreement fuzz", () => {
 
         const existing = binding.graph.edges;
         const removing = existing.length > 0 && rand() < 0.4;
+        const mutationSeeds = new Set();
 
         try {
           if (removing) {
             const edge = existing[Math.floor(rand() * existing.length)];
+            mutationSeeds.add(edge.target);
             binding.removeEdge({ source: edge.source, target: edge.target, role: edge.role });
           } else {
             const source = ids[Math.floor(rand() * ids.length)];
             const target = ids[Math.floor(rand() * ids.length)];
+            mutationSeeds.add(target);
             binding.addEdge({
               source,
               target,
@@ -283,13 +302,12 @@ describe("GraphBinding — mutation agreement fuzz", () => {
         );
         expectTopological(publisher.graphOrder, binding.graph, label);
 
-        // A committed mutation resyncs the publisher, so the next flush must
-        // repaint every surviving node exactly once, in topological order.
+        // A topology commit invalidates only the changed target and its
+        // downstream closure. Unrelated warm cache entries must stay idle.
         published.length = 0;
         publisher.flush();
-        expect(new Set(published), `${label}: mutation did not republish everything`).toEqual(
-          new Set([...binding.tracks.keys()]),
-        );
+        const expected = downstreamClosure(graphMotion(binding.graph), [...mutationSeeds]);
+        expect(new Set(published), `${label}: mutation invalidated the wrong closure`).toEqual(expected);
         expectTopological(published.map((id) => id), binding.graph, `${label}: publish order`);
       }
 
