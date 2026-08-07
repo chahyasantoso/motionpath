@@ -1,5 +1,4 @@
 import { gsap } from "gsap";
-
 export class TrackGroup {
   #masterTimeline; #proxies = new Map(); #tracks = new Map(); #staggerTransition; #graphOrder;
   constructor(masterTimeline, staggerTransition = {}, graphOrder = []) { this.#masterTimeline = masterTimeline; this.#staggerTransition = staggerTransition; this.#graphOrder = [...graphOrder]; }
@@ -14,16 +13,10 @@ export class TrackGroup {
   _unmountChild(child) { this.unmount(child); }
   destroy() { for (const tween of this.#proxies.values()) tween.kill(); this.#proxies.clear(); for (const track of this.#tracks.values()) track._unmount(); this.#tracks.clear(); }
 }
-
 export class Motion {
   id; #triggerDelegate; #group; #binding = null; #active = false; #initialTracks = []; #masterTimeline; #staggerTransition; #graphOrder; #destroyed = false;
   constructor({ id, triggerDelegate, staggerTransition, graphOrder = [] }) { this.id = id; this.#triggerDelegate = triggerDelegate; this.#staggerTransition = staggerTransition ?? {}; this.#graphOrder = [...graphOrder]; }
   init() { if (this.#active) this.destroy(); this.#destroyed = false; this.#active = true; this.#masterTimeline = this.#triggerDelegate.build(); this.#group = new TrackGroup(this.#masterTimeline, this.#staggerTransition, this.#graphOrder); for (const { track, position } of this.#initialTracks) this.#group.mount(track, position); }
-  /**
-   * A Motion owns exactly one graph binding at a time. Replacing one disposes
-   * the outgoing binding, and handing one to a destroyed Motion disposes it
-   * immediately rather than parking a live graph on a dead owner.
-   */
   setGraphBinding(binding) { if (this.#binding === binding) return; if (this.#binding) this.#binding.destroy(); if (this.#destroyed) { binding?.destroy?.(); this.#binding = null; return; } this.#binding = binding ?? null; }
   get graphBinding() { return this.#binding; }
   get isDestroyed() { return this.#destroyed; }
@@ -38,7 +31,5 @@ export class Motion {
   seek(p) { this.#triggerDelegate.seek(p); }
   reverse() { this.#triggerDelegate.reverse(); }
   onComplete(cb) { this.#triggerDelegate.onComplete(cb); }
-  // The binding is disposed before the group so publisher hooks and cycle
-  // guards are gone before any track teardown fires lifecycle events.
   destroy() { if (this.#destroyed) return; this.#destroyed = true; this.#binding?.destroy(); this.#binding = null; if (this.#group) { this.#group.destroy(); this.#group = null; } for (const { track } of this.#initialTracks) track.destroy?.(); this.#initialTracks = []; this.#triggerDelegate.destroy(); this.#masterTimeline = null; this.#active = false; }
 }
