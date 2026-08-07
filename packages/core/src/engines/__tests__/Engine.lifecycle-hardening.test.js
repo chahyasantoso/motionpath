@@ -32,6 +32,19 @@ describe("Engine lifecycle hardening", () => {
     expect(engine.instanceCount).toBe(0);
   });
 
+  it("attaches and disposes the graph binding with the mounted Motion", async () => {
+    const engine = new Engine();
+    await engine.loadProject({
+      schemaVersion: 4,
+      motions: [{ id: "motion", trigger: { type: "manual" }, tracks: [{ id: "track", keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }] }],
+    });
+    const motion = engine.mountInstance("motion");
+    const binding = motion.graphBinding;
+    expect(binding).not.toBeNull();
+    motion.destroy();
+    expect(() => binding.destroy()).not.toThrow();
+  });
+
   it("makes repeated unmount and destroy safe", async () => {
     const engine = new Engine();
     await engine.loadProject({
