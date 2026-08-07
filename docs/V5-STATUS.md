@@ -1,18 +1,19 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-07 21:30 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-14-explicit-graph-inputs`  
+**Status captured:** 2026-08-07 21:56 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-15-observation-graph`  
 **Base branch:** `v5`  
-**Base SHA:** `a73b79de3a0bed2c1f00cff07959613a16342bb9  
-**Active PR:** #94, explicit authored-graph plugin input validation.
+**Base SHA:** `bdde0053f70d28e0328d5c43b2303ce9c842b064`  
+**Active PR:** #95, immutable ObservationGraph extraction.
 
 ## Current position
 
 - PR #91 merged green: Checkpoint C passed.
 - PR #92 merged green: GSAP adapter boundary landed.
 - PR #93 merged green: recursive Motion scheduling landed.
-- Active PR #94 addresses PR-14: explicit `standalone` versus `authored-graph` track modes.
-- If CI is green, merge PR #94 and continue to PR-15 ObservationGraph extraction. If red, use supplied logs and fix the active branch.
+- PR #94 merged green: explicit authored-graph input validation landed.
+- Active PR #95 targets PR-15: ObservationGraph is now an explicit immutable value object; normalization remains the parser and validator.
+- If CI is green, merge PR #95 and continue to PR-16 publisher-only same-motion runtime. If red, use supplied logs and fix the active branch.
 
 ## Open review findings
 
