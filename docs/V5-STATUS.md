@@ -2,12 +2,12 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 17:36 Asia/Jakarta  
+**Status captured:** 2026-08-07 17:48 Asia/Jakarta  
 **Branch reviewed:** `v5-pr-01-baseline`  
 **Base branch:** `v5`  
 **Active PR:** [#76](https://github.com/chahyasantoso/motionpath/pull/76)  
 **Stacked on:** [PR #75](https://github.com/chahyasantoso/motionpath/pull/75)  
-**Latest implementation commits:** `1459daa` baseline runner, `6d7e1af` baseline script, `c72186c` CI artifact upload
+**Latest fixes:** `7be898b` creates the baseline output directory; `7a176c6` removes duplicate push runs for implementation branches
 
 ## Current position
 
@@ -15,15 +15,13 @@
 - **Active implementation:** PR-01, baseline and observability.
 - **Merged v5 implementation PRs:** none; PR-00 is the prerequisite CI bootstrap.
 - **Last passed checkpoint:** none. Checkpoint A is not passed until PR-03 completes.
-- **Current implementation phase:** Phase 0, PR-01 in progress.
-- **Resume here:** merge PR #75 first, rebase/retarget PR #76 onto the updated `v5`, then require the baseline artifact to pass before starting PR-02 lifecycle repair.
+- **Resume here:** wait for the fresh PR-75/PR-76 checks; merge PR-75 first, then rebase/retarget PR-76 onto the updated `v5` and require the baseline artifact to pass.
 
-## PR-01 changes
+## PR-01 diagnosis and fixes
 
-- Added `performance/v5-baseline.mjs`, which wraps the existing rig benchmark and emits a JSON report.
-- Added `npm run benchmark:v5:baseline`.
-- Added a CI baseline job that uploads `docs/benchmarks/v5-baseline.json` as an artifact.
-- No runtime behavior was changed.
+The first baseline job failed because `docs/benchmarks/` did not exist in a clean GitHub Actions checkout. The runner now creates the destination directory before writing `v5-baseline.json`.
+
+The repository workflow was also running on both implementation-branch pushes and pull requests, producing duplicate check sets and cancellation noise. Push triggers now cover the stable base branches and feature/fix/test branches, while `v5-*` implementation branches are validated through their pull requests targeting `v5`.
 
 ## Verified repository state
 
