@@ -10,19 +10,17 @@ export class CompositeRuntime {
   get host() { return this.#host; }
   register(track) { this.#assertAlive(); if (!track?.id) throw new TypeError("CompositeRuntime.register requires a Track."); this.#tracks.set(track.id, track); return this.sync(); }
   unregister(id) { this.#assertAlive(); this.#tracks.delete(id); return this.sync(); }
-  sync() {
-    this.#assertAlive();
-    const tracks = new Map([...this.#tracks].filter(([id]) => this.#host.getChild(id)));
-    const graph = normalizeObservationGraph({ tracks: [...tracks.keys()].map((id) => ({ id })) });
-    this.#runtime?.dispose(); this.#runtime = new GraphRuntime({ graph, tracks, clock: this.#clock }); return this;
-  }
+  sync() { this.#assertAlive(); const tracks = new Map([...this.#tracks].filter(([id]) => this.#host.getChild(id))); const graph = normalizeObservationGraph({ tracks: [...tracks.keys()].map((id) => ({ id })) }); this.#runtime?.dispose(); this.#runtime = new GraphRuntime({ graph, tracks, clock: this.#clock }); return this; }
   flush() { this.#assertAlive(); return this.#runtime?.flush() ?? 0; }
   shadow() {
     this.#assertAlive();
     const legacy = new Map();
     const composed = new Map();
-    for (const id of this.#host.graphOrder ?? []) {
-      const track = this.#host.getChild(id);
+    // TrackGroup.graphOrder is intentionally not the source of truth for a
+    // dynamically spawned host: the host's order starts empty. The adapter's
+    // explicit registration order is the live Spiral child set we shadow.
+    for (const [id, registered] of this.#tracks) {
+      const track = this.#host.getChild(id) ?? registered;
       if (track && !track.isDestroyed) legacy.set(id, track.compose(undefined, composed));
     }
     const published = new Map([...this.#runtime?.patches.snapshot() ?? []].map(([id, patch]) => [id, patch.values]));
