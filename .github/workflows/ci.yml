@@ -103,3 +103,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run benchmark:rig
+
+  v5-baseline:
+    name: v5 baseline report (node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run benchmark:v5:baseline
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v5-baseline-${{ github.sha }}
+          path: docs/benchmarks/v5-baseline.json
