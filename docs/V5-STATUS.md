@@ -2,10 +2,10 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 20:03 Asia/Jakarta  
+**Status captured:** 2026-08-07 20:05 Asia/Jakarta  
 **Branch reviewed:** `v5`  
 **Base branch:** `v5`  
-**Base SHA:** `5f60c40852554b0992a1a4b00310b138cd212fa8`  
+**Base SHA:** `038cdd2eb5fc6132fd9c2f357a422dd6f39e604e`  
 **Active PR:** none. Session closed after PR-10 merge and implementation review.  
 **Closed stale PRs:** #76, #77
 
@@ -29,7 +29,7 @@
 
 ## Review report
 
-- [Implementation review: PR-00 through PR-10](docs/V5-IMPLEMENTATION-REVIEW-2026-08-07.md)
+- `docs/V5-IMPLEMENTATION-REVIEW-2026-08-07.md`: review of PR-00 through PR-10, correctness verdict, remaining gaps, optimization notes, and next-session recommendations.
 
 ## Verification protocol
 
