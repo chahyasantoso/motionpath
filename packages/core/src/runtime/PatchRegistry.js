@@ -1,3 +1,5 @@
+import { toImmutablePatchValues } from "./immutablePatchValue.js";
+
 function stableValue(value) {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) return value.map(stableValue);
@@ -5,7 +7,10 @@ function stableValue(value) {
 }
 function sameValue(a, b) { return JSON.stringify(stableValue(a)) === JSON.stringify(stableValue(b)); }
 function withoutNode(sourceRevisions, nodeId) { return Object.fromEntries(Object.entries(sourceRevisions ?? {}).filter(([id]) => id !== nodeId)); }
-function freezePatch(patch) { return Object.freeze({ ...patch, values: Object.freeze({ ...(patch.values ?? {}) }), sourceRevisions: Object.freeze({ ...(patch.sourceRevisions ?? {}) }) }); }
+// Deep, not shallow: nested objects inside `values` used to stay mutable, so a
+// subscriber could rewrite a published patch in place and every later reader
+// saw the edit as if the producer had published it.
+function freezePatch(patch) { return Object.freeze({ ...patch, values: toImmutablePatchValues(patch.values), sourceRevisions: Object.freeze({ ...(patch.sourceRevisions ?? {}) }) }); }
 
 export class PatchRegistry {
   #patches = new Map();
