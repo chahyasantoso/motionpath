@@ -2,6 +2,7 @@
 
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+import { gsap } from "gsap";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { engine } from "@motionpath/core/engines/Engine.js";
 import { CompositeRuntime } from "@motionpath/core/runtime/CompositeRuntime.js";
@@ -72,6 +73,13 @@ describe("useSpiralWaveController integration", () => {
   it("drives the live controller through spawn, shadow comparison, and cleanup", () =>
     withCiAnnotation(async () => {
       const createHost = vi.spyOn(engine, "createGroupHost");
+      vi.spyOn(gsap, "to").mockImplementation((target, vars) => {
+        queueMicrotask(() => {
+          target.progress(vars.progress);
+          vars.onComplete?.();
+        });
+        return { kill: vi.fn() };
+      });
       let controller;
       function Harness() {
         controller = useSpiralWaveController({ isLoaded: true });
@@ -82,8 +90,12 @@ describe("useSpiralWaveController integration", () => {
       await act(async () => root.render(<Harness />));
       expect(createHost).toHaveBeenCalledOnce();
 
-      act(() => gsapTickerClock.tick());
+      await act(async () => {
+        gsapTickerClock.tick();
+        await Promise.resolve();
+      });
       expect(controller.ballVms).toHaveLength(1);
+      expect(controller.ballVms[0].status).toBe("active");
 
       const host = createHost.mock.results[0].value;
       const ball = controller.ballVms[0];
