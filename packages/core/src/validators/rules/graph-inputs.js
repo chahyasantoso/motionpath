@@ -1,8 +1,9 @@
 import { resolvePluginInput } from "../../domain/plugins.js";
 
 /**
- * Authored graph tracks must declare every required plugin input as an input
- * observation. Standalone tracks keep the documented plugin default.
+ * Tracks opt into strict authored-graph input validation explicitly. Legacy
+ * schemas remain standalone until their author adds `mode: "authored-graph"`.
+ * This avoids treating old observation metadata as a new FK contract.
  */
 export function graphInputsRule(schema) {
   const errors = [];
@@ -11,7 +12,7 @@ export function graphInputsRule(schema) {
     if (!motion || typeof motion !== "object" || !Array.isArray(motion.tracks)) return;
     motion.tracks.forEach((track, trackIndex) => {
       if (!track || typeof track !== "object") return;
-      const mode = track.mode ?? "authored-graph";
+      const mode = track.mode ?? "standalone";
       const path = `motions[${motionIndex}].tracks[${trackIndex}]`;
       if (mode !== "authored-graph" && mode !== "standalone") {
         errors.push({ ruleId: "GRAPH_INPUT_MODE_INVALID", severity: "error", message: "Track mode must be 'authored-graph' or 'standalone'.", path: `${path}.mode` });
