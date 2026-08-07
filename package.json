@@ -9,9 +9,12 @@
     "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:deterministic": "vitest run --reporter=dot",
     "typecheck": "npm exec --yes --package=typescript@5.8.3 -- tsc --noEmit -p tsconfig.json",
     "pack:check": "npm pack --dry-run",
     "format": "prettier . --write",
+    "format:check": "npm exec --yes --package=prettier@3.6.2 -- prettier --check .",
+    "format:check:ci": "npm exec --yes --package=prettier@3.6.2 -- prettier --check package.json .github/workflows/ci.yml",
     "reorg:physical": "node scripts/physical-reorg.mjs",
     "benchmark:rig": "node performance/rig-graph-benchmark.mjs"
   },
