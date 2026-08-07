@@ -2,36 +2,36 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 19:26 Asia/Jakarta  
-**Branch reviewed:** `v5`  
+**Status captured:** 2026-08-07 19:33 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-07-fixture-shadow`  
 **Base branch:** `v5`  
 **Base SHA:** `975fe6dbf33faeb06efc70aa9e5732657701d174`  
-**Active PR:** none. PR-07 has not been opened.  
+**Head SHA:** `f54d9e39f8dcd6e637f45ef0ca1f1b937e1fec91`  
+**Active PR:** [#84](https://github.com/chahyasantoso/motionpath/pull/84)  
+**Checks:** pending at open; merge only after all seven checks are green.  
 **Closed stale PRs:** #76, #77
 
 ## Current position
 
 - **Architecture:** accepted.
 - **Merged:** PR #75 CI bootstrap, PR #78 PR-01 baseline instrumentation, PR #79 PR-02 lifecycle ownership repair, PR #80 PR-03 graph transaction correctness, PR #81 PR-04 runtime scope boundary, PR #82 PR-05 patch and clock contracts, PR #83 PR-06 publisher path behind a flag.
-- **Active:** none.
+- **Active:** PR #84, PR-07 fixture shadow mode.
 - **Last passed checkpoint:** A, after PR-03. Checkpoint B remains gated on PR-08.
-- **Current phase:** Phase 3, PR-06 complete, PR-07 not started.
-- **Resume here:** create PR-07 fixture shadow mode from current `v5`, update this file when the PR opens, then verify its checks before deciding whether to merge.
+- **Current phase:** Phase 3, PR-07.
+- **Resume here:** verify PR #84 checks; merge only if green; then create PR-08 temporary CompositeRuntime and live Spiral shadow from updated `v5`.
 
-## PR-06 changes
+## PR-07 changes
 
-- Added `GraphRuntime.usePublisher`, `getPatch`, `subscribe`, and `compose` contracts.
-- Kept the existing recursive composer as the default when `enabled: false`.
-- Preserved the one-argument compose callback contract.
-- Exposed immutable patch envelopes through the enabled subscription path.
-- Disposal rejects new subscriptions and stops publication.
+- Added deterministic legacy-versus-publisher fixture comparison helpers.
+- Shadow comparisons cover fan-in/fan-out, multi-level chains, disconnected branches, structure/status mismatches, and invalidation closure timing.
+- Numeric values use a documented tolerance; keys, structure, roles, and statuses compare exactly.
+- Rendering authority is unchanged. The fixture shadow is evidence only.
 
 ## Verified state
 
 - Existing group-host/composer path remains authoritative by default.
-- Publisher path is opt-in; no default rendering migration has occurred.
-- PR-05 established deterministic revisions, source progress/revision metadata, one flush per clock tick, and batch-wide subscriber snapshots.
-- PR-03 graph transaction correctness remains merged and Checkpoint A is passed.
+- Publisher/runtime path remains opt-in.
+- PR-06 is merged green.
 - No nested-GSAP spike result is committed; treat it as not run.
 
 ## Verification protocol
@@ -59,4 +59,4 @@ Publisher/runtime path remains opt-in. Existing composer/group-host path remains
 
 ## Evidence policy
 
-A planned feature is not completed feature. A checkpoint passes only when its PR is merged and CI/exit evidence is recorded. A spike passes only when its repro, environment, result, and artifact or test is committed.
+A planned feature is not completed feature. A checkpoint passes only when its PR is merged and CI/exit evidence is recorded.
