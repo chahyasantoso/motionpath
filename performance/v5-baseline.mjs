@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { performance } from "node:perf_hooks";
 
 const startedAt = new Date().toISOString();
@@ -20,5 +21,6 @@ const report = {
 };
 
 const destination = process.argv[2] ?? "docs/benchmarks/v5-baseline.json";
+mkdirSync(dirname(destination), { recursive: true });
 writeFileSync(destination, `${JSON.stringify(report, null, 2)}\n`);
 console.log(`wrote ${destination}`);
