@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Engine } from "../../engines/Engine.js";
 
-function project() { return { schemaVersion: 4, projectId: "motion-host-test", motions: [{ id: "ball-template-motion", trigger: { type: "time", autoplay: false }, tracks: [{ id: "ball-track", duration: 1, keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }] }], tracks: [] }; }
+function project() { return { schemaVersion: 4, projectId: "motion-host-test", motions: [{ id: "ball-template-motion", trigger: { type: "time", autoplay: false }, tracks: [{ id: "ball-track", duration: 1, keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }] }], tracks: [{ id: "host-template-track", duration: 1, keyframes: {} }] }; }
 
 describe("Engine.createMotionHost", () => {
   let engine;
