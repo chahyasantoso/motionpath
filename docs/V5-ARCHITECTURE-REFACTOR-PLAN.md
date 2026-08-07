@@ -1,17 +1,26 @@
 # MotionPath v5 architecture refactor plan
 
 **Status:** proposal, not yet accepted  
-**Revision:** 2026-08-07, integrates `docs/GRAPH-OBSERVATION-AUDIT-2026-08-05.md`  
+**Revision:** 2026-08-07, senior architecture pass  
 **Base branch:** `feat/graph-spiral-demo`  
 **Scope:** runtime architecture refactor, including the observation graph foundation. This is not a graph feature plan.
 
-## Executive judgment
+## Executive decision
 
-The original v5 direction was correct but incomplete. The runtime needs fewer, sharper objects, recursive composition, explicit platform ports, and one composition path. The observation audit adds a non-negotiable prerequisite: the graph code is not simply unused code that can be deleted. It currently installs the only live cycle guard, while its publisher and binding are unreachable, retained by track callbacks, and never flushed.
+The target architecture is directionally right, but the original sequencing is too aggressive. We should **not introduce a project-wide graph, recursive Motion composition, and a new publisher path in the same migration step**. That is three independent sources of semantic change with no safe rollback boundary.
 
-Therefore the graph audit is now a **dependency track inside v5**, not a separate follow-up. Repair graph ownership and lifecycle first, then move graph state out of `Track`, then make the repaired publisher the single render path.
+The recommended strategy is a **strangler migration**:
 
-The target is:
+1. Characterize and repair the currently live lifecycle seams.
+2. Introduce explicit runtime ownership and ports without changing public behavior.
+3. Migrate the existing same-motion graph to one real publisher path behind a compatibility boundary.
+4. Collapse the three composite implementations into `Motion`.
+5. Make nested scheduling recursive and prove it with an isolated adapter spike.
+6. Only then enable a project-wide graph, cross-motion edges, and free tracks behind an explicit capability/feature flag.
+
+This preserves the important conclusion from the graph audit: the graph code is not harmless dead code. It currently installs the only live cycle guard, while its publisher and binding are unreachable, retained by track callbacks, and never flushed.
+
+The target end state remains:
 
 ```text
 Project schema
@@ -24,47 +33,63 @@ Project schema
   -> React / DOM / Canvas / Flutter adapters
 ```
 
-The core design rules are:
+## Non-negotiable design rules
 
-1. A `Track` is a leaf. It samples and composes its own plugin output.
-2. A `Motion` is a composite. It schedules `Track` or nested `Motion` children recursively.
+1. `Track` is a leaf. It samples and composes only its own plugin output.
+2. `Motion` is the sole composite. It schedules `Track` or nested `Motion` children recursively.
 3. Topology is a tree. Observation is a DAG. Never merge those models.
-4. GSAP is an adapter behind two ports: `Interpolator` and `Scheduler`.
-5. The project owns one observation graph and one flush barrier.
+4. GSAP is an adapter behind `Interpolator`, `Scheduler`, and `Clock` ports.
+5. There is one graph owner per runtime scope. The migration starts motion-scoped and ends project-scoped.
 6. A subscriber consumes a published patch. It does not recursively compose the graph itself.
-7. Mutations are atomic, ownership is explicit, and every runtime object has one disposer.
+7. Mutations are atomic, ownership is explicit, and every runtime object has one idempotent disposer.
+8. Compatibility behavior must live at a boundary, not in `Track` or `Motion` forever.
+9. Every semantic migration has a kill switch and a measured exit gate.
 
----
+## Architecture decisions
 
-# 1. Bird's-eye architecture
+### AD-1: Use a staged graph scope
 
-## 1.1 What exists today
+The final scope is one graph per loaded project, but the first publisher migration is same-motion only. Add a `GraphRuntime` abstraction with a scope-aware registry so the implementation can move from `MotionRuntime` to `ProjectRuntime` without changing graph mutation semantics.
 
-MotionPath is a declarative animation runtime. A JSON project is validated and normalized, plugins compile keyframes, GSAP schedules time, tracks compose renderer-neutral patches, and React applies those patches to the DOM.
+- `MotionRuntime`: temporary compatibility scope for the migration.
+- `ProjectRuntime`: final scope, owning all mounted motions and adopted/free tracks.
+- No code outside the runtime should know which scope is active.
 
-The layering is good. The object model is not:
+Cross-motion edges and free tracks are **not enabled** until the project scope has passed the clock, unmount, rollback, and performance gates.
 
-- `Track` currently combines interpolation, plugin composition, timeline topology, observation edges, and composite playback.
-- `TrackGroup`, `Motion`, and `Engine.createGroupHost()` are three implementations of a composite timeline.
-- `Track.compose()` is the only live composition path; `Motion.composeGraph()` has no callers.
-- `GraphPublisher` and `GraphBinding` are built during motion mounting with `publish: () => {}`, never flushed, and not attached to the `Motion`. Their lifecycle closures still retain them.
-- React recomposes the upstream closure independently for every subscriber and frame.
-- GSAP is imported from core domain/use-case modules and raw GSAP tweens leak through the `Track` constructor.
+### AD-2: Use one composed patch contract
 
-## 1.2 Why this matters
+Define a renderer-neutral patch envelope before wiring React to the publisher:
 
-This is not mainly a naming problem. The current structure causes concrete correctness and performance failures:
+```js
+{
+  nodeId,
+  revision,
+  values,
+  sourceProgress,
+  status: "ready" | "blocked" | "error",
+}
+```
 
-- A grandchild's parent-relative offset is inserted as an absolute master-timeline offset.
-- Removing a subtree can leave descendants scheduled as orphaned tweens.
-- Calling `Motion.init()` twice can empty the Motion and reuse a destroyed trigger delegate.
-- The graph's live cycle guard exists without a reachable graph mutation API.
-- `removeChild()` removes live observation edges without notifying the graph binding or publisher.
-- The publisher's cache is unused, while the naive path does repeated recursive composition.
-- Two graph sorters can produce different tie-break ordering after mutations.
-- A project-wide graph, cross-motion edges, and free tracks are impossible with one graph per Motion.
+Patches are immutable for subscribers. A revision changes only when the node's effective output changes. Subscribers must never observe a half-flushed graph.
 
-## 1.3 Target ownership
+### AD-3: Make clock ownership explicit
+
+Add a `Clock` port. A publisher flush is scheduled once per runtime clock tick, not opportunistically from an individual track callback. The clock defines ordering only; it does not synchronize independently controlled Motion timelines.
+
+For the final project graph, each source is sampled at its current progress during the shared flush. This behavior must be documented and tested for paused, seeking, reversed, and independently mounted motions.
+
+### AD-4: Transaction boundaries are first-class
+
+Graph mutations, motion mount, motion unmount, project reload, and publisher flush each have explicit transaction boundaries. A failed operation must leave the previous committed runtime usable.
+
+The minimum rule is: **prepare, validate, wire, commit, publish invalidation**. Never mutate live edges or shared membership maps while still resolving later inputs.
+
+### AD-5: Public API follows ownership, not implementation
+
+Do not expose `GraphPublisher`, `GraphBinding`, `SchedulerSlot`, raw GSAP objects, or graph internals from the package root. Expose public `Engine`, `Motion`, `Track`, runtime handles, and supported adapter contracts only.
+
+## Target ownership
 
 ```text
 Engine
@@ -72,10 +97,9 @@ Engine
   owns one ProjectRuntime
 
 ProjectRuntime
-  owns one ObservationGraph
-  owns one GraphPublisher
-  owns one project clock subscription
-  registers mounted Motion and free Track nodes
+  owns one ObservationGraph, GraphPublisher, Clock
+  owns graph membership and qualified node ids
+  owns mounted Motion and adopted/free Track registration
 
 Motion
   owns one Scheduler and child slots
@@ -87,85 +111,44 @@ Track
   has no children, host, observation edges, or playback bridge
 
 ObservationGraph
-  owns qualified node ids, edges, validation, cycle checks, and topological order
+  owns qualified node ids, edges, validation, cycle checks, topological order
 
 GraphPublisher
   owns dirty state, composed-patch cache, downstream invalidation, retry policy
   publishes once per dirty node per flush
 
 Adapters
-  own GSAP, DOM, React bindings, clocks, and browser capability checks
+  own GSAP, DOM, React, clocks, and browser capability checks
 ```
 
----
+## Current findings that drive the order
 
-# 2. Structural findings and their consequences
-
-## 2.1 `Track` is five roles
-
-`packages/core/src/lib/Track.js` currently owns:
-
-| Current role | Current state | v5 owner |
-|---|---|---|
-| interpolation | raw GSAP tween and proxy state | `Interpolator` adapter + `Track` |
-| plugin composition | `compose()` and plugin metadata | `Track` |
-| topology | `children`, `parent`, host, offsets, layout | `Motion` |
-| observation graph | observed edges, reverse observers, cycle guard | `ObservationGraph` |
-| playback handle | group host and play/seek forwarding | `Motion` |
-
-The private-field count is a symptom. The real issue is that unrelated owners need `_`-prefixed escape hatches into the same object.
-
-## 2.2 Composition is flat, not recursive
-
-`Track.addChild()` computes an offset relative to the parent's children. `TrackGroup.mount()` inserts that value directly into the master timeline. Depth one works only because the first host is at zero. At depth two, the parent's offset is lost.
-
-The fix is not merely a shared `Progressable` interface. The scheduler must nest a child scheduler, and offsets must remain parent-relative. Recursive ownership also fixes subtree removal and destroy cleanup.
-
-## 2.3 There are three composites
-
-`TrackGroup`, `Motion`, and `Engine.createGroupHost()` all hold children and expose playback. `Motion` additionally mirrors tracks in `#initialTracks`, `TrackGroup.#tracks`, and `TrackGroup.#proxies`. The duplicated lifecycle creates the `init()`-twice bug.
-
-v5 has exactly one composite: `Motion`. A group host becomes a manual-trigger `Motion`, not a synthetic one-second `Track`.
-
-## 2.4 The graph audit changes the priority
-
-The audit's headline is authoritative:
-
-> There are three composition systems, and the graph subsystem is not one of them.
-
-The live path is `Track.compose()` called by React subscribers. `composeGraph()` has zero callers. `GraphPublisher` and `GraphBinding` are instantiated but not reachable after mount. However, the publisher installs the live graph guard on tracks, so deleting the graph objects now would silently remove cycle protection.
-
-Important audit findings incorporated into this plan:
-
-- `Engine.#mountMotion()` does not call `motion.setGraphBinding(binding)`, so binding teardown never happens.
-- `GraphPublisher` and `GraphBinding` can share the same mutable `tracks` Map.
-- `GraphPublisher.removeTrack()` is live through destroy hooks and must not be deleted casually.
-- `Track.removeChild()` detaches observation edges without graph invalidation.
-- `GraphBinding.addTrack()` is not atomic when a later edge fails.
+- `Track` currently combines interpolation, plugin composition, topology, observation edges, and playback.
+- `TrackGroup`, `Motion`, and `Engine.createGroupHost()` are three composite implementations.
+- `Track.compose()` is the only live composition path; `composeGraph()` has no callers.
+- `GraphPublisher` and `GraphBinding` are constructed during mount but not attached to the Motion, never flushed, and retained through track callbacks.
+- The graph guard is live and must not disappear during cleanup.
+- `removeChild()` can remove live observation edges without graph invalidation.
+- `GraphPublisher` and `GraphBinding` can share a mutable `tracks` Map.
+- `GraphBinding.addTrack()` is not atomic on failure.
 - `replaceObserved()` emits removals but not additions.
-- `retry.onExhausted` is validated but ignored.
-- Publisher graph nodes and registered tracks are not asserted to be the same set.
-- Two topological sort implementations have unstable, different tie-break inputs.
-- The intended future is one project graph with cross-motion edges and free tracks, not one graph per Motion.
+- Retry `onExhausted` is validated but ignored.
+- Two topological sort paths can produce different tie-break ordering.
+- The current public barrel exports internals and omits the intended public object model.
 
-These are not optional cleanup items. They define the order of the refactor.
+## Contracts
 
----
-
-# 3. Target contracts
-
-## 3.1 Leaf and composite contract
+### Progressable
 
 Use a structural contract, not inheritance:
 
 ```js
-// Progressable: shared public shape only
 { id, duration, progress(value?), getSnapshot(), subscribe(callback) }
 ```
 
-`Track` and `Motion` may both satisfy this shape, but the contract itself does not solve nesting. `Motion` must own a scheduler that can contain another scheduler.
+Both `Track` and `Motion` may satisfy it. The contract alone does not solve nesting; `Motion` still needs a scheduler capable of containing another scheduler.
 
-## 3.2 Interpolator port
+### Interpolator
 
 ```js
 interface Interpolator {
@@ -175,9 +158,9 @@ interface Interpolator {
 }
 ```
 
-`BuildTrackTween` keeps plugin staging, collision checks, and keyframe description generation. `GsapInterpolator` turns that description into a GSAP tween. The domain never reads `_gsap` and never calls `progress()` or `kill()` on a raw tween.
+`BuildTrackTween` owns plugin staging, collision checks, and keyframe description generation. `GsapInterpolator` turns that description into GSAP behavior. Core code never reads `_gsap` or calls `progress()`/`kill()` on a raw tween.
 
-## 3.3 Scheduler port
+### Scheduler
 
 ```js
 interface Scheduler {
@@ -194,250 +177,196 @@ interface Scheduler {
 }
 ```
 
-The GSAP adapter drives children explicitly through `onUpdate`, for example `child.progress(proxy.t)`. Do not rely on GSAP's function-valued property setter behavior.
+The GSAP adapter must drive children explicitly through `child.progress(proxy.t)`. Do not rely on function-valued property setter behavior.
 
-`SchedulerSlot` is an infrastructure handle. It must not become the public-facing `Track` handle.
+### Clock
 
-## 3.4 Project graph contract
+```js
+interface Clock {
+  subscribe(callback): unsubscribe;
+  start(): void;
+  stop(): void;
+  now(): number;
+}
+```
 
-The end state is one graph per loaded project:
+The clock must be injectable in tests. The production adapter may use `gsap.ticker`; core tests must use a deterministic fake clock.
 
-- Mounted motion tracks use qualified ids such as `motionId/trackId`.
-- Free/adopted tracks use a reserved namespace such as `~/trackId`.
-- Bare authored references remain motion-local for backward compatibility.
-- Qualified references resolve across motions.
-- The project graph has one deterministic tie-break key independent of mount order.
-- Partial mounting has an explicit policy: either staged unresolved nodes are allowed and reported, or all referenced nodes must be present before commit. The default recommendation is staged registration with commit-time validation before a flush.
+## Phased execution plan
 
-Before implementing cross-motion edges, settle these policies:
+Each phase is one PR unless stated. Every phase starts with tests and ends with an explicit exit gate. No phase may silently change the migration flag's default behavior.
 
-1. When a source Motion unmounts, does a dependent edge auto-remove, become invalid, or block unmount? Recommendation: auto-remove with a diagnostic and downstream invalidation.
-2. If two independent Motion timelines are at different progress values, what does a cross-motion observer see? Recommendation: sample each source at its current progress during the shared flush; the project clock orders composition, it does not synchronize timelines.
-3. What is the deterministic order for independent nodes? Recommendation: qualified id, not mount order.
-
----
-
-# 4. Phased execution plan
-
-Each phase is one PR unless stated. Do not combine structural phases. Every phase starts with tests and ends with an explicit exit gate.
-
-## Phase 0: characterization and guardrails
-
-**Why:** timing and lifecycle behavior must be measured before changing it.
+### Phase 0: characterization, observability, and guardrails
 
 **Do:**
 
-- Add a red grandchild-offset regression test.
-- Add a red subtree-orphan test.
-- Add a red `Motion.init()`-twice test.
-- Add a 60-frame compose-count baseline with 3-depth and 10 subscribers.
+- Add red tests for grandchild offsets, orphaned subtree removal, and `Motion.init()` twice.
 - Add mount/unmount churn and retained-object checks.
-- Extend the core boundary test to forbid GSAP imports outside adapters.
-- Record test count, build result, bundle size, and package contents.
+- Add a 60-frame baseline with 3-depth nesting, 10 subscribers, and the Spiral demo scale.
+- Record compose calls per node, flush duration, dropped-frame count, heap-retained objects, test count, build result, bundle size, and package contents.
+- Add a core boundary test forbidding GSAP imports outside adapters.
+- Add a feature-flag test proving old and new paths can be selected deterministically.
+- Add a test fixture for paused, reversed, seeking, and independently mounted motions.
 
-**Exit:** tests document current failures; no runtime behavior changes.
+**Exit:** current failures are documented; no runtime behavior changes; baseline artifacts are committed.
 
-## Phase 1: repair graph lifecycle before touching architecture
-
-**Why:** the graph audit proves the current graph is partly live. Deleting it would remove cycle protection and create worse failures.
+### Phase 1: repair graph lifecycle without changing composition
 
 **Do:**
 
-1. Attach the binding on the success path with `motion.setGraphBinding(binding)`, or, if the project-runtime migration begins immediately, attach it to `ProjectRuntime`. Never leave it in a local variable.
-2. Give the graph owner one explicit disposer and test destruction after successful mount, failed mount, and reload.
-3. Copy `tracks` defensively in both publisher construction and `applyGraph`.
-4. Assert graph node ids and track ids are equal in both directions.
-5. Keep `GraphPublisher.removeTrack()` until destroy ownership is rewritten; do not apply the old blanket deletion recommendation.
-6. Stop the publisher's destroy hook from mutating binding-owned membership. Membership changes go through the graph owner.
-7. Make `GraphBinding.addTrack()` atomic: resolve all sources, validate all edges, wire, commit, and subscribe as one transaction; unwind and destroy on failure.
-8. Route edge removal from `removeChild()` through graph invalidation, or make topology removal call the graph owner explicitly.
+1. Attach the binding on the success path, or move it immediately to the runtime owner. Never leave it in a method-local variable.
+2. Give the graph owner one explicit idempotent disposer and test successful mount, failed mount, reload, unmount, and repeated destroy.
+3. Copy `tracks` defensively in publisher construction and `applyGraph`.
+4. Assert graph node ids and registered track ids are equal in both directions.
+5. Keep `GraphPublisher.removeTrack()` until destroy ownership is rewritten and tested.
+6. Stop publisher hooks from mutating binding-owned membership. Membership changes go through the graph owner.
+7. Make `GraphBinding.addTrack()` atomic: resolve all sources, validate all edges, wire, commit, subscribe, and unwind on failure.
+8. Route `removeChild()` edge teardown through graph invalidation, or make topology removal call the graph owner explicitly.
 9. Emit edge additions during `replaceObserved()`.
-10. Either implement `retry.onExhausted: retain` or remove the option. Prefer removing it unless a caller needs retain semantics.
-11. Replace duplicated publisher mutation paths with the graph owner's transaction API, but preserve the live destroy path until its replacement is tested.
-12. Use one topological sorter and one deterministic tie-break policy.
+10. Delete ignored `retry.onExhausted` semantics or implement them. Prefer deletion until a real caller needs retain behavior.
+11. Use one topological sorter with one deterministic tie-break key.
 
-**Exit:** no unreachable binding, no shared mutable ownership, no silent graph/live-track divergence in lifecycle tests.
+**Exit:** no unreachable binding, no shared mutable ownership, no silent graph/live-track divergence, and cycle protection remains active.
 
-## Phase 2: establish the project graph boundary
-
-**Why:** cross-motion edges and free tracks are an architectural direction, not a later optimization. The object model must not hard-code one graph per Motion.
+### Phase 2: introduce runtime scope and compatibility boundaries
 
 **Do:**
 
-- Introduce `ProjectRuntime` owned by `Engine`.
-- Move `GraphPublisher` and `GraphBinding` ownership from `Motion` to `ProjectRuntime`.
-- Register mounted Motion children and adopted/free tracks through one API.
-- Add qualified node-id resolution and validator diagnostics.
-- Define staged mounting behavior and source-unmount semantics.
-- Keep graph mutations atomic across all motions.
-- Add tests for same-motion edges, cross-motion edges, free tracks, source removal, and duplicate qualified ids.
-- Keep `Motion` unaware of graph topology except for publication/subscription integration.
+- Introduce `GraphRuntime` with `register`, `unregister`, `replaceEdges`, `flush`, and `dispose`.
+- Start with one `MotionRuntime` per mounted Motion, but hide that scope behind the same interface intended for `ProjectRuntime`.
+- Move publisher/binding ownership out of `Motion` implementation details and into the runtime owner.
+- Add a deterministic fake Clock and patch registry.
+- Define patch revision, blocked-node, error, and retry behavior.
+- Add a runtime kill switch that keeps the current recursive subscriber path as fallback.
+- Make mount and unmount prepare a candidate membership set, validate it, then commit atomically.
 
-**Exit:** one graph per loaded project, one owner for graph membership, and no graph object retained only through callback closure.
+**Exit:** the graph is addressable through one runtime API, the old path still passes, and the new runtime can be constructed and disposed without leaks.
 
-## Phase 3: collapse to one composite
+### Phase 3: wire one publisher path for same-motion graphs
 
-**Why:** ports and recursion must be designed against one client shape, not three composites.
+**Do:**
+
+- Run one publisher flush per injected Clock tick.
+- Make React subscribe to published patches when the migration flag is enabled.
+- Keep standalone tracks on their direct local composition path.
+- Preserve the one-argument `compose` callback supplied to user `transformFn`s for compatibility.
+- Publish successful nodes in topological order; retain retry state for failed nodes; block downstream nodes only when inputs are unavailable.
+- Ensure subscribers never receive partial flush state.
+- Add shadow mode that computes both old and new patches, compares them, and reports mismatches without switching rendering.
+
+**Exit:** same-motion graphs compose each dirty node once per tick, shared sources are composed once, old/new outputs match in shadow mode, and the fallback can be restored with one flag.
+
+### Phase 4: collapse to one composite
 
 **Do:**
 
 - Merge `TrackGroup` behavior into `Motion`.
-- Delete `#initialTracks`, `#tracks`, and `#proxies` mirroring in favor of one ordered child collection with opaque scheduler slots.
+- Replace mirrored `#initialTracks`, `#tracks`, and `#proxies` with one ordered child collection plus opaque scheduler slots.
 - Build the scheduler in the constructor; delete `init()`.
-- Delete `Engine.createGroupHost()` and replace it with `createMotion({ trigger: { type: "manual" } })`.
-- Delete `Track` playback forwarding, group host state, mount state, and topology methods.
-- Consolidate trigger delegates around one control implementation plus trigger-specific configuration.
+- Replace `Engine.createGroupHost()` with `createMotion({ trigger: { type: "manual" } })`.
+- Delete Track playback forwarding, group-host state, mount state, and topology methods.
 - Define `unmount()` as detach and `destroy()` as ownership disposal. Both are idempotent.
 - Migrate Spiral, TowerDefense, Walker, and all tests.
 
-**Exit:** only `Motion` schedules children; no `TrackGroup`, group-host bridge, or two-phase init remains.
+**Exit:** only Motion schedules children; no TrackGroup, group-host bridge, or two-phase initialization remains.
 
-## Phase 4: introduce ports and fake-backed tests
-
-**Why:** the current Flutter/Canvas portability claim is false while raw GSAP objects leak into Track and domain modules.
+### Phase 5: introduce ports and fake-backed tests
 
 **Do:**
 
-- Add `ports/Interpolator.js` and `ports/Scheduler.js`.
-- Move GSAP timeline/tween construction into `adapters/gsap/`.
-- Move the ticker clock into the GSAP adapter directory.
-- Make `BuildTrackTween` return a platform-neutral keyframe description.
-- Make Track depend on `Interpolator`, not a raw tween.
-- Make Motion depend on `Scheduler`, not a raw timeline.
-- Make the GSAP scheduler call `child.progress()` explicitly.
-- Run Track and Motion tests against fake ports without loading GSAP.
+- Add `Interpolator`, `Scheduler`, and `Clock` ports.
+- Move GSAP timeline/tween construction and ticker integration into `adapters/gsap/`.
+- Make Track depend on Interpolator and Motion depend on Scheduler.
+- Run Track, Motion, and publisher tests without loading GSAP.
 - Empty the boundary-test allow-list.
 
-**Exit:** no GSAP imports outside adapters; fake-backed core tests pass; snapshots contain no GSAP implementation details.
+**Exit:** no GSAP import exists outside adapters; fake-backed core tests pass; snapshots contain no GSAP details.
 
-## Phase 5: make composition genuinely recursive
+### Phase 6: make composition genuinely recursive
 
-**Why:** this is where the grandchild bug is fixed. A shared interface alone is insufficient.
-
-**Hard gate before coding:** run an isolated nested-GSAP spike proving that a child scheduler can be nested, reflowed, sought, and disposed at depth three. Do not infer this from documentation.
+**Hard gate before coding:** run an isolated nested-GSAP spike proving a child scheduler can be nested, reflowed, sought, reversed, and disposed at depth three. Do not infer this from documentation.
 
 **Do:**
 
-- Make `Motion` satisfy `Progressable`.
-- Allow `Motion.add(child)` for either Track or nested Motion.
+- Make Motion satisfy Progressable.
+- Allow Motion.add(child) for either Track or nested Motion.
 - Keep layout offsets parent-relative.
-- Put every child on its parent's scheduler, never directly on an ancestor scheduler.
+- Put every child on its immediate parent's scheduler, never directly on an ancestor scheduler.
 - Make subtree removal recursively dispose scheduler slots and descendants.
-- Ensure destroy without an explicit remove cannot leave a scheduled child.
-- Keep `GaplessLayoutDelegate` unchanged unless characterization proves it wrong; its current responsibility is correct.
+- Ensure destroy without explicit remove cannot leave a scheduled child.
 
 **Exit:** arbitrary-depth nesting passes; grandchild offset and orphan tests are green; no Track has parent/children/host fields.
 
-## Phase 6: move observation state out of Track
-
-**Why:** topology and data-flow are different graphs. Once topology leaves Track, observation state must leave too.
+### Phase 7: move observation state out of Track
 
 **Do:**
 
-- Introduce `ObservationGraph` as the sole owner of edges, reverse indexes, cycle validation, and topological order.
-- Make `Track.compose(input)` compose only its own plugin output. It does not walk upstream edges.
-- Move `setObserved`, `removeObserved`, and `replaceObserved` semantics into graph transactions.
-- Preserve `GraphBinding`'s atomic mutation behavior, but make it the graph runtime API rather than a coordinator between duplicated live state and IR.
-- Remove `_setGraphGuard`, `_addObserver`, `_removeObserver`, and live observed maps from Track.
-- Run cycle validation once per graph mutation and once during normalization, with one implementation and stable diagnostics.
+- Introduce ObservationGraph as sole owner of edges, reverse indexes, cycle validation, and topological order.
+- Make Track.compose(input) compose only its own plugin output.
+- Move setObserved, removeObserved, and replaceObserved semantics into graph transactions.
+- Remove graph guards and live observed maps from Track only after the runtime graph owns cycle validation in all enabled paths.
+- Preserve standalone-track behavior explicitly: unaffiliated tracks may use local composition; adopted tracks use runtime graph validation.
 
-**Exit:** Track is a leaf with no topology or observation API; graph tests pass through ObservationGraph; cycle rejection has one owner.
+**Exit:** Track is a leaf; graph tests run through ObservationGraph; cycle rejection has one owner; compatibility mode still has equivalent protection.
 
-## Phase 7: make publishing the only composition path
+### Phase 8: promote to ProjectRuntime
 
-**Why:** the audit confirms that `composeGraph()` is unused and React recomposes per subscriber. The publisher cache only pays off when it is the single path.
+**Prerequisite:** Phases 1-7 pass all correctness and performance gates in same-motion mode.
 
 **Do:**
 
-- Delete `Motion.composeGraph()`, `TrackGroup.composeGraph()`, `applyGraphOrder()`, and `#graphOrder`; do not repair an API with zero callers.
-- Give ProjectRuntime one publisher and one clock/tick integration.
-- Flush once per clock tick in project topological order.
-- Publish patches through a per-node subscription registry.
-- Make React subscribe to published patches rather than call `track.compose()`.
-- Keep standalone tracks supported through a direct local composition path when they are not adopted into a ProjectRuntime.
-- Remove `Overlay`; represent entrance/exit layering with the graph mechanism or a clearly separate renderer concern, not two equivalent runtime APIs.
-- Define error behavior: successful nodes publish, failed nodes retain retry state, downstream nodes are blocked only when their inputs are unavailable.
+- Introduce one ProjectRuntime per loaded project with one graph, publisher, clock, and membership owner.
+- Add qualified ids such as `motionId/trackId` and a reserved namespace for free tracks such as `~/trackId`.
+- Keep bare authored references motion-local for backward compatibility.
+- Add `adopt(track)` for free tracks.
+- Define staged mounting: register candidates, validate the complete candidate graph, then commit; no partial graph becomes renderable.
+- Define source unmount semantics: dependent edges are auto-removed with a diagnostic and downstream invalidation. They do not silently resolve to null.
+- Define independent timeline semantics: each source is sampled at its current progress during the shared flush.
+- Use qualified id as the deterministic tie-break key, never mount order.
+- Add tests for cross-motion edges, free tracks, duplicate ids, source removal, partial mount failure, reload, and foreign unmount.
 
-**Exit:** exactly one production compose call site, one flush barrier, shared composition for shared sources, and dirty state drains after each flush.
+**Exit:** one graph per loaded project, one membership owner, one flush barrier, and no cross-motion behavior enabled without explicit capability selection.
 
-## Phase 8: extract assembly and simplify Engine
-
-**Why:** `Engine` currently hides graph ownership and motion assembly, which is how the dropped binding escaped review.
+### Phase 9: simplify Engine and public API
 
 **Do:**
 
 - Extract `assembleMotion` and `assembleProjectRuntime` use cases.
 - Keep Engine responsible for dependencies, project load/reload, instance ownership, and public lookup.
-- Replace linear duck-typed `getTrack()` scanning with typed registries for tracks, motions, and free objects.
-- Make load failure-atomic and dispose the old ProjectRuntime only after the candidate is ready.
-- Test partial assembly failure, reload, foreign unmount, duplicate ids, and repeated destroy.
-
-**Exit:** Engine is a lifecycle façade, not a runtime assembler; no graph object is created inside a method scope and lost.
-
-## Phase 9: public API, docs, and adapters
-
-**Why:** the current barrel exports internals while omitting the public object model, forcing deep imports.
-
-**Do:**
-
+- Replace duck-typed scanning with typed registries for motions, tracks, and free objects.
+- Make reload failure-atomic: prepare the candidate ProjectRuntime, validate it, then swap and dispose the old runtime.
 - Export Engine, Motion, Track, public contracts, and supported adapters from the package root.
 - Hide GraphPublisher internals, normalization helpers, and use cases behind package exports.
 - Block deep imports into `lib/` and `usecases/` with an exports map.
-- Update `ARCHITECTURE.md`, the observation audit, graph guides, API reference, and demo docs.
-- Add ADRs for recursive composition, two ports, one project graph, one publisher path, and Overlay removal.
 
-**Exit:** a clean consumer fixture imports only public APIs; docs describe the actual runtime rather than planned-but-unused methods.
+**Exit:** Engine is a lifecycle facade, not a runtime assembler; consumers use public APIs only; old runtime is still usable if candidate assembly fails.
 
-## Phase 10: optional tween collapse
+### Phase 10: measurement-gated optimization
 
-**Why last:** after the publisher and compose path are fixed, tween count may not be the bottleneck. This change also depends on unverified GSAP re-parenting and reflow behavior.
+Only optimize after the publisher path is real and the project graph is enabled.
 
-**Gate:** isolated repro, benchmark at demo scale, and a measured win in CPU or memory. No number, no PR.
+**Required evidence before merging an optimization:**
 
----
+- p50 and p95 flush time at baseline and demo scale.
+- compose count per node per clock tick.
+- retained objects after repeated mount/unmount/reload churn.
+- dropped frames during spawn, pop, reflow, and cross-motion updates.
+- bundle-size and package-content diff.
+- visual output comparison against the compatibility path.
 
-# 5. Sequencing summary
+Optional tween collapse, heap-based topological sorting, and downstream-index optimization are separate PRs. No benchmark, no optimization PR.
 
-```text
-0  Characterize behavior and tighten boundaries
-1  Repair graph lifecycle and ownership seams
-2  Establish one project graph and cross-motion policy
-3  Collapse TrackGroup / Motion / group-host into one Motion
-4  Add Interpolator and Scheduler ports
-5  Make scheduler composition recursive
-6  Move observation state into ObservationGraph
-7  Make GraphPublisher the single compose/publish path
-8  Extract assembly and reduce Engine
-9  Fix public exports and documentation
-10 Optional tween collapse, measurement-gated
-```
+## Explicit policies to lock before ProjectRuntime
 
-The important dependency changes from the previous v5 plan are:
+1. **Source removal:** auto-remove dependent edges, emit a diagnostic, invalidate downstream nodes.
+2. **Timeline independence:** sample every source at its current progress during the shared flush.
+3. **Ordering:** sort independent nodes by qualified id.
+4. **Partial mounting:** staged registration is allowed, but a candidate graph must validate before it can flush.
+5. **Failure isolation:** successful nodes publish; failed nodes retain retry state; dependent nodes are blocked only when required inputs are unavailable.
+6. **Mutation atomicity:** failed add, remove, replace, mount, unmount, and reload leave the last committed runtime intact.
+7. **Standalone tracks:** remain supported, but they are outside ProjectRuntime and do not receive project-wide cycle validation until adopted.
 
-- Graph lifecycle repair is now before structural graph extraction.
-- Project-wide graph ownership is explicit before moving graph state out of Track.
-- `composeGraph()` is deleted, not revived, because the audit found zero callers.
-- `GraphPublisher.removeTrack()` is retained until destroy ownership is deliberately rewritten.
-- The project graph is not postponed until after the render path; cross-motion and free-track semantics are settled before the publisher becomes global.
-- Recursive composition still requires the GSAP nesting spike. This remains a hard gate.
-
----
-
-# 6. Explicit non-goals
-
-- Do not eliminate standalone tracks. They are a real product category.
-- Do not make `SchedulerSlot` the public handle.
-- Do not use inheritance between Track and Motion.
-- Do not merge the topology tree with the observation DAG.
-- Do not build speculative Flutter, CSS, or WebGL adapters. Fake ports are enough to prove the seam.
-- Do not migrate to TypeScript during this structural refactor.
-- Do not rewrite `GaplessLayoutDelegate` without a failing characterization test.
-- Do not optimize topological sorting or tween count before project-scale benchmarks.
-- Do not delete graph construction merely because its publisher is currently unwired; the cycle guard is live.
-
----
-
-# 7. Definition of done
+## Definition of done
 
 - `Track` is a leaf with interpolation and local plugin composition only.
 - `Motion` is the sole composite and supports arbitrary-depth nesting.
@@ -447,16 +376,24 @@ The important dependency changes from the previous v5 plan are:
 - Graph mutations are atomic, and graph/live runtime state cannot silently diverge.
 - No GSAP import exists outside adapters; fake-backed core tests pass.
 - One publisher flush composes each dirty node once and serves all subscribers.
-- React does not recursively compose graph sources per subscriber.
-- `Overlay` and `composeGraph()` are either deleted or have an explicitly documented, independently justified role. The default plan deletes both.
+- React does not recursively compose graph sources per subscriber when the publisher path is enabled.
+- `Overlay` and `composeGraph()` are deleted unless an independently justified role survives review.
 - Engine owns lifecycle, not assembly internals.
 - Public package exports represent the actual object model.
 - Spiral, TowerDefense, Walker, and existing renderer behavior remain visually unchanged.
-- Every phase has a test, an exit gate, and a measured regression/benchmark where timing or performance changed.
+- Every phase has tests, an exit gate, a rollback path, and measured regression/performance evidence where timing or performance changes.
 
----
+## Rollback strategy
 
-# Appendix: evidence index
+Every migration phase must be reversible without reverting unrelated commits:
+
+- Keep the compatibility composer until shadow mode proves output equivalence.
+- Gate publisher rendering, ProjectRuntime, and cross-motion edges independently.
+- On mismatch, disable the narrowest flag, preserve diagnostics, and continue using the last known-good path.
+- Never remove cycle protection as part of a rollback.
+- Never dispose the old runtime until the replacement has mounted, validated, and produced its first successful flush.
+
+## Appendix: evidence index
 
 | Finding | Evidence |
 |---|---|
@@ -473,12 +410,11 @@ The important dependency changes from the previous v5 plan are:
 | Shared mutable map ownership | `GraphPublisher` constructor/applyGraph and `GraphBinding.#syncPublisher()` |
 | Retry option is ignored | `GraphPublisher.#normalizeRetry()` and `#recordPublishFailure()` |
 | Topological tie-breakers differ | `normalizeObservationGraph.js` and `GraphPublisher` mutation paths |
-| Cross-motion/free-track target is documented | `docs/GRAPH-OBSERVATION-AUDIT-2026-08-05.md`, section 6 |
 | Public barrel omits core object model | `packages/core/src/index.js` |
 
 ## Related documents
 
-- `docs/GRAPH-OBSERVATION-AUDIT-2026-08-05.md`: verified graph findings, corrections to earlier recommendations, and project-wide graph direction.
+- `docs/GRAPH-OBSERVATION-AUDIT-2026-08-05.md`: verified graph findings and lifecycle corrections.
 - `docs/ARCHITECTURE.md`: current package ownership and graph architecture baseline.
 - `docs/REFACTOR-PLAN-v4.1.md`: historical package-boundary and lifecycle plan.
 - `docs/V4.3-GRAPH-CORRECTNESS-PLAN.md`: graph correctness acceptance criteria to preserve while relocating ownership.
