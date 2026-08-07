@@ -2,17 +2,25 @@ import { resolvePluginForKey, ensureLoaded } from "../../domain/plugins.js";
 import { triggerDelegateRegistry } from "../TriggerDelegate.js";
 import { normalizeProject } from "./normalizeProject.js";
 
-function qualify(motionId, trackId) { return `${motionId}/${trackId}`; }
+/** Namespace that bare top-level tracks are registered under: `~/trackId`. */
+export const FREE_TRACK_NAMESPACE = "~";
+
+function qualify(namespace, trackId) { return `${namespace}/${trackId}`; }
 
 export async function parseV4Project(schema = {}, deps = {}) {
   const runtime = deps.plugins ? deps : deps.dependencies || {};
   const resolvePlugin = runtime.plugins?.resolve?.bind(runtime.plugins) || deps.resolvePluginForKey || resolvePluginForKey;
   const loadPlugin = runtime.plugins?.ensureLoaded?.bind(runtime.plugins) || deps.ensureLoaded || ensureLoaded;
   const delegates = runtime.triggerDelegates || deps.triggerDelegateRegistry || triggerDelegateRegistry;
-  const project = normalizeProject(schema); const templates = project.templates; const motionConfigsMap = new Map(); const trackConfigsMap = new Map(); const qualifiedTrackConfigsMap = new Map(); const pluginsToLoad = new Set(); const preparations = [];
+  const project = normalizeProject(schema); const templates = project.templates; const motionConfigsMap = new Map(); const trackConfigsMap = new Map(); const qualifiedTrackConfigsMap = new Map(); const bareTrackOwners = new Map(); const pluginsToLoad = new Set(); const preparations = [];
   const collect = (resolved) => { for (const key of Object.keys(resolved.keyframes || {})) { const plugin = resolvePlugin(key); if (!plugin) throw new Error(`No plugin found for key "${key}" on track "${resolved.id}".`); pluginsToLoad.add(plugin); if (plugin.prepare) preparations.push(Promise.resolve(plugin.prepare(resolved))); } };
-  for (const motion of project.motions) { const type = motion.trigger?.type; if (!type) throw new Error(`Motion "${motion.id}" is missing trigger.type.`); if (!delegates.get(type)) throw new Error(`Unknown trigger type "${type}" on motion "${motion.id}".`); motionConfigsMap.set(motion.id, motion); for (const track of motion.tracks || []) { collect(track); const qualifiedId = qualify(motion.id, track.id); if (qualifiedTrackConfigsMap.has(qualifiedId)) throw new Error(`Duplicate qualified track id "${qualifiedId}".`); qualifiedTrackConfigsMap.set(qualifiedId, track); if (!trackConfigsMap.has(track.id)) trackConfigsMap.set(track.id, track); } }
-  for (const track of project.tracks) { collect(track); if (!trackConfigsMap.has(track.id)) trackConfigsMap.set(track.id, track); }
+  // Register a track under its qualified id. Bare ids stay motion-local (PR-17), so the
+  // flat bare index is first-wins and every claimant is recorded: an ambiguous bare
+  // lookup throws later instead of silently resolving to whichever motion parsed first.
+  const register = (namespace, track) => { const trackId = track?.id; if (typeof trackId !== "string" || trackId.includes("/")) throw new Error(`Track id "${trackId}" must be a string without "/": that separator is reserved for qualified ids.`); const qualifiedId = qualify(namespace, trackId); if (qualifiedTrackConfigsMap.has(qualifiedId)) throw new Error(`Duplicate qualified track id "${qualifiedId}".`); qualifiedTrackConfigsMap.set(qualifiedId, track); const owners = bareTrackOwners.get(trackId); if (owners) owners.push(qualifiedId); else bareTrackOwners.set(trackId, [qualifiedId]); if (!trackConfigsMap.has(trackId)) trackConfigsMap.set(trackId, track); };
+  for (const motion of project.motions) { const type = motion.trigger?.type; if (!type) throw new Error(`Motion "${motion.id}" is missing trigger.type.`); if (!delegates.get(type)) throw new Error(`Unknown trigger type "${type}" on motion "${motion.id}".`); if (typeof motion.id !== "string" || motion.id.includes("/")) throw new Error(`Motion id "${motion.id}" must be a string without "/": that separator is reserved for qualified ids.`); if (motion.id === FREE_TRACK_NAMESPACE) throw new Error(`Motion id "${FREE_TRACK_NAMESPACE}" is reserved for the free-track namespace.`); motionConfigsMap.set(motion.id, motion); for (const track of motion.tracks || []) { collect(track); register(motion.id, track); } }
+  for (const track of project.tracks) { collect(track); register(FREE_TRACK_NAMESPACE, track); }
   for (const plugin of pluginsToLoad) await loadPlugin(plugin); await Promise.all(preparations);
-  return { ...project, templates, motionConfigs: motionConfigsMap, trackConfigs: trackConfigsMap, qualifiedTrackConfigs: qualifiedTrackConfigsMap, getMotionConfig: (id) => motionConfigsMap.get(id), getTrackConfig: (id) => trackConfigsMap.get(id), getQualifiedTrackConfig: (id) => qualifiedTrackConfigsMap.get(id), getMotion: (id) => motionConfigsMap.get(id), getTrack: (id) => trackConfigsMap.get(id) };
+  const getTrackConfig = (id) => { const owners = bareTrackOwners.get(id); if (owners && owners.length > 1) throw new Error(`Ambiguous track id "${id}": it is declared as ${owners.join(", ")}. Address it with a qualified id.`); return trackConfigsMap.get(id); };
+  return { ...project, templates, motionConfigs: motionConfigsMap, trackConfigs: trackConfigsMap, qualifiedTrackConfigs: qualifiedTrackConfigsMap, bareTrackOwners, getMotionConfig: (id) => motionConfigsMap.get(id), getTrackConfig, getQualifiedTrackConfig: (id) => qualifiedTrackConfigsMap.get(id), getMotion: (id) => motionConfigsMap.get(id), getTrack: getTrackConfig };
 }

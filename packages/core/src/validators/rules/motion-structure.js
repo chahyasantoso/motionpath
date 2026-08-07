@@ -90,9 +90,18 @@ export function motionStructureRule(schema) {
     }
   }
 
-  // Helper to validate track references
-  const validateTracksArray = (tracks, pathPrefix, motionIdOrIdx) => {
+  // Helper to validate track references.
+  // `allowEmpty` exists for the bare top-level `tracks[]` array: an empty array
+  // is a legitimate way to say "this project declares no free tracks". Motions
+  // still require at least one track.
+  const validateTracksArray = (
+    tracks,
+    pathPrefix,
+    motionIdOrIdx,
+    { allowEmpty = false } = {},
+  ) => {
     if (tracks === undefined || tracks === null) {
+      if (allowEmpty) return;
       errors.push({
         ruleId: "motion-structure",
         severity: "error",
@@ -106,7 +115,7 @@ export function motionStructureRule(schema) {
         message: "tracks must be an array.",
         path: pathPrefix,
       });
-    } else if (tracks.length < 1) {
+    } else if (tracks.length < 1 && !allowEmpty) {
       errors.push({
         ruleId: "motion-structure",
         severity: "error",
@@ -264,7 +273,9 @@ export function motionStructureRule(schema) {
 
   // Validate top-level bare tracks if present
   if (Array.isArray(schema.tracks)) {
-    validateTracksArray(schema.tracks, "tracks", "top-level");
+    validateTracksArray(schema.tracks, "tracks", "top-level", {
+      allowEmpty: true,
+    });
   }
 
   return errors;
