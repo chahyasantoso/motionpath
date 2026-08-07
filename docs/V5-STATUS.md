@@ -2,36 +2,27 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 19:38 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-08-spiral-shadow`  
+**Status captured:** 2026-08-07 19:42 Asia/Jakarta  
+**Branch reviewed:** `v5`  
 **Base branch:** `v5`  
-**Base SHA:** `a61d06287d7656475044928d625f8b19092ea9c7`  
-**Head SHA:** `1e00b2e10c4a5fb38b9bfb0d6ade9e70844fb0c9`  
-**Active PR:** [#85](https://github.com/chahyasantoso/motionpath/pull/85)  
-**Checks:** pending after status update; merge only after all seven checks are green.  
+**Base SHA:** `b8fe91841e5513921d32a8801bbf60bf1d4da57e`  
+**Active PR:** none. PR-09 has not been opened.  
 **Closed stale PRs:** #76, #77
 
 ## Current position
 
 - **Architecture:** accepted.
-- **Merged:** PR #75 CI bootstrap, PR #78 PR-01 baseline instrumentation, PR #79 PR-02 lifecycle ownership repair, PR #80 PR-03 graph transaction correctness, PR #81 PR-04 runtime scope boundary, PR #82 PR-05 patch and clock contracts, PR #83 PR-06 publisher path behind a flag, PR #84 PR-07 fixture shadow mode.
-- **Active:** PR #85, PR-08 live Spiral shadow through temporary CompositeRuntime.
-- **Last passed checkpoint:** A, after PR-03. Checkpoint B is gated on PR-08.
-- **Current phase:** Phase 3, PR-08.
-- **Resume here:** verify PR #85 checks and shadow evidence; merge only if green; if the live shadow gate passes, mark Checkpoint B passed and create PR-09 manual-trigger Motion compatibility from updated `v5`.
-
-## PR-08 changes
-
-- Added temporary `CompositeRuntime` around existing `TrackGroup`/`createGroupHost()`.
-- Adapter owns no topology, playback, or graph semantics; host remains behavior authority.
-- Shadow tests cover spawn, pop, reflow, seek, reverse, destroy, and churn, comparing legacy host patches against publisher patches.
-- Rendering remains on the old group-host path; this is evidence only.
+- **Merged:** PR #75 CI bootstrap, PR #78 PR-01 baseline instrumentation, PR #79 PR-02 lifecycle ownership repair, PR #80 PR-03 graph transaction correctness, PR #81 PR-04 runtime scope boundary, PR #82 PR-05 patch and clock contracts, PR #83 PR-06 publisher path behind a flag, PR #84 PR-07 fixture shadow mode, PR #85 PR-08 live Spiral shadow through temporary CompositeRuntime.
+- **Active:** none.
+- **Last passed checkpoint:** B, after PR-08. All seven CI checks passed and live Spiral-style shadow tests matched with zero unexplained mismatches.
+- **Current phase:** Phase 4, PR-08 complete, PR-09 not started.
+- **Resume here:** create PR-09 manual-trigger Motion compatibility from current `v5`. Add explicit `trigger.autoplay`, defaulting to current group-host behavior (`true`), while preserving seek, pause, reverse, remove, reflow, destroy, and repeated initialization.
 
 ## Verified state
 
 - Existing group-host/composer path remains authoritative by default.
 - Publisher/runtime path remains opt-in.
-- PR-07 fixture shadow merged green.
+- Temporary CompositeRuntime exists only on merged history as migration evidence; no production default switched.
 - No nested-GSAP spike result is committed; treat it as not run.
 
 ## Verification protocol
@@ -47,7 +38,7 @@
 ## Checkpoints
 
 - **A, after PR-03:** passed, PR-03 merged with all seven CI checks green.
-- **B, after PR-08:** not passed; requires all live Spiral shadow tests and PR-08 CI green.
+- **B, after PR-08:** passed, PR-08 merged with all seven CI checks green and live Spiral shadow equivalence recorded.
 - **C, after PR-11:** not passed.
 - **D, after PR-16:** not passed.
 - **E, after PR-18:** not passed.
