@@ -1,6 +1,6 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-07 22:04 Asia/Jakarta  
+**Status captured:** 2026-08-08 06:30 Asia/Jakarta  
 **Branch reviewed:** `v5-pr-17-qualified-ids`  
 **Base branch:** `v5`  
 **Base SHA:** `e92e1f03c20c13af6d26954fdf523e84ee187343`  
@@ -15,7 +15,9 @@
 - PR #95 merged green: immutable ObservationGraph landed.
 - PR #96 merged green: opt-in publisher-backed React subscription path landed.
 - Active PR #97 targets PR-17: qualified `motionId/trackId` lookup and duplicate motion-local track support.
-- Session resume: check PR #97 CI. If green, merge it and continue PR-18 ProjectRuntime. If red, use supplied logs and fix the active branch.
+- PR #97 CI went red on 2026-08-07. Root cause was a parse error, not a design problem: `mountWithDelegate` and `createTrackInstance` in `packages/core/src/engines/Engine.js` opened their error messages with a backtick and closed them with a double quote, so oxc failed the transform. That single file broke the Vite production build and cascaded into 11 failing suites. The twelfth failure, `qualifiedIds.test.js`, was an unrelated bad relative import (`../../engines/Engine.js` instead of `../../../engines/Engine.js`).
+- Fix pushed: template literals terminated correctly, test import path corrected, and the duplicate-qualified-id case reworked to use two identically named tracks inside one motion so it actually reaches `parseV4Project` instead of tripping the duplicate-motion-id validator first.
+- Session resume: re-check PR #97 CI. If green, merge it and continue PR-18 ProjectRuntime.
 
 ## Review linkage
 
