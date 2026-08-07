@@ -23,19 +23,27 @@ export class Engine {
     const motion = new Motion({ id: `motion-${this.#instanceCounter + 1}`, triggerDelegate: delegate, staggerTransition: config.staggerTransition, graphOrder: graph.order });
     motion.motionId = config.id;
     const tracks = [];
+    let publisher;
     let binding;
     try {
       const stagger = typeof config.stagger === "number" ? config.stagger : 0;
       const entries = (config.tracks || []).map((trackConfig, index) => { const track = createTrack(trackConfig, this.#v4Project.templates, this.#trackOptions()); tracks.push(track); motion.mount(track, index * stagger); return { track, config: trackConfig }; });
       this.#wireObservations(entries);
       const trackMap = new Map(entries.map(({ track }) => [track.id, track]));
-      const publisher = new GraphPublisher({ graph, tracks: trackMap, publish: () => {} });
+      publisher = new GraphPublisher({ graph, tracks: trackMap, publish: () => {} });
       binding = new GraphBinding({ graph, tracks: trackMap, publisher });
       motion.init();
+      // Hand the graph layer to its runtime owner. Previously both objects were
+      // built here and dropped: unreachable, undisposable, and unable to receive
+      // a single runtime mutation.
+      motion.setGraphBinding(binding);
       this.#register(motion, "motion");
       return motion;
     } catch (error) {
-      binding?.destroy();
+      // A failed mount must leave nothing alive. The binding owns the publisher,
+      // so dispose it directly only when the binding never got constructed.
+      if (binding) binding.destroy();
+      else publisher?.destroy();
       motion.destroy();
       for (const track of tracks) track.destroy?.();
       throw error;

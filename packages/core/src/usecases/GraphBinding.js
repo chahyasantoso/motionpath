@@ -9,18 +9,25 @@ import { normalizeObservationGraph, topologicalTrackOrder } from "./normalizeObs
  * them in agreement after a runtime mutation. Track owns edge lifecycle,
  * GraphPublisher owns scheduling, and GraphBinding owns the transaction that
  * moves both at once or neither at all.
+ *
+ * Ownership: a GraphBinding owns the publisher it is constructed with unless
+ * the caller opts out with `ownsPublisher: false`. Disposal therefore has a
+ * single entry point, which is what lets the Motion that owns the binding tear
+ * the whole graph layer down without knowing its internals.
  */
 export class GraphBinding {
   #tracks;
   #publisher;
   #graph;
+  #ownsPublisher;
   #unsubscribers = [];
   #destroyed = false;
 
-  constructor({ graph, tracks = new Map(), publisher } = {}) {
+  constructor({ graph, tracks = new Map(), publisher, ownsPublisher = true } = {}) {
     if (!publisher || typeof publisher.applyGraph !== "function") throw new TypeError("GraphBinding requires a graph-aware publisher.");
     this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks);
     this.#publisher = publisher;
+    this.#ownsPublisher = ownsPublisher !== false;
     this.#graph = this.#freeze(graph);
     this.#assertTrackGraphMatches();
     this.#syncPublisher();
@@ -28,6 +35,8 @@ export class GraphBinding {
   }
   get graph() { return this.#graph; }
   get tracks() { return new Map(this.#tracks); }
+  get publisher() { return this.#publisher; }
+  get isDestroyed() { return this.#destroyed; }
   replaceEdge(oldEdge, newEdge) {
     this.#assertAlive();
     const observer = this.#tracks.get(oldEdge.target ?? newEdge.target);
@@ -81,7 +90,21 @@ export class GraphBinding {
     if (!track.isDestroyed) track.destroy?.();
     this.#commit(candidate);
   }
-  destroy() { if (this.#destroyed) return; this.#destroyed = true; for (const unsubscribe of this.#unsubscribers) unsubscribe(); this.#unsubscribers = []; }
+  /**
+   * Idempotent. Unsubscribes every lifecycle hook, releases the tracks it was
+   * holding, and disposes the publisher it owns. After this the binding retains
+   * nothing and can schedule nothing.
+   */
+  destroy() {
+    if (this.#destroyed) return;
+    this.#destroyed = true;
+    for (const unsubscribe of this.#unsubscribers) unsubscribe();
+    this.#unsubscribers = [];
+    this.#tracks = new Map();
+    const publisher = this.#publisher;
+    this.#publisher = null;
+    if (this.#ownsPublisher) publisher?.destroy?.();
+  }
   #normalizeEdge(edge) { const role = edge.role ?? "output"; return { source: edge.source, target: edge.target, role, input: role === "input" ? edge.input ?? edge.target : undefined }; }
   #freeze(graph) {
     if (!graph || graph.errors?.length) throw new Error("GraphBinding requires a valid normalized graph.");

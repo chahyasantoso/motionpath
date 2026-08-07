@@ -19,8 +19,13 @@ export class Motion {
   id; #triggerDelegate; #group; #binding = null; #active = false; #initialTracks = []; #masterTimeline; #staggerTransition; #graphOrder; #destroyed = false;
   constructor({ id, triggerDelegate, staggerTransition, graphOrder = [] }) { this.id = id; this.#triggerDelegate = triggerDelegate; this.#staggerTransition = staggerTransition ?? {}; this.#graphOrder = [...graphOrder]; }
   init() { if (this.#active) this.destroy(); this.#destroyed = false; this.#active = true; this.#masterTimeline = this.#triggerDelegate.build(); this.#group = new TrackGroup(this.#masterTimeline, this.#staggerTransition, this.#graphOrder); for (const { track, position } of this.#initialTracks) this.#group.mount(track, position); }
-  setGraphBinding(binding) { if (this.#binding && this.#binding !== binding) this.#binding.destroy(); this.#binding = binding ?? null; }
+  /**
+   * The Motion is the runtime owner of its graph layer. An unattached binding is
+   * unreachable: nothing can dispose it and no runtime mutation can reach it.
+   */
+  setGraphBinding(binding) { if (this.#destroyed) throw new Error(`Motion "${this.id}" is destroyed.`); if (this.#binding && this.#binding !== binding) this.#binding.destroy(); this.#binding = binding ?? null; }
   get graphBinding() { return this.#binding; }
+  get isDestroyed() { return this.#destroyed; }
   applyGraphOrder(order) { this.#graphOrder = [...order]; this.#group?.applyGraphOrder(order); }
   mount(track, position) { if (this.#destroyed) throw new Error(`Motion "${this.id}" is destroyed.`); if (this.#initialTracks.some((entry) => entry.track.id === track.id)) throw new Error(`Motion "${this.id}" already contains track "${track.id}".`); this.#initialTracks.push({ track, position }); if (this.#active) this.#group.mount(track, position); }
   unmount(track) { this.#initialTracks = this.#initialTracks.filter((t) => t.track.id !== track.id); if (this.#active) this.#group.unmount(track); track.destroy?.(); }
@@ -32,5 +37,5 @@ export class Motion {
   seek(p) { this.#triggerDelegate.seek(p); }
   reverse() { this.#triggerDelegate.reverse(); }
   onComplete(cb) { this.#triggerDelegate.onComplete(cb); }
-  destroy() { if (this.#destroyed) return; this.#destroyed = true; this.#binding?.destroy(); this.#binding = null; if (this.#group) { this.#group.destroy(); this.#group = null; } for (const { track } of this.#initialTracks) track.destroy?.(); this.#initialTracks = []; this.#triggerDelegate.destroy(); this.#masterTimeline = null; this.#active = false; }
+  destroy() { if (this.#destroyed) return; this.#destroyed = true; const binding = this.#binding; this.#binding = null; binding?.destroy(); if (this.#group) { this.#group.destroy(); this.#group = null; } for (const { track } of this.#initialTracks) track.destroy?.(); this.#initialTracks = []; this.#triggerDelegate.destroy(); this.#masterTimeline = null; this.#active = false; }
 }
