@@ -2,35 +2,35 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 17:26 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-00-ci`  
+**Status captured:** 2026-08-07 17:36 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-01-baseline`  
 **Base branch:** `v5`  
-**Active PR:** [#75](https://github.com/chahyasantoso/motionpath/pull/75)  
-**Latest implementation commits:** `1c34e2f` manifest correction, `5b09ade` scoped CI format gate
+**Active PR:** [#76](https://github.com/chahyasantoso/motionpath/pull/76)  
+**Stacked on:** [PR #75](https://github.com/chahyasantoso/motionpath/pull/75)  
+**Latest implementation commits:** `1459daa` baseline runner, `6d7e1af` baseline script, `c72186c` CI artifact upload
 
 ## Current position
 
 - **Architecture:** accepted.
-- **Active implementation:** PR-00, CI bootstrap and repository contracts.
-- **Merged v5 implementation PRs:** none.
+- **Active implementation:** PR-01, baseline and observability.
+- **Merged v5 implementation PRs:** none; PR-00 is the prerequisite CI bootstrap.
 - **Last passed checkpoint:** none. Checkpoint A is not passed until PR-03 completes.
-- **Current implementation phase:** Phase 0, PR-00 in progress.
-- **Resume here:** wait for the new CI run; merge PR-00 only after all required checks pass, then create PR-01 baseline and observability.
+- **Current implementation phase:** Phase 0, PR-01 in progress.
+- **Resume here:** merge PR #75 first, rebase/retarget PR #76 onto the updated `v5`, then require the baseline artifact to pass before starting PR-02 lifecycle repair.
 
-## PR-00 changes and CI diagnosis
+## PR-01 changes
 
-The first CI run showed **12 check runs**, but that is two workflow runs with the same six jobs, likely from both the branch push and pull-request events. There are **6 unique jobs**, not 12 planned checks.
-
-The only failing unique job was format check. It scanned the whole existing repository and found 104 pre-existing files needing formatting. Unit tests, typecheck, build, package dry run, and benchmark passed.
-
-Fix applied: PR-00 now uses `format:check:ci`, a non-mutating check scoped to the files owned by this CI bootstrap PR. The full-repository `format:check` remains available for the later formatting/boundary work instead of turning PR-00 into a 104-file cleanup.
+- Added `performance/v5-baseline.mjs`, which wraps the existing rig benchmark and emits a JSON report.
+- Added `npm run benchmark:v5:baseline`.
+- Added a CI baseline job that uploads `docs/benchmarks/v5-baseline.json` as an artifact.
+- No runtime behavior was changed.
 
 ## Verified repository state
 
-- No v5 runtime implementation was found for `GraphRuntime`, `MotionRuntime`, or `CompositeRuntime`.
 - The existing group-host path remains authoritative.
-- No committed nested-GSAP spike result was found; treat it as not run or not recorded.
-- No accepted v5 migration flags were found implemented; the old composer/group-host path remains default.
+- No `GraphRuntime`, `MotionRuntime`, or `CompositeRuntime` implementation is present.
+- No committed nested-GSAP spike result is present; treat it as not run or not recorded.
+- No accepted v5 migration flags are implemented; old composer/group-host remains default.
 
 ## Checkpoints
 
@@ -46,13 +46,14 @@ Fix applied: PR-00 now uses `format:check:ci`, a non-mutating check scoped to th
 1. Read this file for orientation only.
 2. Confirm the branch tip, PR status, and CI checks against GitHub.
 3. Confirm workflow triggers and job names from `.github/workflows/ci.yml`.
-4. Search source for relevant feature flags and runtime symbols before assuming any migration exists.
-5. Run the checks required by the active PR and record results here.
-6. Update this file in the closing commit with the new SHA, active PR/branch, checkpoint state, spike evidence, flag state, and exact resume point.
+4. Verify the baseline artifact exists and inspect its numbers.
+5. Search source for relevant feature flags and runtime symbols before assuming any migration exists.
+6. Run the checks required by the active PR and record results here.
+7. Update this file in the closing commit with the new SHA, active PR/branch, checkpoint state, spike evidence, flag state, and exact resume point.
 
 ## Flag state
 
-No accepted v5 migration flags were found implemented at status capture time. The default production path remains the existing composer/group-host path.
+No accepted v5 migration flags were found implemented. The default production path remains the existing composer/group-host path.
 
 ## Evidence policy
 
