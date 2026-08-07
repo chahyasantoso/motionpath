@@ -1,6 +1,54 @@
 import { observationGraphEdgeKey } from "./observationEdge.js";
 
 /**
+ * The one topological sort in the system.
+ *
+ * There used to be two: this one and an inline copy inside
+ * normalizeObservationGraph. They agreed on the happy path and diverged on tie
+ * breaking and cycle reporting, which meant the compiled order a graph was
+ * validated against was not always the order it was published in.
+ *
+ * Ties are broken by declaration position so the order is stable and
+ * reproducible for a given input.
+ *
+ * @returns {{ order: string[], complete: boolean }} `complete` is false when a
+ * cycle prevented every node from being emitted. The partial order is still
+ * returned so callers that report rather than throw can show progress.
+ */
+export function tryTopologicalOrder(nodes, edges) {
+  const indegree = new Map(nodes.map(({ id }) => [id, 0]));
+  const outgoing = new Map(nodes.map(({ id }) => [id, []]));
+  for (const edge of edges) {
+    if (!indegree.has(edge.source) || !indegree.has(edge.target)) {
+      throw new Error(`Observation edge references an unknown track ('${edge.source}' -> '${edge.target}').`);
+    }
+    outgoing.get(edge.source).push(edge.target);
+    indegree.set(edge.target, indegree.get(edge.target) + 1);
+  }
+  const position = new Map(nodes.map(({ id }, index) => [id, index]));
+  const queue = nodes.filter(({ id }) => indegree.get(id) === 0).map(({ id }) => id);
+  const order = [];
+  while (queue.length) {
+    const id = queue.shift();
+    order.push(id);
+    for (const target of outgoing.get(id)) {
+      indegree.set(target, indegree.get(target) - 1);
+      if (indegree.get(target) !== 0) continue;
+      const insertAt = queue.findIndex((queuedId) => position.get(queuedId) > position.get(target));
+      if (insertAt === -1) queue.push(target);
+      else queue.splice(insertAt, 0, target);
+    }
+  }
+  return { order, complete: order.length === nodes.length };
+}
+
+export function buildTopologicalOrder(nodes, edges) {
+  const { order, complete } = tryTopologicalOrder(nodes, edges);
+  if (!complete) throw new Error("Observation graph contains a cycle.");
+  return order;
+}
+
+/**
  * Normalize a motion's declarative observation edges into an immutable graph IR.
  * The graph is JSON-safe and contains no Track instances or plugin functions.
  */
@@ -70,27 +118,10 @@ export function normalizeObservationGraph(motion) {
     }
   });
 
-  const outgoing = new Map(nodes.map((node) => [node.id, []]));
-  const indegree = new Map(nodes.map((node) => [node.id, 0]));
-  for (const edge of edges) {
-    outgoing.get(edge.source)?.push(edge);
-    if (indegree.has(edge.target)) indegree.set(edge.target, indegree.get(edge.target) + 1);
-  }
-  const queue = nodes.filter((node) => indegree.get(node.id) === 0).map((node) => node.id);
-  const order = [];
-  while (queue.length) {
-    const id = queue.shift();
-    order.push(id);
-    for (const edge of outgoing.get(id) ?? []) {
-      indegree.set(edge.target, indegree.get(edge.target) - 1);
-      if (indegree.get(edge.target) === 0) {
-        const insertAt = queue.findIndex((queuedId) => nodeIndexes.get(queuedId) > nodeIndexes.get(edge.target));
-        if (insertAt === -1) queue.push(edge.target);
-        else queue.splice(insertAt, 0, edge.target);
-      }
-    }
-  }
-  if (order.length !== nodes.length) errors.push({ ruleId: "track-observations-cycle", path: "tracks", message: "Observation graph contains a cycle." });
+  // One sorter, shared with the publisher. The normalizer reports a cycle as a
+  // validation error instead of throwing, which is the only difference.
+  const { order, complete } = tryTopologicalOrder(nodes, edges);
+  if (!complete) errors.push({ ruleId: "track-observations-cycle", path: "tracks", message: "Observation graph contains a cycle." });
 
   return Object.freeze({
     valid: errors.length === 0,
@@ -113,32 +144,4 @@ export function topologicalTrackOrder(graph, { strict = true } = {}) {
     throw new Error(`Cannot use invalid observation graph: ${graph.errors.map((error) => error.message).join("; ")}`);
   }
   return [...graph.order];
-}
-
-export function buildTopologicalOrder(nodes, edges) {
-  const indegree = new Map(nodes.map(({ id }) => [id, 0]));
-  const outgoing = new Map(nodes.map(({ id }) => [id, []]));
-  for (const edge of edges) {
-    if (!indegree.has(edge.source) || !indegree.has(edge.target)) {
-      throw new Error(`Observation edge references an unknown track ('${edge.source}' -> '${edge.target}').`);
-    }
-    outgoing.get(edge.source).push(edge.target);
-    indegree.set(edge.target, indegree.get(edge.target) + 1);
-  }
-  const index = new Map(nodes.map(({ id }, position) => [id, position]));
-  const queue = nodes.filter(({ id }) => indegree.get(id) === 0).map(({ id }) => id);
-  const order = [];
-  while (queue.length) {
-    const id = queue.shift();
-    order.push(id);
-    for (const target of outgoing.get(id)) {
-      indegree.set(target, indegree.get(target) - 1);
-      if (indegree.get(target) !== 0) continue;
-      const insertAt = queue.findIndex((queuedId) => index.get(queuedId) > index.get(target));
-      if (insertAt === -1) queue.push(target);
-      else queue.splice(insertAt, 0, target);
-    }
-  }
-  if (order.length !== nodes.length) throw new Error("Observation graph contains a cycle.");
-  return order;
 }
