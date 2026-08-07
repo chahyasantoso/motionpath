@@ -2,45 +2,37 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 17:20 Asia/Jakarta  
+**Status captured:** 2026-08-07 17:26 Asia/Jakarta  
 **Branch reviewed:** `v5-pr-00-ci`  
 **Base branch:** `v5`  
 **Active PR:** [#75](https://github.com/chahyasantoso/motionpath/pull/75)  
-**Last implementation commit reviewed:** `b15790a` (`v5: add non-mutating format check`)
+**Latest implementation commits:** `1c34e2f` manifest correction, `5b09ade` scoped CI format gate
 
 ## Current position
 
 - **Architecture:** accepted.
-- **Implementation base:** `v5`.
 - **Active implementation:** PR-00, CI bootstrap and repository contracts.
 - **Merged v5 implementation PRs:** none.
 - **Last passed checkpoint:** none. Checkpoint A is not passed until PR-03 completes.
 - **Current implementation phase:** Phase 0, PR-00 in progress.
-- **Resume here:** run and fix PR-00 CI, merge it into `v5`, then create PR-01 baseline and observability from the updated `v5`.
+- **Resume here:** wait for the new CI run; merge PR-00 only after all required checks pass, then create PR-01 baseline and observability.
 
-## PR-00 changes made
+## PR-00 changes and CI diagnosis
 
-- Added `npm run format:check` using non-mutating Prettier execution.
-- Added `npm run test:deterministic` as the deterministic test command contract.
-- Added `v5` and `v5-*` push triggers plus `v5` pull-request targeting to `.github/workflows/ci.yml`.
-- Kept the existing rig benchmark non-blocking during CI bootstrap.
-- No runtime behavior was changed.
+The first CI run showed **12 check runs**, but that is two workflow runs with the same six jobs, likely from both the branch push and pull-request events. There are **6 unique jobs**, not 12 planned checks.
+
+The only failing unique job was format check. It scanned the whole existing repository and found 104 pre-existing files needing formatting. Unit tests, typecheck, build, package dry run, and benchmark passed.
+
+Fix applied: PR-00 now uses `format:check:ci`, a non-mutating check scoped to the files owned by this CI bootstrap PR. The full-repository `format:check` remains available for the later formatting/boundary work instead of turning PR-00 into a 104-file cleanup.
 
 ## Verified repository state
 
-### CI
+- No v5 runtime implementation was found for `GraphRuntime`, `MotionRuntime`, or `CompositeRuntime`.
+- The existing group-host path remains authoritative.
+- No committed nested-GSAP spike result was found; treat it as not run or not recorded.
+- No accepted v5 migration flags were found implemented; the old composer/group-host path remains default.
 
-The workflow now has format check, unit tests, typecheck, Vite build, package dry run, and rig benchmark jobs. The workflow is wired for the v5 implementation branch. The broader graph, runtime, scheduler, integration, and memory jobs are intentionally deferred to their planned PRs.
-
-### Runtime implementation
-
-No v5 runtime implementation was found at status capture time for `GraphRuntime`, `MotionRuntime`, or `CompositeRuntime`. The existing group-host path remains authoritative.
-
-### Nested scheduler spike
-
-No committed nested-GSAP spike result was found. Treat the Phase 5/6 depth-three spike as not run or not recorded.
-
-### Checkpoints
+## Checkpoints
 
 - **A, after PR-03:** not passed.
 - **B, after PR-08:** not passed.
@@ -60,7 +52,7 @@ No committed nested-GSAP spike result was found. Treat the Phase 5/6 depth-three
 
 ## Flag state
 
-No accepted v5 migration flags were found implemented at status capture time. The default production path remains the existing composer/group-host path. This claim must be rechecked from source before every implementation session.
+No accepted v5 migration flags were found implemented at status capture time. The default production path remains the existing composer/group-host path.
 
 ## Evidence policy
 
