@@ -73,7 +73,11 @@ describe("useSpiralWaveController integration", () => {
   it("drives the live controller through spawn, shadow comparison, and cleanup", () =>
     withCiAnnotation(async () => {
       const createHost = vi.spyOn(engine, "createGroupHost");
+      const realGsapTo = gsap.to.bind(gsap);
       vi.spyOn(gsap, "to").mockImplementation((target, vars) => {
+        if (typeof target?.progress !== "function" || vars?.progress === undefined) {
+          return realGsapTo(target, vars);
+        }
         queueMicrotask(() => {
           target.progress(vars.progress);
           vars.onComplete?.();
