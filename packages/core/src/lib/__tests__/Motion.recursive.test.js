@@ -14,11 +14,11 @@ describe("recursive Motion scheduling", () => {
     child.mount(track("child-track")); grandchild.mount(track("grandchild-track"));
     child.mount(grandchild, 0.25); root.mount(child, 0.5);
     expect(child.isMounted).toBe(true); expect(grandchild.isMounted).toBe(true);
-    // The root timeline is 1.5s: the child starts at 0.5s and runs for 1s.
-    // Motion.seek() accepts normalized progress, so these checkpoints are 0.5s
-    // and 1.0s on the root timeline respectively.
-    root.seek(1 / 3); expect(child.progress()).toBeCloseTo(0, 5);
-    root.seek(2 / 3); expect(child.progress()).toBeCloseTo(0.5, 5);
+    // The child runs for 1.25s: its own track is 1s and its nested Motion
+    // extends the schedule to 0.25 + 1s. The root therefore runs for 1.75s.
+    // Checkpoints are expressed as normalized root progress.
+    root.seek(2 / 7); expect(child.progress()).toBeCloseTo(0, 5);
+    root.seek(9 / 14); expect(child.progress()).toBeCloseTo(0.5, 5);
     root.destroy(); expect(child.isDestroyed).toBe(true); expect(grandchild.isDestroyed).toBe(true);
   });
   it("restarts nested schedules without duplicating slots", () => {
