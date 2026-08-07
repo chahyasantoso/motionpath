@@ -4,6 +4,7 @@ function stableValue(value) {
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
 }
 function sameValue(a, b) { return JSON.stringify(stableValue(a)) === JSON.stringify(stableValue(b)); }
+function withoutNode(sourceRevisions, nodeId) { return Object.fromEntries(Object.entries(sourceRevisions ?? {}).filter(([id]) => id !== nodeId)); }
 function freezePatch(patch) { return Object.freeze({ ...patch, values: Object.freeze({ ...(patch.values ?? {}) }), sourceRevisions: Object.freeze({ ...(patch.sourceRevisions ?? {}) }) }); }
 
 export class PatchRegistry {
@@ -27,11 +28,10 @@ export class PatchRegistry {
     if (typeof nodeId !== "string" || nodeId.length === 0) throw new TypeError("PatchRegistry nodeId must be a non-empty string.");
     if (!["ready", "blocked", "error"].includes(status)) throw new TypeError(`Unknown patch status '${status}'.`);
     const previous = this.#patches.get(nodeId);
-    const nextRevision = this.#revisions.get(nodeId) ?? 0;
-    const completeSourceRevisions = { ...sourceRevisions, [nodeId]: nextRevision + 1 };
-    if (previous && sameValue(previous.values, values) && previous.sourceProgress === sourceProgress && sameValue(previous.sourceRevisions, completeSourceRevisions) && previous.status === status) return previous;
-    const revision = nextRevision + 1;
-    const patch = freezePatch({ nodeId, revision, values, sourceProgress, sourceRevisions: { ...sourceRevisions, [nodeId]: revision }, status });
+    const externalSourceRevisions = withoutNode(sourceRevisions, nodeId);
+    if (previous && sameValue(previous.values, values) && previous.sourceProgress === sourceProgress && sameValue(withoutNode(previous.sourceRevisions, nodeId), externalSourceRevisions) && previous.status === status) return previous;
+    const revision = (this.#revisions.get(nodeId) ?? 0) + 1;
+    const patch = freezePatch({ nodeId, revision, values, sourceProgress, sourceRevisions: { ...externalSourceRevisions, [nodeId]: revision }, status });
     this.#revisions.set(nodeId, revision);
     this.#patches.set(nodeId, patch);
     if (this.#batchDepth) this.#pending.add(nodeId); else { this.#notifyNode(nodeId); this.#notifyGlobal(); }
