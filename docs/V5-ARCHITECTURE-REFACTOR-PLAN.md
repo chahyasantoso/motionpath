@@ -1,7 +1,7 @@
 # MotionPath v5 architecture refactor plan
 
 **Status:** accepted for implementation  
-**Revision:** 2026-08-07, addendum integrated  
+**Revision:** 2026-08-07, graph-mode validation clarified  
 **Implementation base branch:** `v5`  
 **Original design branch:** `feat/graph-spiral-demo`  
 **Scope:** runtime architecture refactor, including the observation graph foundation. This is not a graph feature plan.
@@ -22,6 +22,19 @@ The implementation order is:
 8. Enable cross-motion edges and free tracks only after correctness, rollback, and performance gates pass.
 
 The graph layer is not harmless dead code. Its cycle guard is live today, while its publisher and binding are unreachable, retained through track callbacks, and never flushed. No migration or rollback may remove cycle protection.
+
+The target end state is:
+
+```text
+Project schema
+  -> validate + normalize
+  -> compile tracks into interpolators
+  -> assemble recursive Motions
+  -> one project ObservationGraph
+  -> one topological Publisher flush per clock tick
+  -> renderer-neutral patches
+  -> React / DOM / Canvas / Flutter adapters
+```
 
 ## Non-negotiable design rules
 
@@ -107,9 +120,14 @@ Until `Motion` replaces `createGroupHost()`, the existing group-host path partic
 
 ### AD-11: authored graph inputs versus standalone defaults
 
-In authored graph mode, every required plugin input must have exactly one compatible observation edge. Standalone tracks may use documented defaults. For `fkPlugin`, `parentWorld` is required in authored graph mode but may use an identity-world standalone default.
+A track's graph mode is explicit, never inferred from whether an observation edge happens to be present. Runtime construction assigns one of two states:
 
-Stable diagnostics include `GRAPH_INPUT_MISSING`, `GRAPH_INPUT_UNKNOWN`, `GRAPH_INPUT_DUPLICATE`, and `GRAPH_INPUT_ROLE_MISMATCH`.
+- **`standalone`**: intentionally created outside a graph runtime, such as a direct `createTrackInstance()` that has not been adopted. Plugin `standaloneDefault` values may apply.
+- **`authored-graph`**: created from a project/motion schema or registered with a `GraphRuntime`, even if registration is staged or incomplete. Required plugin inputs must be validated and missing edges fail with diagnostics; standalone defaults must not mask the error.
+
+The graph-mode state is carried by the runtime/track contract and is not derived from `observes.length`, publisher attachment, or current membership. Registration may produce a pending authored-graph node, but it never downgrades that node to standalone.
+
+For `fkPlugin`, `parentWorld` is required in authored graph mode but may use an identity-world standalone default. Stable diagnostics include `GRAPH_INPUT_MISSING`, `GRAPH_INPUT_UNKNOWN`, `GRAPH_INPUT_DUPLICATE`, and `GRAPH_INPUT_ROLE_MISMATCH`.
 
 ## Target ownership
 
@@ -193,7 +211,7 @@ Add `Interpolator`, `Scheduler`, and `Clock` ports. Move GSAP construction and t
 
 ### Phase 7: FK input contract and ObservationGraph extraction
 
-First enforce plugin-input/observation cross-checks and explicit standalone defaults. Then make `ObservationGraph` the sole owner of edges, reverse indexes, cycle validation, and topological order. Remove Track observation state only after all enabled paths have equivalent cycle protection.
+First enforce plugin-input/observation cross-checks and explicit standalone defaults. The validator receives the track's explicit mode: `standalone` skips authored-edge requirements and may use documented defaults; `authored-graph` requires every required plugin input to have exactly one compatible edge, even when the node is pending registration. Then make `ObservationGraph` the sole owner of edges, reverse indexes, cycle validation, and topological order. Remove Track observation state only after all enabled paths have equivalent cycle protection.
 
 **Exit:** malformed authored FK rigs fail validation, standalone defaults remain supported, and Track is a leaf.
 
@@ -232,7 +250,7 @@ Extract assembly use cases, make reload failure-atomic, simplify Engine, update 
 - Publisher composition occurs once per dirty node per tick and serves all subscribers.
 - React does not recursively compose graph sources when publisher mode is enabled.
 - Temporary `CompositeRuntime` is deleted after live Spiral shadow validation and manual Motion migration.
-- Authored FK inputs are validated separately from standalone defaults.
+- Authored FK inputs are validated separately from standalone defaults using explicit track mode, never inferred from missing edges.
 - Cross-motion/free-track behavior is capability-gated and disabled by default until accepted evidence exists.
 - Every phase has tests, CI gates, rollback guidance, and measured evidence where behavior or performance changes.
 
