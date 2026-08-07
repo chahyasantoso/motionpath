@@ -1,9 +1,8 @@
-import { resolvePluginInput } from "../../domain/plugins.js";
+import { resolvePluginForKey } from "../../domain/plugins.js";
 
 /**
  * Tracks opt into strict authored-graph input validation explicitly. Legacy
  * schemas remain standalone until their author adds `mode: "authored-graph"`.
- * This avoids treating old observation metadata as a new FK contract.
  */
 export function graphInputsRule(schema) {
   const errors = [];
@@ -21,7 +20,7 @@ export function graphInputsRule(schema) {
       if (mode === "standalone") return;
       const requiredInputs = new Set();
       for (const key of Object.keys(track.keyframes || {})) {
-        const plugin = resolvePluginInput(key);
+        const plugin = resolvePluginForKey(key);
         for (const input of plugin?.inputs || []) requiredInputs.add(input);
       }
       for (const input of requiredInputs) {
