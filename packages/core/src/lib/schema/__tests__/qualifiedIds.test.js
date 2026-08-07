@@ -75,6 +75,20 @@ describe("qualified project-local IDs", () => {
     await expect(
       new Engine().loadProject(project(motion("left", track("a/b"))), { validate: false }),
     ).rejects.toThrow(/reserved for qualified ids/);
+    await expect(
+      new Engine().loadProject(project(motion("a/b", track("bone"))), { validate: false }),
+    ).rejects.toThrow(/reserved for qualified ids/);
+  });
+
+  it("leaves malformed IDs to the validator instead of throwing in the parser (R-02)", async () => {
+    // A motion with no `id` must keep its documented legacy failure mode under
+    // { validate: false }: registered under the key `undefined`, unmountable.
+    // The namespace guard must not turn that into a parse error.
+    const engine = new Engine();
+    const anonymous = { schemaVersion: 4, motions: [{ trigger: { type: "manual" }, tracks: [track("bone")] }] };
+    await expect(engine.loadProject(anonymous, { validate: false })).resolves.toBeUndefined();
+    expect(() => engine.mountInstance("legacy")).toThrow(/not found in project/);
+    engine.destroy();
   });
 
   it("remounting a qualified ID yields independent instances", async () => {
