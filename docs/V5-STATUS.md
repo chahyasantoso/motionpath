@@ -1,7 +1,29 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-07 21:19 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-13-recursive-scheduler`  
+**Status captured:** 2026-08-07 21:30 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-14-explicit-graph-inputs`  
 **Base branch:** `v5`  
-**Base SHA:** `045a9580eefdfcf9898e305533f2c95784dd154d`  
-**Active PR:** #93, recursive Motion scheduler proof and implementation.\n\n## Current position\n\n- PR #91 merged green: Checkpoint C passed, migration adapter deleted.\n- PR #92 merged green: renderer-neutral ports and GSAP adapter boundary landed.\n- Active PR #93 targets PR-13: nested Motion scheduling, parent-relative offsets, restart, and recursive disposal.\n- If CI is red, use the supplied logs and fix the active branch. If green, merge and continue to PR-14 explicit graph input modes.\n\n## Open review findings\n\n- #2 production GraphRuntime integration\n- #4 public exports\n- #6 nested Motion scheduling, addressed by PR #93\n\n## Checkpoints\n\n- A passed\n- B passed with actual controller evidence\n- C passed after PR #91\n- D not passed\n- E not passed\n- F not passed\n
+**Base SHA:** `a73b79de3a0bed2c1f00cff07959613a16342bb9  
+**Active PR:** #94, explicit authored-graph plugin input validation.
+
+## Current position
+
+- PR #91 merged green: Checkpoint C passed.
+- PR #92 merged green: GSAP adapter boundary landed.
+- PR #93 merged green: recursive Motion scheduling landed.
+- Active PR #94 addresses PR-14: explicit `standalone` versus `authored-graph` track modes.
+- If CI is green, merge PR #94 and continue to PR-15 ObservationGraph extraction. If red, use supplied logs and fix the active branch.
+
+## Open review findings
+
+- #2 production GraphRuntime integration
+- #4 public exports
+
+## Checkpoints
+
+- A passed
+- B passed with actual controller evidence
+- C passed after PR #91
+- D not passed
+- E not passed
+- F not passed
