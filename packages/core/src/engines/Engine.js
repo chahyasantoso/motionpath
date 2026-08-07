@@ -18,24 +18,33 @@ export class Engine {
   #register(object, kind) { const handle = `${kind}#${++this.#instanceCounter}`; this.#instances.set(handle, object); this.#handles.set(object, handle); return handle; }
   #trackOptions() { return { dependencies: this.#dependencies }; }
   #wireObservations(entries) { const tracks = new Map(entries.map(({ track }) => [track.id, track])); for (const { track, config } of entries) for (const edge of config.observes || []) { const source = tracks.get(edge.source); if (!source) throw new Error(`Track "${track.id}" observes missing track "${edge.source}".`); const role = edge.role ?? "output"; const mapFn = role === "input" ? (patch) => ({ [edge.target]: patch || {} }) : (patch) => patch; track.setObserved(source, mapFn, { role, target: role === "input" ? edge.target : undefined }); } }
+  /**
+   * The graph is owned by the Motion it belongs to: Motion -> GraphBinding ->
+   * GraphPublisher. Previously both were built and then dropped, kept alive
+   * only by the lifecycle subscriptions the tracks held, which left no way to
+   * dispose them on destroy and leaked them outright when a mount failed.
+   */
   #mountMotion(config, delegate) {
     const graph = normalizeObservationGraph(config);
     const motion = new Motion({ id: `motion-${this.#instanceCounter + 1}`, triggerDelegate: delegate, staggerTransition: config.staggerTransition, graphOrder: graph.order });
     motion.motionId = config.id;
     const tracks = [];
     let binding;
+    let publisher;
     try {
       const stagger = typeof config.stagger === "number" ? config.stagger : 0;
       const entries = (config.tracks || []).map((trackConfig, index) => { const track = createTrack(trackConfig, this.#v4Project.templates, this.#trackOptions()); tracks.push(track); motion.mount(track, index * stagger); return { track, config: trackConfig }; });
       this.#wireObservations(entries);
       const trackMap = new Map(entries.map(({ track }) => [track.id, track]));
-      const publisher = new GraphPublisher({ graph, tracks: trackMap, publish: () => {} });
+      publisher = new GraphPublisher({ graph, tracks: trackMap, publish: () => {} });
       binding = new GraphBinding({ graph, tracks: trackMap, publisher });
+      motion.setGraphBinding(binding);
       motion.init();
       this.#register(motion, "motion");
       return motion;
     } catch (error) {
       binding?.destroy();
+      publisher?.destroy?.();
       motion.destroy();
       for (const track of tracks) track.destroy?.();
       throw error;

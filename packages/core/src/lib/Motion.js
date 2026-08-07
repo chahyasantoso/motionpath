@@ -19,8 +19,14 @@ export class Motion {
   id; #triggerDelegate; #group; #binding = null; #active = false; #initialTracks = []; #masterTimeline; #staggerTransition; #graphOrder; #destroyed = false;
   constructor({ id, triggerDelegate, staggerTransition, graphOrder = [] }) { this.id = id; this.#triggerDelegate = triggerDelegate; this.#staggerTransition = staggerTransition ?? {}; this.#graphOrder = [...graphOrder]; }
   init() { if (this.#active) this.destroy(); this.#destroyed = false; this.#active = true; this.#masterTimeline = this.#triggerDelegate.build(); this.#group = new TrackGroup(this.#masterTimeline, this.#staggerTransition, this.#graphOrder); for (const { track, position } of this.#initialTracks) this.#group.mount(track, position); }
-  setGraphBinding(binding) { if (this.#binding && this.#binding !== binding) this.#binding.destroy(); this.#binding = binding ?? null; }
+  /**
+   * A Motion owns exactly one graph binding at a time. Replacing one disposes
+   * the outgoing binding, and handing one to a destroyed Motion disposes it
+   * immediately rather than parking a live graph on a dead owner.
+   */
+  setGraphBinding(binding) { if (this.#binding === binding) return; if (this.#binding) this.#binding.destroy(); if (this.#destroyed) { binding?.destroy?.(); this.#binding = null; return; } this.#binding = binding ?? null; }
   get graphBinding() { return this.#binding; }
+  get isDestroyed() { return this.#destroyed; }
   applyGraphOrder(order) { this.#graphOrder = [...order]; this.#group?.applyGraphOrder(order); }
   mount(track, position) { if (this.#destroyed) throw new Error(`Motion "${this.id}" is destroyed.`); if (this.#initialTracks.some((entry) => entry.track.id === track.id)) throw new Error(`Motion "${this.id}" already contains track "${track.id}".`); this.#initialTracks.push({ track, position }); if (this.#active) this.#group.mount(track, position); }
   unmount(track) { this.#initialTracks = this.#initialTracks.filter((t) => t.track.id !== track.id); if (this.#active) this.#group.unmount(track); track.destroy?.(); }
@@ -32,5 +38,7 @@ export class Motion {
   seek(p) { this.#triggerDelegate.seek(p); }
   reverse() { this.#triggerDelegate.reverse(); }
   onComplete(cb) { this.#triggerDelegate.onComplete(cb); }
+  // The binding is disposed before the group so publisher hooks and cycle
+  // guards are gone before any track teardown fires lifecycle events.
   destroy() { if (this.#destroyed) return; this.#destroyed = true; this.#binding?.destroy(); this.#binding = null; if (this.#group) { this.#group.destroy(); this.#group = null; } for (const { track } of this.#initialTracks) track.destroy?.(); this.#initialTracks = []; this.#triggerDelegate.destroy(); this.#masterTimeline = null; this.#active = false; }
 }

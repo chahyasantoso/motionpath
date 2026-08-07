@@ -9,6 +9,10 @@ import { normalizeObservationGraph, topologicalTrackOrder } from "./normalizeObs
  * them in agreement after a runtime mutation. Track owns edge lifecycle,
  * GraphPublisher owns scheduling, and GraphBinding owns the transaction that
  * moves both at once or neither at all.
+ *
+ * Ownership: a binding owns the publisher it was given unless the caller opts
+ * out with `ownsPublisher: false`. Disposal therefore runs the whole chain,
+ * which is what makes a destroyed Motion actually release its graph.
  */
 export class GraphBinding {
   #tracks;
@@ -16,11 +20,13 @@ export class GraphBinding {
   #graph;
   #unsubscribers = [];
   #destroyed = false;
+  #ownsPublisher;
 
-  constructor({ graph, tracks = new Map(), publisher } = {}) {
+  constructor({ graph, tracks = new Map(), publisher, ownsPublisher = true } = {}) {
     if (!publisher || typeof publisher.applyGraph !== "function") throw new TypeError("GraphBinding requires a graph-aware publisher.");
     this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks);
     this.#publisher = publisher;
+    this.#ownsPublisher = ownsPublisher !== false;
     this.#graph = this.#freeze(graph);
     this.#assertTrackGraphMatches();
     this.#syncPublisher();
@@ -28,6 +34,8 @@ export class GraphBinding {
   }
   get graph() { return this.#graph; }
   get tracks() { return new Map(this.#tracks); }
+  get isDestroyed() { return this.#destroyed; }
+  get ownsPublisher() { return this.#ownsPublisher; }
   replaceEdge(oldEdge, newEdge) {
     this.#assertAlive();
     const observer = this.#tracks.get(oldEdge.target ?? newEdge.target);
@@ -81,7 +89,18 @@ export class GraphBinding {
     if (!track.isDestroyed) track.destroy?.();
     this.#commit(candidate);
   }
-  destroy() { if (this.#destroyed) return; this.#destroyed = true; for (const unsubscribe of this.#unsubscribers) unsubscribe(); this.#unsubscribers = []; }
+  /**
+   * Idempotent. Unsubscribes, disposes the owned publisher, then releases the
+   * track references so a destroyed binding cannot retain a dead graph.
+   */
+  destroy() {
+    if (this.#destroyed) return;
+    this.#destroyed = true;
+    for (const unsubscribe of this.#unsubscribers) unsubscribe();
+    this.#unsubscribers = [];
+    if (this.#ownsPublisher) this.#publisher.destroy?.();
+    this.#tracks = new Map();
+  }
   #normalizeEdge(edge) { const role = edge.role ?? "output"; return { source: edge.source, target: edge.target, role, input: role === "input" ? edge.input ?? edge.target : undefined }; }
   #freeze(graph) {
     if (!graph || graph.errors?.length) throw new Error("GraphBinding requires a valid normalized graph.");
