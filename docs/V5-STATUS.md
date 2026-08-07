@@ -2,29 +2,30 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 19:45 Asia/Jakarta  
+**Status captured:** 2026-08-07 19:46 Asia/Jakarta  
 **Branch reviewed:** `v5-pr-09-motion-compat`  
 **Base branch:** `v5`  
 **Base SHA:** `b8fe91841e5513921d32a8801bbf60bf1d4da57e`  
-**Head SHA:** `a4cfe9c38af99d92e92e257dd4fab34f331d897d`  
-**Active PR:** PR-09 pending creation  
-**Checks:** pending at open; merge only after all seven checks are green.  
+**Head SHA:** `a0142d877e072f8de303ba483111fed46c5f762a`  
+**Active PR:** [#86](https://github.com/chahyasantoso/motionpath/pull/86)  
+**Checks:** pending after status update; merge only after all seven checks are green.  
 **Closed stale PRs:** #76, #77
 
 ## Current position
 
 - **Architecture:** accepted.
 - **Merged:** PR #75 CI bootstrap, PR #78 PR-01 baseline instrumentation, PR #79 PR-02 lifecycle ownership repair, PR #80 PR-03 graph transaction correctness, PR #81 PR-04 runtime scope boundary, PR #82 PR-05 patch and clock contracts, PR #83 PR-06 publisher path behind a flag, PR #84 PR-07 fixture shadow mode, PR #85 PR-08 live Spiral shadow.
-- **Active:** PR-09 manual-trigger Motion compatibility.
+- **Active:** PR #86, PR-09 manual-trigger Motion compatibility.
 - **Last passed checkpoint:** B, after PR-08.
 - **Current phase:** Phase 4, PR-09.
-- **Resume here:** open PR-09 from this clean branch, verify checks; merge only if green; then create PR-10 composite collapse from updated `v5`.
+- **Resume here:** verify PR #86 checks; merge only if green; then create PR-10 composite collapse from updated `v5`.
 
 ## PR-09 changes
 
-- Make time-trigger autoplay explicit while preserving the current default of `true`.
-- Preserve explicit autoplay false and manual-trigger paused behavior.
-- Cover seek, pause, play, reverse, destroy, and repeated control safety.
+- Time-trigger autoplay remains explicit and defaults to `true`.
+- Explicit autoplay false remains paused.
+- Manual triggers remain paused until play.
+- Seek, pause, play, reverse, and repeated destroy are covered.
 - No default rendering migration and no composite deletion.
 
 ## Verified state
