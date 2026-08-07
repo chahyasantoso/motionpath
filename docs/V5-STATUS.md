@@ -2,21 +2,23 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 19:31 Asia/Jakarta  
+**Status captured:** 2026-08-07 19:33 Asia/Jakarta  
 **Branch reviewed:** `v5-pr-07-fixture-shadow`  
 **Base branch:** `v5`  
 **Base SHA:** `975fe6dbf33faeb06efc70aa9e5732657701d174`  
-**Active PR:** PR-07 pending creation  
+**Head SHA:** `f54d9e39f8dcd6e637f45ef0ca1f1b937e1fec91`  
+**Active PR:** [#84](https://github.com/chahyasantoso/motionpath/pull/84)  
+**Checks:** pending at open; merge only after all seven checks are green.  
 **Closed stale PRs:** #76, #77
 
 ## Current position
 
 - **Architecture:** accepted.
 - **Merged:** PR #75 CI bootstrap, PR #78 PR-01 baseline instrumentation, PR #79 PR-02 lifecycle ownership repair, PR #80 PR-03 graph transaction correctness, PR #81 PR-04 runtime scope boundary, PR #82 PR-05 patch and clock contracts, PR #83 PR-06 publisher path behind a flag.
-- **Active:** PR-07 fixture shadow mode.
+- **Active:** PR #84, PR-07 fixture shadow mode.
 - **Last passed checkpoint:** A, after PR-03. Checkpoint B remains gated on PR-08.
 - **Current phase:** Phase 3, PR-07.
-- **Resume here:** verify PR-07 checks; merge only if green; then create PR-08 temporary CompositeRuntime and live Spiral shadow from updated `v5`.
+- **Resume here:** verify PR #84 checks; merge only if green; then create PR-08 temporary CompositeRuntime and live Spiral shadow from updated `v5`.
 
 ## PR-07 changes
 
