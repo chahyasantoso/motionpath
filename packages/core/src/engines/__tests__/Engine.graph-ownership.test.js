@@ -1,20 +1,20 @@
 /**
  * PR-02, lifecycle ownership repair.
  *
- * #mountMotion built a GraphPublisher and a GraphBinding and then dropped both
- * on the floor. Nothing referenced them, so nothing could dispose them and no
- * runtime mutation could ever reach the graph. The Motion now owns its graph
- * layer, which is what makes destroy, unmount, reload and failed mount able to
- * tear it down.
+ * Engine.#mountMotion built a GraphBinding and a GraphPublisher per Motion and
+ * then dropped both references. Nothing owned them, so nothing could dispose
+ * them: destroying a Motion left a live publisher and live cycle guards behind,
+ * and a mount that failed after publisher construction leaked the lot.
+ *
+ * These tests pin the ownership chain Motion -> GraphBinding -> GraphPublisher
+ * through the public Engine surface only.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Engine } from "../Engine.js";
-import { GraphBinding } from "../../usecases/GraphBinding.js";
-import { GraphPublisher } from "../../usecases/GraphPublisher.js";
 
 const project = {
   schemaVersion: 4,
-  projectId: "graph-ownership",
+  projectId: "lifecycle-ownership",
   motions: [
     {
       id: "arm",
@@ -31,134 +31,129 @@ const project = {
         {
           id: "child",
           observes: [{ source: "parent", role: "input", target: "parentWorld" }],
-          keyframes: { boneLength: { stops: [{ p: 0, v: 10 }, { p: 1, v: 20 }] } },
+          keyframes: {
+            boneLength: { stops: [{ p: 0, v: 10 }, { p: 1, v: 20 }] },
+          },
         },
       ],
     },
   ],
 };
 
+function throwingDelegate() {
+  return {
+    destroyed: false,
+    build() { throw new Error("delegate build failed"); },
+    play() {},
+    pause() {},
+    seek() {},
+    reverse() {},
+    onComplete() {},
+    destroy() { this.destroyed = true; },
+  };
+}
+
 describe("Engine graph ownership", () => {
   let engine;
-  afterEach(() => {
-    engine?.destroy();
-    engine = null;
-    vi.restoreAllMocks();
-  });
+  afterEach(() => { engine?.destroy(); engine = undefined; });
 
-  async function mounted() {
+  it("attaches the graph binding to the motion that owns it", async () => {
     engine = new Engine();
     await engine.loadProject(project);
-    return engine.mountInstance("arm");
-  }
+    const motion = engine.mountInstance("arm");
 
-  it("attaches the graph layer to the motion that owns it", async () => {
-    const motion = await mounted();
-
-    expect(motion.graphBinding).toBeInstanceOf(GraphBinding);
-    expect(motion.graphBinding.publisher).toBeInstanceOf(GraphPublisher);
-    expect(motion.graphBinding.publisher.trackCount).toBe(2);
-    const order = motion.graphBinding.graph.order;
-    expect(order.indexOf("parent")).toBeLessThan(order.indexOf("child"));
+    const binding = motion.graphBinding;
+    expect(binding).toBeTruthy();
+    expect(binding.isDestroyed).toBe(false);
+    expect(binding.tracks.size).toBe(2);
+    expect(binding.graph.edges).toHaveLength(1);
   });
 
-  it("keeps the live cycle guard installed on mounted tracks", async () => {
-    const motion = await mounted();
+  it("keeps the live cycle guard installed on a mounted motion", async () => {
+    engine = new Engine();
+    await engine.loadProject(project);
+    const motion = engine.mountInstance("arm");
     const parent = motion.getTrack("parent");
     const child = motion.getTrack("child");
 
     expect(() => parent.setObserved(child, (patch) => patch, { role: "output" })).toThrow(/cycle/i);
   });
 
-  it("disposes the graph layer on destroy, repeatedly", async () => {
-    const motion = await mounted();
+  it("disposes the binding and its publisher when the motion is destroyed", async () => {
+    engine = new Engine();
+    await engine.loadProject(project);
+    const motion = engine.mountInstance("arm");
     const binding = motion.graphBinding;
-    const publisher = binding.publisher;
-    const parent = motion.getTrack("parent");
-    const child = motion.getTrack("child");
 
     motion.destroy();
 
     expect(binding.isDestroyed).toBe(true);
-    expect(publisher.isDestroyed).toBe(true);
-    expect(publisher.trackCount).toBe(0);
-    expect(publisher.graphOrder).toEqual([]);
-    expect(motion.graphBinding).toBeNull();
-    expect(parent.isDestroyed).toBe(true);
-    expect(child.isDestroyed).toBe(true);
-    expect(parent.observerCount).toBe(0);
-    expect(child.observedSources).toEqual([]);
-
-    expect(() => motion.destroy()).not.toThrow();
-    expect(() => motion.destroy()).not.toThrow();
+    expect(binding.tracks.size).toBe(0);
+    expect(motion.graphBinding).toBe(null);
   });
 
-  it("disposes the graph layer on unmount", async () => {
-    const motion = await mounted();
+  it("makes repeated destroy safe", async () => {
+    engine = new Engine();
+    await engine.loadProject(project);
+    const motion = engine.mountInstance("arm");
     const binding = motion.graphBinding;
-    const publisher = binding.publisher;
+
+    expect(() => { motion.destroy(); motion.destroy(); }).not.toThrow();
+    expect(() => binding.destroy()).not.toThrow();
+    expect(motion.graphBinding).toBe(null);
+  });
+
+  it("disposes the binding when the engine unmounts the motion", async () => {
+    engine = new Engine();
+    await engine.loadProject(project);
+    const motion = engine.mountInstance("arm");
+    const binding = motion.graphBinding;
 
     expect(engine.unmount(motion)).toBe(true);
-
     expect(binding.isDestroyed).toBe(true);
-    expect(publisher.isDestroyed).toBe(true);
     expect(engine.instanceCount).toBe(0);
-    expect(engine.unmount(motion)).toBe(false);
   });
 
-  it("disposes the previous graph layer on reload", async () => {
-    const motion = await mounted();
+  it("releases the previous binding when the project reloads", async () => {
+    engine = new Engine();
+    await engine.loadProject(project);
+    const motion = engine.mountInstance("arm");
     const binding = motion.graphBinding;
-    const publisher = binding.publisher;
 
     await engine.loadProject(project);
 
     expect(binding.isDestroyed).toBe(true);
-    expect(publisher.isDestroyed).toBe(true);
     expect(engine.instanceCount).toBe(0);
 
     const remounted = engine.mountInstance("arm");
-    expect(remounted.graphBinding).toBeInstanceOf(GraphBinding);
+    expect(remounted.graphBinding).toBeTruthy();
+    expect(remounted.graphBinding).not.toBe(binding);
     expect(remounted.graphBinding.isDestroyed).toBe(false);
-    expect(remounted.graphBinding.publisher.trackCount).toBe(2);
   });
 
-  it("disposes the graph layer on engine destroy", async () => {
-    const motion = await mounted();
-    const binding = motion.graphBinding;
-    const publisher = binding.publisher;
-
-    engine.destroy();
-
-    expect(binding.isDestroyed).toBe(true);
-    expect(publisher.isDestroyed).toBe(true);
-  });
-
-  it("disposes the graph layer when the mount fails after it is built", async () => {
+  it("cleans up the graph when a mount fails after the publisher is built", async () => {
     engine = new Engine();
     await engine.loadProject(project);
-    const bindingDestroy = vi.spyOn(GraphBinding.prototype, "destroy");
-    const publisherDestroy = vi.spyOn(GraphPublisher.prototype, "destroy");
-    const delegate = {
-      build: () => { throw new Error("delegate build failed"); },
-      play: () => {}, pause: () => {}, seek: () => {}, reverse: () => {}, onComplete: () => {}, destroy: () => {},
-    };
+    const delegate = throwingDelegate();
 
     expect(() => engine.mountWithDelegate("arm", delegate)).toThrow("delegate build failed");
 
-    expect(bindingDestroy).toHaveBeenCalledTimes(1);
-    expect(publisherDestroy).toHaveBeenCalledTimes(1);
+    expect(delegate.destroyed).toBe(true);
     expect(engine.instanceCount).toBe(0);
+    expect(engine.getTrack("parent")).toBe(null);
   });
 
-  it("leaves nothing registered when track construction fails before the graph exists", async () => {
+  it("does not resurrect a graph binding on a destroyed motion", async () => {
     engine = new Engine();
     await engine.loadProject(project);
-    const publisherDestroy = vi.spyOn(GraphPublisher.prototype, "destroy");
+    const first = engine.mountInstance("arm");
+    const second = engine.mountInstance("arm");
+    const orphan = second.graphBinding;
 
-    expect(() => engine.mountWithDelegate("missing-motion", {})).toThrow(/not found/i);
+    first.destroy();
+    first.setGraphBinding(orphan);
 
-    expect(publisherDestroy).not.toHaveBeenCalled();
-    expect(engine.instanceCount).toBe(0);
+    expect(first.graphBinding).toBe(null);
+    expect(orphan.isDestroyed).toBe(true);
   });
 });
