@@ -17,7 +17,17 @@ export class CompositeRuntime {
     this.#runtime?.dispose(); this.#runtime = new GraphRuntime({ graph, tracks, clock: this.#clock }); return this;
   }
   flush() { this.#assertAlive(); return this.#runtime?.flush() ?? 0; }
-  shadow() { this.#assertAlive(); const legacy = this.#host.composeGraph(); const published = new Map([...this.#runtime?.patches.snapshot() ?? []].map(([id, patch]) => [id, patch.values])); return { legacy, published }; }
+  shadow() {
+    this.#assertAlive();
+    const legacy = new Map();
+    const composed = new Map();
+    for (const id of this.#host.graphOrder ?? []) {
+      const track = this.#host.getChild(id);
+      if (track && !track.isDestroyed) legacy.set(id, track.compose(undefined, composed));
+    }
+    const published = new Map([...this.#runtime?.patches.snapshot() ?? []].map(([id, patch]) => [id, patch.values]));
+    return { legacy, published };
+  }
   dispose() { if (this.#disposed) return; this.#disposed = true; this.#runtime?.dispose(); this.#runtime = null; this.#tracks.clear(); this.#host = null; }
   #assertAlive() { if (this.#disposed) throw new Error("CompositeRuntime is disposed."); }
 }
