@@ -2,13 +2,15 @@ export { CURRENT_SCHEMA_VERSION, SUPPORTED_TRIGGER_TYPES, OBSERVATION_ROLES, PLU
 export { createAnimationPlugin } from "./domain/createAnimationPlugin.js";
 export { ALL_PLUGINS, createPluginRegistry, registerPlugin, unregisterPlugin, resolvePluginForKey, resolvePluginInput, ensureLoaded, getInternalKeys, getOutputSerializers, pathPlugin, cssVarPlugin, imageSequencePlugin, fkPlugin } from "./domain/plugins.js";
 export { buildTrackTween, buildTrackTweenSync } from "./usecases/BuildTrackTween.js";
-export { composeTrackPatch, composePatch } from "./usecases/ComposeTrackPatch.js";
 export { resolveTrack, resolveTrackKeyframes } from "./usecases/ResolveTrack.js";
 export { mergePatches } from "./usecases/mergePatches.js";
 export { Overlay } from "./usecases/Overlay.js";
 export { Spawner } from "./usecases/Spawner.js";
 export { normalizeObservationGraph, topologicalTrackOrder, tryTopologicalOrder } from "./usecases/normalizeObservationGraph.js";
 export { observationEdgeKey, observationEdgeEquals } from "./usecases/observationEdge.js";
+export { createManualClock, assertClock } from "./ports/Clock.js";
+export { assertInterpolator } from "./ports/Interpolator.js";
+export { assertScheduler } from "./ports/Scheduler.js";
 export { FakeClock } from "./runtime/FakeClock.js";
 export { PatchRegistry } from "./runtime/PatchRegistry.js";
 export { GraphRuntime, MotionRuntime, createGraphRuntime } from "./runtime/GraphRuntime.js";
