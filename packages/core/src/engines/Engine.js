@@ -20,9 +20,6 @@ export class Engine {
     const candidate = await parseV4Project(schema, this.#dependencies);
     const staged = this.#projectRuntime.beginCandidate(candidate);
     try {
-      // Parsing is complete before the candidate becomes visible. Keep this
-      // registry deliberately empty: mounted graph instances are committed by
-      // mountInstance, never exposed while a reload is only half-built.
       this.#projectRuntime.commitCandidate(staged);
     } catch (error) {
       this.#projectRuntime.abortCandidate(staged);
@@ -32,6 +29,8 @@ export class Engine {
     this.#instances = new Map();
     this.#handles = new WeakMap();
     this.#v4Project = candidate;
+    // The ProjectRuntime now owns the committed instance lifecycle. The old
+    // Engine registry remains as the identity index used by public methods.
     for (const object of previousInstances.values()) object?.destroy?.();
     this.#dependencies.eventBus.clear();
   }
@@ -53,6 +52,6 @@ export class Engine {
   getTrackConfig(id) { return this.#v4Project?.getTrackConfig(id) ?? null; }
   get templates() { return this.#v4Project?.templates ?? []; }
   get eventBus() { return this.#dependencies.eventBus; }
-  destroy() { for (const object of this.#instances.values()) object?.destroy?.(); this.#instances.clear(); this.#handles = new WeakMap(); this.#projectRuntime.dispose(); this.#v4Project = null; this.#dependencies.eventBus.clear(); }
+  destroy() { if (this.#projectRuntime && !this.#projectRuntime.isDisposed) this.#projectRuntime.dispose(); this.#instances.clear(); this.#handles = new WeakMap(); this.#v4Project = null; this.#dependencies.eventBus.clear(); }
 }
 export const engine = new Engine({ triggerDelegates: triggerDelegateRegistry });

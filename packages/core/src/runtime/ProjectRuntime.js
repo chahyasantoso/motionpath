@@ -42,8 +42,9 @@ export class ProjectRuntime {
 
   commitCandidate(candidate) {
     this.#assertCandidate(candidate);
-    // Swap visibility first. The caller destroys the previous project only after
-    // this succeeds, so a candidate failure cannot tear down a live project.
+    // Swap project visibility first. Mounted instances belong to the old
+    // project until the caller destroys them after this method returns. Drop
+    // only our references here so registering the replacement cannot collide.
     const previous = this.#active;
     this.#active = {
       project: candidate.project,
@@ -51,6 +52,8 @@ export class ProjectRuntime {
       metadata: new Map(candidate.metadata),
     };
     this.#candidate = null;
+    this.#instances.clear();
+    this.#instanceMetadata.clear();
     return previous?.project ?? null;
   }
 
