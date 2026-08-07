@@ -136,6 +136,10 @@ export class Track {
       if (previous) previous.source._removeObserver(this, addition.key);
       this.#observed.set(addition.key, { source: addition.source, mapFn: addition.mapFn, role: addition.role, input: addition.input });
       newSource._addObserver(this, addition.key);
+      // The removals above announce themselves. The additions used to be
+      // silent, so anything rebuilding an IR from lifecycle events saw a rewire
+      // as a pure deletion and dropped the edge entirely.
+      this.#emitLifecycle({ type: previous ? "edge-replaced" : "edge-added", track: this, source: addition.source, edge: { source: addition.source.id, target: this.#id, role: addition.role, input: addition.input } });
     }
     this.#invalidate("observation");
   }
@@ -189,11 +193,19 @@ export class Track {
   }
 
   #detachObservationEdges() {
+    const affected = new Set();
     for (const [observer, keys] of [...this.#observers]) {
       for (const key of [...keys]) observer.#removeObservedKey(key);
+      affected.add(observer);
     }
     this.#observers.clear();
+    const hadObserved = this.#observed.size > 0;
     for (const key of [...this.#observed.keys()]) this.#removeObservedKey(key);
+    // Losing a source changes what an observer composes. Without this the
+    // publisher keeps serving a warm patch that still carries the detached
+    // source's contribution, which is the stale-render bug this fixes.
+    for (const observer of affected) observer.#invalidate("observation");
+    if (hadObserved) this.#invalidate("observation");
   }
 
   _mount(host) { if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`); if (this.#host) throw new Error(`Track "${this.#id}" already mounted to "${this.#host.id ?? "another motion"}"`); this.#host = host; }
@@ -231,6 +243,10 @@ export class Track {
       target.child.#currentOffset = target.offset;
       if (this.#host) this.#host._reflowChild(target.child, target.offset);
     }
+    // The child survives this call, so "destroyed" would be a lie. The graph
+    // layer still has to drop it: a removed child that stays in the publish
+    // order composes off a timeline nothing advances any more.
+    child.#emitLifecycle({ type: "detached", track: child, parent: this });
     this.#eventBus.emit("child:removing", { id: child.id, parentId: this.#id });
     this.#invalidate("children");
   }
