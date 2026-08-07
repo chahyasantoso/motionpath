@@ -41,6 +41,19 @@ const project = createSpiralProject({
   ballSize: 12,
 });
 
+async function withCiAnnotation(run) {
+  try {
+    await run();
+  } catch (error) {
+    const message = String(error?.stack ?? error)
+      .replaceAll("%", "%25")
+      .replaceAll("\r", "%0D")
+      .replaceAll("\n", "%0A");
+    console.error(`::error title=Spiral controller integration::${message}`);
+    throw error;
+  }
+}
+
 describe("useSpiralWaveController integration", () => {
   beforeEach(async () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -56,36 +69,37 @@ describe("useSpiralWaveController integration", () => {
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   });
 
-  it("drives the live controller through spawn, shadow comparison, and cleanup", async () => {
-    const createHost = vi.spyOn(engine, "createGroupHost");
-    let controller;
-    function Harness() {
-      controller = useSpiralWaveController({ isLoaded: true });
-      return null;
-    }
+  it("drives the live controller through spawn, shadow comparison, and cleanup", () =>
+    withCiAnnotation(async () => {
+      const createHost = vi.spyOn(engine, "createGroupHost");
+      let controller;
+      function Harness() {
+        controller = useSpiralWaveController({ isLoaded: true });
+        return null;
+      }
 
-    const root = createRoot(document.createElement("div"));
-    await act(async () => root.render(<Harness />));
-    expect(createHost).toHaveBeenCalledOnce();
+      const root = createRoot(document.createElement("div"));
+      await act(async () => root.render(<Harness />));
+      expect(createHost).toHaveBeenCalledOnce();
 
-    act(() => gsapTickerClock.tick());
-    expect(controller.ballVms).toHaveLength(1);
+      act(() => gsapTickerClock.tick());
+      expect(controller.ballVms).toHaveLength(1);
 
-    const host = createHost.mock.results[0].value;
-    const ball = controller.ballVms[0];
-    const shadow = new CompositeRuntime(host);
-    shadow.register(ball.ballTrack);
-    shadow.runtime.publisher.markAllDirty();
-    shadow.flush();
-    const comparison = shadow.shadow();
+      const host = createHost.mock.results[0].value;
+      const ball = controller.ballVms[0];
+      const shadow = new CompositeRuntime(host);
+      shadow.register(ball.ballTrack);
+      shadow.runtime.publisher.markAllDirty();
+      shadow.flush();
+      const comparison = shadow.shadow();
 
-    expect(
-      compareShadowPatches(comparison.legacy, comparison.published),
-    ).toEqual({ equal: true, mismatches: [] });
-    expect(host.getChild(ball.ballTrack.id)).toBe(ball.ballTrack);
+      expect(
+        compareShadowPatches(comparison.legacy, comparison.published),
+      ).toEqual({ equal: true, mismatches: [] });
+      expect(host.getChild(ball.ballTrack.id)).toBe(ball.ballTrack);
 
-    shadow.dispose();
-    await act(async () => root.unmount());
-    expect(engine.instanceCount).toBe(0);
-  });
+      shadow.dispose();
+      await act(async () => root.unmount());
+      expect(engine.instanceCount).toBe(0);
+    }));
 });
