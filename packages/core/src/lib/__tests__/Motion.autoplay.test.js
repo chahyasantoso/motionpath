@@ -27,6 +27,7 @@ describe("Motion autoplay compatibility", () => {
   it("preserves seek, pause, play and reverse controls", () => {
     const delegate = new ManualTriggerDelegate();
     const timeline = delegate.build();
+    timeline.to({}, { duration: 1, x: 1 });
     delegate.seek(0.5);
     expect(timeline.progress()).toBeCloseTo(0.5, 5);
     delegate.play();
@@ -34,6 +35,6 @@ describe("Motion autoplay compatibility", () => {
     delegate.reverse();
     expect(() => delegate.destroy()).not.toThrow();
   });
-});
 
-void gsap;
+  void gsap;
+});
