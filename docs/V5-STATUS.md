@@ -2,22 +2,23 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 19:36 Asia/Jakarta  
+**Status captured:** 2026-08-07 19:38 Asia/Jakarta  
 **Branch reviewed:** `v5-pr-08-spiral-shadow`  
 **Base branch:** `v5`  
 **Base SHA:** `a61d06287d7656475044928d625f8b19092ea9c7`  
-**Active PR:** PR-08 pending creation  
-**Checks:** pending at open; merge only after all seven checks are green.  
+**Head SHA:** `1e00b2e10c4a5fb38b9bfb0d6ade9e70844fb0c9`  
+**Active PR:** [#85](https://github.com/chahyasantoso/motionpath/pull/85)  
+**Checks:** pending after status update; merge only after all seven checks are green.  
 **Closed stale PRs:** #76, #77
 
 ## Current position
 
 - **Architecture:** accepted.
 - **Merged:** PR #75 CI bootstrap, PR #78 PR-01 baseline instrumentation, PR #79 PR-02 lifecycle ownership repair, PR #80 PR-03 graph transaction correctness, PR #81 PR-04 runtime scope boundary, PR #82 PR-05 patch and clock contracts, PR #83 PR-06 publisher path behind a flag, PR #84 PR-07 fixture shadow mode.
-- **Active:** PR-08 live Spiral shadow through temporary CompositeRuntime.
-- **Last passed checkpoint:** A, after PR-03. Checkpoint B is gated on this PR.
+- **Active:** PR #85, PR-08 live Spiral shadow through temporary CompositeRuntime.
+- **Last passed checkpoint:** A, after PR-03. Checkpoint B is gated on PR-08.
 - **Current phase:** Phase 3, PR-08.
-- **Resume here:** verify PR-08 checks; merge only if green; if all live Spiral shadow evidence passes, mark Checkpoint B passed, then create PR-09 manual-trigger Motion compatibility from updated `v5`.
+- **Resume here:** verify PR #85 checks and shadow evidence; merge only if green; if the live shadow gate passes, mark Checkpoint B passed and create PR-09 manual-trigger Motion compatibility from updated `v5`.
 
 ## PR-08 changes
 
@@ -46,7 +47,7 @@
 ## Checkpoints
 
 - **A, after PR-03:** passed, PR-03 merged with all seven CI checks green.
-- **B, after PR-08:** not passed.
+- **B, after PR-08:** not passed; requires all live Spiral shadow tests and PR-08 CI green.
 - **C, after PR-11:** not passed.
 - **D, after PR-16:** not passed.
 - **E, after PR-18:** not passed.
