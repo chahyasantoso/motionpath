@@ -30,6 +30,8 @@ export class GraphPublisher {
   get graphOrder() { return [...this.#order]; }
   get trackCount() { return this.#tracks.size; }
   get isDestroyed() { return this.#destroyed; }
+  // Invalidation is inert after disposal rather than fatal: it arrives from
+  // Track lifecycle events, which can still be in flight during teardown.
   markDirty(trackId) { if (this.#destroyed) return; if (!this.#tracks.has(trackId)) { if (this.#strict) throw new Error(`Unknown track id '${trackId}'.`); return; } this.#marked.add(trackId); }
   markAllDirty() { if (this.#destroyed) return; for (const id of this.#tracks.keys()) this.#marked.add(id); }
   resetRetry(trackId) { if (this.#destroyed) return; if (!this.#tracks.has(trackId)) { if (this.#strict) throw new Error(`Unknown track id '${trackId}'.`); return; } this.#retryState.delete(trackId); this.#publishPending.add(trackId); }
@@ -81,7 +83,7 @@ export class GraphPublisher {
     return published;
   }
   applyGraph(graph, tracks = this.#tracks) {
-    if (this.#destroyed) return;
+    this.#assertAlive();
     const order = topologicalTrackOrder(graph, { strict: true });
     const nextTracks = tracks instanceof Map ? tracks : new Map(tracks);
     const previousTracks = this.#tracks;
@@ -101,13 +103,16 @@ export class GraphPublisher {
     for (const id of invalidationSeeds) { if (!this.#tracks.has(id)) continue; this.#cache.delete(id); this.#publishPending.delete(id); this.#retryState.delete(id); this.#marked.add(id); }
     this.#markDownstream(invalidationSeeds);
   }
-  addTrack(idOrTrack, trackOrOptions, maybeOptions) { if (this.#destroyed) return; const idFirst = typeof idOrTrack === "string"; const track = idFirst ? trackOrOptions : idOrTrack; const id = idFirst ? idOrTrack : track?.id; const options = (idFirst ? maybeOptions : trackOrOptions) ?? {}; if (!track || typeof track.compose !== "function") throw new TypeError("addTrack requires a Track."); if (track.id !== id) throw new Error(`Track id '${track.id}' does not match registration id '${id}'.`); if (this.#tracks.has(id)) throw new Error(`Duplicate track id '${id}'.`); const nodes = [...this.#order.map((existing) => ({ id: existing })), { id }]; const edges = [...this.#edges, ...(options.observes ?? []).map((edge) => ({ ...edge, target: id }))]; const order = buildTopologicalOrder(nodes, edges); this.#tracks.set(id, track); this.#adoptGraph(nodes, edges, order); this.#attachHooks(); this.#marked.add(id); }
-  addEdge(edge) { if (this.#destroyed) return; const edges = [...this.#edges, { source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.role === "input" ? edge.target : undefined }]; const nodes = this.#order.map((id) => ({ id })); this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges)); this.#marked.add(edge.target); this.#cache.delete(edge.target); }
-  removeEdge(edge) { if (this.#destroyed) return; const edges = this.#edges.filter((existing) => !(existing.source === edge.source && existing.target === edge.target && (edge.role === undefined || existing.role === edge.role))); const nodes = this.#order.map((id) => ({ id })); this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges)); this.#marked.add(edge.target); this.#cache.delete(edge.target); }
+  addTrack(idOrTrack, trackOrOptions, maybeOptions) { this.#assertAlive(); const idFirst = typeof idOrTrack === "string"; const track = idFirst ? trackOrOptions : idOrTrack; const id = idFirst ? idOrTrack : track?.id; const options = (idFirst ? maybeOptions : trackOrOptions) ?? {}; if (!track || typeof track.compose !== "function") throw new TypeError("addTrack requires a Track."); if (track.id !== id) throw new Error(`Track id '${track.id}' does not match registration id '${id}'.`); if (this.#tracks.has(id)) throw new Error(`Duplicate track id '${id}'.`); const nodes = [...this.#order.map((existing) => ({ id: existing })), { id }]; const edges = [...this.#edges, ...(options.observes ?? []).map((edge) => ({ ...edge, target: id }))]; const order = buildTopologicalOrder(nodes, edges); this.#tracks.set(id, track); this.#adoptGraph(nodes, edges, order); this.#attachHooks(); this.#marked.add(id); }
+  addEdge(edge) { this.#assertAlive(); const edges = [...this.#edges, { source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.role === "input" ? edge.target : undefined }]; const nodes = this.#order.map((id) => ({ id })); this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges)); this.#marked.add(edge.target); this.#cache.delete(edge.target); }
+  removeEdge(edge) { this.#assertAlive(); const edges = this.#edges.filter((existing) => !(existing.source === edge.source && existing.target === edge.target && (edge.role === undefined || existing.role === edge.role))); const nodes = this.#order.map((id) => ({ id })); this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges)); this.#marked.add(edge.target); this.#cache.delete(edge.target); }
   /**
    * Retained deliberately through PR-02. The replacement destroy path does not
    * exist until the graph transaction work in PR-03, and removing this early
    * would leave a destroyed track wired into the publish order.
+   *
+   * Unlike the other mutators this stays a no-op after disposal: it is where a
+   * late Track "destroyed" event lands, and teardown must not throw.
    */
   removeTrack(id) { if (this.#destroyed || !this.#tracks.has(id)) return; this.#detachHook(id); this.#tracks.delete(id); const nodes = this.#order.filter((existing) => existing !== id).map((existing) => ({ id: existing })); const edges = this.#edges.filter((edge) => edge.source !== id && edge.target !== id); this.#adoptGraph(nodes, edges, buildTopologicalOrder(nodes, edges)); this.#cache.delete(id); this.#marked.delete(id); this.#publishPending.delete(id); this.#retryState.delete(id); }
   /**
@@ -129,6 +134,7 @@ export class GraphPublisher {
     this.#edges = [];
     this.#order = [];
   }
+  #assertAlive() { if (this.#destroyed) throw new Error("GraphPublisher is destroyed."); }
   #isWarm() { for (const [id, track] of this.#tracks) { if (track?.isDestroyed) continue; if (!this.#cache.has(id)) return false; } return true; }
   #canRetry(id) { const state = this.#retryState.get(id); return !state || state.nextRetryFlush <= this.#flushNumber; }
   #recordPublishFailure(id) { const previous = this.#retryState.get(id); const attempts = (previous?.attempts ?? 0) + 1; const exhausted = attempts >= this.#retry.maxAttempts; this.#retryState.set(id, { attempts, exhausted, nextRetryFlush: this.#flushNumber + this.#retry.backoff + 1 }); if (!exhausted) this.#publishPending.add(id); else this.#publishPending.delete(id); }

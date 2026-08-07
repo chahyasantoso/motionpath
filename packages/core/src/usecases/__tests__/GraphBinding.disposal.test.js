@@ -3,9 +3,8 @@
  *
  * Disposal used to stop at the binding: GraphBinding.destroy() unsubscribed
  * itself and left the publisher fully wired, holding every track and every
- * cycle guard. These tests pin the chain GraphBinding -> GraphPublisher, prove
- * it is idempotent, and prove cycle protection survives everything except
- * disposal itself.
+ * cycle guard. These tests pin the chain GraphBinding -> GraphPublisher.
+ * The publisher's own disposal contract lives in GraphPublisher.disposal.test.js.
  */
 import { describe, expect, it } from "vitest";
 import { GraphBinding } from "../GraphBinding.js";
@@ -61,17 +60,15 @@ describe("GraphBinding — disposal ownership", () => {
     expect(binding.isDestroyed).toBe(true);
     expect(publisher.isDestroyed).toBe(true);
   });
-});
 
-describe("GraphPublisher — disposal", () => {
-  it("stops composing and publishing once destroyed", () => {
-    const { publisher, published, composeCounts } = bind(chainMotion(3));
+  it("stops composing once the whole chain is disposed", () => {
+    const { binding, publisher, published, composeCounts } = bind(chainMotion(3));
     publisher.markAllDirty();
     publisher.flush();
     const warmed = new Map(composeCounts);
     published.length = 0;
 
-    publisher.destroy();
+    binding.destroy();
     publisher.markAllDirty();
 
     expect(publisher.flush()).toBe(0);
@@ -79,44 +76,13 @@ describe("GraphPublisher — disposal", () => {
     for (const [id, count] of warmed) expect(composeCounts.get(id)).toBe(count);
   });
 
-  it("ignores graph mutations once destroyed", () => {
-    const { publisher } = bind(chainMotion(2));
-    publisher.destroy();
-    expect(() => { publisher.addEdge({ source: "n0", target: "n1", role: "output" }); publisher.removeEdge({ source: "n0", target: "n1" }); publisher.removeTrack("n0"); }).not.toThrow();
-    expect(publisher.graphOrder).toEqual([]);
-    expect(publisher.trackCount).toBe(0);
-  });
-
-  it("does not mutate a track map it was handed", () => {
-    const { graph, tracks } = buildRealGraph(chainMotion(3));
-    const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
-    publisher.destroy();
-    expect(tracks.size).toBe(3);
-    expect([...tracks.values()].every((track) => !track.isDestroyed)).toBe(true);
-  });
-});
-
-describe("GraphPublisher — cycle protection", () => {
-  it("keeps the live cycle guard installed while the graph is alive", () => {
-    const { tracks } = bind(chainMotion(2));
-    expect(() => tracks.get("n0").setObserved(tracks.get("n1"), (patch) => patch, { role: "output" })).toThrow(/cycle/i);
-  });
-
-  it("keeps the guard installed after an unrelated mutation", () => {
+  it("keeps the cycle guard installed after an unrelated mutation", () => {
     const { binding, tracks } = bind(chainMotion(3));
     binding.removeEdge({ source: "n1", target: "n2", role: "output" });
     expect(() => tracks.get("n0").setObserved(tracks.get("n1"), (patch) => patch, { role: "output" })).toThrow(/cycle/i);
   });
 
-  it("releases the guard on disposal instead of retaining it", () => {
-    const { binding, tracks } = bind(chainMotion(2));
-    binding.destroy();
-    expect(() => tracks.get("n0").setObserved(tracks.get("n1"), (patch) => patch, { role: "output" })).not.toThrow();
-  });
-});
-
-describe("GraphPublisher — failed binding construction", () => {
-  it("can be disposed after its binding rejects the graph", () => {
+  it("can dispose a publisher whose binding rejected the graph", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     tracks.get("n0").setObserved(tracks.get("n2"), () => ({}), { role: "output" });
     const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
