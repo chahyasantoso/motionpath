@@ -1,16 +1,14 @@
 # MotionPath v5 implementation plan
 
 **Status:** accepted execution plan  
-**Revision:** 2026-08-07  
+**Revision:** 2026-08-07, graph-mode validation clarified  
 **Implementation base branch:** `v5`  
 **Parent plan:** `docs/V5-ARCHITECTURE-REFACTOR-PLAN.md`  
 **Review addendum:** `docs/V5-MIGRATION-REVIEW-ADDENDUM.md`
 
 ## Architecture review verdict
 
-The implementation plan is sound after three corrections: the accepted architecture plan now incorporates the addendum; all implementation branches start from `v5`; and CI is bootstrapped before runtime changes. The critical sequencing rule is unchanged: fixture shadow validation precedes live Spiral shadow validation through temporary `CompositeRuntime`, which precedes manual-trigger Motion migration.
-
-The plan is intentionally conservative. No project-wide graph, cross-motion edge, or free-track capability is enabled before the same-motion publisher, composite migration, plugin-input validation, and ProjectRuntime rollback gates pass.
+The implementation plan is sound after four corrections: the accepted architecture plan incorporates the addendum; all implementation branches start from `v5`; CI is bootstrapped before runtime changes; and authored graph mode is explicit rather than inferred from missing edges. The critical sequencing rule is unchanged: fixture shadow validation precedes live Spiral shadow validation through temporary `CompositeRuntime`, which precedes manual-trigger Motion migration.
 
 ## Delivery rules
 
@@ -141,11 +139,15 @@ Complete the isolated depth-three GSAP spike, then allow Motion to contain Track
 
 ### PR-14: FK input and observation contract
 
-Before extracting observation state, validate plugin-declared inputs against authored edges. In graph mode required inputs need exactly one compatible edge; standalone tracks may use documented defaults. For `fkPlugin`, `parentWorld` is required in graph mode and has an explicit identity-world standalone default.
+Before extracting observation state, assign every track an explicit mode in its runtime contract: `standalone` for intentionally unaffiliated direct tracks, or `authored-graph` for project/schema-created tracks and any track registered with `GraphRuntime`. The validator must receive this mode explicitly; it must never infer standalone status from absent edges, missing publisher membership, or an incomplete registration.
 
-Add stable diagnostics: `GRAPH_INPUT_MISSING`, `GRAPH_INPUT_UNKNOWN`, `GRAPH_INPUT_DUPLICATE`, `GRAPH_INPUT_ROLE_MISMATCH`.
+In `authored-graph` mode, required plugin inputs need exactly one compatible edge, even while a node is pending registration. In `standalone` mode, documented plugin defaults may apply. For `fkPlugin`, `parentWorld` is required in graph mode and has an explicit identity-world standalone default.
 
-**CI gate:** valid FK chain, missing input, wrong target, duplicate edge, role mismatch, standalone fallback, and qualified-source fixtures.
+Add stable diagnostics: `GRAPH_INPUT_MISSING`, `GRAPH_INPUT_UNKNOWN`, `GRAPH_INPUT_DUPLICATE`, and `GRAPH_INPUT_ROLE_MISMATCH`. Add tests proving a missed `#wireObservations` call or incomplete registration fails rather than silently taking the standalone default.
+
+**CI gate:** valid FK chain, missing input, wrong target, duplicate edge, role mismatch, standalone fallback, explicit-mode fixtures, and qualified-source fixtures.
+
+**Merge gate:** malformed authored rigs fail validation instead of silently falling back.
 
 ### PR-15: ObservationGraph extraction
 
@@ -242,7 +244,7 @@ Rollback disables the narrowest flag first. Keep the prior runtime alive until t
 - All implementation PRs target the `v5` base branch.
 - Phase 3 is explicitly fixture shadow plus live Spiral shadow through temporary CompositeRuntime.
 - Manual-trigger Motion preserves group-host autoplay/control semantics.
-- FK authored inputs are validated separately from standalone defaults.
+- FK authored inputs are validated using explicit track mode, never inferred from missing edges, and standalone defaults cannot mask missed wiring.
 - No partial graph is renderable or flushable.
 - Cross-motion behavior is capability-gated and disabled by default until PR-19 evidence is accepted.
 - Parent architecture and implementation plans agree on ownership, lifecycle, ordering, timeline, validation, and branch policy.
