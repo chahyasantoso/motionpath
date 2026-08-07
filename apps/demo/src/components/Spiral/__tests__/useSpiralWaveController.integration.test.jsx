@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import React, { act } from "react";
+import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { engine } from "@motionpath/core/engines/Engine.js";
 import { CompositeRuntime } from "@motionpath/core/runtime/CompositeRuntime.js";
@@ -9,10 +10,27 @@ import { gsapTickerClock } from "@motionpath/core/lib/gsapTickerClock.js";
 import { createSpiralProject } from "../spiralMotions.js";
 import { useSpiralWaveController } from "../useSpiralWaveController.js";
 
-vi.mock("@motionpath/core/lib/gsapTickerClock.js", async () => {
-  const { FakeClock } = await import("@motionpath/core/runtime/FakeClock.js");
-  return { gsapTickerClock: new FakeClock() };
+const { clock } = vi.hoisted(() => {
+  const listeners = new Set();
+  return {
+    clock: {
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      tick(delta = 1 / 60) {
+        for (const listener of [...listeners]) listener(delta);
+      },
+      reset() {
+        listeners.clear();
+      },
+    },
+  };
 });
+
+vi.mock("@motionpath/core/lib/gsapTickerClock.js", () => ({
+  gsapTickerClock: clock,
+}));
 
 const project = createSpiralProject({
   spiralPathPoints: [
@@ -25,40 +43,49 @@ const project = createSpiralProject({
 
 describe("useSpiralWaveController integration", () => {
   beforeEach(async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     engine.destroy();
+    clock.reset();
     await engine.loadProject(project);
   });
 
   afterEach(() => {
     engine.destroy();
+    clock.reset();
     vi.restoreAllMocks();
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   });
 
   it("drives the live controller through spawn, shadow comparison, and cleanup", async () => {
     const createHost = vi.spyOn(engine, "createGroupHost");
-    const { result, unmount } = renderHook(() =>
-      useSpiralWaveController({ isLoaded: true }),
-    );
+    let controller;
+    function Harness() {
+      controller = useSpiralWaveController({ isLoaded: true });
+      return null;
+    }
 
-    await waitFor(() => expect(createHost).toHaveBeenCalledOnce());
-    act(() => gsapTickerClock.tick(1 / 60));
-    await waitFor(() => expect(result.current.ballVms).toHaveLength(1));
+    const root = createRoot(document.createElement("div"));
+    await act(async () => root.render(<Harness />));
+    expect(createHost).toHaveBeenCalledOnce();
+
+    act(() => gsapTickerClock.tick());
+    expect(controller.ballVms).toHaveLength(1);
 
     const host = createHost.mock.results[0].value;
-    const ball = result.current.ballVms[0];
+    const ball = controller.ballVms[0];
     const shadow = new CompositeRuntime(host);
     shadow.register(ball.ballTrack);
     shadow.runtime.publisher.markAllDirty();
     shadow.flush();
+    const comparison = shadow.shadow();
 
-    expect(compareShadowPatches(shadow.shadow().legacy, shadow.shadow().published)).toEqual({
-      equal: true,
-      mismatches: [],
-    });
+    expect(
+      compareShadowPatches(comparison.legacy, comparison.published),
+    ).toEqual({ equal: true, mismatches: [] });
     expect(host.getChild(ball.ballTrack.id)).toBe(ball.ballTrack);
 
     shadow.dispose();
-    unmount();
+    await act(async () => root.unmount());
     expect(engine.instanceCount).toBe(0);
   });
 });
