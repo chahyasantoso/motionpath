@@ -2,21 +2,22 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 20:05 Asia/Jakarta  
-**Branch reviewed:** `v5`  
+**Status captured:** 2026-08-07 20:32 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-10-controller-evidence`  
 **Base branch:** `v5`  
-**Base SHA:** `038cdd2eb5fc6132fd9c2f357a422dd6f39e604e`  
-**Active PR:** none. Session closed after PR-10 merge and implementation review.  
+**Base SHA:** `a72f77800bf54706b30a205bc54938a6e156a5b4`  
+**Active PR:** #88, actual Spiral controller integration evidence.  
+**Active branch SHA before this status commit:** `77918ceb1c3d97c73bb3433e950fa6574615214c`  
 **Closed stale PRs:** #76, #77
 
 ## Current position
 
 - **Architecture:** accepted.
 - **Merged:** PR #75 CI bootstrap, PR #78 PR-01 baseline instrumentation, PR #79 PR-02 lifecycle ownership repair, PR #80 PR-03 graph transaction correctness, PR #81 PR-04 runtime scope boundary, PR #82 PR-05 patch and clock contracts, PR #83 PR-06 publisher path behind a flag, PR #84 PR-07 fixture shadow mode, PR #85 PR-08 live Spiral shadow, PR #86 PR-09 manual-trigger Motion compatibility, PR #87 PR-10 composite collapse and Motion-owned scheduling.
-- **Active:** none.
+- **Active:** PR #88 adds actual `useSpiralWaveController` integration evidence before compatibility deletion.
 - **Last passed checkpoint:** B, after PR-08. Checkpoint C remains gated on PR-11.
-- **Current phase:** Phase 5, PR-10 complete, PR-11 not started.
-- **Resume here:** create PR-11 as a narrow migration-adapter deletion PR from current `v5`, but first use `docs/V5-IMPLEMENTATION-REVIEW-2026-08-07.md` to decide whether actual Spiral controller integration is needed before deletion.
+- **Current phase:** Phase 5, PR-10 review follow-up active, PR-11 not started.
+- **Resume here:** wait for PR #88 CI. If green, merge it into `v5`, refresh this status from the merged head, then create PR-11 as a narrow migration-adapter deletion PR.
 
 ## Verified state
 
@@ -24,7 +25,7 @@
 - Publisher/runtime path remains opt-in.
 - Motion owns direct Track scheduling; TrackGroup remains as a compatibility bridge until PR-11.
 - PR-10 merged with all seven CI checks green, including the disposal-race fix and child-unmount callback fix.
-- Checkpoint B passed using committed Spiral-style live shadow evidence; actual React controller integration is still a review finding.
+- PR #88 mounts and drives the actual React Spiral controller with a deterministic clock, compares the spawned live host against publisher output, and verifies cleanup. CI is pending.
 - No nested-GSAP spike result is committed; treat it as not run.
 
 ## Review report
@@ -44,7 +45,7 @@
 ## Checkpoints
 
 - **A, after PR-03:** passed.
-- **B, after PR-08:** passed for committed Spiral-style shadow evidence.
+- **B, after PR-08:** passed for committed Spiral-style shadow evidence. PR #88 upgrades the evidence to the actual controller path when merged and green.
 - **C, after PR-11:** not passed.
 - **D, after PR-16:** not passed.
 - **E, after PR-18:** not passed.
