@@ -1,26 +1,26 @@
 # MotionPath v5 architecture refactor plan
 
 **Status:** proposal, not yet accepted  
-**Revision:** 2026-08-07, senior architecture pass  
+**Revision:** 2026-08-07, architecture decisions recorded  
 **Base branch:** `feat/graph-spiral-demo`  
 **Scope:** runtime architecture refactor, including the observation graph foundation. This is not a graph feature plan.
 
 ## Executive decision
 
-The target architecture is directionally right, but the original sequencing is too aggressive. We should **not introduce a project-wide graph, recursive Motion composition, and a new publisher path in the same migration step**. That is three independent sources of semantic change with no safe rollback boundary.
+The target architecture is directionally right, but the migration must be staged. We will not introduce a project-wide graph, recursive Motion composition, and a new publisher path in the same step.
 
-The recommended strategy is a **strangler migration**:
+The strategy is a strangler migration:
 
 1. Characterize and repair the currently live lifecycle seams.
 2. Introduce explicit runtime ownership and ports without changing public behavior.
-3. Migrate the existing same-motion graph to one real publisher path behind a compatibility boundary.
+3. Migrate existing same-motion graphs to one real publisher path behind a compatibility boundary.
 4. Collapse the three composite implementations into `Motion`.
 5. Make nested scheduling recursive and prove it with an isolated adapter spike.
-6. Only then enable a project-wide graph, cross-motion edges, and free tracks behind an explicit capability/feature flag.
+6. Enable a project-wide graph, cross-motion edges, and free tracks only after the previous stages pass correctness and performance gates.
 
-This preserves the important conclusion from the graph audit: the graph code is not harmless dead code. It currently installs the only live cycle guard, while its publisher and binding are unreachable, retained by track callbacks, and never flushed.
+The graph code is not harmless dead code. It currently installs the only live cycle guard, while its publisher and binding are unreachable, retained by track callbacks, and never flushed.
 
-The target end state remains:
+The target end state is:
 
 ```text
 Project schema
@@ -39,25 +39,24 @@ Project schema
 2. `Motion` is the sole composite. It schedules `Track` or nested `Motion` children recursively.
 3. Topology is a tree. Observation is a DAG. Never merge those models.
 4. GSAP is an adapter behind `Interpolator`, `Scheduler`, and `Clock` ports.
-5. There is one graph owner per runtime scope. The migration starts motion-scoped and ends project-scoped.
+5. There is one graph owner per runtime scope. Migration starts motion-scoped and ends project-scoped.
 6. A subscriber consumes a published patch. It does not recursively compose the graph itself.
 7. Mutations are atomic, ownership is explicit, and every runtime object has one idempotent disposer.
-8. Compatibility behavior must live at a boundary, not in `Track` or `Motion` forever.
+8. Compatibility behavior lives at a boundary, not in `Track` or `Motion` forever.
 9. Every semantic migration has a kill switch and a measured exit gate.
+10. No partial graph is ever renderable.
 
 ## Architecture decisions
 
-### AD-1: Use a staged graph scope
+### AD-1: staged graph scope
 
-The final scope is one graph per loaded project, but the first publisher migration is same-motion only. Add a `GraphRuntime` abstraction with a scope-aware registry so the implementation can move from `MotionRuntime` to `ProjectRuntime` without changing graph mutation semantics.
+The final scope is one graph per loaded project, but the first publisher migration is same-motion only. Add a scope-aware `GraphRuntime` interface so implementation can move from `MotionRuntime` to `ProjectRuntime` without changing graph mutation semantics.
 
-- `MotionRuntime`: temporary compatibility scope for the migration.
+- `MotionRuntime`: temporary migration scope.
 - `ProjectRuntime`: final scope, owning all mounted motions and adopted/free tracks.
-- No code outside the runtime should know which scope is active.
+- Cross-motion edges and free tracks remain disabled until the project scope passes clock, unmount, rollback, and performance gates.
 
-Cross-motion edges and free tracks are **not enabled** until the project scope has passed the clock, unmount, rollback, and performance gates.
-
-### AD-2: Use one composed patch contract
+### AD-2: immutable patch contract
 
 Define a renderer-neutral patch envelope before wiring React to the publisher:
 
@@ -67,27 +66,50 @@ Define a renderer-neutral patch envelope before wiring React to the publisher:
   revision,
   values,
   sourceProgress,
+  sourceRevisions,
   status: "ready" | "blocked" | "error",
 }
 ```
 
-Patches are immutable for subscribers. A revision changes only when the node's effective output changes. Subscribers must never observe a half-flushed graph.
+Patches are immutable for subscribers. A revision changes only when effective output changes. Subscribers never observe a half-flushed graph.
 
-### AD-3: Make clock ownership explicit
+### AD-3: explicit clock ownership
 
 Add a `Clock` port. A publisher flush is scheduled once per runtime clock tick, not opportunistically from an individual track callback. The clock defines ordering only; it does not synchronize independently controlled Motion timelines.
 
-For the final project graph, each source is sampled at its current progress during the shared flush. This behavior must be documented and tested for paused, seeking, reversed, and independently mounted motions.
+For the project graph, each source is sampled at its current progress during the shared flush. Source progress and revision are included in diagnostics/patch metadata so stale reads are observable.
 
-### AD-4: Transaction boundaries are first-class
+### AD-4: transaction boundaries
 
-Graph mutations, motion mount, motion unmount, project reload, and publisher flush each have explicit transaction boundaries. A failed operation must leave the previous committed runtime usable.
+Graph mutations, motion mount, motion unmount, project reload, and publisher flush each have explicit transaction boundaries. Failed operations leave the previous committed runtime usable.
 
-The minimum rule is: **prepare, validate, wire, commit, publish invalidation**. Never mutate live edges or shared membership maps while still resolving later inputs.
+Minimum rule: **prepare, resolve, validate, wire, commit, publish invalidation**. Never mutate live edges or shared membership maps while resolving later inputs.
 
-### AD-5: Public API follows ownership, not implementation
+### AD-5: public API follows ownership
 
 Do not expose `GraphPublisher`, `GraphBinding`, `SchedulerSlot`, raw GSAP objects, or graph internals from the package root. Expose public `Engine`, `Motion`, `Track`, runtime handles, and supported adapter contracts only.
+
+### AD-6: source-unmount semantics
+
+When a source Motion or track is unmounted, dependent edges are **auto-removed**, a structured diagnostic is emitted, and downstream nodes are invalidated. The dependent is not failed globally, and the source is never replaced with `null`.
+
+The diagnostic must identify the dependent, removed source, edge role, and runtime revision. Re-adding a source does not silently recreate the edge; authored or runtime configuration must explicitly restore it.
+
+### AD-7: independent timeline semantics
+
+A shared project flush orders composition but does not synchronize timelines. If Motion A observes Motion B, A samples B at B's current progress, including paused, seeking, reversed, and independently mounted states. A must not advance, rewind, or otherwise control B as a side effect of composition.
+
+This behavior is tested with deterministic fake clocks and independent fake schedulers before enabling cross-motion edges.
+
+### AD-8: canonical ordering
+
+Independent nodes are ordered by canonical qualified ID, never declaration index or mount order. IDs use a stable namespace such as `motionId/trackId`, with `~/trackId` reserved for adopted/free tracks. The same project state must produce the same order after reload, remount, or mutation history changes.
+
+### AD-9: staged validation and atomic visibility
+
+Internal registration may be staged, but only a complete candidate graph can be committed to the renderable runtime. Candidate validation resolves qualified references, duplicate IDs, unknown sources, edge roles, and cycles before commit.
+
+Unresolved references remain pending with structured diagnostics and cannot publish. They are not treated as `null`, and a partial graph is never flushed. Once all required nodes are present, the candidate is revalidated and committed atomically.
 
 ## Target ownership
 
@@ -123,7 +145,7 @@ Adapters
 
 ## Current findings that drive the order
 
-- `Track` currently combines interpolation, plugin composition, topology, observation edges, and playback.
+- `Track` combines interpolation, plugin composition, topology, observation edges, and playback.
 - `TrackGroup`, `Motion`, and `Engine.createGroupHost()` are three composite implementations.
 - `Track.compose()` is the only live composition path; `composeGraph()` has no callers.
 - `GraphPublisher` and `GraphBinding` are constructed during mount but not attached to the Motion, never flushed, and retained through track callbacks.
@@ -190,7 +212,7 @@ interface Clock {
 }
 ```
 
-The clock must be injectable in tests. The production adapter may use `gsap.ticker`; core tests must use a deterministic fake clock.
+The clock is injectable in tests. The production adapter may use `gsap.ticker`; core tests use a deterministic fake clock.
 
 ## Phased execution plan
 
@@ -206,7 +228,7 @@ Each phase is one PR unless stated. Every phase starts with tests and ends with 
 - Record compose calls per node, flush duration, dropped-frame count, heap-retained objects, test count, build result, bundle size, and package contents.
 - Add a core boundary test forbidding GSAP imports outside adapters.
 - Add a feature-flag test proving old and new paths can be selected deterministically.
-- Add a test fixture for paused, reversed, seeking, and independently mounted motions.
+- Add fixtures for paused, reversed, seeking, and independently mounted motions.
 
 **Exit:** current failures are documented; no runtime behavior changes; baseline artifacts are committed.
 
@@ -217,7 +239,7 @@ Each phase is one PR unless stated. Every phase starts with tests and ends with 
 1. Attach the binding on the success path, or move it immediately to the runtime owner. Never leave it in a method-local variable.
 2. Give the graph owner one explicit idempotent disposer and test successful mount, failed mount, reload, unmount, and repeated destroy.
 3. Copy `tracks` defensively in publisher construction and `applyGraph`.
-4. Assert graph node ids and registered track ids are equal in both directions.
+4. Assert graph node IDs and registered track IDs are equal in both directions.
 5. Keep `GraphPublisher.removeTrack()` until destroy ownership is rewritten and tested.
 6. Stop publisher hooks from mutating binding-owned membership. Membership changes go through the graph owner.
 7. Make `GraphBinding.addTrack()` atomic: resolve all sources, validate all edges, wire, commit, subscribe, and unwind on failure.
@@ -233,8 +255,8 @@ Each phase is one PR unless stated. Every phase starts with tests and ends with 
 **Do:**
 
 - Introduce `GraphRuntime` with `register`, `unregister`, `replaceEdges`, `flush`, and `dispose`.
-- Start with one `MotionRuntime` per mounted Motion, but hide that scope behind the same interface intended for `ProjectRuntime`.
-- Move publisher/binding ownership out of `Motion` implementation details and into the runtime owner.
+- Start with one `MotionRuntime` per mounted Motion, hidden behind the interface intended for `ProjectRuntime`.
+- Move publisher/binding ownership out of Motion implementation details and into the runtime owner.
 - Add a deterministic fake Clock and patch registry.
 - Define patch revision, blocked-node, error, and retry behavior.
 - Add a runtime kill switch that keeps the current recursive subscriber path as fallback.
@@ -316,16 +338,17 @@ Each phase is one PR unless stated. Every phase starts with tests and ends with 
 **Do:**
 
 - Introduce one ProjectRuntime per loaded project with one graph, publisher, clock, and membership owner.
-- Add qualified ids such as `motionId/trackId` and a reserved namespace for free tracks such as `~/trackId`.
+- Add qualified IDs such as `motionId/trackId` and reserve `~/trackId` for adopted/free tracks.
 - Keep bare authored references motion-local for backward compatibility.
 - Add `adopt(track)` for free tracks.
-- Define staged mounting: register candidates, validate the complete candidate graph, then commit; no partial graph becomes renderable.
-- Define source unmount semantics: dependent edges are auto-removed with a diagnostic and downstream invalidation. They do not silently resolve to null.
-- Define independent timeline semantics: each source is sampled at its current progress during the shared flush.
-- Use qualified id as the deterministic tie-break key, never mount order.
-- Add tests for cross-motion edges, free tracks, duplicate ids, source removal, partial mount failure, reload, and foreign unmount.
+- Define staged mounting: register candidates, resolve references, validate the complete candidate graph, then commit; no partial graph becomes renderable.
+- If a source unmounts, auto-remove dependent edges, emit the structured diagnostic defined in AD-6, and invalidate downstream nodes.
+- Define independent timeline semantics exactly as AD-7; add paused, seek, reverse, and remount tests.
+- Use qualified ID as the deterministic tie-break key, never mount order.
+- Add tests for cross-motion edges, free tracks, duplicate IDs, source removal, partial mount failure, reload, and foreign unmount.
+- Keep the capability flag off by default until all project-scope gates pass.
 
-**Exit:** one graph per loaded project, one membership owner, one flush barrier, and no cross-motion behavior enabled without explicit capability selection.
+**Exit:** one graph per loaded project, one membership owner, one flush barrier, deterministic output across mount order, and no cross-motion behavior without explicit capability selection.
 
 ### Phase 9: simplify Engine and public API
 
@@ -339,7 +362,7 @@ Each phase is one PR unless stated. Every phase starts with tests and ends with 
 - Hide GraphPublisher internals, normalization helpers, and use cases behind package exports.
 - Block deep imports into `lib/` and `usecases/` with an exports map.
 
-**Exit:** Engine is a lifecycle facade, not a runtime assembler; consumers use public APIs only; old runtime is still usable if candidate assembly fails.
+**Exit:** Engine is a lifecycle facade, not a runtime assembler; consumers use public APIs only; old runtime remains usable if candidate assembly fails.
 
 ### Phase 10: measurement-gated optimization
 
@@ -358,13 +381,14 @@ Optional tween collapse, heap-based topological sorting, and downstream-index op
 
 ## Explicit policies to lock before ProjectRuntime
 
-1. **Source removal:** auto-remove dependent edges, emit a diagnostic, invalidate downstream nodes.
-2. **Timeline independence:** sample every source at its current progress during the shared flush.
-3. **Ordering:** sort independent nodes by qualified id.
-4. **Partial mounting:** staged registration is allowed, but a candidate graph must validate before it can flush.
+1. **Source removal:** auto-remove dependent edges, emit a structured diagnostic, invalidate downstream nodes, and never substitute `null`.
+2. **Timeline independence:** sample every source at its current progress during the shared flush; never control another Motion as a side effect.
+3. **Ordering:** sort independent nodes by canonical qualified ID.
+4. **Partial mounting:** staged registration is allowed, but unresolved or incomplete candidate graphs cannot flush or publish.
 5. **Failure isolation:** successful nodes publish; failed nodes retain retry state; dependent nodes are blocked only when required inputs are unavailable.
 6. **Mutation atomicity:** failed add, remove, replace, mount, unmount, and reload leave the last committed runtime intact.
-7. **Standalone tracks:** remain supported, but they are outside ProjectRuntime and do not receive project-wide cycle validation until adopted.
+7. **Standalone tracks:** remain supported, but are outside ProjectRuntime and do not receive project-wide cycle validation until adopted.
+8. **Reattachment:** removing an edge because its source disappeared does not recreate it automatically when that source later returns.
 
 ## Definition of done
 
