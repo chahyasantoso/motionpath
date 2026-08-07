@@ -10,10 +10,10 @@ export class TrackGroup {
   get graphOrder() { return [...this.#graphOrder]; }
   applyGraphOrder(order) { this.#graphOrder = [...order]; }
   composeGraph() { const patches = new Map(); for (const id of this.#graphOrder) { const track = this.#tracks.get(id); if (track) track.compose(undefined, patches); } return patches; }
-  _reflowChild(track, newPosition) { const tween = this.#proxies.get(track.id); if (!tween) return; const duration = this.#staggerTransition.duration ?? 0; if (duration <= 0) { this.#masterTimeline.add(tween, newPosition); this.#masterTimeline.render(this.#masterTimeline.time(), true, true); return; } gsap.to(tween, { startTime: newPosition, duration, ease: this.#staggerTransition.ease ?? "power2.out", onUpdate: () => this.#masterTimeline.render(this.#masterTimeline.time(), true, true) }); }
+  _reflowChild(track, newPosition) { const tween = this.#proxies.get(track.id); if (!tween) return; const duration = this.#staggerTransition.duration ?? 0; if (duration <= 0) { this.#masterTimeline.add(tween, newPosition); this.#masterTimeline.render(this.#masterTimeline.time(), true, true); return; } const timeline = this.#masterTimeline; gsap.to(tween, { startTime: newPosition, duration, ease: this.#staggerTransition.ease ?? "power2.out", onUpdate: () => timeline?.render(timeline.time(), true, true) }); }
   _mountChild(child, spawnOffset) { this.mount(child, spawnOffset); }
   _unmountChild(child) { this.unmount(child); }
-  destroy() { for (const tween of this.#proxies.values()) tween.kill(); this.#proxies.clear(); for (const track of this.#tracks.values()) track._unmount(); this.#tracks.clear(); }
+  destroy() { for (const tween of this.#proxies.values()) tween.kill(); this.#proxies.clear(); for (const track of this.#tracks.values()) track._unmount(); this.#tracks.clear(); this.#masterTimeline = null; }
 }
 
 export class Motion {
@@ -30,9 +30,9 @@ export class Motion {
   get graphOrder() { return [...this.#graphOrder]; }
   composeGraph() { const patches = new Map(); for (const id of this.#graphOrder) { const track = this.#tracks.get(id); if (track) track.compose(undefined, patches); } return patches; }
   _mountChild(child, spawnOffset) { this.#schedule(child, spawnOffset); }
-  _unmountChild(child) { this.#unschedule(child); }
-  _reflowChild(track, newPosition) { const tween = this.#proxies.get(track.id); if (!tween) return; const duration = this.#staggerTransition.duration ?? 0; if (duration <= 0) { this.#masterTimeline.add(tween, newPosition); this.#masterTimeline.render(this.#masterTimeline.time(), true, true); return; } gsap.to(tween, { startTime: newPosition, duration, ease: this.#staggerTransition.ease ?? "power2.out", onUpdate: () => this.#masterTimeline.render(this.#masterTimeline.time(), true, true) }); }
-  #schedule(track, position) { if (!this.#active) return; if (this.#tracks.has(track.id)) return; track._mount(this); const tween = gsap.to(track, { progress: 1, ease: "none", duration: track.duration || 0, paused: false }); this.#proxies.set(track.id, tween); this.#tracks.set(track.id, track); this.#masterTimeline.add(tween, position); this.#masterTimeline.render(this.#masterTimeline.time(), true, true); }
+  _unmountChild(child) { this._unschedule(child); }
+  _reflowChild(track, newPosition) { const tween = this.#proxies.get(track.id); if (!tween) return; const duration = this.#staggerTransition.duration ?? 0; if (duration <= 0) { this.#masterTimeline?.add(tween, newPosition); this.#masterTimeline?.render(this.#masterTimeline.time(), true, true); return; } const timeline = this.#masterTimeline; if (!timeline) return; gsap.to(tween, { startTime: newPosition, duration, ease: this.#staggerTransition.ease ?? "power2.out", onUpdate: () => timeline?.render(timeline.time(), true, true) }); }
+  #schedule(track, position) { if (!this.#active) return; if (this.#tracks.has(track.id)) return; track._mount(this); const tween = gsap.to(track, { progress: 1, ease: "none", duration: track.duration || 0, paused: false }); this.#proxies.set(track.id, tween); this.#tracks.set(track.id, track); this.#masterTimeline?.add(tween, position); this.#masterTimeline?.render(this.#masterTimeline.time(), true, true); }
   #unschedule(track) { const tween = this.#proxies.get(track.id); if (tween) { this.#masterTimeline?.remove(tween); tween.kill(); this.#proxies.delete(track.id); } this.#tracks.delete(track.id); if (track.isMounted) track._unmount(); this.#masterTimeline?.render(this.#masterTimeline.time(), true, true); }
   play() { this.#triggerDelegate.play(); }
   pause() { this.#triggerDelegate.pause(); }
