@@ -20,18 +20,21 @@ export class PatchRegistry {
     if (this.#batchDepth !== 0) return;
     const pending = [...this.#pending];
     this.#pending.clear();
-    for (const nodeId of pending) this.#notify(nodeId);
+    for (const nodeId of pending) this.#notifyNode(nodeId);
+    this.#notifyGlobal();
   }
   publish(nodeId, values, { sourceProgress = 0, sourceRevisions = {}, status = "ready" } = {}) {
     if (typeof nodeId !== "string" || nodeId.length === 0) throw new TypeError("PatchRegistry nodeId must be a non-empty string.");
     if (!["ready", "blocked", "error"].includes(status)) throw new TypeError(`Unknown patch status '${status}'.`);
     const previous = this.#patches.get(nodeId);
-    if (previous && sameValue(previous.values, values) && previous.sourceProgress === sourceProgress && sameValue(previous.sourceRevisions, sourceRevisions) && previous.status === status) return previous;
-    const revision = (this.#revisions.get(nodeId) ?? 0) + 1;
-    const patch = freezePatch({ nodeId, revision, values, sourceProgress, sourceRevisions, status });
+    const nextRevision = this.#revisions.get(nodeId) ?? 0;
+    const completeSourceRevisions = { ...sourceRevisions, [nodeId]: nextRevision + 1 };
+    if (previous && sameValue(previous.values, values) && previous.sourceProgress === sourceProgress && sameValue(previous.sourceRevisions, completeSourceRevisions) && previous.status === status) return previous;
+    const revision = nextRevision + 1;
+    const patch = freezePatch({ nodeId, revision, values, sourceProgress, sourceRevisions: { ...sourceRevisions, [nodeId]: revision }, status });
     this.#revisions.set(nodeId, revision);
     this.#patches.set(nodeId, patch);
-    if (this.#batchDepth) this.#pending.add(nodeId); else this.#notify(nodeId);
+    if (this.#batchDepth) this.#pending.add(nodeId); else { this.#notifyNode(nodeId); this.#notifyGlobal(); }
     return patch;
   }
   get(nodeId) { return this.#patches.get(nodeId) ?? null; }
@@ -43,5 +46,6 @@ export class PatchRegistry {
     return () => { subscribers.delete(callback); if (subscribers.size === 0) this.#subscribers.delete(nodeId); };
   }
   clear() { this.#patches.clear(); this.#subscribers.clear(); this.#revisions.clear(); this.#pending.clear(); this.#batchDepth = 0; }
-  #notify(nodeId) { for (const callback of [...(this.#subscribers.get(nodeId) ?? []), ...(this.#subscribers.get("*") ?? [])]) callback(this.#patches.get(nodeId)); }
+  #notifyNode(nodeId) { for (const callback of [...(this.#subscribers.get(nodeId) ?? [])]) callback(this.#patches.get(nodeId)); }
+  #notifyGlobal() { for (const callback of [...(this.#subscribers.get("*") ?? [])]) callback(this.snapshot()); }
 }

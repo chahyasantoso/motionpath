@@ -8,7 +8,10 @@ export class GraphRuntime {
   constructor({ graph, tracks = new Map(), clock = null, patches = new PatchRegistry(), enabled = true } = {}) {
     if (!graph) throw new TypeError("GraphRuntime requires a normalized graph.");
     this.#patches = patches; this.enabled = enabled !== false;
-    const publish = (nodeId, values) => { const track = this.#binding?.tracks.get(nodeId); const sourceRevisions = {}; for (const [id, patch] of this.#patches.snapshot()) sourceRevisions[id] = patch.revision; return this.#patches.publish(nodeId, values, { sourceProgress: track?.progress?.() ?? 0, sourceRevisions }); };
+    const publish = (nodeId, values) => {
+      const track = this.#binding?.tracks.get(nodeId);
+      return this.#patches.publish(nodeId, values, { sourceProgress: track?.progress?.(), sourceRevisions: Object.fromEntries([...this.#patches.snapshot()].map(([id, patch]) => [id, patch.revision])) });
+    };
     this.#publisher = new GraphPublisher({ graph, tracks, publish });
     this.#binding = new GraphBinding({ graph, tracks, publisher: this.#publisher });
     if (clock) this.start(clock);
