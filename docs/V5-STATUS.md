@@ -2,52 +2,43 @@
 
 **Purpose:** living handoff for implementation state. This is not a plan and must be verified against source before continuing work.
 
-**Status captured:** 2026-08-07 17:16 Asia/Jakarta  
-**Branch reviewed:** `v5`  
-**Last commit reviewed:** [`7d007a0`](https://github.com/chahyasantoso/motionpath/commit/7d007a00b43e0ac8ddbe9a64454888c75a460ef7)  
-**Last commit message:** `Add phase to PR traceability map`
+**Status captured:** 2026-08-07 17:20 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-00-ci`  
+**Base branch:** `v5`  
+**Active PR:** [#75](https://github.com/chahyasantoso/motionpath/pull/75)  
+**Last implementation commit reviewed:** `b15790a` (`v5: add non-mutating format check`)
 
 ## Current position
 
 - **Architecture:** accepted.
-- **Implementation base:** `v5` exists and currently points to the last reviewed planning commit.
-- **Active implementation PR:** none found on the branch list at status capture time.
-- **Merged v5 implementation PRs:** none found; no `v5/pr-*` branches found.
+- **Implementation base:** `v5`.
+- **Active implementation:** PR-00, CI bootstrap and repository contracts.
+- **Merged v5 implementation PRs:** none.
 - **Last passed checkpoint:** none. Checkpoint A is not passed until PR-03 completes.
-- **Current implementation phase:** pre-PR-00, planning and CI bootstrap.
-- **Resume here:** create `v5/pr-00-ci`, make the CI contract executable on `v5`, then open PR-01 only after the required checks pass on the unchanged base.
+- **Current implementation phase:** Phase 0, PR-00 in progress.
+- **Resume here:** run and fix PR-00 CI, merge it into `v5`, then create PR-01 baseline and observability from the updated `v5`.
+
+## PR-00 changes made
+
+- Added `npm run format:check` using non-mutating Prettier execution.
+- Added `npm run test:deterministic` as the deterministic test command contract.
+- Added `v5` and `v5-*` push triggers plus `v5` pull-request targeting to `.github/workflows/ci.yml`.
+- Kept the existing rig benchmark non-blocking during CI bootstrap.
+- No runtime behavior was changed.
 
 ## Verified repository state
 
 ### CI
 
-A workflow exists at `.github/workflows/ci.yml`, but it has not yet been updated for the accepted v5 delivery plan.
-
-Present jobs:
-
-- unit tests, Node 24;
-- typecheck, Node 24;
-- Vite production build, Node 24;
-- package dry run;
-- rig graph benchmark.
-
-Current gaps relative to PR-00:
-
-- `v5` is not included in the workflow push branches;
-- pull requests targeting `v5` are not included;
-- no non-mutating format-check command is wired;
-- no boundary, consumer-fixture, deterministic-rerun, lifecycle, graph, runtime, scheduler, integration, or memory jobs are wired;
-- the workflow invokes only scripts currently present in `package.json`.
+The workflow now has format check, unit tests, typecheck, Vite build, package dry run, and rig benchmark jobs. The workflow is wired for the v5 implementation branch. The broader graph, runtime, scheduler, integration, and memory jobs are intentionally deferred to their planned PRs.
 
 ### Runtime implementation
 
-No v5 runtime implementation was found at status capture time for the planned symbols `GraphRuntime`, `MotionRuntime`, or `CompositeRuntime`. The repository still contains the existing group-host path, including `createGroupHost()` and its tests.
-
-The accepted migration flags, publisher shadow path, explicit track-mode contract, ProjectRuntime, and cross-motion capability were not found as implemented v5 runtime features at status capture time.
+No v5 runtime implementation was found at status capture time for `GraphRuntime`, `MotionRuntime`, or `CompositeRuntime`. The existing group-host path remains authoritative.
 
 ### Nested scheduler spike
 
-No committed nested-GSAP spike result was found. Treat the Phase 5/6 depth-three spike as **not run or not recorded**, not as passed.
+No committed nested-GSAP spike result was found. Treat the Phase 5/6 depth-three spike as not run or not recorded.
 
 ### Checkpoints
 
@@ -61,9 +52,9 @@ No committed nested-GSAP spike result was found. Treat the Phase 5/6 depth-three
 ## Verification protocol for the next session
 
 1. Read this file for orientation only.
-2. Confirm the branch tip and active PRs against GitHub.
-3. Confirm CI workflow triggers and job names from `.github/workflows/ci.yml`.
-4. Search source for the relevant feature flags and runtime symbols before assuming any migration exists.
+2. Confirm the branch tip, PR status, and CI checks against GitHub.
+3. Confirm workflow triggers and job names from `.github/workflows/ci.yml`.
+4. Search source for relevant feature flags and runtime symbols before assuming any migration exists.
 5. Run the checks required by the active PR and record results here.
 6. Update this file in the closing commit with the new SHA, active PR/branch, checkpoint state, spike evidence, flag state, and exact resume point.
 
