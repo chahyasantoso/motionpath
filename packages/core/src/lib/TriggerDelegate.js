@@ -1,5 +1,4 @@
-import { gsap } from "gsap";
-import { registerScrollTrigger } from "../adapters/gsapPlatform.js";
+import { gsap, registerScrollTrigger } from "../adapters/gsapPlatform.js";
 function clamp01(value) { return Math.max(0, Math.min(1, Number(value) || 0)); }
 export class AutonomousTimelineControls { #timeline; constructor(timeline) { this.#timeline = timeline; } play() { this.#timeline.play(); } pause() { this.#timeline.pause(); } seek(p) { this.#timeline.progress(clamp01(p)); } reverse() { this.#timeline.reverse(); } onComplete(cb) { this.#timeline.eventCallback("onComplete", cb); } }
 export function isScrubbedScrollConfig(config = {}) { return config.scrub === true || typeof config.scrub === "number"; }

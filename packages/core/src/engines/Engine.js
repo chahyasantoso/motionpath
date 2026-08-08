@@ -3,7 +3,7 @@ import { triggerDelegateRegistry, TimeTriggerDelegate } from '../lib/TriggerDele
 import { Motion } from '../lib/Motion.js';
 import { createTrack } from '../lib/createTrack.js';
 import { createRuntimeDependencies } from '../lib/runtimeDependencies.js';
-import { gsapTickerClock } from '../lib/gsapTickerClock.js';
+import { gsapTickerClock } from '../adapters/gsap/gsapTickerClock.js';
 import { createTickClock } from '../ports/Clock.js';
 import { validateProject, hasFatalErrors } from '../validators/index.js';
 import { MotionPathValidationError } from '../errors/MotionPathValidationError.js';

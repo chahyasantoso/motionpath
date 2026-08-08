@@ -1,4 +1,4 @@
-import { gsap } from "gsap";
+import { gsap } from "../adapters/gsapPlatform.js";
 
 export class Motion {
   id; #triggerDelegate; #binding = null; #runtime = null; #active = false; #initialTracks = []; #masterTimeline; #staggerTransition; #graphOrder; #proxies = new Map(); #tracks = new Map(); #destroyed = false; #host = null;

@@ -1,4 +1,4 @@
-import { gsap } from "gsap";
+import { gsap } from "../adapters/gsapPlatform.js";
 import { resolvePluginForKey as defaultResolvePlugin } from "../domain/plugins.js";
 const STAGE_ORDER = new Map([["base", 10], ["filter", 20], ["media", 30], ["transform", 40], ["override", 50], ["default", 100]]);
 function sortPlugins(plugins) { return plugins.map((plugin, index) => ({ plugin, index })).sort((a, b) => (STAGE_ORDER.get(a.plugin.stage) ?? 100) - (STAGE_ORDER.get(b.plugin.stage) ?? 100) || (a.plugin.priority ?? 0) - (b.plugin.priority ?? 0) || a.index - b.index).map(({ plugin }) => plugin); }
