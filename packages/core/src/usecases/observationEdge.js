@@ -6,7 +6,7 @@
  * intentional: concatenating fields without a delimiter lets pairs such as
  * ["A", "BC"] and ["AB", "C"] collide.
  */
-export const EDGE_KEY_DELIMITER = "\";
+export const EDGE_KEY_DELIMITER = String.fromCharCode(0);
 
 export function observationEdgeKey(sourceId, role = "output", input) {
   return [sourceId, role, input ?? ""].join(EDGE_KEY_DELIMITER);
