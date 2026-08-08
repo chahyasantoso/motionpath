@@ -1,7 +1,9 @@
-// Deliberately private package surface. Consumers should import from `.`;
+// Deliberately private package surface. Consumers should import from ".";
 // this entrypoint exists for internal tests and migration code that needs to
 // name runtime machinery without making it part of the supported API.
 export { ObservationGraph } from "./usecases/ObservationGraph.js";
+export { ObservationState } from "./usecases/ObservationState.js";
+export { ObservationStateBridge } from "./usecases/ObservationStateBridge.js";
 export { normalizeObservationGraph, topologicalTrackOrder, tryTopologicalOrder } from "./usecases/normalizeObservationGraph.js";
 export { observationEdgeKey, observationEdgeEquals } from "./usecases/observationEdge.js";
 export { createTickClock } from "./ports/Clock.js";
