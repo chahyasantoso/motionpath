@@ -29,9 +29,15 @@ export function graphInputsRule(schema) {
         if (matches.length === 0) errors.push({ ruleId: "GRAPH_INPUT_MISSING", severity: "error", message: `Authored-graph track requires exactly one '${input}' input observation.`, path: `${path}.observes` });
         else if (matches.length > 1) errors.push({ ruleId: "GRAPH_INPUT_DUPLICATE", severity: "error", message: `Authored-graph track declares '${input}' more than once.`, path: `${path}.observes` });
       }
-      for (const edge of track.observes || []) {
-        if (edge?.role === "input" && typeof edge.target === "string" && !requiredInputs.has(edge.target)) errors.push({ ruleId: "GRAPH_INPUT_UNKNOWN", severity: "error", message: `Input observation target '${edge.target}' is not declared by this track's plugins.`, path: `${path}.observes` });
-        if (edge?.role === "output" && edge.target !== undefined) errors.push({ ruleId: "GRAPH_INPUT_ROLE_MISMATCH", severity: "error", message: "Output observations cannot target a plugin input.", path: `${path}.observes` });
+      // Generic observation metadata is valid for plugins with no declared
+      // inputs. Only reject an unknown input target when this track is actually
+      // using an input-aware plugin, otherwise legacy v4 observations such as
+      // `x -> parentWorld` remain valid metadata and composition behavior is
+      // unchanged. FK tracks still get strict unknown-target diagnostics.
+      if (requiredInputs.size > 0) {
+        for (const edge of track.observes || []) {
+          if (edge?.role === "input" && typeof edge.target === "string" && !requiredInputs.has(edge.target)) errors.push({ ruleId: "GRAPH_INPUT_UNKNOWN", severity: "error", message: `Input observation target '${edge.target}' is not declared by this track's plugins.`, path: `${path}.observes` });
+        }
       }
     });
   });
