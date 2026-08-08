@@ -6,6 +6,7 @@ export class GraphPublisher {
   #order = [];
   #tracks = new Map();
   #upstream = new Map();
+  #downstream = new Map();
   #edges = [];
   #marked = new Set();
   #publishPending = new Set();
@@ -196,6 +197,7 @@ export class GraphPublisher {
     this.#retryState.clear();
     this.#tracks = new Map();
     this.#upstream = new Map();
+    this.#downstream = new Map();
     this.#edges = [];
     this.#order = [];
   }
@@ -228,6 +230,7 @@ export class GraphPublisher {
     }
     const nextEdges = edges.map((edge) => ({ source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.input }));
     const upstream = new Map([...nodeIds].map((id) => [id, []]));
+    const downstream = new Map([...nodeIds].map((id) => [id, []]));
     for (const edge of nextEdges) {
       if (!upstream.has(edge.source)) throw new Error(`Graph edge sources unknown track '${edge.source}'.`);
       if (!upstream.has(edge.target)) throw new Error(`Graph edge targets unknown track '${edge.target}'.`);
@@ -235,10 +238,11 @@ export class GraphPublisher {
       // dependent composes before its source and reads a stale patch.
       if (rank.get(edge.source) >= rank.get(edge.target)) throw new Error(`Publish order violates edge '${edge.source}' -> '${edge.target}'.`);
       upstream.get(edge.target).push(edge.source);
+      downstream.get(edge.source).push(edge.target);
     }
-    return { order: nextOrder, edges: nextEdges, upstream, tracks };
+    return { order: nextOrder, edges: nextEdges, upstream, downstream, tracks };
   }
-  #commitGraph(state) { this.#order = state.order; this.#edges = state.edges; this.#upstream = state.upstream; this.#tracks = state.tracks; }
+  #commitGraph(state) { this.#order = state.order; this.#edges = state.edges; this.#upstream = state.upstream; this.#downstream = state.downstream; this.#tracks = state.tracks; }
   #isWarm() { for (const [id, track] of this.#tracks) { if (track?.isDestroyed) continue; if (!this.#cache.has(id)) return false; } return true; }
   #canRetry(id) { const state = this.#retryState.get(id); return !state || state.nextRetryFlush <= this.#flushNumber; }
   #recordPublishFailure(id) { const previous = this.#retryState.get(id); const attempts = (previous?.attempts ?? 0) + 1; const exhausted = attempts >= this.#retry.maxAttempts; this.#retryState.set(id, { attempts, exhausted, nextRetryFlush: this.#flushNumber + this.#retry.backoff + 1 }); if (!exhausted) this.#publishPending.add(id); else this.#publishPending.delete(id); }
@@ -258,7 +262,22 @@ export class GraphPublisher {
     if (!(backoff >= 0) || !Number.isInteger(backoff)) throw new TypeError("retry.backoff must be a non-negative integer.");
     return { maxAttempts, backoff };
   }
-  #markDownstream(seeds) { const queue = [...seeds].filter((id) => this.#tracks.has(id)); const seen = new Set(queue); while (queue.length) { const sourceId = queue.shift(); for (const [targetId, upstream] of this.#upstream) { if (!upstream.includes(sourceId) || seen.has(targetId)) continue; seen.add(targetId); this.#cache.delete(targetId); this.#publishPending.delete(targetId); this.#retryState.delete(targetId); this.#marked.add(targetId); queue.push(targetId); } } }
+  #markDownstream(seeds) {
+    const queue = [...seeds].filter((id) => this.#tracks.has(id));
+    const seen = new Set(queue);
+    while (queue.length) {
+      const sourceId = queue.shift();
+      for (const targetId of this.#downstream.get(sourceId) ?? []) {
+        if (seen.has(targetId)) continue;
+        seen.add(targetId);
+        this.#cache.delete(targetId);
+        this.#publishPending.delete(targetId);
+        this.#retryState.delete(targetId);
+        this.#marked.add(targetId);
+        queue.push(targetId);
+      }
+    }
+  }
   #graphGuard = (observer, source) => { if (!this.#tracks.has(observer.id) || !this.#tracks.has(source.id)) return; const seen = new Set(); const queue = [source]; while (queue.length) { const current = queue.shift(); if (current === observer) throw new Error(`Observing "${source.id}" from "${observer.id}" would create a cycle.`); if (seen.has(current.id)) continue; seen.add(current.id); for (const edge of current.observedEdges ?? []) queue.push(edge.source); } };
   #attachHooks() { if (this.#destroyed) return; for (const [id, track] of this.#tracks) { if (this.#hooks.has(id)) continue; track._setGraphGuard?.(this.#graphGuard); const unsubscribe = track.onLifecycle?.((event) => { if (event.type === "invalidated") this.markDirty(id); if (event.type === "destroyed" || event.type === "detached") this.removeTrack(id); }); this.#hooks.set(id, unsubscribe ?? (() => {})); } }
   #detachHook(id) { this.#hooks.get(id)?.(); this.#hooks.delete(id); this.#tracks.get(id)?._setGraphGuard?.(null); }
