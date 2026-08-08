@@ -1,6 +1,6 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 11:40 Asia/Jakarta  
+**Status captured:** 2026-08-08 12:30 Asia/Jakarta  
 **Branch:** `v5`  
 **Canonical index:** [`docs/V5-README.md`](./V5-README.md)
 
@@ -10,7 +10,9 @@ The accepted implementation plan, PR-00 through PR-21, is complete and green on 
 
 ## Next step
 
-A proposed continuation plan is now documented in [`V5-IMPLEMENTATION-PLAN-PASS-2.md`](./V5-IMPLEMENTATION-PLAN-PASS-2.md). It is planning-only until explicitly accepted as a named plan revision. It uses work packages `P2-00` through `P2-07`, not PR-24.
+The continuation plan in [`V5-IMPLEMENTATION-PLAN-PASS-2.md`](./V5-IMPLEMENTATION-PLAN-PASS-2.md) is **accepted as pass-2 revision A**, effective 2026-08-08. It uses work packages `P2-00` through `P2-07`, not PR-24. Acceptance authorizes implementation; it marks nothing complete and changes no default.
+
+P2-00 establishes the baseline, the boundary audit, and [`V5-PASS-2-COMPLETION-MATRIX.md`](./V5-PASS-2-COMPLETION-MATRIX.md). P2-01 and P2-02 are unblocked once it lands.
 
 ## Remaining completion work
 
@@ -25,7 +27,7 @@ A proposed continuation plan is now documented in [`V5-IMPLEMENTATION-PLAN-PASS-
 
 ## Boundary
 
-These items complete the target architecture. Cross-motion and free-track capabilities remain separate, explicitly gated product decisions. No pass-2 package is an accepted checkpoint until the continuation plan is approved.
+These items complete the target architecture. Cross-motion and free-track capabilities remain separate, explicitly gated product decisions. No pass-2 package is complete until its own gate is green and the completion matrix cites merged evidence.
 
 ## Landed work
 
