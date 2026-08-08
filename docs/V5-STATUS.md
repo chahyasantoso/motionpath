@@ -1,10 +1,10 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 09:00 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-19-pending-references`  
+**Status captured:** 2026-08-08 09:10 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-19-unmount-diagnostics`  
 **Base branch:** `v5`  
-**Base SHA:** `80daeaca7f028d9a452e02af8ac701c20c12b7f6`  
-**Next work:** PR-19 pending references and explicit reattachment.
+**Base SHA:** `9468b040f272df49a47b3ce716f830507d5cd383`  
+**Next work:** PR-19 source-unmount diagnostics and explicit dependent-reference removal.
 
 ## Current position
 
@@ -20,15 +20,26 @@
 - PR #100 merged green: ProjectRuntime owns one project-scoped graph runtime.
 - PR #101 merged green: qualified config lookup routes through committed ProjectRuntime membership.
 - PR #102 merged green: explicit PR-19 capability gates and canonical qualified ordering.
-- Active branch adds pending-reference state and explicit resolution without enabling cross-motion behavior.
+- PR #103 merged green: unresolved references stay pending and unpublished until explicit resolution.
+- Active branch adds structured source-unmount diagnostics and removes dependent pending references without silent reattachment.
 
-## PR-19 slice: pending references
+## PR-19 slice: source-unmount policy
 
-Unresolved references are now staged as `pending`, excluded from membership lookup, and blocked from publication. They become publishable only after an explicit `resolvePendingReference()` call. Removed references do not silently reattach.
+Unmounting an owned source records `SOURCE_UNMOUNTED` with the source ID and removed dependent references. Pending references tied to that source are removed, not reattached. Re-adding the source later does nothing automatically; configuration must explicitly register or resolve the reference again.
+
+## Workflow for every continuation session
+
+1. Read this status doc and identify the active PR and next gate.
+2. Inspect the current branch and relevant implementation/tests before editing.
+3. Cut a new branch from merged `v5`, keeping one architectural concern per PR.
+4. Implement the smallest coherent slice, including success, failure, disposal, and repeat-execution tests.
+5. Update this status doc on the same branch with the current PR, base SHA, decisions, and next gate.
+6. Open a readable Markdown PR with summary, scope, guardrails, and verification sections.
+7. Wait for all CI checks. If green, squash-merge and continue. If red, ask for the failed CI logs before changing code.
 
 ## Guardrails
 
-`crossMotion` and `freeTracks` remain disabled by default. Source-unmount diagnostics, current-progress sampling, explicit reattachment, and canary performance remain before the capability can be enabled.
+`crossMotion` and `freeTracks` remain disabled by default. Pending references never publish. Source removal never silently reattaches dependencies. Preserve current-progress sampling and canonical qualified ordering before enabling capability behavior.
 
 ## Checkpoints
 
