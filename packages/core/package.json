@@ -14,10 +14,13 @@
     "./gsapTickerClock.js": "./src/lib/gsapTickerClock.js",
     "./Overlay.js": "./src/usecases/Overlay.js",
     "./Spawner.js": "./src/usecases/Spawner.js",
-    "./lib/*": "./src/lib/*",
-    "./math/*": "./src/math/*",
-    "./usecases/*": "./src/usecases/*",
-    "./validators": "./src/validators/index.js"
+    "./validators": "./src/validators/index.js",
+    "./math/pathUtils.js": "./src/math/pathUtils.js",
+    "./math/projection3d.js": "./src/math/projection3d.js",
+    "./lib/createTrack.js": "./src/lib/createTrack.js",
+    "./lib/helpers.js": "./src/lib/helpers.js",
+    "./lib/mergePatches.js": "./src/usecases/mergePatches.js",
+    "./internal": "./src/internal.js"
   },
   "dependencies": { "gsap": "^3.12.5" }
 }
