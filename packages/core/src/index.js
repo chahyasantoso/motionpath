@@ -15,3 +15,4 @@ export { assertScheduler } from "./ports/Scheduler.js";
 export { FakeClock } from "./runtime/FakeClock.js";
 export { PatchRegistry } from "./runtime/PatchRegistry.js";
 export { GraphRuntime, MotionRuntime, createGraphRuntime } from "./runtime/GraphRuntime.js";
+export { ProjectRuntime } from "./runtime/ProjectRuntime.js";
