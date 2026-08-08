@@ -31,6 +31,10 @@ export class StandaloneObservationAdapter {
     this.#lifecycleUnsubscribers.delete(id);
     this.#state.unregister(id);
   }
+  clearObserved(observer) {
+    if (this.#destroyed || !observer?.id) return;
+    for (const edge of this.#state.getEdges(observer.id)) this.#state.removeEdge({ source: edge.source.id, target: observer.id, role: edge.role, input: edge.input });
+  }
 
   setObserved(observer, source, mapFn, { role = "output", target } = {}) {
     this.#assertAlive();
@@ -56,7 +60,7 @@ export class StandaloneObservationAdapter {
     this.#assertAlive();
     if (!track?.id) throw new TypeError("StandaloneObservationAdapter.compose requires a track.");
     this.register(track);
-    return this.#state.compose(track.id, rawData, ctx, trackComposeLeaf);
+    return this.#state.compose(track.id, rawData, ctx, trackComposeLeaf, (source, sharedCtx) => source.compose(undefined, sharedCtx));
   }
 
   destroy() {
@@ -77,7 +81,10 @@ export class StandaloneObservationAdapter {
       }));
     }
     if (typeof track.onSourceDestroyed === "function") {
-      this.#sourceUnsubscribers.set(track.id, track.onSourceDestroyed(() => this.unregister(track.id)));
+      this.#sourceUnsubscribers.set(track.id, track.onSourceDestroyed((event) => {
+        if (event && Array.isArray(event.observerIds)) event.observerIds.splice(0, event.observerIds.length, ...this.#state.getObserverIds(track.id));
+        this.unregister(track.id);
+      }));
     }
   }
 
