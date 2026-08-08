@@ -32,6 +32,8 @@ export class ProjectRuntime {
   get candidateMembership() { return new Map(this.#candidate?.membership ?? []); }
   get graphRuntime() { return this.#graphRuntime; }
   get capabilities() { return { ...this.#capabilities }; }
+  get pendingReferences() { return new Map(this.#active?.pending ?? []); }
+  get candidatePendingReferences() { return new Map(this.#candidate?.pending ?? []); }
   get qualifiedMembershipOrder() {
     return [...this.membership.keys()].sort((a, b) => {
       const aFree = a.startsWith('~/');
@@ -51,7 +53,7 @@ export class ProjectRuntime {
     this.#assertAlive();
     if (!project || typeof project !== 'object') throw new TypeError('ProjectRuntime candidate must be an object.');
     if (this.#candidate) throw new Error('ProjectRuntime already has a candidate project.');
-    const candidate = { project, instances: new Map(), metadata: new Map(), membership: new Map(), resources: new Set() };
+    const candidate = { project, instances: new Map(), metadata: new Map(), membership: new Map(), pending: new Map(), resources: new Set() };
     this.#candidate = candidate;
     return candidate;
   }
@@ -61,14 +63,23 @@ export class ProjectRuntime {
     if (typeof id !== 'string' || id.length === 0) throw new TypeError('ProjectRuntime candidate id must be a non-empty string.');
     if (candidate.membership.has(id)) throw new Error(`ProjectRuntime candidate already registers '${id}'.`);
     candidate.membership.set(id, { value, metadata: { ...metadata } });
+    candidate.pending.delete(id);
     if (value && typeof value.destroy === 'function') candidate.resources.add(value);
     return value;
+  }
+
+  registerPendingReference(candidate, id, metadata = {}) {
+    this.#assertCandidate(candidate);
+    if (typeof id !== 'string' || id.length === 0) throw new TypeError('ProjectRuntime pending reference id must be a non-empty string.');
+    if (candidate.membership.has(id)) throw new Error(`ProjectRuntime reference '${id}' is already resolved.`);
+    candidate.pending.set(id, { ...metadata, id, status: 'pending' });
+    return candidate.pending.get(id);
   }
 
   commitCandidate(candidate) {
     this.#assertCandidate(candidate);
     const previous = this.#active;
-    this.#active = { project: candidate.project, instances: new Map(candidate.instances), metadata: new Map(candidate.metadata), membership: new Map(candidate.membership) };
+    this.#active = { project: candidate.project, instances: new Map(candidate.instances), metadata: new Map(candidate.metadata), membership: new Map(candidate.membership), pending: new Map(candidate.pending) };
     this.#candidate = null;
     this.#instances.clear();
     this.#instanceMetadata.clear();
@@ -80,9 +91,22 @@ export class ProjectRuntime {
     if (!candidate || this.#candidate !== candidate) return false;
     this.#candidate = null;
     if (destroy) { for (const value of candidate.instances.values()) value?.destroy?.(); for (const value of candidate.resources) value?.destroy?.(); }
-    candidate.instances.clear(); candidate.metadata.clear(); candidate.membership.clear(); candidate.resources.clear();
+    candidate.instances.clear(); candidate.metadata.clear(); candidate.membership.clear(); candidate.pending.clear(); candidate.resources.clear();
     return true;
   }
+
+  resolvePendingReference(id, value, metadata = {}) {
+    this.#assertAlive();
+    if (!this.#active) throw new Error('ProjectRuntime has no committed project.');
+    if (!this.#active.pending.has(id)) throw new Error(`ProjectRuntime has no pending reference '${id}'.`);
+    if (this.#active.membership.has(id)) throw new Error(`ProjectRuntime reference '${id}' is already resolved.`);
+    const pending = this.#active.pending.get(id);
+    this.#active.pending.delete(id);
+    this.#active.membership.set(id, { value, metadata: { ...pending, ...metadata, status: 'resolved' } });
+    return value;
+  }
+
+  canPublish(id) { return Boolean(this.#active?.membership.has(id) && !this.#active?.pending.has(id)); }
 
   attachGraphRuntime(runtime) {
     this.#assertAlive();
