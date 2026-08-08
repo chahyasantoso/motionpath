@@ -5,35 +5,38 @@ import { trackComposeLeaf } from "./composeContext.js";
 export class StandaloneObservationAdapter {
   #state;
   #sourceUnsubscribers = new Map();
+  #lifecycleUnsubscribers = new Map();
   #destroyed = false;
 
   constructor({ tracks = [] } = {}) {
     const registry = tracks instanceof Map ? tracks : new Map(tracks.map((track) => [track.id, track]));
     this.#state = new ObservationState({ tracks: registry, validateCycles: false });
+    for (const track of registry.values()) this.#watchTrack(track);
   }
   get state() { return this.#state; }
   get isDestroyed() { return this.#destroyed; }
   get tracks() { return this.#state.tracks; }
 
-  register(track) { this.#assertAlive(); return this.#state.register(track); }
+  register(track) {
+    this.#assertAlive();
+    const registered = this.#state.register(track);
+    this.#watchTrack(registered);
+    return registered;
+  }
   unregister(id) {
     if (this.#destroyed) return;
     this.#sourceUnsubscribers.get(id)?.();
     this.#sourceUnsubscribers.delete(id);
+    this.#lifecycleUnsubscribers.get(id)?.();
+    this.#lifecycleUnsubscribers.delete(id);
     this.#state.unregister(id);
   }
 
   setObserved(observer, source, mapFn, { role = "output", target } = {}) {
     this.#assertAlive();
     if (!observer?.id || !source?.id) throw new TypeError("StandaloneObservationAdapter.setObserved requires two tracks.");
-    // Direct Track callers commonly create the two endpoints independently.
-    // Registering both here keeps ownership external without requiring callers
-    // to manually assemble a registry first.
     this.register(observer);
     this.register(source);
-    if (!this.#sourceUnsubscribers.has(source.id) && typeof source.onSourceDestroyed === "function") {
-      this.#sourceUnsubscribers.set(source.id, source.onSourceDestroyed(() => this.unregister(source.id)));
-    }
     return this.#state.addEdge({ source: source.id, target: observer.id, role, input: role === "input" ? target ?? observer.id : undefined, mapFn: mapFn ?? null });
   }
 
@@ -46,7 +49,6 @@ export class StandaloneObservationAdapter {
     this.#assertAlive();
     this.register(observer);
     this.register(newSource);
-    if (!this.#sourceUnsubscribers.has(newSource.id) && typeof newSource.onSourceDestroyed === "function") this.#sourceUnsubscribers.set(newSource.id, newSource.onSourceDestroyed(() => this.unregister(newSource.id)));
     return this.#state.replaceEdge({ source: oldSource.id, target: observer.id, role }, { source: newSource.id, target: observer.id, role, input: target, mapFn });
   }
 
@@ -61,8 +63,23 @@ export class StandaloneObservationAdapter {
     if (this.#destroyed) return;
     this.#destroyed = true;
     for (const unsubscribe of this.#sourceUnsubscribers.values()) unsubscribe();
+    for (const unsubscribe of this.#lifecycleUnsubscribers.values()) unsubscribe();
     this.#sourceUnsubscribers.clear();
+    this.#lifecycleUnsubscribers.clear();
     this.#state.destroy();
   }
+
+  #watchTrack(track) {
+    if (!track || this.#lifecycleUnsubscribers.has(track.id)) return;
+    if (typeof track.onLifecycle === "function") {
+      this.#lifecycleUnsubscribers.set(track.id, track.onLifecycle((event) => {
+        if (event?.type === "detached") this.#state.removeSourceEdges(track.id);
+      }));
+    }
+    if (typeof track.onSourceDestroyed === "function") {
+      this.#sourceUnsubscribers.set(track.id, track.onSourceDestroyed(() => this.unregister(track.id)));
+    }
+  }
+
   #assertAlive() { if (this.#destroyed) throw new Error("StandaloneObservationAdapter is destroyed."); }
 }
