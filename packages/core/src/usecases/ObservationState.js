@@ -41,14 +41,19 @@ export class ObservationState {
     if (this.#destroyed || !this.#tracks.has(id)) return;
     const outgoing = [...(this.#edges.get(id)?.values() ?? [])];
     for (const edge of outgoing) this.removeEdge({ source: edge.source.id, target: id, role: edge.role, input: edge.input });
-    for (const targetId of [...(this.#observers.get(id) ?? [])]) {
-      const targetEdges = this.#edges.get(targetId) ?? new Map();
-      for (const edge of [...targetEdges.values()]) if (edge.source.id === id) this.removeEdge({ source: id, target: targetId, role: edge.role, input: edge.input });
-    }
+    this.removeSourceEdges(id);
     this.#tracks.delete(id);
     this.#edges.delete(id);
     this.#observers.delete(id);
     if (detach) this.#invalidate({ type: "track-removed", id });
+  }
+
+  removeSourceEdges(sourceId) {
+    if (this.#destroyed) return;
+    for (const targetId of [...(this.#observers.get(sourceId) ?? [])]) {
+      const targetEdges = this.#edges.get(targetId) ?? new Map();
+      for (const edge of [...targetEdges.values()]) if (edge.source.id === sourceId) this.removeEdge({ source: sourceId, target: targetId, role: edge.role, input: edge.input });
+    }
   }
 
   getEdges(targetId) { return [...(this.#edges.get(targetId)?.values() ?? [])].map((edge) => ({ ...edge })); }
