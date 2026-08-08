@@ -1,14 +1,14 @@
-import { gsap } from "gsap";
+import { gsap } from "../gsapPlatform.js";
 
 /**
  * Adapter that gives orchestration code one shared GSAP-owned clock.
  *
- * Relocated from `lib/` in pass-2 P2-02. The module was always an adapter by
- * intent, but it lived inside core orchestration, which meant importing the
- * engine pulled GSAP into the module graph from a path the architecture rules
- * forbid. Behavior is unchanged on purpose: it still emits a bare millisecond
- * delta, and `createTickClock` is still the thing that normalizes that into
- * the `{ tick, delta }` clock contract and multiplexes it.
+ * Moved here from `lib/` by pass-2 P2-02. The implementation is unchanged: it
+ * still emits a bare millisecond delta, because existing demo callers and
+ * `Spawner` are written against that signature. `ports/Clock.js`
+ * (`createTickClock`) is the thing that normalizes this into the `{ tick,
+ * delta }` contract and multiplexes it, and that is where the shape change
+ * belongs, not here.
  */
 export const gsapTickerClock = {
   subscribe(listener) {
