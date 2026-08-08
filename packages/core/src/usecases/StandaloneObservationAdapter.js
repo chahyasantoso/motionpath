@@ -15,22 +15,15 @@ export class StandaloneObservationAdapter {
 
   constructor({ tracks = [] } = {}) {
     const registry = tracks instanceof Map ? tracks : new Map(tracks.map((track) => [track.id, track]));
-    this.#state = new ObservationState({ tracks: registry });
+    this.#state = new ObservationState({ tracks: registry, validateCycles: false });
   }
 
   get state() { return this.#state; }
   get isDestroyed() { return this.#destroyed; }
   get tracks() { return this.#state.tracks; }
 
-  register(track) {
-    this.#assertAlive();
-    return this.#state.register(track);
-  }
-
-  unregister(id) {
-    if (this.#destroyed) return;
-    this.#state.unregister(id);
-  }
+  register(track) { this.#assertAlive(); return this.#state.register(track); }
+  unregister(id) { if (!this.#destroyed) this.#state.unregister(id); }
 
   setObserved(observer, source, mapFn, { role = "output", target } = {}) {
     this.#assertAlive();
@@ -45,10 +38,7 @@ export class StandaloneObservationAdapter {
 
   replaceObserved(observer, oldSource, newSource, mapFn, { role, target } = {}) {
     this.#assertAlive();
-    return this.#state.replaceEdge(
-      { source: oldSource.id, target: observer.id, role },
-      { source: newSource.id, target: observer.id, role, input: target, mapFn },
-    );
+    return this.#state.replaceEdge({ source: oldSource.id, target: observer.id, role }, { source: newSource.id, target: observer.id, role, input: target, mapFn });
   }
 
   compose(track, rawData, ctx) {
@@ -57,13 +47,6 @@ export class StandaloneObservationAdapter {
     return this.#state.compose(track.id, rawData, ctx, trackComposeLeaf);
   }
 
-  destroy() {
-    if (this.#destroyed) return;
-    this.#destroyed = true;
-    this.#state.destroy();
-  }
-
-  #assertAlive() {
-    if (this.#destroyed) throw new Error("StandaloneObservationAdapter is destroyed.");
-  }
+  destroy() { if (!this.#destroyed) { this.#destroyed = true; this.#state.destroy(); } }
+  #assertAlive() { if (this.#destroyed) throw new Error("StandaloneObservationAdapter is destroyed."); }
 }
