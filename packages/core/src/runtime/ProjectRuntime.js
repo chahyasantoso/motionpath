@@ -3,7 +3,7 @@
  *
  * A candidate is invisible until commitCandidate succeeds. Membership and the
  * graph runtime are owned by the committed project, never by individual Motion
- * instances. Cross-motion registration remains capability-gated for PR-19.
+ * instances. Cross-motion and free-track behavior are explicit capabilities.
  */
 export class ProjectRuntime {
   #active = null;
@@ -11,7 +11,15 @@ export class ProjectRuntime {
   #instances = new Map();
   #instanceMetadata = new Map();
   #graphRuntime = null;
+  #capabilities;
   #disposed = false;
+
+  constructor({ capabilities = {} } = {}) {
+    this.#capabilities = Object.freeze({
+      crossMotion: capabilities.crossMotion === true,
+      freeTracks: capabilities.freeTracks === true,
+    });
+  }
 
   get isDisposed() { return this.#disposed; }
   get isCommitted() { return this.#active !== null; }
@@ -23,11 +31,19 @@ export class ProjectRuntime {
   get membership() { return new Map(this.#active?.membership ?? []); }
   get candidateMembership() { return new Map(this.#candidate?.membership ?? []); }
   get graphRuntime() { return this.#graphRuntime; }
+  get capabilities() { return { ...this.#capabilities }; }
+  get qualifiedMembershipOrder() { return [...this.membership.keys()].sort((a, b) => a.localeCompare(b)); }
+
+  assertCapability(capability) {
+    if (capability !== 'crossMotion' && capability !== 'freeTracks') throw new Error(`Unknown ProjectRuntime capability '${capability}'.`);
+    if (!this.#capabilities[capability]) throw new Error(`ProjectRuntime capability '${capability}' is disabled.`);
+    return true;
+  }
 
   beginCandidate(project) {
     this.#assertAlive();
-    if (!project || typeof project !== "object") throw new TypeError("ProjectRuntime candidate must be an object.");
-    if (this.#candidate) throw new Error("ProjectRuntime already has a candidate project.");
+    if (!project || typeof project !== 'object') throw new TypeError('ProjectRuntime candidate must be an object.');
+    if (this.#candidate) throw new Error('ProjectRuntime already has a candidate project.');
     const candidate = { project, instances: new Map(), metadata: new Map(), membership: new Map(), resources: new Set() };
     this.#candidate = candidate;
     return candidate;
@@ -35,10 +51,10 @@ export class ProjectRuntime {
 
   registerCandidate(candidate, id, value, metadata = {}) {
     this.#assertCandidate(candidate);
-    if (typeof id !== "string" || id.length === 0) throw new TypeError("ProjectRuntime candidate id must be a non-empty string.");
+    if (typeof id !== 'string' || id.length === 0) throw new TypeError('ProjectRuntime candidate id must be a non-empty string.');
     if (candidate.membership.has(id)) throw new Error(`ProjectRuntime candidate already registers '${id}'.`);
     candidate.membership.set(id, { value, metadata: { ...metadata } });
-    if (value && typeof value.destroy === "function") candidate.resources.add(value);
+    if (value && typeof value.destroy === 'function') candidate.resources.add(value);
     return value;
   }
 
@@ -63,8 +79,8 @@ export class ProjectRuntime {
 
   attachGraphRuntime(runtime) {
     this.#assertAlive();
-    if (!this.#active) throw new Error("ProjectRuntime has no committed project.");
-    if (!runtime || typeof runtime.flush !== "function" || typeof runtime.dispose !== "function") throw new TypeError("ProjectRuntime graph runtime must support flush() and dispose().");
+    if (!this.#active) throw new Error('ProjectRuntime has no committed project.');
+    if (!runtime || typeof runtime.flush !== 'function' || typeof runtime.dispose !== 'function') throw new TypeError('ProjectRuntime graph runtime must support flush() and dispose().');
     if (this.#graphRuntime && this.#graphRuntime !== runtime) this.#graphRuntime.dispose();
     this.#graphRuntime = runtime;
     return runtime;
@@ -72,12 +88,12 @@ export class ProjectRuntime {
 
   flush() { return this.#graphRuntime?.flush?.() ?? 0; }
   getPatch(nodeId) { return this.#graphRuntime?.getPatch?.(nodeId) ?? null; }
-  subscribe(nodeId, callback) { if (!this.#graphRuntime) throw new Error("ProjectRuntime has no graph runtime."); return this.#graphRuntime.subscribe(nodeId, callback); }
+  subscribe(nodeId, callback) { if (!this.#graphRuntime) throw new Error('ProjectRuntime has no graph runtime.'); return this.#graphRuntime.subscribe(nodeId, callback); }
 
   registerInstance(id, value, metadata = {}) {
     this.#assertAlive();
-    if (!this.#active) throw new Error("ProjectRuntime has no committed project.");
-    if (typeof id !== "string" || id.length === 0) throw new TypeError("ProjectRuntime instance id must be a non-empty string.");
+    if (!this.#active) throw new Error('ProjectRuntime has no committed project.');
+    if (typeof id !== 'string' || id.length === 0) throw new TypeError('ProjectRuntime instance id must be a non-empty string.');
     if (this.#instances.has(id)) throw new Error(`ProjectRuntime already owns instance '${id}'.`);
     this.#instances.set(id, value); this.#instanceMetadata.set(id, { ...metadata }); return value;
   }
@@ -100,6 +116,6 @@ export class ProjectRuntime {
     this.#instances.clear(); this.#instanceMetadata.clear(); this.#active = null;
   }
 
-  #assertCandidate(candidate) { this.#assertAlive(); if (!candidate || this.#candidate !== candidate) throw new Error("ProjectRuntime candidate is not active."); }
-  #assertAlive() { if (this.#disposed) throw new Error("ProjectRuntime is disposed."); }
+  #assertCandidate(candidate) { this.#assertAlive(); if (!candidate || this.#candidate !== candidate) throw new Error('ProjectRuntime candidate is not active.'); }
+  #assertAlive() { if (this.#disposed) throw new Error('ProjectRuntime is disposed.'); }
 }

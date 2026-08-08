@@ -1,10 +1,10 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 07:30 Asia/Jakarta  
+**Status captured:** 2026-08-08 08:58 Asia/Jakarta  
 **Branch reviewed:** `v5-pr-19-cross-motion-capability`  
 **Base branch:** `v5`  
 **Base SHA:** `65995482e4d2252a2be349ba9496f88dfdff85bc`  
-**Next work:** PR-19, capability-gated cross-motion and free-track behavior.
+**Next work:** PR-19 capability-gated cross-motion and free-track behavior.
 
 ## Current position
 
@@ -19,31 +19,17 @@
 - PR #99 merged green: staged qualified membership registry for `motionId/trackId` and `~/trackId`.
 - PR #100 merged green: ProjectRuntime owns one project-scoped graph runtime with safe replacement and disposal.
 - PR #101 merged green: public qualified config lookup now routes through committed ProjectRuntime membership, with failed-reload isolation coverage.
-- PR-19 branch started from merged `v5` at `65995482e4d2252a2be349ba9496f88dfdff85bc`.
+- PR-19 capability branch continues from merged `v5` at `65995482e4d2252a2be349ba9496f88dfdff85bc`.
 
-## PR-18 contract now enforced
+## PR-19 slice: explicit capability gates
 
-A loaded project has one staged-to-committed membership boundary. Qualified track configs are registered before visibility, and a failed parse or plugin load leaves the previous project's membership and mounted instances untouched. ProjectRuntime owns the project-scoped graph runtime slot; no incomplete graph is published or flushed.
+This slice adds no default behavior change. `ProjectRuntime` now exposes immutable capability state for `crossMotion` and `freeTracks`, both disabled by default. Callers must explicitly opt in and pass `assertCapability()` before enabling either behavior.
 
-Public config lookup follows the same ownership path:
+It also exposes a canonical sorted qualified membership order for deterministic scheduling and remount equivalence. This is groundwork only: no cross-motion edge is registered, no free track is adopted, and no source-unmount policy is enabled yet.
 
-- `motionId/trackId` resolves through committed ProjectRuntime membership.
-- `~/trackId` resolves through committed ProjectRuntime membership.
-- Bare lookup remains motion-local; ambiguous bare config lookup returns `null`, while ambiguous mount lookup rejects loudly.
-- Candidate membership is never visible during a failed reload.
+## Guardrails
 
-## PR-19 guardrails
-
-Cross-motion edges and free-track adoption remain **disabled by default** until correctness and canary-performance evidence exists. The capability work must preserve:
-
-- source-unmount diagnostics and dependent-edge removal
-- current-progress sampling without controlling the source timeline
-- canonical qualified-ID ordering independent of mount order
-- pending references that cannot publish
-- explicit reattachment after a source is removed and re-added
-- one project graph, publisher, clock, and membership owner
-
-Do not enable the capability by changing the default; add explicit opt-in coverage first.
+The remaining PR-19 work must preserve source-unmount diagnostics, current-progress sampling without controlling the source timeline, pending references that cannot publish, explicit reattachment, and one project graph/publisher/clock/membership owner. Do not flip either capability on by default.
 
 ## Checkpoints
 
@@ -51,8 +37,8 @@ Do not enable the capability by changing the default; add explicit opt-in covera
 - B passed with actual controller evidence
 - C passed after PR #91
 - D pending full PR-16 staged visibility evidence
-- E passed for ProjectRuntime ownership and staged membership; PR-19 capability gate in progress
-- F not passed
+- E passed for ProjectRuntime ownership and staged membership
+- F not passed; PR-19 capability gate in progress
 
 ## Review linkage
 
