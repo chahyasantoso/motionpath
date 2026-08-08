@@ -1,7 +1,9 @@
 import { resolveTrack } from "../usecases/ResolveTrack.js";
 import { buildTrackTweenSync } from "../usecases/BuildTrackTween.js";
 import { resolvePluginForKey as defaultResolvePlugin } from "../domain/plugins.js";
+import { StandaloneObservationAdapter } from "../usecases/StandaloneObservationAdapter.js";
 import { Track } from "./Track.js";
+
 export function createTrack(config, templates = [], options = {}) {
   const resolvedTrack = config?.__normalized ? config : resolveTrack(config, templates);
   if (!resolvedTrack) throw new Error("createTrack: invalid track configuration.");
@@ -9,5 +11,6 @@ export function createTrack(config, templates = [], options = {}) {
   const resolver = options.resolvePluginForKey || plugins?.resolve?.bind(plugins) || defaultResolvePlugin;
   const built = buildTrackTweenSync(resolvedTrack.id, resolvedTrack.keyframes || {}, resolvedTrack.duration ?? 1, resolvedTrack, resolver);
   const mode = config?.mode ?? resolvedTrack.mode ?? options.mode ?? "standalone";
-  return new Track({ id: resolvedTrack.id, mode, interpolationTimeline: built.tween, proxyState: built.proxy, plugins: built.resolvedPlugins, resolvedTrack, layoutDelegate: config.layoutDelegate, eventBus: options.eventBus || options.dependencies?.eventBus });
+  const observationAdapter = options.observationAdapter ?? (mode === "standalone" ? new StandaloneObservationAdapter() : null);
+  return new Track({ id: resolvedTrack.id, mode, interpolationTimeline: built.tween, proxyState: built.proxy, plugins: built.resolvedPlugins, resolvedTrack, layoutDelegate: config.layoutDelegate, eventBus: options.eventBus || options.dependencies?.eventBus, observationAdapter });
 }
