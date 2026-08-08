@@ -1,8 +1,9 @@
 import { resolvePluginForKey } from "../../domain/plugins.js";
 
 /**
- * Tracks opt into strict authored-graph input validation explicitly. Legacy
- * schemas remain standalone until their author adds `mode: "authored-graph"`.
+ * Project motion tracks are authored graph nodes by default. Standalone is an
+ * explicit opt-out for direct/local tracks only; missing mode must never turn
+ * a malformed authored rig into a plugin-default composition.
  */
 export function graphInputsRule(schema) {
   const errors = [];
@@ -11,7 +12,7 @@ export function graphInputsRule(schema) {
     if (!motion || typeof motion !== "object" || !Array.isArray(motion.tracks)) return;
     motion.tracks.forEach((track, trackIndex) => {
       if (!track || typeof track !== "object") return;
-      const mode = track.mode ?? "standalone";
+      const mode = track.mode ?? "authored-graph";
       const path = `motions[${motionIndex}].tracks[${trackIndex}]`;
       if (mode !== "authored-graph" && mode !== "standalone") {
         errors.push({ ruleId: "GRAPH_INPUT_MODE_INVALID", severity: "error", message: "Track mode must be 'authored-graph' or 'standalone'.", path: `${path}.mode` });
@@ -29,7 +30,8 @@ export function graphInputsRule(schema) {
         else if (matches.length > 1) errors.push({ ruleId: "GRAPH_INPUT_DUPLICATE", severity: "error", message: `Authored-graph track declares '${input}' more than once.`, path: `${path}.observes` });
       }
       for (const edge of track.observes || []) {
-        if (edge?.role === "input" && typeof edge.target === "string" && !requiredInputs.has(edge.target)) errors.push({ ruleId: "GRAPH_INPUT_ROLE_MISMATCH", severity: "error", message: `Input observation target '${edge.target}' is not required by this track's plugins.`, path: `${path}.observes` });
+        if (edge?.role === "input" && typeof edge.target === "string" && !requiredInputs.has(edge.target)) errors.push({ ruleId: "GRAPH_INPUT_UNKNOWN", severity: "error", message: `Input observation target '${edge.target}' is not declared by this track's plugins.`, path: `${path}.observes` });
+        if (edge?.role === "output" && edge.target !== undefined) errors.push({ ruleId: "GRAPH_INPUT_ROLE_MISMATCH", severity: "error", message: "Output observations cannot target a plugin input.", path: `${path}.observes` });
       }
     });
   });
