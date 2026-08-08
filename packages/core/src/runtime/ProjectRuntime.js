@@ -26,7 +26,7 @@ export class ProjectRuntime {
     this.#assertAlive();
     if (!project || typeof project !== "object") throw new TypeError("ProjectRuntime candidate must be an object.");
     if (this.#candidate) throw new Error("ProjectRuntime already has a candidate project.");
-    const candidate = { project, instances: new Map(), metadata: new Map(), membership: new Map() };
+    const candidate = { project, instances: new Map(), metadata: new Map(), membership: new Map(), resources: new Set() };
     this.#candidate = candidate;
     return candidate;
   }
@@ -36,6 +36,7 @@ export class ProjectRuntime {
     if (typeof id !== "string" || id.length === 0) throw new TypeError("ProjectRuntime candidate id must be a non-empty string.");
     if (candidate.membership.has(id)) throw new Error(`ProjectRuntime candidate already registers '${id}'.`);
     candidate.membership.set(id, { value, metadata: { ...metadata } });
+    if (value && typeof value.destroy === "function") candidate.resources.add(value);
     return value;
   }
 
@@ -51,16 +52,21 @@ export class ProjectRuntime {
     this.#candidate = null;
     this.#instances.clear();
     this.#instanceMetadata.clear();
+    candidate.resources.clear();
     return previous?.project ?? null;
   }
 
   abortCandidate(candidate, { destroy = true } = {}) {
     if (!candidate || this.#candidate !== candidate) return false;
     this.#candidate = null;
-    if (destroy) for (const value of candidate.instances.values()) value?.destroy?.();
+    if (destroy) {
+      for (const value of candidate.instances.values()) value?.destroy?.();
+      for (const value of candidate.resources) value?.destroy?.();
+    }
     candidate.instances.clear();
     candidate.metadata.clear();
     candidate.membership.clear();
+    candidate.resources.clear();
     return true;
   }
 
