@@ -52,7 +52,7 @@ export class ObservationState {
   }
 
   getEdges(targetId) { return [...(this.#edges.get(targetId)?.values() ?? [])].map((edge) => ({ ...edge })); }
-  getSources(targetId) { return [...new Set(this.getEdges(targetId).map(({ source }) => source))]; }
+  getSources(targetId) { return [...new Set(this.getEdges(targetId).map(({ source }) => source.id))]; }
   getObserverIds(sourceId) { return [...(this.#observers.get(sourceId) ?? [])]; }
 
   addEdge({ source, target, role = "output", input, mapFn = null }) {
