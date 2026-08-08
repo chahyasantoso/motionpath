@@ -1,42 +1,35 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 11:29 Asia/Jakarta  
+**Status captured:** 2026-08-08 11:40 Asia/Jakarta  
 **Branch:** `v5`  
 **Canonical index:** [`docs/V5-README.md`](./V5-README.md)
 
 ## Executive status
 
-The accepted implementation plan, PR-00 through PR-21, is complete and green on `v5`. The implementation is **not a final architecture-complete release**: the accepted delivery gates passed, but supplemental follow-up work exposed remaining boundary and documentation work that must not be silently folded into the original plan.
+The accepted implementation plan, PR-00 through PR-21, is complete and green on `v5`. Supplemental PR-22/23 work also landed. The architecture is not complete yet: observation ownership, immutability enforcement, and the GSAP boundary still need closure.
+
+## Next step
+
+A proposed continuation plan is now documented in [`V5-IMPLEMENTATION-PLAN-PASS-2.md`](./V5-IMPLEMENTATION-PLAN-PASS-2.md). It is planning-only until explicitly accepted as a named plan revision. It uses work packages `P2-00` through `P2-07`, not PR-24.
+
+## Remaining completion work
+
+- Establish a completion matrix and blocking boundary scans.
+- Define and enforce deep immutability for graph and patch values.
+- Isolate the clock and all GSAP dependencies behind approved adapters and ports.
+- Move live observation mutation and edge ownership out of `Track` into `ObservationGraph`/`GraphBinding`.
+- Finish the Track/Motion ownership split, including removal of Track topology and playback bridges.
+- Make publisher rendering authoritative only after real-controller, lifecycle, equivalence, and rollback evidence passes.
+- Remove migration-only exports and compatibility code only after the replacement path is proven.
+- Run final deterministic, lifecycle, memory, package, and benchmark verification.
+
+## Boundary
+
+These items complete the target architecture. Cross-motion and free-track capabilities remain separate, explicitly gated product decisions. No pass-2 package is an accepted checkpoint until the continuation plan is approved.
 
 ## Landed work
 
-- PR #91 through PR #96: graph/runtime foundations.
-- PR #97 through PR #101: qualified IDs, ProjectRuntime ownership, membership, and lookup assembly.
-- PR #102 through PR #108: capability gates, pending references, lifecycle policy, sampling, free-track adoption, and pre-mutation validation.
-- PR #109: checkpoint correction.
-- PR #110: publisher sink, clock delivery, React patch subscription, and PR-16 evidence.
-- PR #111: public API boundary cleanup.
-- PR #112: downstream invalidation index, equal closure, and 43.39x apples-to-apples speedup.
-- PR #113 and #114: explicit authored-graph FK validation, runtime mode propagation, and teardown diagnostics.
-- PR #115: ObservationGraph metadata, adjacency indexes, and collision-proof edge identity.
-
-## Accepted gates
-
-- Checkpoints A through F: passed according to the recorded green checks.
-- PR-21 measurement gate: passed with equal closure and 43.39x speedup.
-- Default flags remain conservative: `crossMotion`, `freeTracks`, and `publisherRendering` are disabled by default.
-
-## Current findings
-
-1. **Deep immutability:** the graph value object freezes containers and direct records, but nested user-owned values are not proven deeply immutable. Treat this as a contract hardening item.
-2. **Live observation mutation ownership:** `GraphBinding` still owns the live transaction boundary and standalone `Track` observation behavior remains. Full extraction from `Track` is not complete.
-3. **GSAP boundary:** direct GSAP imports remain in core-adjacent runtime/test paths. The architecture target of no GSAP imports outside adapters is not fully demonstrated.
-4. **Controller evidence:** the repository now records actual controller evidence for Checkpoint B, but older review wording remains historical and must not be used as current status.
-5. **Documentation drift:** older review text reflects the pre-PR-110 state. Use `V5-README.md`, this file, and `V5-REVIEW-FINDINGS-LOG.md` as the current source of truth.
-
-## Supplemental work boundary
-
-PR-22, PR-23, and any proposed PR-24 are supplemental follow-up work. They are not new accepted checkpoints and do not extend the original PR-00 through PR-21 plan. Remaining observation mutation extraction requires an explicit plan revision before implementation.
+PR #91 through PR #115 are merged on `v5`, including publisher delivery, public API cleanup, recursive scheduling, downstream indexing, explicit FK graph mode, runtime mode propagation, and ObservationGraph metadata/index ownership.
 
 ## Guardrails
 
