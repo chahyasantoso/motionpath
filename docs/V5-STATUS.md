@@ -22,9 +22,9 @@
 
 ## PR-21 in progress
 
-`GraphPublisher.#markDownstream()` now uses a validated source-to-dependent adjacency index instead of scanning every node's upstream list. The optimization is intentionally not called complete yet. `benchmark:rig` now includes a rewire-heavy 60-chain x 5-node scenario, and `docs/V5-PR-21-DOWNSTREAM-INDEX.md` defines the correctness and measurement gates.
+`GraphPublisher.#markDownstream()` now uses a validated source-to-dependent adjacency index instead of scanning every node's upstream list. The first benchmark was not sufficient because it measured only the new path. That is fixed: `performance/downstream-index-benchmark.mjs` now runs the exact pre-PR-21 scan and the indexed traversal on the same 60-chain x 5-node forest, same seed and iterations, in both execution orders, and fails on a closure mismatch.
 
-Merge only if the indexed path is materially faster in the new scenario, does not regress the existing rig benchmark, and all standard checks stay green. If it is not a clear win, revert it. No benchmark, no merge.
+`benchmark:rig` still runs the existing chain, large-forest, idle-majority, and new comparison scenarios. Merge only if the indexed path is materially faster, the closure is equal, existing scenarios do not regress, and all standard checks stay green. If it is not a clear win, revert it. No benchmark, no merge.
 
 ## Completed gates
 
