@@ -1,4 +1,5 @@
 import { composePatch } from "../usecases/ComposeTrackPatch.js";
+import { COMPOSING } from "../usecases/composeContext.js";
 import { mergePatches } from "../usecases/mergePatches.js";
 import { observationEdgeKey } from "../usecases/observationEdge.js";
 import { defaultGaplessLayoutDelegate } from "./GaplessLayoutDelegate.js";
@@ -6,7 +7,6 @@ import { eventBus as defaultEventBus } from "./eventBus.js";
 import { logger } from "./logger.js";
 
 function clamp01(val) { return Math.max(0, Math.min(1, Number(val) || 0)); }
-const COMPOSING = Symbol("composing");
 
 export class Track {
   #id; #mode; #interpolationTimeline; #proxyState; #plugins; #resolvedTrack; #eventBus;
@@ -48,11 +48,24 @@ export class Track {
     return { ...rest, progress: this.#interpolationTimeline?.progress() ?? 0 };
   }
 
+  /**
+   * Leaf composition: this track's own plugin output, with no observation edges
+   * applied. Named so the edge walk can be owned by something other than Track.
+   *
+   * Pass-2 P2-03: ObservationState composes the graph and calls back into this
+   * as its `composeLeaf`, which is what makes the two walkers comparable. Keep
+   * this free of any observation state.
+   */
+  composeLocal(rawData) {
+    this.#assertAlive();
+    return composePatch(this.#plugins, rawData ?? this.getSnapshot(), this.#resolvedTrack, `track "${this.#id}"`);
+  }
+
   compose(rawData, ctx) {
     this.#assertAlive();
     ctx = ctx ?? new Map();
     const cached = ctx.get(this.#id);
-    if (cached === COMPOSING) return composePatch(this.#plugins, rawData ?? this.getSnapshot(), this.#resolvedTrack, `track "${this.#id}"`);
+    if (cached === COMPOSING) return this.composeLocal(rawData);
     if (cached !== undefined) return cached;
     ctx.set(this.#id, COMPOSING);
     let source = rawData ?? this.getSnapshot();
@@ -61,7 +74,7 @@ export class Track {
       const contribution = mapFn(observedSource.compose(undefined, ctx));
       if (contribution) source = { ...source, ...contribution };
     }
-    let patch = composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
+    let patch = this.composeLocal(source);
     for (const { source: observedSource, mapFn, role } of this.#observed.values()) {
       if (role !== "output" || !mapFn) continue;
       const observedPatch = mapFn(observedSource.compose(undefined, ctx));

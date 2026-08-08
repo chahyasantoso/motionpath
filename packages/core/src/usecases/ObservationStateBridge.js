@@ -1,4 +1,5 @@
 import { ObservationState } from "./ObservationState.js";
+import { patchesEqual, trackComposeLeaf } from "./composeContext.js";
 
 /** Shadow bridge used while live Track mutation is being extracted. */
 export class ObservationStateBridge {
@@ -35,6 +36,27 @@ export class ObservationStateBridge {
     live.sort();
     shadow.sort();
     if (live.length !== shadow.length || live.some((key, index) => key !== shadow[index])) throw new Error("ObservationState is out of parity with live Track wiring.");
+    return true;
+  }
+
+  /**
+   * Composition parity, the evidence the P2-03 gate actually needs.
+   *
+   * assertParity() only proves the two sides hold the same edge set. That is not
+   * enough to justify deleting the live Track observation state: two walkers can
+   * agree on every edge and still merge them differently. They did. Output edges
+   * were combined with a shallow spread on the shadow side and with mergePatches
+   * on the live side, so any nested patch value composed to a different result
+   * while wiring parity stayed green.
+   */
+  assertCompositionParity() {
+    if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
+    for (const track of this.#tracks.values()) {
+      if (track.isDestroyed || typeof track.composeLocal !== "function" || typeof track.compose !== "function") continue;
+      const live = track.compose();
+      const shadow = this.#state.compose(track.id, undefined, new Map(), trackComposeLeaf);
+      if (!patchesEqual(live, shadow)) throw new Error(`ObservationState composition differs from live Track composition for track '${track.id}'.`);
+    }
     return true;
   }
 

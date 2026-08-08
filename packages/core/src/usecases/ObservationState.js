@@ -1,4 +1,6 @@
 import { observationEdgeKey } from "./observationEdge.js";
+import { mergePatches } from "./mergePatches.js";
+import { COMPOSING } from "./composeContext.js";
 
 /**
  * Live observation ownership for the pass-2 Track extraction.
@@ -97,27 +99,48 @@ export class ObservationState {
     try { this.addEdge(next); } catch (error) { this.addEdge(snapshot); throw error; }
   }
 
+  /**
+   * Compose one target by walking its observation edges.
+   *
+   * This is the extraction of Track.compose. It must stay patch-for-patch
+   * identical to the live Track walk, so three details are load bearing:
+   *
+   *   - The in-progress marker is checked BEFORE the cache hit. A re-entrant
+   *     call through a legal standalone back-edge sees COMPOSING in the ctx,
+   *     which is not `undefined`, so checking the cache first returned the
+   *     marker Symbol to the caller as if it were a patch.
+   *   - Output contributions merge through mergePatches, not a shallow spread.
+   *     mergePatches merges nested objects one level deep, which is the normal
+   *     shape of a patch, so a spread here quietly drops sibling keys.
+   *   - The base source resolves once, up front. Defaulting it inside the input
+   *     loop handed `undefined` to composeLeaf for any track with no input edge.
+   *
+   * @param {string} targetId
+   * @param {object} [rawData] overrides the target's own snapshot
+   * @param {Map<string, unknown>} [ctx] per-call memo, shared with the caller
+   * @param {(track: object, rawData: object, ctx: Map<string, unknown>) => object} composeLeaf
+   */
   compose(targetId, rawData, ctx = new Map(), composeLeaf) {
     this.#assertAlive();
     const track = this.#tracks.get(targetId);
     if (!track) throw new Error(`Unknown observation target '${targetId}'.`);
     if (typeof composeLeaf !== "function") throw new TypeError("ObservationState.compose requires composeLeaf.");
+    const base = rawData ?? track.getSnapshot?.() ?? {};
     const cached = ctx.get(targetId);
+    if (cached === COMPOSING) return composeLeaf(track, base, ctx);
     if (cached !== undefined) return cached;
-    const composing = Symbol.for(`motionpath.composing.${targetId}`);
-    if (cached === composing) return composeLeaf(track, rawData, ctx);
-    ctx.set(targetId, composing);
-    let source = rawData;
+    ctx.set(targetId, COMPOSING);
+    let source = base;
     for (const edge of this.getEdges(targetId)) {
       if (edge.role !== "input" || !edge.mapFn) continue;
       const contribution = edge.mapFn(this.compose(edge.source.id, undefined, ctx, composeLeaf));
-      if (contribution) source = { ...(source ?? track.getSnapshot?.() ?? {}), ...contribution };
+      if (contribution) source = { ...source, ...contribution };
     }
     let patch = composeLeaf(track, source, ctx);
     for (const edge of this.getEdges(targetId)) {
       if (edge.role !== "output" || !edge.mapFn) continue;
       const contribution = edge.mapFn(this.compose(edge.source.id, undefined, ctx, composeLeaf));
-      if (contribution) patch = { ...patch, ...contribution };
+      if (contribution) patch = mergePatches(patch, contribution);
     }
     ctx.set(targetId, patch);
     return patch;
