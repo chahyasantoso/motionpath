@@ -1,8 +1,10 @@
 # MotionPath v5 implementation plan, pass 2
 
-**Status:** proposed continuation plan  
+**Status:** accepted plan revision, pass-2 revision A  
+**Accepted:** 2026-08-08 Asia/Jakarta, by @chahyasantoso  
 **Base:** `v5` after accepted PR-00 through PR-21 and supplemental PR-22/23  
-**Canonical index:** [`V5-README.md`](./V5-README.md)
+**Canonical index:** [`V5-README.md`](./V5-README.md)  
+**Control sheet:** [`V5-PASS-2-COMPLETION-MATRIX.md`](./V5-PASS-2-COMPLETION-MATRIX.md)
 
 ## Why a second pass exists
 
@@ -91,6 +93,16 @@ Every package should land as one focused change on `v5` or its immediately prece
 - No broad rewrite of plugin behavior while ownership boundaries are being moved.
 - No deletion of compatibility code before real-controller and lifecycle evidence passes.
 
-## Required plan revision before implementation
+## Plan acceptance record
 
-This document is the implementation plan for the continuation. Before P2-03 begins, accept it as the named plan revision and assign owners to the completion matrix. Until then, pass-2 work is planning only.
+This document is accepted as **pass-2 revision A**, effective 2026-08-08, on branch `v5`.
+
+| Item | Decision |
+|---|---|
+| Scope | P2-00 through P2-07 exactly as written above. No renaming to PR-24 and no new top-level checkpoint. |
+| Owner | @chahyasantoso owns every work package and the completion matrix until reassigned in writing here. |
+| Entry condition | P2-00 must land before any other package. P2-01 and P2-02 unblock immediately after it. |
+| Authority | The completion matrix is the control sheet. A package is complete only when its gate is green and the matrix row cites merged evidence. |
+| Revision rule | Any change to scope, ordering, or gates requires a new revision letter recorded in this table, not an inline edit. |
+
+Acceptance authorizes implementation of the packages above. It does not mark any package complete, does not change any default flag, and does not enable cross-motion or free-track behavior.
