@@ -4,12 +4,49 @@ import { domRenderer, clearRendererTarget } from "@motionpath/core/adapters/domR
 import { applyAnchor } from "@motionpath/core/lib/helpers.js";
 
 function sourcesSignature(sources) { return sources.map((s) => `${s.instance?.id ?? ""}:${s.track?.id ?? s.trackId ?? ""}`).join("|"); }
+
+/**
+ * Publisher-backed delivery.
+ *
+ * The graph composed this node once this tick and every subscriber reads the
+ * same frozen patch, instead of each subscriber calling compose() itself and
+ * paying for the node's whole upstream chain again. That is the entire point
+ * of the publisher path: composition cost stops scaling with subscriber count.
+ *
+ * Two details that are easy to get wrong:
+ *
+ * - `patch.values` is deep-frozen. applyAnchor and domRenderer both treat the
+ *   patch as theirs to touch, and mutating a frozen object throws in a module
+ *   (always strict). Hand them a copy.
+ * - `compose` keeps its meaning. Called with no argument it returns the
+ *   published values, which is free. Called with custom raw data it really
+ *   recomposes, because that is what a caller passing data is asking for.
+ */
+function subscribeToPatches(instance, trackId, getTransformFn, getAnchor, onPatch) {
+  return instance.subscribe(trackId, (patch) => {
+    const values = patch?.values ?? {};
+    const transformFn = getTransformFn();
+    let next;
+    if (typeof transformFn === "function") {
+      const track = instance.getTrack?.(trackId);
+      const compose = (data) => (data === undefined ? { ...values } : instance.compose(trackId, data));
+      next = transformFn(track && !track.isDestroyed ? track.getSnapshot() : { ...values }, compose);
+    } else next = { ...values };
+    onPatch(applyAnchor(next, getAnchor()));
+  });
+}
+
 function subscribeToSource(source, getTransformFn, getAnchor, onPatch) {
+  const instance = source.instance;
+  const trackId = source.trackId ?? source.track?.id;
+  // Preferred when available. Falls through to the Track path for standalone
+  // tracks, for motions mounted with the gate off, and for any instance that
+  // predates the runtime, so this is additive rather than a switch.
+  if (instance?.usePublisherRendering && trackId && typeof instance.subscribe === "function") return subscribeToPatches(instance, trackId, getTransformFn, getAnchor, onPatch);
   let targetTrack = source.track;
-  if (!targetTrack && source.instance && source.trackId && typeof source.instance.getTrack === "function") targetTrack = source.instance.getTrack(source.trackId);
+  if (!targetTrack && instance && source.trackId && typeof instance.getTrack === "function") targetTrack = instance.getTrack(source.trackId);
   if (targetTrack?.subscribe) return targetTrack.subscribe((raw) => { const transformFn = getTransformFn(); const compose = (data) => targetTrack.compose(data); const patch = typeof transformFn === "function" ? transformFn(raw, compose) : compose(raw); onPatch(applyAnchor(patch, getAnchor())); });
-  const instance = source.instance; const trackId = source.trackId;
-  if (instance?.subscribe && trackId) return instance.subscribe(trackId, (raw) => { const transformFn = getTransformFn(); const compose = (data) => instance.compose(trackId, data); onPatch(applyAnchor(typeof transformFn === "function" ? transformFn(raw, compose) : compose(raw), getAnchor())); });
+  if (instance?.subscribe && source.trackId) return instance.subscribe(source.trackId, (raw) => { const transformFn = getTransformFn(); const compose = (data) => instance.compose(source.trackId, data); onPatch(applyAnchor(typeof transformFn === "function" ? transformFn(raw, compose) : compose(raw), getAnchor())); });
   return () => {};
 }
 export default function useMotionSubscribers(sources, ref, mergeFn) {
