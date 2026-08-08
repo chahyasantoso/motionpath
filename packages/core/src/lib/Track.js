@@ -9,15 +9,16 @@ function clamp01(val) { return Math.max(0, Math.min(1, Number(val) || 0)); }
 const COMPOSING = Symbol("composing");
 
 export class Track {
-  #id; #interpolationTimeline; #proxyState; #plugins; #resolvedTrack; #eventBus;
+  #id; #mode; #interpolationTimeline; #proxyState; #plugins; #resolvedTrack; #eventBus;
   #host = null; #parent = null; #children = new Map(); #subscribers = new Set();
   #lifecycleSubscribers = new Set(); #destroySubscribers = new Set();
   #currentOffset = 0; #staggerOffset = 0; #layoutDelegate;
   #observed = new Map(); #observers = new Map(); #graphGuard = null;
   #groupHost = null; #destroyed = false;
 
-  constructor({ id, interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate, eventBus = defaultEventBus }) {
+  constructor({ id, mode = "standalone", interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate, eventBus = defaultEventBus }) {
     this.#id = id;
+    this.#mode = mode === "authored-graph" ? "authored-graph" : "standalone";
     this.#interpolationTimeline = interpolationTimeline;
     this.#proxyState = proxyState;
     this.#plugins = plugins;
@@ -27,85 +28,18 @@ export class Track {
   }
 
   get id() { return this.#id; }
+  get mode() { return this.#mode; }
   get currentOffset() { return this.#currentOffset; }
   get parent() { return this.#parent; }
   get duration() { return this.#interpolationTimeline?.duration() ?? 0; }
   get isDestroyed() { return this.#destroyed; }
 
-  progress(p) {
-    if (p === undefined) return this.#interpolationTimeline?.progress() ?? 0;
-    if (this.#destroyed) return;
-    this.#interpolationTimeline?.progress(clamp01(p));
-    this.#notify();
-    this.#invalidate("progress");
-  }
-
-  getSnapshot() {
-    this.#assertAlive();
-    const { _gsap, ...rest } = this.#proxyState || {};
-    return { ...rest, progress: this.#interpolationTimeline?.progress() ?? 0 };
-  }
-
-  compose(rawData, ctx) {
-    this.#assertAlive();
-    ctx = ctx ?? new Map();
-    const cached = ctx.get(this.#id);
-    if (cached === COMPOSING) return composePatch(this.#plugins, rawData ?? this.getSnapshot(), this.#resolvedTrack, `track "${this.#id}"`);
-    if (cached !== undefined) return cached;
-    ctx.set(this.#id, COMPOSING);
-    let source = rawData ?? this.getSnapshot();
-    for (const { source: observedSource, mapFn, role } of this.#observed.values()) {
-      if (role !== "input" || !mapFn) continue;
-      const contribution = mapFn(observedSource.compose(undefined, ctx));
-      if (contribution) source = { ...source, ...contribution };
-    }
-    let patch = composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`);
-    for (const { source: observedSource, mapFn, role } of this.#observed.values()) {
-      if (role !== "output" || !mapFn) continue;
-      const observedPatch = mapFn(observedSource.compose(undefined, ctx));
-      if (observedPatch) patch = mergePatches(patch, observedPatch);
-    }
-    ctx.set(this.#id, patch);
-    return patch;
-  }
-
-  setObserved(track, mapFn, opts = {}) {
-    if (!track) { this.#clearObserved(); return; }
-    if (track === this) throw new Error(`Track "${this.#id}" cannot observe itself.`);
-    if (track.isDestroyed) throw new Error(`Track "${track.id}" is destroyed.`);
-    const role = opts.role ?? "output";
-    const input = role === "input" ? opts.target : undefined;
-    this.#graphGuard?.(this, track, { role, input });
-    const key = observationEdgeKey(track.id, role, input);
-    const previous = this.#observed.get(key);
-    if (previous) previous.source._removeObserver(this, key);
-    this.#observed.set(key, { source: track, mapFn: mapFn ?? null, role, input });
-    track._addObserver(this, key);
-    this.#emitLifecycle({ type: previous ? "edge-replaced" : "edge-added", track: this, source: track, edge: { source: track.id, target: this.#id, role, input } });
-    this.#invalidate("observation");
-  }
-
-  removeObserved(track, opts = {}) {
-    if (!track) return;
-    const keys = [...this.#observed.entries()].filter(([, edge]) => edge.source === track && (opts.role === undefined || edge.role === opts.role) && (opts.role !== "input" || opts.target === undefined || edge.input === opts.target)).map(([key]) => key);
-    for (const key of keys) this.#removeObservedKey(key);
-    if (keys.length) this.#invalidate("observation");
-  }
-
-  replaceObserved(oldSource, newSource, mapFn, opts = {}) {
-    if (!oldSource || !newSource) throw new TypeError("replaceObserved requires old and new source tracks.");
-    if (newSource === this) throw new Error(`Track "${this.#id}" cannot observe itself.`);
-    if (oldSource === newSource) throw new Error("replaceObserved requires two different source tracks.");
-    const replaced = [...this.#observed.entries()].filter(([, edge]) => edge.source === oldSource && (opts.role === undefined || edge.role === opts.role)).map(([key, edge]) => ({ key, edge }));
-    if (replaced.length === 0) throw new Error(`Track "${this.#id}" does not observe "${oldSource.id}".`);
-    const additions = replaced.map(({ edge }) => { const role = edge.role; const input = role === "input" ? (opts.target ?? edge.input) : undefined; return { source: newSource, mapFn: mapFn ?? edge.mapFn, role, input, key: observationEdgeKey(newSource.id, role, input) }; });
-    if (new Set(additions.map(({ key }) => key)).size !== additions.length) throw new Error("replaceObserved would collapse two edges into one.");
-    for (const addition of additions) this.#graphGuard?.(this, newSource, { role: addition.role, input: addition.input, ignoring: replaced.map(({ key }) => key) });
-    for (const { key } of replaced) this.#removeObservedKey(key);
-    for (const addition of additions) { const previous = this.#observed.get(addition.key); if (previous) previous.source._removeObserver(this, addition.key); this.#observed.set(addition.key, { source: addition.source, mapFn: addition.mapFn, role: addition.role, input: addition.input }); newSource._addObserver(this, addition.key); this.#emitLifecycle({ type: previous ? "edge-replaced" : "edge-added", track: this, source: addition.source, edge: { source: addition.source.id, target: this.#id, role: addition.role, input: addition.input } }); }
-    this.#invalidate("observation");
-  }
-
+  progress(p) { if (p === undefined) return this.#interpolationTimeline?.progress() ?? 0; if (this.#destroyed) return; this.#interpolationTimeline?.progress(clamp01(p)); this.#notify(); this.#invalidate("progress"); }
+  getSnapshot() { this.#assertAlive(); const { _gsap, ...rest } = this.#proxyState || {}; return { ...rest, progress: this.#interpolationTimeline?.progress() ?? 0 }; }
+  compose(rawData, ctx) { this.#assertAlive(); ctx = ctx ?? new Map(); const cached = ctx.get(this.#id); if (cached === COMPOSING) return composePatch(this.#plugins, rawData ?? this.getSnapshot(), this.#resolvedTrack, `track "${this.#id}"`); if (cached !== undefined) return cached; ctx.set(this.#id, COMPOSING); let source = rawData ?? this.getSnapshot(); for (const { source: observedSource, mapFn, role } of this.#observed.values()) { if (role !== "input" || !mapFn) continue; const contribution = mapFn(observedSource.compose(undefined, ctx)); if (contribution) source = { ...source, ...contribution }; } let patch = composePatch(this.#plugins, source, this.#resolvedTrack, `track "${this.#id}"`); for (const { source: observedSource, mapFn, role } of this.#observed.values()) { if (role !== "output" || !mapFn) continue; const observedPatch = mapFn(observedSource.compose(undefined, ctx)); if (observedPatch) patch = mergePatches(patch, observedPatch); } ctx.set(this.#id, patch); return patch; }
+  setObserved(track, mapFn, opts = {}) { if (!track) { this.#clearObserved(); return; } if (track === this) throw new Error(`Track "${this.#id}" cannot observe itself.`); if (track.isDestroyed) throw new Error(`Track "${track.id}" is destroyed.`); const role = opts.role ?? "output"; const input = role === "input" ? opts.target : undefined; this.#graphGuard?.(this, track, { role, input }); const key = observationEdgeKey(track.id, role, input); const previous = this.#observed.get(key); if (previous) previous.source._removeObserver(this, key); this.#observed.set(key, { source: track, mapFn: mapFn ?? null, role, input }); track._addObserver(this, key); this.#emitLifecycle({ type: previous ? "edge-replaced" : "edge-added", track: this, source: track, edge: { source: track.id, target: this.#id, role, input } }); this.#invalidate("observation"); }
+  removeObserved(track, opts = {}) { if (!track) return; const keys = [...this.#observed.entries()].filter(([, edge]) => edge.source === track && (opts.role === undefined || edge.role === opts.role) && (opts.role !== "input" || opts.target === undefined || edge.input === opts.target)).map(([key]) => key); for (const key of keys) this.#removeObservedKey(key); if (keys.length) this.#invalidate("observation"); }
+  replaceObserved(oldSource, newSource, mapFn, opts = {}) { if (!oldSource || !newSource) throw new TypeError("replaceObserved requires two source tracks."); if (newSource === this) throw new Error(`Track "${this.#id}" cannot observe itself.`); if (oldSource === newSource) throw new Error("replaceObserved requires two different source tracks."); const replaced = [...this.#observed.entries()].filter(([, edge]) => edge.source === oldSource && (opts.role === undefined || edge.role === opts.role)).map(([key, edge]) => ({ key, edge })); if (!replaced.length) throw new Error(`Track "${this.#id}" does not observe "${oldSource.id}".`); for (const { key } of replaced) this.#removeObservedKey(key); for (const { edge } of replaced) this.setObserved(newSource, mapFn ?? edge.mapFn, { role: edge.role, target: edge.input }); }
   get observedSources() { return [...new Set([...this.#observed.values()].map(({ source }) => source))]; }
   get observedEdges() { return [...this.#observed.values()].map(({ source, mapFn, role, input }) => ({ source, mapFn, role, input, target: this.#id })); }
   get observerCount() { return this.#observers.size; }
@@ -134,5 +68,5 @@ export class Track {
   pause() { this.#groupHost?.timeline.pause(); }
   seek(progress) { if (!this.#groupHost) return this.progress(progress); if (progress === undefined) return this.#groupHost.timeline.progress(); this.#groupHost.timeline.progress(clamp01(progress)); }
   reverse() { this.#groupHost?.timeline.reverse(); }
-  destroy() { if (this.#destroyed) return; const observerIds = [...this.#observers.keys()].map((observer) => observer.id); this.#destroyed = true; this.#detachObservationEdges(); for (const child of this.#children.values()) child.destroy(); this.#children.clear(); this.#parent = null; this.#host = null; this.#subscribers.clear(); this.#graphGuard = null; const event = { id: this.#id, observerIds }; for (const callback of [...this.#destroySubscribers]) callback(event); this.#emitLifecycle({ type: "destroyed", track: this, observerIds }); this.#destroySubscribers.clear(); this.#lifecycleSubscribers.clear(); if (this.#groupHost) { this.#groupHost.group.destroy(); this.#groupHost.timeline.kill(); this.#groupHost = null; } try { this.#interpolationTimeline?.kill(); } catch (e) { logger.warn(`track "${this.#id}"`, "failed to kill the interpolation timeline during destroy()", e); } }
+  destroy() { if (this.#destroyed) return; this.#destroyed = true; this.#detachObservationEdges(); for (const child of this.#children.values()) child.destroy(); this.#children.clear(); this.#parent = null; this.#host = null; this.#subscribers.clear(); this.#graphGuard = null; const event = { id: this.#id, observerIds: [...this.#observers.keys()].map((observer) => observer.id) }; for (const callback of [...this.#destroySubscribers]) callback(event); this.#emitLifecycle({ type: "destroyed", track: this, observerIds: event.observerIds }); this.#destroySubscribers.clear(); this.#lifecycleSubscribers.clear(); if (this.#groupHost) { this.#groupHost.group.destroy(); this.#groupHost.timeline.kill(); this.#groupHost = null; } try { this.#interpolationTimeline?.kill(); } catch (e) { logger.warn(`track "${this.#id}"`, "failed to kill interpolation timeline", e); } }
 }
