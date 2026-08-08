@@ -4,6 +4,7 @@
 export { ObservationGraph } from "./usecases/ObservationGraph.js";
 export { ObservationState } from "./usecases/ObservationState.js";
 export { ObservationStateBridge } from "./usecases/ObservationStateBridge.js";
+export { StandaloneObservationAdapter } from "./usecases/StandaloneObservationAdapter.js";
 export { normalizeObservationGraph, topologicalTrackOrder, tryTopologicalOrder } from "./usecases/normalizeObservationGraph.js";
 export { observationEdgeKey, observationEdgeEquals } from "./usecases/observationEdge.js";
 export { createTickClock } from "./ports/Clock.js";
