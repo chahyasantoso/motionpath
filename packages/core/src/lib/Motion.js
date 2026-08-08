@@ -21,15 +21,20 @@ export class Motion {
   get graphBinding() { return this.#binding ?? this.#runtime?.binding ?? null; }
   get usePublisherRendering() { return Boolean(this.#runtime) && !this.#runtime.isDisposed && this.#runtime.usePublisher === true; }
   /**
-   * Patch subscription for renderers.
+   * Total facade over "give me updates for this track".
    *
-   * Emits the current patch immediately when one exists, matching
-   * Track.subscribe, which calls back with a snapshot on subscribe. Without
-   * that a component mounting mid-animation renders blank until the next
-   * frame that happens to invalidate its node, which for a paused timeline is
-   * never.
+   * Publisher-backed, it hands out published patches and emits the current one
+   * immediately, matching Track.subscribe, which calls back with a snapshot on
+   * subscribe. Without that, a component mounting mid-animation renders blank
+   * until the next frame that happens to invalidate its node, which for a
+   * paused timeline is never.
+   *
+   * Not publisher-backed, it forwards to the Track. Unresolvable, it returns a
+   * no-op unsubscribe rather than throwing: callers legitimately reference ids
+   * for tracks that have not spawned yet, and this was a silent no-op before,
+   * because Motion had no subscribe method at all.
    */
-  subscribe(trackId, callback) { if (!this.usePublisherRendering) throw new Error(`Motion "${this.id}" is not publisher-backed; subscribe to the Track directly.`); const unsubscribe = this.#runtime.subscribe(trackId, callback); const current = this.#runtime.getPatch(trackId); if (current) callback(current); return unsubscribe; }
+  subscribe(trackId, callback) { if (this.usePublisherRendering) { const unsubscribe = this.#runtime.subscribe(trackId, callback); const current = this.#runtime.getPatch(trackId); if (current) callback(current); return unsubscribe; } const track = this.getTrack(trackId); return track && !track.isDestroyed ? track.subscribe(callback) : () => {}; }
   /** Recompose on demand. Falls back to the Track when there is no runtime. */
   compose(trackId, rawData) { if (this.usePublisherRendering) return this.#runtime.compose(trackId, rawData); const track = this.getTrack(trackId); if (!track) throw new Error(`Motion "${this.id}" has no track "${trackId}".`); return track.compose(rawData); }
   getPatch(trackId) { return this.#runtime?.getPatch(trackId) ?? null; }
