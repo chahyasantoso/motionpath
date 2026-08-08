@@ -25,7 +25,10 @@ describe("GraphBinding — representations agree", () => {
 
   it("rejects construction when live edges do not match the IR", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
-    tracks.get("n0").setObserved(tracks.get("n2"), () => ({}), { role: "output" });
+    // Remove a declared edge rather than adding a cycle. The publisher's live
+    // graph guard should correctly reject cycle creation before this binding
+    // validation test ever runs, so use a non-cyclic mismatch here.
+    tracks.get("n1").setObserved(null);
     const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
     expect(() => new GraphBinding({ graph, tracks, publisher })).toThrow(/live Track wiring|declared edges|mismatch/i);
   });
