@@ -25,8 +25,13 @@ export const APPROVED_GSAP_PREFIXES = ["packages/core/src/adapters/"];
  */
 export const QUARANTINED_GSAP_FILES = [
   "packages/core/src/__fixtures__/graphTracks.js",
+  "packages/core/src/lib/__tests__/Motion.autoplay.test.js",
+  "packages/core/src/lib/__tests__/Motion.composite.test.js",
+  "packages/core/src/lib/__tests__/Motion.recursive.test.js",
+  "packages/core/src/lib/__tests__/Motion.reinit.test.js",
   "packages/core/src/lib/__tests__/Motion.test.js",
   "packages/core/src/lib/__tests__/MotionPhase2.test.js",
+  "packages/core/src/lib/__tests__/Track.mode.test.js",
   "packages/core/src/lib/__tests__/Track.test.js",
   "packages/core/src/lib/schema/__tests__/parseV4Project.test.js",
 ];
