@@ -1,10 +1,10 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 08:58 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-19-cross-motion-capability`  
+**Status captured:** 2026-08-08 09:00 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-19-pending-references`  
 **Base branch:** `v5`  
-**Base SHA:** `65995482e4d2252a2be349ba9496f88dfdff85bc`  
-**Next work:** PR-19 capability-gated cross-motion and free-track behavior.
+**Base SHA:** `80daeaca7f028d9a452e02af8ac701c20c12b7f6`  
+**Next work:** PR-19 pending references and explicit reattachment.
 
 ## Current position
 
@@ -16,20 +16,19 @@
 - PR #96 merged green: opt-in publisher-backed React subscription path landed.
 - PR #97 merged green: project-local qualified IDs and motion-local duplicate track support.
 - PR #98 merged green: atomic ProjectRuntime ownership and staged project visibility.
-- PR #99 merged green: staged qualified membership registry for `motionId/trackId` and `~/trackId`.
-- PR #100 merged green: ProjectRuntime owns one project-scoped graph runtime with safe replacement and disposal.
-- PR #101 merged green: public qualified config lookup now routes through committed ProjectRuntime membership, with failed-reload isolation coverage.
-- PR-19 capability branch continues from merged `v5` at `65995482e4d2252a2be349ba9496f88dfdff85bc`.
+- PR #99 merged green: staged qualified membership registry.
+- PR #100 merged green: ProjectRuntime owns one project-scoped graph runtime.
+- PR #101 merged green: qualified config lookup routes through committed ProjectRuntime membership.
+- PR #102 merged green: explicit PR-19 capability gates and canonical qualified ordering.
+- Active branch adds pending-reference state and explicit resolution without enabling cross-motion behavior.
 
-## PR-19 slice: explicit capability gates
+## PR-19 slice: pending references
 
-This slice adds no default behavior change. `ProjectRuntime` now exposes immutable capability state for `crossMotion` and `freeTracks`, both disabled by default. Callers must explicitly opt in and pass `assertCapability()` before enabling either behavior.
-
-It also exposes a canonical sorted qualified membership order for deterministic scheduling and remount equivalence. This is groundwork only: no cross-motion edge is registered, no free track is adopted, and no source-unmount policy is enabled yet.
+Unresolved references are now staged as `pending`, excluded from membership lookup, and blocked from publication. They become publishable only after an explicit `resolvePendingReference()` call. Removed references do not silently reattach.
 
 ## Guardrails
 
-The remaining PR-19 work must preserve source-unmount diagnostics, current-progress sampling without controlling the source timeline, pending references that cannot publish, explicit reattachment, and one project graph/publisher/clock/membership owner. Do not flip either capability on by default.
+`crossMotion` and `freeTracks` remain disabled by default. Source-unmount diagnostics, current-progress sampling, explicit reattachment, and canary performance remain before the capability can be enabled.
 
 ## Checkpoints
 
