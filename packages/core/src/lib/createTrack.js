@@ -8,5 +8,6 @@ export function createTrack(config, templates = [], options = {}) {
   const plugins = options.dependencies?.plugins;
   const resolver = options.resolvePluginForKey || plugins?.resolve?.bind(plugins) || defaultResolvePlugin;
   const built = buildTrackTweenSync(resolvedTrack.id, resolvedTrack.keyframes || {}, resolvedTrack.duration ?? 1, resolvedTrack, resolver);
-  return new Track({ id: resolvedTrack.id, interpolationTimeline: built.tween, proxyState: built.proxy, plugins: built.resolvedPlugins, resolvedTrack, layoutDelegate: config.layoutDelegate, eventBus: options.eventBus || options.dependencies?.eventBus });
+  const mode = config?.mode ?? resolvedTrack.mode ?? options.mode ?? "standalone";
+  return new Track({ id: resolvedTrack.id, mode, interpolationTimeline: built.tween, proxyState: built.proxy, plugins: built.resolvedPlugins, resolvedTrack, layoutDelegate: config.layoutDelegate, eventBus: options.eventBus || options.dependencies?.eventBus });
 }
