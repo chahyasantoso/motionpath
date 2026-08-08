@@ -5,22 +5,24 @@
 | # | Finding | Status | Evidence |
 | --- | --- | --- | --- |
 | 1 | Patch immutability is only shallow | resolved | PR #89, merged green |
-| 2 | GraphRuntime not wired into Engine/Motion production flow | open | see note below. Owned by PR-19b |
+| 2 | GraphRuntime not wired into Engine/Motion production flow | resolved | PR-19b, `docs/V5-PR-19B-PUBLISHER-SINK.md` |
 | 3 | PR-08 was live-style, not actual Spiral controller integration | resolved | PR #88, merged green |
 | 4 | Public exports expose migration internals | open | deferred to PR-20 |
 | 5 | Repeated active Motion initialization remains fragile | resolved | PR #90, merged green |
 | 6 | Nested Motion scheduling not implemented | open | PR-12/PR-13 |
 | 7 | GSAP remains in core before ports are introduced | open | PR-12 |
 
-## Finding #2 correction
+## Finding #2 history
 
-This row previously read "open by design" with the evidence "planned integration flag and React subscription path." Neither exists. Verified against source on 2026-08-08:
+This row read "open by design" with the evidence "planned integration flag and React subscription path." Neither existed. Verified against source on 2026-08-08:
 
-- `Engine.#mountMotion` builds `new GraphPublisher({ graph, tracks: trackMap, publish: () => {} })`. The delivery callback is a no-op, so composed patches are cached and discarded.
-- `Engine` imports `ProjectRuntime` only. No `GraphRuntime` and no `PatchRegistry` is constructed in any mount path.
-- There is no integration flag. "Open by design" implied a deliberate switch waiting to be thrown; there is no switch.
+- `Engine.#mountMotion` built `new GraphPublisher({ graph, tracks: trackMap, publish: () => {} })`. The delivery callback was a no-op, so composed patches were cached and discarded.
+- `Engine` imported `ProjectRuntime` only. No `GraphRuntime` and no `PatchRegistry` was constructed in any mount path, and `GraphPublisher.flush()` had no production caller.
+- There was no integration flag. "Open by design" implied a switch waiting to be thrown; there was no switch.
 
-The finding is plain open. It also blocks Checkpoint D, whose PR-16 merge gate requires publisher-backed same-motion rendering. See `docs/V5-STATUS.md`.
+PR #109 corrected the row to plain **open**. PR-19b closes it: the flag now exists (`Engine.publisherRendering`, default off), the sink is real, and the React subscription path reads published patches. Details and the deliberate non-goals are in `docs/V5-PR-19B-PUBLISHER-SINK.md`.
+
+The row stays "resolved" only while the gate has a real sink behind it. If a future PR reintroduces a placeholder publish callback, this is a regression, not a staging step.
 
 ## PR-11 note
 

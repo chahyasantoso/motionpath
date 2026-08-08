@@ -46,6 +46,16 @@ export class GraphBinding {
   }
   get graph() { return this.#graph; }
   get tracks() { return new Map(this.#tracks); }
+  /**
+   * Single-track lookup that does not clone the registry.
+   *
+   * The `tracks` getter deliberately hands out a copy so no caller can mutate
+   * the binding's registry behind its back, but the publish callback needs one
+   * track per published node per frame and cloning the whole Map for each of
+   * those is an allocation storm in the hot path. Reading is safe; only
+   * writing had to be defended against.
+   */
+  getTrack(id) { return this.#tracks.get(id) ?? null; }
   get publisher() { return this.#publisher; }
   get isDestroyed() { return this.#destroyed; }
   replaceEdge(oldEdge, newEdge) {
