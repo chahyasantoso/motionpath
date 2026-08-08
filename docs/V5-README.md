@@ -4,12 +4,18 @@ This is the **single entry point** for the v5 refactor docs. Read in this order.
 
 ## Current truth
 
-1. [`V5-STATUS.md`](./V5-STATUS.md): what is landed, what is still risky, and the plan boundary.
+1. [`V5-STATUS.md`](./V5-STATUS.md): current landed work, open PRs, risks, and session handoff.
 2. [`V5-REVIEW-FINDINGS-LOG.md`](./V5-REVIEW-FINDINGS-LOG.md): reconciled findings with evidence and next actions.
 3. [`V5-IMPLEMENTATION-PLAN.md`](./V5-IMPLEMENTATION-PLAN.md): accepted PR-00 through PR-21 sequence and gates.
 4. [`V5-IMPLEMENTATION-PLAN-PASS-2.md`](./V5-IMPLEMENTATION-PLAN-PASS-2.md): accepted completion plan, pass-2 revision A, work packages P2-00 through P2-07.
-5. [`V5-PASS-2-COMPLETION-MATRIX.md`](./V5-PASS-2-COMPLETION-MATRIX.md): the pass-2 control sheet of rules, owners, gaps, and gates.
+5. [`V5-PASS-2-COMPLETION-MATRIX.md`](./V5-PASS-2-COMPLETION-MATRIX.md): the pass-2 control sheet of rules, evidence, gaps, and gates.
 6. [`V5-ARCHITECTURE-REFACTOR-PLAN.md`](./V5-ARCHITECTURE-REFACTOR-PLAN.md): target ownership and non-negotiable architecture rules.
+
+## Session handoff, 2026-08-08
+
+PR-00 through PR-21, supplemental PR-22/23, and pass-2 slices through #131 are merged on `v5`. PR #132 is the only current open pass-2 PR: P2-04 Track topology ownership evidence. The architecture is not complete. The remaining work is Track observation extraction, Track topology/playback removal, full fake-port production migration, publisher equivalence/rollout evidence, final API cleanup, and release verification.
+
+Use [`V5-STATUS.md`](./V5-STATUS.md) for the recommended next sequence. Treat stale empty work branches as non-work unless they gain commits and a PR.
 
 ## Supplemental implementation records
 
@@ -26,4 +32,4 @@ This is the **single entry point** for the v5 refactor docs. Read in this order.
 
 ## Status vocabulary
 
-**Accepted complete** means the original PR gate passed. **Supplemental complete** means follow-up work landed without changing the accepted plan. **Open** means evidence or implementation is still required. **Accepted plan revision** means the work is authorized to start but nothing in it is complete until its own gate is green. Never infer current status from the historical review alone.
+**Accepted complete** means the original PR gate passed. **Supplemental complete** means follow-up work landed without changing the accepted plan. **Open** means evidence or implementation is still required. **Accepted plan revision** means the work is authorized to start but nothing in it is complete until its own gate is green. **Session handoff** records the current branch truth and recommended next sequence. Never infer current status from the historical review alone.

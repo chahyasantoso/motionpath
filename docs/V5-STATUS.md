@@ -1,37 +1,38 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 12:30 Asia/Jakarta  
+**Status captured:** 2026-08-08 17:22 Asia/Jakarta  
 **Branch:** `v5`  
 **Canonical index:** [`docs/V5-README.md`](./V5-README.md)
 
 ## Executive status
 
-The accepted implementation plan, PR-00 through PR-21, is complete and green on `v5`. Supplemental PR-22/23 work also landed. The architecture is not complete yet: observation ownership, immutability enforcement, and the GSAP boundary still need closure.
+The accepted implementation plan, PR-00 through PR-21, is complete and green on `v5`. Supplemental PR-22/23 work also landed. Pass-2 revision A is accepted and active. The target architecture is **not complete yet**.
 
-## Next step
+Pass-2 work has now landed through several evidence and ownership slices:
 
-The continuation plan in [`V5-IMPLEMENTATION-PLAN-PASS-2.md`](./V5-IMPLEMENTATION-PLAN-PASS-2.md) is **accepted as pass-2 revision A**, effective 2026-08-08. It uses work packages `P2-00` through `P2-07`, not PR-24. Acceptance authorizes implementation; it marks nothing complete and changes no default.
+- **P2-00:** plan acceptance, completion matrix, and boundary audit infrastructure landed.
+- **P2-01:** merged in PR #117. Supported graph and patch values now use one documented deep clone/freeze contract.
+- **P2-02:** merged in PRs #118 and #126. Production GSAP imports are behind the adapter surface, the boundary scan is blocking, and fake port contracts exist. Core is not yet GSAP-free: intentional test/fixture imports remain quarantined and production construction has not fully moved onto ports.
+- **P2-03:** merged in PRs #119, #120, #121, #123, #127, and #128. ObservationState, parity validation, transactional mutation routing, rollback hardening, late-track registration, and collision-proof bridge identity are in place. Track still owns the legacy observation maps and composition, so extraction is not complete.
+- **P2-04:** PR #129 merged. Motion now exposes named child-slot ownership APIs while compatibility aliases remain. PR #132 is open for the topology ownership evidence gate. Track still owns child topology and the group-host/playback bridge.
+- **P2-05:** PR #131 merged the first publisher rollout evidence slice. Publisher rendering remains default-off pending real-controller equivalence, retention, rollback, and scaling evidence.
 
-P2-00 establishes the baseline, the boundary audit, and [`V5-PASS-2-COMPLETION-MATRIX.md`](./V5-PASS-2-COMPLETION-MATRIX.md). P2-01 and P2-02 are unblocked once it lands.
+## Current open work
 
-## Remaining completion work
+- [PR #132](https://github.com/chahyasantoso/motionpath/pull/132): P2-04 Track topology ownership evidence, rebuilt on current `v5` after the stale PR #130 was superseded.
+- Complete P2-02 fake-backed production construction and retire the GSAP quarantine.
+- Complete P2-03 by moving observation composition and lifecycle ownership out of Track, then remove the legacy Track observation state.
+- Complete P2-04 by removing Track child topology and group-host/playback bridges after parity evidence.
+- Complete P2-05 with real controller/state-vector equivalence, subscriber scaling, memory retention, failure lifecycle, and an explicit rollout/rollback decision.
+- Run P2-06 cleanup and P2-07 release verification, including deterministic reruns, packed-artifact consumer coverage, lifecycle smoke, memory retention, and benchmarks.
 
-- Establish a completion matrix and blocking boundary scans.
-- Define and enforce deep immutability for graph and patch values.
-- Isolate the clock and all GSAP dependencies behind approved adapters and ports.
-- Move live observation mutation and edge ownership out of `Track` into `ObservationGraph`/`GraphBinding`.
-- Finish the Track/Motion ownership split, including removal of Track topology and playback bridges.
-- Make publisher rendering authoritative only after real-controller, lifecycle, equivalence, and rollback evidence passes.
-- Remove migration-only exports and compatibility code only after the replacement path is proven.
-- Run final deterministic, lifecycle, memory, package, and benchmark verification.
+## Handoff decision
+
+The next session should treat `v5` as the source branch. First finish and merge #132 if its CI is green. Then continue P2-03 Track observation extraction and P2-04 topology removal as separate focused changes. Keep `publisherRendering`, `crossMotion`, and `freeTracks` disabled by default. Do not delete compatibility shims or quarantine entries until parity and rollback evidence is merged.
 
 ## Boundary
 
-These items complete the target architecture. Cross-motion and free-track capabilities remain separate, explicitly gated product decisions. No pass-2 package is complete until its own gate is green and the completion matrix cites merged evidence.
-
-## Landed work
-
-PR #91 through PR #115 are merged on `v5`, including publisher delivery, public API cleanup, recursive scheduling, downstream indexing, explicit FK graph mode, runtime mode propagation, and ObservationGraph metadata/index ownership.
+The refactor is complete only when the pass-2 matrix says every target rule is closed with merged source evidence and green gates. Cross-motion and free-track behavior remain separate, explicitly gated product decisions.
 
 ## Guardrails
 
@@ -39,5 +40,5 @@ PR #91 through PR #115 are merged on `v5`, including publisher delivery, public 
 - Source removal never silently reattaches dependencies.
 - Standalone mutual observation remains legal.
 - No partial graph is exposed or flushed.
-- No follow-up is described as an accepted planned PR without a plan revision.
 - No Track observation state is removed without parity evidence.
+- No publisher default change happens without real-controller equivalence and rollback evidence.
