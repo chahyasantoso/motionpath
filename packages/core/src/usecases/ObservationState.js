@@ -5,23 +5,21 @@ import { COMPOSING } from "./composeContext.js";
 /**
  * Live observation ownership for the pass-2 Track extraction.
  *
- * This object owns edge records, reverse observer indexes, cycle validation,
- * and composition traversal. Track instances are only values held by the
- * handle: they do not own topology or mutation state here. GraphBinding is
- * the transaction boundary that should call this handle from the next slice.
- *
- * Edge identity includes source, role, and input. A source can therefore
- * legally provide both an input and output edge to one target.
+ * `validateCycles` defaults to true for authored graph state. Standalone mode
+ * is an explicit capability and may preserve legal mutual observation; its
+ * adapter uses the same state and composition machinery with validation off.
  */
 export class ObservationState {
   #edges = new Map();
   #observers = new Map();
   #tracks = new Map();
   #onInvalidate;
+  #validateCycles;
   #destroyed = false;
 
-  constructor({ tracks = new Map(), onInvalidate = () => {} } = {}) {
+  constructor({ tracks = new Map(), onInvalidate = () => {}, validateCycles = true } = {}) {
     this.#onInvalidate = typeof onInvalidate === "function" ? onInvalidate : () => {};
+    this.#validateCycles = validateCycles !== false;
     for (const [id, track] of tracks instanceof Map ? tracks : new Map(tracks)) this.register(track ?? { id });
   }
 
@@ -64,7 +62,7 @@ export class ObservationState {
     if (!observer || !sourceTrack) throw new Error("ObservationState edge references an unknown track.");
     if (observer === sourceTrack) throw new Error(`Track "${target}" cannot observe itself.`);
     const normalizedInput = role === "input" ? (input ?? target) : undefined;
-    this.#assertAcyclic(target, source);
+    if (this.#validateCycles) this.#assertAcyclic(target, source);
     const key = observationEdgeKey(source, role, normalizedInput);
     const bucket = this.#edges.get(target) ?? new Map();
     const previous = bucket.get(key);
@@ -93,33 +91,12 @@ export class ObservationState {
     const old = this.getEdges(oldEdge.target).find((edge) => edge.source.id === oldEdge.source && (oldEdge.role === undefined || edge.role === oldEdge.role));
     if (!old) throw new Error(`Track "${oldEdge.target}" does not observe "${oldEdge.source}".`);
     const next = { source: newEdge.source, target: oldEdge.target, role: newEdge.role ?? old.role, input: newEdge.input ?? old.input, mapFn: newEdge.mapFn ?? old.mapFn };
-    this.#assertAcyclic(next.target, next.source);
+    if (this.#validateCycles) this.#assertAcyclic(next.target, next.source);
     const snapshot = { source: old.source.id, target: old.target, role: old.role, input: old.input, mapFn: old.mapFn };
     this.removeEdge(snapshot);
     try { this.addEdge(next); } catch (error) { this.addEdge(snapshot); throw error; }
   }
 
-  /**
-   * Compose one target by walking its observation edges.
-   *
-   * This is the extraction of Track.compose. It must stay patch-for-patch
-   * identical to the live Track walk, so three details are load bearing:
-   *
-   *   - The in-progress marker is checked BEFORE the cache hit. A re-entrant
-   *     call through a legal standalone back-edge sees COMPOSING in the ctx,
-   *     which is not `undefined`, so checking the cache first returned the
-   *     marker Symbol to the caller as if it were a patch.
-   *   - Output contributions merge through mergePatches, not a shallow spread.
-   *     mergePatches merges nested objects one level deep, which is the normal
-   *     shape of a patch, so a spread here quietly drops sibling keys.
-   *   - The base source resolves once, up front. Defaulting it inside the input
-   *     loop handed `undefined` to composeLeaf for any track with no input edge.
-   *
-   * @param {string} targetId
-   * @param {object} [rawData] overrides the target's own snapshot
-   * @param {Map<string, unknown>} [ctx] per-call memo, shared with the caller
-   * @param {(track: object, rawData: object, ctx: Map<string, unknown>) => object} composeLeaf
-   */
   compose(targetId, rawData, ctx = new Map(), composeLeaf) {
     this.#assertAlive();
     const track = this.#tracks.get(targetId);
