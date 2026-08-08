@@ -9,15 +9,16 @@ function clamp01(val) { return Math.max(0, Math.min(1, Number(val) || 0)); }
 const COMPOSING = Symbol("composing");
 
 export class Track {
-  #id; #interpolationTimeline; #proxyState; #plugins; #resolvedTrack; #eventBus;
+  #id; #mode; #interpolationTimeline; #proxyState; #plugins; #resolvedTrack; #eventBus;
   #host = null; #parent = null; #children = new Map(); #subscribers = new Set();
   #lifecycleSubscribers = new Set(); #destroySubscribers = new Set();
   #currentOffset = 0; #staggerOffset = 0; #layoutDelegate;
   #observed = new Map(); #observers = new Map(); #graphGuard = null;
   #groupHost = null; #destroyed = false;
 
-  constructor({ id, interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate, eventBus = defaultEventBus }) {
+  constructor({ id, mode = "standalone", interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate, eventBus = defaultEventBus }) {
     this.#id = id;
+    this.#mode = mode === "authored-graph" ? "authored-graph" : "standalone";
     this.#interpolationTimeline = interpolationTimeline;
     this.#proxyState = proxyState;
     this.#plugins = plugins;
@@ -27,6 +28,7 @@ export class Track {
   }
 
   get id() { return this.#id; }
+  get mode() { return this.#mode; }
   get currentOffset() { return this.#currentOffset; }
   get parent() { return this.#parent; }
   get duration() { return this.#interpolationTimeline?.duration() ?? 0; }
@@ -102,7 +104,13 @@ export class Track {
     if (new Set(additions.map(({ key }) => key)).size !== additions.length) throw new Error("replaceObserved would collapse two edges into one.");
     for (const addition of additions) this.#graphGuard?.(this, newSource, { role: addition.role, input: addition.input, ignoring: replaced.map(({ key }) => key) });
     for (const { key } of replaced) this.#removeObservedKey(key);
-    for (const addition of additions) { const previous = this.#observed.get(addition.key); if (previous) previous.source._removeObserver(this, addition.key); this.#observed.set(addition.key, { source: addition.source, mapFn: addition.mapFn, role: addition.role, input: addition.input }); newSource._addObserver(this, addition.key); this.#emitLifecycle({ type: previous ? "edge-replaced" : "edge-added", track: this, source: addition.source, edge: { source: addition.source.id, target: this.#id, role: addition.role, input: addition.input } }); }
+    for (const addition of additions) {
+      const previous = this.#observed.get(addition.key);
+      if (previous) previous.source._removeObserver(this, addition.key);
+      this.#observed.set(addition.key, { source: addition.source, mapFn: addition.mapFn, role: addition.role, input: addition.input });
+      newSource._addObserver(this, addition.key);
+      this.#emitLifecycle({ type: previous ? "edge-replaced" : "edge-added", track: this, source: addition.source, edge: { source: addition.source.id, target: this.#id, role: addition.role, input: addition.input } });
+    }
     this.#invalidate("observation");
   }
 
@@ -134,5 +142,5 @@ export class Track {
   pause() { this.#groupHost?.timeline.pause(); }
   seek(progress) { if (!this.#groupHost) return this.progress(progress); if (progress === undefined) return this.#groupHost.timeline.progress(); this.#groupHost.timeline.progress(clamp01(progress)); }
   reverse() { this.#groupHost?.timeline.reverse(); }
-  destroy() { if (this.#destroyed) return; const observerIds = [...this.#observers.keys()].map((observer) => observer.id); this.#destroyed = true; this.#detachObservationEdges(); for (const child of this.#children.values()) child.destroy(); this.#children.clear(); this.#parent = null; this.#host = null; this.#subscribers.clear(); this.#graphGuard = null; const event = { id: this.#id, observerIds }; for (const callback of [...this.#destroySubscribers]) callback(event); this.#emitLifecycle({ type: "destroyed", track: this, observerIds }); this.#destroySubscribers.clear(); this.#lifecycleSubscribers.clear(); if (this.#groupHost) { this.#groupHost.group.destroy(); this.#groupHost.timeline.kill(); this.#groupHost = null; } try { this.#interpolationTimeline?.kill(); } catch (e) { logger.warn(`track "${this.#id}"`, "failed to kill the interpolation timeline during destroy()", e); } }
+  destroy() { if (this.#destroyed) return; const observerIds = [...this.#observers.keys()].map((observer) => observer.id); this.#destroyed = true; this.#detachObservationEdges(); for (const child of this.#children.values()) child.destroy(); this.#children.clear(); this.#parent = null; this.#host = null; this.#subscribers.clear(); this.#graphGuard = null; const event = { id: this.#id, observerIds }; for (const callback of [...this.#destroySubscribers]) callback(event); this.#emitLifecycle({ type: "destroyed", track: this, observerIds: event.observerIds }); this.#destroySubscribers.clear(); this.#lifecycleSubscribers.clear(); if (this.#groupHost) { this.#groupHost.group.destroy(); this.#groupHost.timeline.kill(); this.#groupHost = null; } try { this.#interpolationTimeline?.kill(); } catch (e) { logger.warn(`track "${this.#id}", failed to kill interpolation timeline during destroy()`, e); } }
 }
