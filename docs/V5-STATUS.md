@@ -1,8 +1,8 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 11:13 Asia/Jakarta  
+**Status captured:** 2026-08-08 11:17 Asia/Jakarta  
 **Branch reviewed:** `v5`  
-**Next work:** PR-24, live observation mutation ownership extraction.
+**Accepted implementation plan:** complete through PR-21.
 
 ## Current position
 
@@ -23,15 +23,29 @@
 - PR #114 merged green: runtime Track mode propagation and observer teardown diagnostics.
 - PR #115 merged green: ObservationGraph metadata, adjacency indexes, and collision-proof edge identity.
 
-## PR-23 completion
+## Plan boundary
 
-ObservationGraph is now the immutable owner of normalized graph metadata, upstream/downstream adjacency, and edge identity. `GraphBinding` remains the live transactional mutation boundary, and standalone Track observation behavior remains unchanged. The full PR-23 suite is green: 98 files, 543 tests, plus typecheck, format, build, package, and benchmark checks.
+The accepted `docs/V5-IMPLEMENTATION-PLAN.md` defines PR-00 through PR-21. There is no planned PR-22, PR-23, or PR-24 in that document.
 
-The phase was intentionally split at the safe boundary. PR-23 did not delete Track observation state or move live mutation semantics without parity proof. That extraction is the next job, not a hidden half-finished claim.
+PR-22, PR-23, and the proposed PR-24 were follow-up work I introduced while decomposing gaps after the accepted plan. They must not be presented as part of the original plan or as new checkpoints. In particular, **PR-24 is not an authorized next job**. The status below records the extra work honestly so it is not confused with the accepted sequence.
 
-## Next gate
+## Supplemental follow-up work
 
-PR-24 owns live observation mutation ownership: route GraphBinding and publisher updates through the ObservationGraph index, prove rollback/lifecycle/standalone parity, and only then reduce Track's managed observation state. No renderer or cross-motion changes.
+- PR #113 and #114: FK graph-mode validation and runtime mode propagation, supplemental follow-up to the PR-14 contract.
+- PR #115: ObservationGraph metadata/index ownership slice, supplemental follow-up to the PR-15 phase.
+- The remaining live observation mutation extraction is an unplanned follow-up proposal, not PR-24. It requires an explicit plan revision before implementation.
+
+These follow-ups do not create new top-level checkpoints. A future plan revision should decide whether to absorb, rename, or stop this work.
+
+## Completed accepted gates
+
+- Checkpoint A, PR-03: passed.
+- Checkpoint B, PR-08: passed with actual controller evidence.
+- Checkpoint C, PR-11: passed.
+- Checkpoint D, PR-16: passed on green PR #110.
+- Checkpoint E, PR-18: passed.
+- Checkpoint F, PR-19: passed.
+- PR-21 measurement gate: passed on green PR #112 with equal closure and 43.39x speedup in the apples-to-apples benchmark.
 
 ## Guardrails
 
@@ -40,23 +54,8 @@ PR-24 owns live observation mutation ownership: route GraphBinding and publisher
 - Source removal never silently reattaches dependencies.
 - Standalone mutual observation remains legal.
 - No partial graph is exposed or flushed.
-- No phase is called complete without its regression suites green.
+- No follow-up is called a planned PR without an accepted plan revision.
 - No Track observation state is removed without parity evidence.
-
-## Checkpoints
-
-Checkpoints A through F are defined in `docs/V5-IMPLEMENTATION-PLAN.md` under "Checkpoints and rollback". Current status:
-
-| Checkpoint | Status |
-| --- | --- |
-| A, PR-03 | passed |
-| B, PR-08 | passed with actual controller evidence |
-| C, PR-11 | passed |
-| D, PR-16 | passed on green PR #110 |
-| E, PR-18 | passed |
-| F, PR-19 | passed |
-
-PR-23 is a phase gate, not a new top-level checkpoint. Its exit criteria are recorded in `docs/V5-PR-23-OBSERVATION-GRAPH.md` and were met by green PR #115.
 
 ## Review linkage
 
