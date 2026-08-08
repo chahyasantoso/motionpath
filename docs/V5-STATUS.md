@@ -1,10 +1,9 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 09:35 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-19-reference-validation`  
-**Branch base:** `v5`  
-**Base SHA:** `d68892b45cc6c5c33a9504dcd7da944e76b934da`  
-**Next work:** PR-19 reference validation and capability completion.
+**Status captured:** 2026-08-08 09:23 Asia/Jakarta  
+**Branch reviewed:** `v5`  
+**Merged commit:** `b9ffbda62e12326d6ebe93a11ebe8134cf17e895`  
+**Next work:** PR-20, resolving the remaining implementation-review finding #4.
 
 ## Current position
 
@@ -16,21 +15,17 @@
 - PR #105 merged green: current-progress sampling without timeline control.
 - PR #106 merged green: combined reference lifecycle with explicit reattachment.
 - PR #107 merged green: gated `~/trackId` free-track adoption.
-- Active branch validates cross-motion reference IDs, namespaces, roles, self-edges, and duplicate references.
+- PR #108 merged green: cross-motion reference validation before mutation.
 
-## PR-19 slice: reference validation
+## PR-19 completion
 
-Cross-motion reference registration now rejects malformed IDs, qualified reference IDs, self-edges, unsupported roles, invalid input-role payloads, output-role inputs, and duplicate reference IDs before mutating committed state. Free-track sources remain addressable only through explicit capability-gated adoption.
+Cross-motion reference registration now rejects malformed IDs, qualified reference IDs, self-edges, unsupported roles, invalid input-role payloads, output-role inputs, and duplicate reference IDs before mutating committed state. Missing sources remain pending until explicit resolution on mount, source removal detaches dependents without silent reattachment, and free-track adoption remains separately capability-gated and off by default.
 
-## Continuation workflow
+All PR-19 validation checks passed: unit tests, typecheck, format check, Vite production build, package dry run, runtime benchmark, and v5 baseline report.
 
-1. Read this status doc and identify the next gate.
-2. Inspect the current branch, implementation, tests, and latest CI before editing.
-3. Cut a branch from merged `v5`, grouping only tightly coupled work that shares one contract and rollback boundary.
-4. Implement the smallest coherent slice with success, failure, disposal, repeat-execution, and default-off tests.
-5. Update this status doc on the same branch with the active PR, base SHA, decisions, and next gate.
-6. Open a readable Markdown PR with summary, scope, guardrails, and verification.
-7. Wait for every CI check. If green, squash-merge and continue. If red, ask for the failed CI logs before changing code.
+## Next gate
+
+PR-20 owns the remaining implementation-review finding #4. Keep the PR narrowly scoped, preserve the default-off capability gates, and verify success, failure, disposal, repeat execution, and no-partial-graph publication before merging.
 
 ## Guardrails
 
@@ -48,7 +43,7 @@ Cross-motion reference registration now rejects malformed IDs, qualified referen
 - C passed after PR #91
 - D pending full PR-16 staged visibility evidence
 - E passed for ProjectRuntime ownership and staged membership
-- F not passed; PR-19 capability gate in progress
+- F passed: PR-19 capability and reference-validation gate complete
 
 ## Review linkage
 
