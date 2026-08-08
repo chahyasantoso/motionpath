@@ -11,13 +11,15 @@ This is the **single entry point** for the v5 refactor docs. Read in this order.
 5. [`V5-PASS-2-COMPLETION-MATRIX.md`](./V5-PASS-2-COMPLETION-MATRIX.md): the pass-2 control sheet of rules, evidence, gaps, and gates.
 6. [`V5-ARCHITECTURE-REFACTOR-PLAN.md`](./V5-ARCHITECTURE-REFACTOR-PLAN.md): target ownership and non-negotiable architecture rules.
 
-## Session handoff, 2026-08-08 20:14 Asia/Jakarta
+## Session handoff, 2026-08-08 21:05 Asia/Jakarta
 
-PR-00 through PR-21, supplemental PR-22/23, and pass-2 evidence through **#138** are merged on `v5`. **PR #139** is the only current open pass-2 PR. It advances P2-03 by moving standalone observation ownership out of Track, but its latest CI has 6 of 7 checks green and the unit-test gate is still red. The architecture is not complete.
+PR-00 through PR-21, supplemental PR-22/23, and pass-2 evidence through **#139** are merged on `v5`. #139 landed the standalone observation externalization: standalone Tracks now receive or construct a `StandaloneObservationAdapter`, `createTrack` injects it, `ObservationState` gained `removeSourceEdges` and an injectable source composer, and `GraphPublisher.removeTrack` invalidates dependents on detach.
 
-Next session: fix and rerun #139 first, then merge only when the full gate is green. After that, remove the remaining Track observation compatibility state and mutators with a symbol-ban and lifecycle evidence. Remaining work also includes Track topology/playback removal, full fake-port production migration, publisher equivalence and rollout evidence, final API cleanup, and release verification.
+**PR #140** is the only current open pass-2 PR. Unlike the previous handoff note about #139, its full Node 24 gate is green, 7 of 7 checks, and it is mergeable. It extracts `TrackObservationOwner` and routes the standalone adapter through it, but it only *declares* the Track symbol-ban in [`V5-P2-03-SYMBOL-BAN.md`](./V5-P2-03-SYMBOL-BAN.md). Track still owns the compatibility observation maps, the reverse observer registry, the graph guard, and the observation mutators. The architecture is not complete.
 
-Use [`V5-STATUS.md`](./V5-STATUS.md) for the detailed sequence and risks. Treat stale empty work branches as non-work unless they gain commits and a PR.
+Next session: merge #140, then execute the symbol-ban in focused commits against the evidence list in [`V5-P2-03-SYMBOL-BAN.md`](./V5-P2-03-SYMBOL-BAN.md). Remaining work after that is Track topology/playback removal, full fake-port production migration, publisher equivalence and rollout evidence, final API cleanup, and release verification.
+
+Use [`V5-STATUS.md`](./V5-STATUS.md) for the detailed sequence and risks. Treat stale empty work branches as non-work unless they gain commits and a PR, and treat #125 and #130 as superseded: both were closed unmerged and relanded as `-resolved` branches in #127 and #132.
 
 ## Supplemental implementation records
 
@@ -26,6 +28,7 @@ Use [`V5-STATUS.md`](./V5-STATUS.md) for the detailed sequence and risks. Treat 
 - [`V5-PR-22-FK-CONTRACT.md`](./V5-PR-22-FK-CONTRACT.md): explicit authored-graph versus standalone mode.
 - [`V5-PR-23-OBSERVATION-GRAPH.md`](./V5-PR-23-OBSERVATION-GRAPH.md): ObservationGraph metadata/index ownership slice.
 - [`V5-PASS-2-BOUNDARY-AUDIT.md`](./V5-PASS-2-BOUNDARY-AUDIT.md): pass-2 baseline commands and current boundary findings.
+- [`V5-P2-03-SYMBOL-BAN.md`](./V5-P2-03-SYMBOL-BAN.md): target ownership split, banned Track symbols, and required removal evidence.
 
 ## Historical review
 
