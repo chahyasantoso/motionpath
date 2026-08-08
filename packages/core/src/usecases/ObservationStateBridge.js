@@ -4,6 +4,7 @@ import { ObservationState } from "./ObservationState.js";
 export class ObservationStateBridge {
   #tracks;
   #state;
+  #destroyed = false;
 
   constructor({ tracks = new Map() } = {}) {
     this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks);
@@ -15,16 +16,16 @@ export class ObservationStateBridge {
   get tracks() { return new Map(this.#tracks); }
 
   syncFromTracks() {
+    if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
     for (const track of this.#tracks.values()) {
-      for (const edge of track.observedEdges ?? []) {
-        this.#state.addEdge({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input, mapFn: edge.mapFn });
-      }
+      for (const edge of track.observedEdges ?? []) this.#state.addEdge({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input, mapFn: edge.mapFn });
     }
     this.assertParity();
     return this;
   }
 
   assertParity() {
+    if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
     const live = [];
     const shadow = [];
     for (const track of this.#tracks.values()) {
@@ -44,7 +45,5 @@ export class ObservationStateBridge {
     this.#tracks.clear();
   }
 
-  #key({ source, target, role = "output", input }) {
-    return [source, target, role, input ?? ""].join(String.fromCharCode(0));
-  }
+  #key({ source, target, role = "output", input }) { return [source, target, role, input ?? ""].join(String.fromCharCode(0)); }
 }
