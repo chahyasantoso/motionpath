@@ -13,7 +13,7 @@ export class Track {
   #host = null; #parent = null; #children = new Map(); #subscribers = new Set();
   #lifecycleSubscribers = new Set(); #destroySubscribers = new Set();
   #currentOffset = 0; #staggerOffset = 0; #layoutDelegate;
-  #observed = new Map(); #observers = new Map(); #graphGuard = null;
+  #observed = new Map(); #observers = new Map(); #graphGuard = null; #observationComposer = null;
   #groupHost = null; #destroyed = false;
 
   constructor({ id, mode = "standalone", interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate, eventBus = defaultEventBus }) {
@@ -48,14 +48,6 @@ export class Track {
     return { ...rest, progress: this.#interpolationTimeline?.progress() ?? 0 };
   }
 
-  /**
-   * Leaf composition: this track's own plugin output, with no observation edges
-   * applied. Named so the edge walk can be owned by something other than Track.
-   *
-   * Pass-2 P2-03: ObservationState composes the graph and calls back into this
-   * as its `composeLeaf`, which is what makes the two walkers comparable. Keep
-   * this free of any observation state.
-   */
   composeLocal(rawData) {
     this.#assertAlive();
     return composePatch(this.#plugins, rawData ?? this.getSnapshot(), this.#resolvedTrack, `track "${this.#id}"`);
@@ -63,6 +55,7 @@ export class Track {
 
   compose(rawData, ctx) {
     this.#assertAlive();
+    if (this.#observationComposer) return this.#observationComposer(rawData, ctx);
     ctx = ctx ?? new Map();
     const cached = ctx.get(this.#id);
     if (cached === COMPOSING) return this.composeLocal(rawData);
@@ -122,7 +115,7 @@ export class Track {
       if (previous) previous.source._removeObserver(this, addition.key);
       this.#observed.set(addition.key, { source: addition.source, mapFn: addition.mapFn, role: addition.role, input: addition.input });
       newSource._addObserver(this, addition.key);
-      this.#emitLifecycle({ type: previous ? "edge-replaced" : "edge-added", track: this, source: addition.source, edge: { source: addition.source.id, target: this.#id, role: addition.role, input: addition.input } });
+      this.#emitLifecycle({ type: previous ? "edge-replaced" : "edge-added", track: this, source: newSource, edge: { source: newSource.id, target: this.#id, role: addition.role, input: addition.input } });
     }
     this.#invalidate("observation");
   }
@@ -134,6 +127,7 @@ export class Track {
   onSourceDestroyed(callback) { if (typeof callback !== "function") throw new TypeError("Track destroy callback must be a function."); this.#destroySubscribers.add(callback); return () => this.#destroySubscribers.delete(callback); }
   subscribe(callback) { this.#subscribers.add(callback); callback(this.getSnapshot()); return () => this.#subscribers.delete(callback); }
   _setGraphGuard(guard) { this.#graphGuard = guard ?? null; }
+  _setObservationComposer(composer) { this.#observationComposer = typeof composer === "function" ? composer : null; }
   _addObserver(observer, key) { const keys = this.#observers.get(observer) ?? new Set(); keys.add(key); this.#observers.set(observer, keys); }
   _removeObserver(observer, key) { const keys = this.#observers.get(observer); if (!keys) return; keys.delete(key); if (!keys.size) this.#observers.delete(observer); }
   #notify() { const snapshot = this.getSnapshot(); for (const callback of this.#subscribers) callback(snapshot); }
@@ -155,5 +149,5 @@ export class Track {
   pause() { this.#groupHost?.timeline.pause(); }
   seek(progress) { if (!this.#groupHost) return this.progress(progress); if (progress === undefined) return this.#groupHost.timeline.progress(); this.#groupHost.timeline.progress(clamp01(progress)); }
   reverse() { this.#groupHost?.timeline.reverse(); }
-  destroy() { if (this.#destroyed) return; const observerIds = [...this.#observers.keys()].map((observer) => observer.id); this.#destroyed = true; this.#detachObservationEdges(); for (const child of this.#children.values()) child.destroy(); this.#children.clear(); this.#parent = null; this.#host = null; this.#subscribers.clear(); this.#graphGuard = null; const event = { id: this.#id, observerIds }; for (const callback of [...this.#destroySubscribers]) callback(event); this.#emitLifecycle({ type: "destroyed", track: this, observerIds: event.observerIds }); this.#destroySubscribers.clear(); this.#lifecycleSubscribers.clear(); if (this.#groupHost) { this.#groupHost.group.destroy(); this.#groupHost.timeline.kill(); this.#groupHost = null; } try { this.#interpolationTimeline?.kill(); } catch (e) { logger.warn(`track "${this.#id}", failed to kill interpolation timeline during destroy()`, e); } }
+  destroy() { if (this.#destroyed) return; const observerIds = [...this.#observers.keys()].map((observer) => observer.id); this.#destroyed = true; this.#observationComposer = null; this.#detachObservationEdges(); for (const child of this.#children.values()) child.destroy(); this.#children.clear(); this.#parent = null; this.#host = null; this.#subscribers.clear(); this.#graphGuard = null; const event = { id: this.#id, observerIds }; for (const callback of [...this.#destroySubscribers]) callback(event); this.#emitLifecycle({ type: "destroyed", track: this, observerIds: event.observerIds }); this.#destroySubscribers.clear(); this.#lifecycleSubscribers.clear(); if (this.#groupHost) { this.#groupHost.group.destroy(); this.#groupHost.timeline.kill(); this.#groupHost = null; } try { this.#interpolationTimeline?.kill(); } catch (e) { logger.warn(`track "${this.#id}", failed to kill interpolation timeline during destroy()`, e); } }
 }
