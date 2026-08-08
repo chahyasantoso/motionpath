@@ -1,11 +1,9 @@
 /**
  * Project-scoped ownership and staged visibility boundary.
  *
- * A candidate is invisible until commitCandidate succeeds. This is deliberately
- * a small lifecycle owner for PR-18: graph construction remains in the existing
- * motion runtime until the project-level graph can replace it without changing
- * behavior. Candidates never share the active maps, so a failed reload cannot
- * partially overwrite the live project.
+ * A candidate is invisible until commitCandidate succeeds. Membership is staged
+ * alongside the parsed project, so qualified lookups cannot observe half-loaded
+ * projects or a mixture of old and new registries.
  */
 export class ProjectRuntime {
   #active = null;
@@ -21,12 +19,14 @@ export class ProjectRuntime {
   get candidateProject() { return this.#candidate?.project ?? null; }
   get instanceCount() { return this.#instances.size; }
   get instances() { return new Map(this.#instances); }
+  get membership() { return new Map(this.#active?.membership ?? []); }
+  get candidateMembership() { return new Map(this.#candidate?.membership ?? []); }
 
   beginCandidate(project) {
     this.#assertAlive();
     if (!project || typeof project !== "object") throw new TypeError("ProjectRuntime candidate must be an object.");
     if (this.#candidate) throw new Error("ProjectRuntime already has a candidate project.");
-    const candidate = { project, instances: new Map(), metadata: new Map() };
+    const candidate = { project, instances: new Map(), metadata: new Map(), membership: new Map(), resources: new Set() };
     this.#candidate = candidate;
     return candidate;
   }
@@ -34,35 +34,39 @@ export class ProjectRuntime {
   registerCandidate(candidate, id, value, metadata = {}) {
     this.#assertCandidate(candidate);
     if (typeof id !== "string" || id.length === 0) throw new TypeError("ProjectRuntime candidate id must be a non-empty string.");
-    if (candidate.instances.has(id)) throw new Error(`ProjectRuntime candidate already owns '${id}'.`);
-    candidate.instances.set(id, value);
-    candidate.metadata.set(id, { ...metadata });
+    if (candidate.membership.has(id)) throw new Error(`ProjectRuntime candidate already registers '${id}'.`);
+    candidate.membership.set(id, { value, metadata: { ...metadata } });
+    if (value && typeof value.destroy === "function") candidate.resources.add(value);
     return value;
   }
 
   commitCandidate(candidate) {
     this.#assertCandidate(candidate);
-    // Swap project visibility first. Mounted instances belong to the old
-    // project until the caller destroys them after this method returns. Drop
-    // only our references here so registering the replacement cannot collide.
     const previous = this.#active;
     this.#active = {
       project: candidate.project,
       instances: new Map(candidate.instances),
       metadata: new Map(candidate.metadata),
+      membership: new Map(candidate.membership),
     };
     this.#candidate = null;
     this.#instances.clear();
     this.#instanceMetadata.clear();
+    candidate.resources.clear();
     return previous?.project ?? null;
   }
 
   abortCandidate(candidate, { destroy = true } = {}) {
     if (!candidate || this.#candidate !== candidate) return false;
     this.#candidate = null;
-    if (destroy) for (const value of candidate.instances.values()) value?.destroy?.();
+    if (destroy) {
+      for (const value of candidate.instances.values()) value?.destroy?.();
+      for (const value of candidate.resources) value?.destroy?.();
+    }
     candidate.instances.clear();
     candidate.metadata.clear();
+    candidate.membership.clear();
+    candidate.resources.clear();
     return true;
   }
 
@@ -87,7 +91,7 @@ export class ProjectRuntime {
 
   lookupInstance(id) { return this.#instances.get(id) ?? null; }
   getInstanceMetadata(id) { const metadata = this.#instanceMetadata.get(id); return metadata ? { ...metadata } : null; }
-  getProjectLookup(id) { return this.#active?.project?.getQualifiedTrackConfig?.(id) ?? this.#active?.project?.getTrackConfig?.(id) ?? null; }
+  getProjectLookup(id) { return this.#active?.membership?.get(id)?.value ?? null; }
 
   dispose() {
     if (this.#disposed) return;

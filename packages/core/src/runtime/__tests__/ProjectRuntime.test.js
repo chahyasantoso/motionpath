@@ -7,11 +7,22 @@ describe("ProjectRuntime staged visibility", () => {
   it("keeps a candidate invisible until commit", () => {
     const runtime = new ProjectRuntime();
     const candidate = runtime.beginCandidate(project("next"));
+    runtime.registerCandidate(candidate, "left/bone", { id: "bone" });
     expect(runtime.project).toBeNull();
     expect(runtime.candidateProject.projectId).toBe("next");
+    expect(runtime.candidateMembership.has("left/bone")).toBe(true);
     expect(runtime.lookupInstance("motion")).toBeNull();
     runtime.commitCandidate(candidate);
     expect(runtime.project.projectId).toBe("next");
+    expect(runtime.membership.get("left/bone").value.id).toBe("bone");
+  });
+
+  it("rejects duplicate candidate membership before visibility", () => {
+    const runtime = new ProjectRuntime();
+    const candidate = runtime.beginCandidate(project("next"));
+    runtime.registerCandidate(candidate, "left/bone", {});
+    expect(() => runtime.registerCandidate(candidate, "left/bone", {})).toThrow(/already registers/);
+    runtime.abortCandidate(candidate);
   });
 
   it("rolls back a candidate without touching the active project", () => {
