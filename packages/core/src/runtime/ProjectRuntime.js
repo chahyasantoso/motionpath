@@ -1,15 +1,16 @@
 /**
  * Project-scoped ownership and staged visibility boundary.
  *
- * A candidate is invisible until commitCandidate succeeds. Membership is staged
- * alongside the parsed project, so qualified lookups cannot observe half-loaded
- * projects or a mixture of old and new registries.
+ * A candidate is invisible until commitCandidate succeeds. Membership and the
+ * graph runtime are owned by the committed project, never by individual Motion
+ * instances. Cross-motion registration remains capability-gated for PR-19.
  */
 export class ProjectRuntime {
   #active = null;
   #candidate = null;
   #instances = new Map();
   #instanceMetadata = new Map();
+  #graphRuntime = null;
   #disposed = false;
 
   get isDisposed() { return this.#disposed; }
@@ -21,6 +22,7 @@ export class ProjectRuntime {
   get instances() { return new Map(this.#instances); }
   get membership() { return new Map(this.#active?.membership ?? []); }
   get candidateMembership() { return new Map(this.#candidate?.membership ?? []); }
+  get graphRuntime() { return this.#graphRuntime; }
 
   beginCandidate(project) {
     this.#assertAlive();
@@ -43,12 +45,7 @@ export class ProjectRuntime {
   commitCandidate(candidate) {
     this.#assertCandidate(candidate);
     const previous = this.#active;
-    this.#active = {
-      project: candidate.project,
-      instances: new Map(candidate.instances),
-      metadata: new Map(candidate.metadata),
-      membership: new Map(candidate.membership),
-    };
+    this.#active = { project: candidate.project, instances: new Map(candidate.instances), metadata: new Map(candidate.metadata), membership: new Map(candidate.membership) };
     this.#candidate = null;
     this.#instances.clear();
     this.#instanceMetadata.clear();
@@ -59,34 +56,35 @@ export class ProjectRuntime {
   abortCandidate(candidate, { destroy = true } = {}) {
     if (!candidate || this.#candidate !== candidate) return false;
     this.#candidate = null;
-    if (destroy) {
-      for (const value of candidate.instances.values()) value?.destroy?.();
-      for (const value of candidate.resources) value?.destroy?.();
-    }
-    candidate.instances.clear();
-    candidate.metadata.clear();
-    candidate.membership.clear();
-    candidate.resources.clear();
+    if (destroy) { for (const value of candidate.instances.values()) value?.destroy?.(); for (const value of candidate.resources) value?.destroy?.(); }
+    candidate.instances.clear(); candidate.metadata.clear(); candidate.membership.clear(); candidate.resources.clear();
     return true;
   }
+
+  attachGraphRuntime(runtime) {
+    this.#assertAlive();
+    if (!this.#active) throw new Error("ProjectRuntime has no committed project.");
+    if (!runtime || typeof runtime.flush !== "function" || typeof runtime.dispose !== "function") throw new TypeError("ProjectRuntime graph runtime must support flush() and dispose().");
+    if (this.#graphRuntime && this.#graphRuntime !== runtime) this.#graphRuntime.dispose();
+    this.#graphRuntime = runtime;
+    return runtime;
+  }
+
+  flush() { return this.#graphRuntime?.flush?.() ?? 0; }
+  getPatch(nodeId) { return this.#graphRuntime?.getPatch?.(nodeId) ?? null; }
+  subscribe(nodeId, callback) { if (!this.#graphRuntime) throw new Error("ProjectRuntime has no graph runtime."); return this.#graphRuntime.subscribe(nodeId, callback); }
 
   registerInstance(id, value, metadata = {}) {
     this.#assertAlive();
     if (!this.#active) throw new Error("ProjectRuntime has no committed project.");
     if (typeof id !== "string" || id.length === 0) throw new TypeError("ProjectRuntime instance id must be a non-empty string.");
     if (this.#instances.has(id)) throw new Error(`ProjectRuntime already owns instance '${id}'.`);
-    this.#instances.set(id, value);
-    this.#instanceMetadata.set(id, { ...metadata });
-    return value;
+    this.#instances.set(id, value); this.#instanceMetadata.set(id, { ...metadata }); return value;
   }
 
   unregisterInstance(id, { destroy = true } = {}) {
     if (!this.#instances.has(id)) return false;
-    const value = this.#instances.get(id);
-    this.#instances.delete(id);
-    this.#instanceMetadata.delete(id);
-    if (destroy) value?.destroy?.();
-    return true;
+    const value = this.#instances.get(id); this.#instances.delete(id); this.#instanceMetadata.delete(id); if (destroy) value?.destroy?.(); return true;
   }
 
   lookupInstance(id) { return this.#instances.get(id) ?? null; }
@@ -97,15 +95,11 @@ export class ProjectRuntime {
     if (this.#disposed) return;
     this.#disposed = true;
     this.abortCandidate(this.#candidate);
+    this.#graphRuntime?.dispose?.(); this.#graphRuntime = null;
     for (const value of this.#instances.values()) value?.destroy?.();
-    this.#instances.clear();
-    this.#instanceMetadata.clear();
-    this.#active = null;
+    this.#instances.clear(); this.#instanceMetadata.clear(); this.#active = null;
   }
 
-  #assertCandidate(candidate) {
-    this.#assertAlive();
-    if (!candidate || this.#candidate !== candidate) throw new Error("ProjectRuntime candidate is not active.");
-  }
+  #assertCandidate(candidate) { this.#assertAlive(); if (!candidate || this.#candidate !== candidate) throw new Error("ProjectRuntime candidate is not active."); }
   #assertAlive() { if (this.#disposed) throw new Error("ProjectRuntime is disposed."); }
 }
