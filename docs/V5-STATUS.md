@@ -1,10 +1,10 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 09:20 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-19-reference-lifecycle`  
+**Status captured:** 2026-08-08 09:25 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-19-free-track-capability`  
 **Branch base:** `v5`  
-**Base SHA:** `7521abad7a2cc5dae7421a89b0d3f079185e8899`  
-**Next work:** PR-19 reference lifecycle, combining gated registration, pending resolution, source sampling, and explicit reattachment.
+**Base SHA:** `fd524f80e9361eae66e384a6703be499f07e1822`  
+**Next work:** PR-19 explicit free-track adoption and capability completion.
 
 ## Current position
 
@@ -14,13 +14,12 @@
 - PR #103 merged green: unresolved references stay pending and unpublished.
 - PR #104 merged green: source-unmount diagnostics and explicit dependent-reference removal.
 - PR #105 merged green: current-progress sampling without timeline control.
-- Active branch combines the remaining compatible PR-19 lifecycle pieces into one tested slice.
+- PR #106 merged green: combined gated reference lifecycle with explicit reattachment.
+- Active branch adds the explicit `~/trackId` free-track adoption API; default behavior remains unchanged.
 
-## Combined PR-19 slice
+## PR-19 slice: free-track capability
 
-Cross-motion references now require explicit `crossMotion` capability. A reference with a missing source is `pending`, becomes `ready` only when that exact source is mounted, and can be sampled without controlling the source timeline. Unmounting the source removes the reference and records `SOURCE_UNMOUNTED`; re-adding the source does not recreate it. Reattachment requires an explicit new registration.
-
-`freeTracks` remains separately gated and disabled by default. No capability default changes here.
+Free-track adoption now requires the `freeTracks` capability and a `~/trackId` identifier. Adoption through another namespace is rejected. The API records the instance as a free-track owner with its qualified ID, while the capability remains off by default.
 
 ## Continuation workflow
 
@@ -30,7 +29,7 @@ Cross-motion references now require explicit `crossMotion` capability. A referen
 4. Implement the smallest coherent slice with success, failure, disposal, repeat-execution, and default-off tests.
 5. Update this status doc on the same branch with the active PR, base SHA, decisions, and next gate.
 6. Open a readable Markdown PR with summary, scope, guardrails, and verification.
-7. Wait for every CI check. If green, squash-merge and continue. If red, ask for the failed logs before changing code.
+7. Wait for every CI check. If green, squash-merge and continue. If red, ask for the failed CI logs before changing code.
 
 ## Guardrails
 
