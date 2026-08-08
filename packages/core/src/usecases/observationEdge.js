@@ -1,11 +1,10 @@
 /**
  * Canonical identity for one live observation edge.
  *
- * The NUL delimiter prevents collisions such as ["A", "BC"] and ["AB", "C"],
- * which the old concatenated key silently deduped into one edge.
- *
  * Role and input are part of identity because one source may legally provide
- * both an input and an output edge to the same observer.
+ * both an input and an output edge to the same observer. The NUL delimiter is
+ * intentional: concatenating fields without a delimiter lets pairs such as
+ * ["A", "BC"] and ["AB", "C"] collide.
  */
 export const EDGE_KEY_DELIMITER = "";
 
