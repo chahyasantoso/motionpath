@@ -1,5 +1,6 @@
 import { observationEdgeEquals, observationEdgeKey } from "./observationEdge.js";
 import { normalizeObservationGraph, topologicalTrackOrder } from "./normalizeObservationGraph.js";
+import { toImmutableList } from "../contract/immutableValue.js";
 
 /**
  * The bridge between live Track edges and GraphPublisher metadata.
@@ -188,10 +189,25 @@ export class GraphBinding {
     }
   }
   #normalizeEdge(edge) { const role = edge.role ?? "output"; return { source: edge.source, target: edge.target, role, input: role === "input" ? edge.input ?? edge.target : undefined }; }
+  /**
+   * Deep, not shallow (pass-2 P2-01).
+   *
+   * This used to be `Object.freeze({ ..., nodes: [...], edges: [...] })`, which
+   * froze the wrapper and left the arrays and every record inside them fully
+   * mutable. A consumer holding `binding.graph` could push a node, retarget an
+   * edge, or reorder the publish order in place, and the binding would keep
+   * reporting the mutated object as its committed truth.
+   */
   #freeze(graph) {
     if (!graph || graph.errors?.length) throw new Error("GraphBinding requires a valid normalized graph.");
     topologicalTrackOrder(graph, { strict: true });
-    return Object.freeze({ valid: true, nodes: graph.nodes.map((node) => ({ ...node })), edges: graph.edges.map(({ source, target, role, input }) => ({ source, target, role, input })), order: [...graph.order], errors: [] });
+    return Object.freeze({
+      valid: true,
+      nodes: toImmutableList(graph.nodes.map((node) => ({ ...node }))),
+      edges: toImmutableList(graph.edges.map(({ source, target, role, input }) => ({ source, target, role, input }))),
+      order: Object.freeze([...graph.order]),
+      errors: Object.freeze([]),
+    });
   }
   /**
    * Membership in both directions, then edges in both directions. A one-way
