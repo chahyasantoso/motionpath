@@ -41,14 +41,19 @@ export class ObservationState {
     if (this.#destroyed || !this.#tracks.has(id)) return;
     const outgoing = [...(this.#edges.get(id)?.values() ?? [])];
     for (const edge of outgoing) this.removeEdge({ source: edge.source.id, target: id, role: edge.role, input: edge.input });
-    for (const targetId of [...(this.#observers.get(id) ?? [])]) {
-      const targetEdges = this.#edges.get(targetId) ?? new Map();
-      for (const edge of [...targetEdges.values()]) if (edge.source.id === id) this.removeEdge({ source: id, target: targetId, role: edge.role, input: edge.input });
-    }
+    this.removeSourceEdges(id);
     this.#tracks.delete(id);
     this.#edges.delete(id);
     this.#observers.delete(id);
     if (detach) this.#invalidate({ type: "track-removed", id });
+  }
+
+  removeSourceEdges(sourceId) {
+    if (this.#destroyed) return;
+    for (const targetId of [...(this.#observers.get(sourceId) ?? [])]) {
+      const targetEdges = this.#edges.get(targetId) ?? new Map();
+      for (const edge of [...targetEdges.values()]) if (edge.source.id === sourceId) this.removeEdge({ source: sourceId, target: targetId, role: edge.role, input: edge.input });
+    }
   }
 
   getEdges(targetId) { return [...(this.#edges.get(targetId)?.values() ?? [])].map((edge) => ({ ...edge })); }
@@ -97,7 +102,7 @@ export class ObservationState {
     try { this.addEdge(next); } catch (error) { this.addEdge(snapshot); throw error; }
   }
 
-  compose(targetId, rawData, ctx = new Map(), composeLeaf) {
+  compose(targetId, rawData, ctx = new Map(), composeLeaf, composeSource) {
     this.#assertAlive();
     const track = this.#tracks.get(targetId);
     if (!track) throw new Error(`Unknown observation target '${targetId}'.`);
@@ -107,16 +112,17 @@ export class ObservationState {
     if (cached === COMPOSING) return composeLeaf(track, base, ctx);
     if (cached !== undefined) return cached;
     ctx.set(targetId, COMPOSING);
+    const composeObserved = (source) => composeSource ? composeSource(source, ctx) : this.compose(source.id, undefined, ctx, composeLeaf, composeSource);
     let source = base;
     for (const edge of this.getEdges(targetId)) {
       if (edge.role !== "input" || !edge.mapFn) continue;
-      const contribution = edge.mapFn(this.compose(edge.source.id, undefined, ctx, composeLeaf));
+      const contribution = edge.mapFn(composeObserved(edge.source));
       if (contribution) source = { ...source, ...contribution };
     }
     let patch = composeLeaf(track, source, ctx);
     for (const edge of this.getEdges(targetId)) {
       if (edge.role !== "output" || !edge.mapFn) continue;
-      const contribution = edge.mapFn(this.compose(edge.source.id, undefined, ctx, composeLeaf));
+      const contribution = edge.mapFn(composeObserved(edge.source));
       if (contribution) patch = mergePatches(patch, contribution);
     }
     ctx.set(targetId, patch);
