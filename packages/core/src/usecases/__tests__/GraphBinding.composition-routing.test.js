@@ -18,7 +18,7 @@ describe("P2-03 Track composition routing", () => {
 
     const patch = tracks.get("n2").compose();
 
-    expect(compose).toHaveBeenCalledWith("n2", undefined, expect.any(Map), expect.any(Function));
+    expect(compose).toHaveBeenCalledWith("n2", undefined, undefined, expect.any(Function));
     expect(patch).toEqual(state.compose("n2", undefined, new Map(), (track, rawData) => track.composeLocal(rawData)));
     binding.destroy();
   });
