@@ -1,8 +1,8 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 10:45 Asia/Jakarta  
-**Branch reviewed:** `v5` plus PR-21 measurement work  
-**Next work:** PR-21, measurement-gated downstream invalidation index.
+**Status captured:** 2026-08-08 11:06 Asia/Jakarta  
+**Branch reviewed:** `v5` plus PR-23 ObservationGraph work  
+**Next work:** PR-23, ObservationGraph ownership.
 
 ## Current position
 
@@ -18,31 +18,23 @@
 - PR #109 merged: checkpoint correction, docs only.
 - PR #110 merged green: publisher sink, clock delivery, React patch subscription, and PR-16 evidence.
 - PR #111 merged green: API boundary cleanup and finding #4 resolution.
-- PR-21 is in progress on `v5-pr-21-downstream-index`.
+- PR #112 merged green: downstream invalidation index, 43.39x benchmark speedup, equal closure.
+- PR #113 merged green: strict authored-graph FK validation with compatibility regression fix.
+- PR #114 merged green: runtime Track mode propagation and observer teardown diagnostics.
+- PR-23 is in progress on `v5-pr-23-observation-graph`.
 
-## PR-21 in progress
+## PR-23 in progress
 
-`GraphPublisher.#markDownstream()` now uses a validated source-to-dependent adjacency index instead of scanning every node's upstream list. The first benchmark was not sufficient because it measured only the new path. That is fixed: `performance/downstream-index-benchmark.mjs` now runs the exact pre-PR-21 scan and the indexed traversal on the same 60-chain x 5-node forest, same seed and iterations, in both execution orders, and fails on a closure mismatch.
-
-`benchmark:rig` still runs the existing chain, large-forest, idle-majority, and new comparison scenarios. Merge only if the indexed path is materially faster, the closure is equal, existing scenarios do not regress, and all standard checks stay green. If it is not a clear win, revert it. No benchmark, no merge.
-
-## Completed gates
-
-- Checkpoint D, PR-16: passed on green PR #110.
-- Checkpoint E, PR-18: passed.
-- Checkpoint F, PR-19: passed.
-- Finding #2: resolved by PR #110.
-- Finding #4: resolved by PR #111.
+ObservationGraph now owns immutable graph metadata and adjacency indexes. The edge-key delimiter collision is fixed. GraphBinding remains the deliberate transaction boundary for live Track wiring and publisher state; no behavior is being moved out of Track until the graph and lifecycle suites prove parity.
 
 ## Guardrails
 
 - `crossMotion`, `freeTracks`, and `publisherRendering` stay disabled by default.
 - Pending references never publish.
 - Source removal never silently reattaches dependencies.
-- Source sampling reads progress only and never controls another timeline.
-- Canonical qualified ordering remains stable.
+- Standalone mutual observation remains legal.
 - No partial graph is exposed or flushed.
-- No optimization merges without benchmark evidence.
+- No phase is called complete without its regression suites green.
 
 ## Review linkage
 
