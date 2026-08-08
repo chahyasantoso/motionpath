@@ -1,4 +1,5 @@
 import { observationGraphEdgeKey } from "./observationEdge.js";
+import { toImmutableList } from "../contract/immutableValue.js";
 
 /**
  * Immutable, renderer-neutral observation graph value object.
@@ -7,14 +8,18 @@ import { observationGraphEdgeKey } from "./observationEdge.js";
  * normalizer remains the parser and validator; this object is the only shape
  * consumers need after normalization. Adjacency indexes are built once here,
  * so publishers and bindings do not rebuild reverse indexes from live Tracks.
+ *
+ * Nodes, edges, and diagnostics are frozen through the shared immutable-value
+ * contract rather than a one-level spread, so a record that later grows a
+ * nested field cannot silently become mutable again.
  */
 export class ObservationGraph {
   #nodes; #edges; #order; #errors; #upstream; #downstream; #edgeIndex;
   constructor({ nodes = [], edges = [], order = [], errors = [] } = {}) {
-    this.#nodes = Object.freeze(nodes.map((node) => Object.freeze({ ...node })));
-    this.#edges = Object.freeze(edges.map((edge) => Object.freeze({ ...edge })));
+    this.#nodes = toImmutableList(nodes);
+    this.#edges = toImmutableList(edges);
     this.#order = Object.freeze([...order]);
-    this.#errors = Object.freeze(errors.map((error) => Object.freeze({ ...error })));
+    this.#errors = toImmutableList(errors);
     const upstream = new Map(this.#nodes.map(({ id }) => [id, []]));
     const downstream = new Map(this.#nodes.map(({ id }) => [id, []]));
     const edgeIndex = new Map();
