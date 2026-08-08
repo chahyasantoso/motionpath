@@ -7,7 +7,8 @@ This is the **single entry point** for the v5 refactor docs. Read in this order.
 1. [`V5-STATUS.md`](./V5-STATUS.md): what is landed, what is still risky, and the plan boundary.
 2. [`V5-REVIEW-FINDINGS-LOG.md`](./V5-REVIEW-FINDINGS-LOG.md): reconciled findings with evidence and next actions.
 3. [`V5-IMPLEMENTATION-PLAN.md`](./V5-IMPLEMENTATION-PLAN.md): accepted PR-00 through PR-21 sequence and gates.
-4. [`V5-ARCHITECTURE-REFACTOR-PLAN.md`](./V5-ARCHITECTURE-REFACTOR-PLAN.md): target ownership and non-negotiable architecture rules.
+4. [`V5-IMPLEMENTATION-PLAN-PASS-2.md`](./V5-IMPLEMENTATION-PLAN-PASS-2.md): proposed completion plan for the remaining architecture seams.
+5. [`V5-ARCHITECTURE-REFACTOR-PLAN.md`](./V5-ARCHITECTURE-REFACTOR-PLAN.md): target ownership and non-negotiable architecture rules.
 
 ## Supplemental implementation records
 
@@ -23,4 +24,4 @@ This is the **single entry point** for the v5 refactor docs. Read in this order.
 
 ## Status vocabulary
 
-**Accepted complete** means the original PR gate passed. **Supplemental complete** means follow-up work landed without changing the accepted plan. **Open** means evidence or implementation is still required. Never infer current status from the historical review alone.
+**Accepted complete** means the original PR gate passed. **Supplemental complete** means follow-up work landed without changing the accepted plan. **Open** means evidence or implementation is still required. **Proposed continuation** means the work is planned but not yet accepted for implementation. Never infer current status from the historical review alone.
