@@ -1,46 +1,45 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 09:15 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-19-progress-sampling`  
-**Base branch:** `v5`  
-**Base SHA:** `b1aeb0ff605ddcf213b74ef082525c4836406fc7`  
-**Next work:** PR-19 current-progress sampling and pending-source behavior.
+**Status captured:** 2026-08-08 09:20 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-19-reference-lifecycle`  
+**Branch base:** `v5`  
+**Base SHA:** `7521abad7a2cc5dae7421a89b0d3f079185e8899`  
+**Next work:** PR-19 reference lifecycle, combining gated registration, pending resolution, source sampling, and explicit reattachment.
 
 ## Current position
 
-- PR #91 merged green: Checkpoint C passed.
-- PR #92 merged green: GSAP adapter boundary landed.
-- PR #93 merged green: recursive Motion scheduling landed.
-- PR #94 merged green: explicit authored-graph input validation landed.
-- PR #95 merged green: immutable ObservationGraph landed.
-- PR #96 merged green: opt-in publisher-backed React subscription path landed.
-- PR #97 merged green: project-local qualified IDs and motion-local duplicate track support.
-- PR #98 merged green: atomic ProjectRuntime ownership and staged project visibility.
-- PR #99 merged green: staged qualified membership registry.
-- PR #100 merged green: ProjectRuntime owns one project-scoped graph runtime.
-- PR #101 merged green: qualified config lookup routes through committed ProjectRuntime membership.
-- PR #102 merged green: explicit PR-19 capability gates and canonical qualified ordering.
-- PR #103 merged green: unresolved references stay pending and unpublished until explicit resolution.
-- PR #104 merged green: source-unmount diagnostics and explicit dependent-reference detachment.
-- Active branch adds current-progress sampling from mounted instances without controlling their timelines.
+- PR #91 through PR #96 merged green: graph/runtime foundations landed.
+- PR #97 through PR #101 merged green: qualified IDs, staged ProjectRuntime ownership, membership, and lookup assembly landed.
+- PR #102 merged green: explicit `crossMotion` and `freeTracks` gates with canonical ordering.
+- PR #103 merged green: unresolved references stay pending and unpublished.
+- PR #104 merged green: source-unmount diagnostics and explicit dependent-reference removal.
+- PR #105 merged green: current-progress sampling without timeline control.
+- Active branch combines the remaining compatible PR-19 lifecycle pieces into one tested slice.
 
-## PR-19 slice: current-progress sampling
+## Combined PR-19 slice
 
-`sampleQualifiedProgress()` reads the mounted instance's current progress and returns a renderer-neutral `{ status, qualifiedId, progress }` envelope. It never calls `seek`, `play`, `pause`, or any other timeline-control method. Missing mounted sources remain `{ status: 'pending' }` and cannot publish.
+Cross-motion references now require explicit `crossMotion` capability. A reference with a missing source is `pending`, becomes `ready` only when that exact source is mounted, and can be sampled without controlling the source timeline. Unmounting the source removes the reference and records `SOURCE_UNMOUNTED`; re-adding the source does not recreate it. Reattachment requires an explicit new registration.
 
-## Workflow for every continuation session
+`freeTracks` remains separately gated and disabled by default. No capability default changes here.
 
-1. Read this status doc and identify the active PR and next gate.
-2. Inspect the current branch and relevant implementation/tests before editing.
-3. Cut a new branch from merged `v5`, keeping one architectural concern per PR.
-4. Implement the smallest coherent slice with success, failure, disposal, and repeat-execution tests.
-5. Update this status doc on the same branch with current PR, base SHA, decisions, and next gate.
-6. Open a readable Markdown PR with summary, scope, guardrails, and verification sections.
-7. Wait for all CI checks. If green, squash-merge and continue. If red, ask for the failed CI logs before changing code.
+## Continuation workflow
+
+1. Read this status doc and identify the next gate.
+2. Inspect the current branch, implementation, tests, and latest CI before editing.
+3. Cut a branch from merged `v5`, grouping only tightly coupled work that shares one contract and rollback boundary.
+4. Implement the smallest coherent slice with success, failure, disposal, repeat-execution, and default-off tests.
+5. Update this status doc on the same branch with the active PR, base SHA, decisions, and next gate.
+6. Open a readable Markdown PR with summary, scope, guardrails, and verification.
+7. Wait for every CI check. If green, squash-merge and continue. If red, ask for the failed logs before changing code.
 
 ## Guardrails
 
-`crossMotion` and `freeTracks` remain disabled by default. Pending references never publish. Source removal never silently reattaches dependencies. Preserve canonical qualified ordering before enabling capability behavior.
+- `crossMotion` and `freeTracks` stay disabled by default.
+- Pending references never publish.
+- Source removal never silently reattaches dependencies.
+- Source sampling reads progress only and never controls another timeline.
+- Canonical qualified ordering remains stable.
+- No partial graph is exposed or flushed.
 
 ## Checkpoints
 
