@@ -1,7 +1,6 @@
 import { resolveTrack } from "../usecases/ResolveTrack.js";
 import { buildTrackTweenSync } from "../usecases/BuildTrackTween.js";
 import { resolvePluginForKey as defaultResolvePlugin } from "../domain/plugins.js";
-import { StandaloneObservationAdapter } from "../usecases/StandaloneObservationAdapter.js";
 import { Track } from "./Track.js";
 
 export function createTrack(config, templates = [], options = {}) {
