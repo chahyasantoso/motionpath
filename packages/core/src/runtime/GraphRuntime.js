@@ -34,17 +34,25 @@ export class GraphRuntime {
   compose(nodeId, rawData) { this.#assertAlive(); const track = this.#binding.getTrack(nodeId); if (!track) throw new Error(`Unknown runtime node '${nodeId}'.`); return track.compose(rawData); }
   flush() { if (this.#disposed || !this.enabled || this.#flushInProgress) return 0; this.#flushInProgress = true; this.#patches.beginBatch(); try { return this.#publisher.flush(); } finally { this.#patches.endBatch(); this.#flushInProgress = false; } }
   /**
-   * Clock-driven flush swallows and records. A direct `flush()` still throws,
-   * because a test or a caller that asked for a flush wants the failure.
+   * Attach to a clock and publish a complete snapshot on the first tick.
    *
-   * The difference matters now that this runs on a real ticker: a single track
-   * whose plugin throws would otherwise raise once per frame, forever, from
-   * inside GSAP's tick loop. GraphPublisher already isolates the failure
-   * (the node is blocked, its dependents are held back, siblings still
-   * publish), so the exception carries no information the diagnostics do not,
-   * and re-raising it into the ticker only takes the whole page down with it.
+   * markAllDirty is not a convenience. A patch is only published when a node's
+   * state changed, so a runtime that starts against a paused or not-yet-played
+   * timeline would sit warm and silent: it composes to fill its cache, decides
+   * nothing changed, and publishes nothing. Any renderer subscribing at mount
+   * then has no patch to draw and waits for an invalidation that, for a paused
+   * timeline, never comes. Seeding one full pass makes "subscribed" and "has
+   * something to render" the same state.
+   *
+   * Clock-driven flush swallows and records; a direct `flush()` still throws,
+   * because a caller that asked for a flush wants the failure. That difference
+   * matters on a real ticker: one track whose plugin throws would otherwise
+   * raise once per frame, forever, from inside GSAP's tick loop.
+   * GraphPublisher already isolates the failure (the node is blocked, its
+   * dependents are held back, its siblings still publish), so re-raising into
+   * the ticker adds no information and takes the page down with it.
    */
-  start(clock) { this.#assertAlive(); if (!clock || typeof clock.subscribe !== "function") throw new TypeError("GraphRuntime.start requires a clock."); if (this.#clockUnsubscribe) this.#clockUnsubscribe(); this.#clockUnsubscribe = clock.subscribe(({ tick } = {}) => { this.lastTick = tick ?? (this.lastTick ?? 0) + 1; try { this.flush(); } catch (error) { this.#recordDiagnostic({ code: "GRAPH_FLUSH_FAILED", tick: this.lastTick, error }); } }); return this; }
+  start(clock) { this.#assertAlive(); if (!clock || typeof clock.subscribe !== "function") throw new TypeError("GraphRuntime.start requires a clock."); if (this.#clockUnsubscribe) this.#clockUnsubscribe(); this.#publisher.markAllDirty(); this.#clockUnsubscribe = clock.subscribe(({ tick } = {}) => { this.lastTick = tick ?? (this.lastTick ?? 0) + 1; try { this.flush(); } catch (error) { this.#recordDiagnostic({ code: "GRAPH_FLUSH_FAILED", tick: this.lastTick, error }); } }); return this; }
   stop() { this.#clockUnsubscribe?.(); this.#clockUnsubscribe = null; return this; }
   dispose() { if (this.#disposed) return; this.#disposed = true; this.#clockUnsubscribe?.(); this.#clockUnsubscribe = null; this.#binding.destroy(); this.#binding = null; this.#publisher = null; }
   // Bounded. This list is appended to from a 60fps callback, so an unbounded
