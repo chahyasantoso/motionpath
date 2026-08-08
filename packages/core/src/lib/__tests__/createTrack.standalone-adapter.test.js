@@ -8,10 +8,10 @@ describe("P2-03 createTrack standalone ownership", () => {
     const source = createTrack({ id: "source", duration: 1, keyframes: {} }, [], { observationAdapter: adapter });
     const observer = createTrack({ id: "observer", duration: 1, keyframes: {} }, [], { observationAdapter: adapter });
 
-    observer.setObserved(source, (patch) => ({ sourceProgress: patch.progress }));
+    observer.setObserved(source, () => ({ sourceSeen: true }));
 
     expect(observer.observedSources).toEqual([source]);
-    expect(observer.compose()).toMatchObject({ sourceProgress: 0 });
+    expect(observer.compose()).toMatchObject({ sourceSeen: true });
     observer.destroy();
     source.destroy();
     adapter.destroy();
