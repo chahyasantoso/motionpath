@@ -32,7 +32,14 @@ export class ProjectRuntime {
   get candidateMembership() { return new Map(this.#candidate?.membership ?? []); }
   get graphRuntime() { return this.#graphRuntime; }
   get capabilities() { return { ...this.#capabilities }; }
-  get qualifiedMembershipOrder() { return [...this.membership.keys()].sort((a, b) => a.localeCompare(b)); }
+  get qualifiedMembershipOrder() {
+    return [...this.membership.keys()].sort((a, b) => {
+      const aFree = a.startsWith('~/');
+      const bFree = b.startsWith('~/');
+      if (aFree !== bFree) return aFree ? 1 : -1;
+      return a.localeCompare(b);
+    });
+  }
 
   assertCapability(capability) {
     if (capability !== 'crossMotion' && capability !== 'freeTracks') throw new Error(`Unknown ProjectRuntime capability '${capability}'.`);
