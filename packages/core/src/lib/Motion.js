@@ -24,11 +24,12 @@ export class Motion {
   /** Explicit composite ownership API. Track and adapters should call these rather than underscored aliases. */
   mountChild(child, position = 0) { this.#schedule(child, position); }
   unmountChild(child) { this.#unschedule(child); }
-  reflowChild(child, newPosition) { this.#reflowChild(child, newPosition); }
+  reflowChild(child, newPosition) { this.#reflowChildInternal(child, newPosition); }
   /** Compatibility aliases retained until the Track topology extraction lands. */
   _mountChild(child, position) { this.mountChild(child, position); }
   _unmountChild(child) { this.unmountChild(child); }
-  _reflowChild(child, newPosition) { const tween = this.#proxies.get(child.id); if (!tween) return; const duration = this.#staggerTransition.duration ?? 0; if (duration <= 0) { this.#masterTimeline?.add(tween, newPosition); this.#masterTimeline?.render(this.#masterTimeline.time(), true, true); return; } const timeline = this.#masterTimeline; if (!timeline) return; gsap.to(tween, { startTime: newPosition, duration, ease: this.#staggerTransition.ease ?? "power2.out", onUpdate: () => timeline?.render(timeline.time(), true, true) }); }
+  _reflowChild(child, newPosition) { this.reflowChild(child, newPosition); }
+  #reflowChildInternal(child, newPosition) { const tween = this.#proxies.get(child.id); if (!tween) return; const duration = this.#staggerTransition.duration ?? 0; if (duration <= 0) { this.#masterTimeline?.add(tween, newPosition); this.#masterTimeline?.render(this.#masterTimeline.time(), true, true); return; } const timeline = this.#masterTimeline; if (!timeline) return; gsap.to(tween, { startTime: newPosition, duration, ease: this.#staggerTransition.ease ?? "power2.out", onUpdate: () => timeline?.render(timeline.time(), true, true) }); }
   #captureSchedule() { const declared = new Map(this.#initialTracks.map(({ track, position }) => [track.id, position])); const entries = []; for (const [id, track] of this.#tracks) { if (track.isDestroyed) continue; entries.push({ track, position: declared.get(id) ?? track.currentOffset ?? 0 }); } for (const { track, position } of this.#initialTracks) if (!this.#tracks.has(track.id) && !track.isDestroyed) entries.push({ track, position }); return entries; }
   #teardownSchedule() { for (const tween of this.#proxies.values()) tween.kill(); this.#proxies.clear(); for (const track of this.#tracks.values()) if (track.isMounted) track._unmount(); this.#tracks.clear(); this.#triggerDelegate.destroy(); this.#masterTimeline = null; }
   #schedule(track, position) { if (!this.#active || this.#tracks.has(track.id)) return; track._mount(this); const tween = gsap.to(track, { progress: 1, ease: "none", duration: track.duration || 0, paused: false }); this.#proxies.set(track.id, tween); this.#tracks.set(track.id, track); this.#masterTimeline?.add(tween, position); this.#masterTimeline?.render(this.#masterTimeline.time(), true, true); }
