@@ -1,25 +1,26 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-08 09:25 Asia/Jakarta  
-**Branch reviewed:** `v5-pr-19-free-track-capability`  
+**Status captured:** 2026-08-08 09:35 Asia/Jakarta  
+**Branch reviewed:** `v5-pr-19-reference-validation`  
 **Branch base:** `v5`  
-**Base SHA:** `fd524f80e9361eae66e384a6703be499f07e1822`  
-**Next work:** PR-19 explicit free-track adoption and capability completion.
+**Base SHA:** `d68892b45cc6c5c33a9504dcd7da944e76b934da`  
+**Next work:** PR-19 reference validation and capability completion.
 
 ## Current position
 
 - PR #91 through PR #96 merged green: graph/runtime foundations landed.
 - PR #97 through PR #101 merged green: qualified IDs, staged ProjectRuntime ownership, membership, and lookup assembly landed.
-- PR #102 merged green: explicit `crossMotion` and `freeTracks` gates with canonical ordering.
-- PR #103 merged green: unresolved references stay pending and unpublished.
-- PR #104 merged green: source-unmount diagnostics and explicit dependent-reference removal.
+- PR #102 merged green: explicit capability gates and canonical qualified ordering.
+- PR #103 merged green: pending references and explicit resolution.
+- PR #104 merged green: source-unmount diagnostics and dependent-reference removal.
 - PR #105 merged green: current-progress sampling without timeline control.
-- PR #106 merged green: combined gated reference lifecycle with explicit reattachment.
-- Active branch adds the explicit `~/trackId` free-track adoption API; default behavior remains unchanged.
+- PR #106 merged green: combined reference lifecycle with explicit reattachment.
+- PR #107 merged green: gated `~/trackId` free-track adoption.
+- Active branch validates cross-motion reference IDs, namespaces, roles, self-edges, and duplicate references.
 
-## PR-19 slice: free-track capability
+## PR-19 slice: reference validation
 
-Free-track adoption now requires the `freeTracks` capability and a `~/trackId` identifier. Adoption through another namespace is rejected. The API records the instance as a free-track owner with its qualified ID, while the capability remains off by default.
+Cross-motion reference registration now rejects malformed IDs, qualified reference IDs, self-edges, unsupported roles, invalid input-role payloads, output-role inputs, and duplicate reference IDs before mutating committed state. Free-track sources remain addressable only through explicit capability-gated adoption.
 
 ## Continuation workflow
 
