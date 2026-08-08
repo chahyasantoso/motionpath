@@ -6,13 +6,6 @@ export { resolveTrack, resolveTrackKeyframes } from "./usecases/ResolveTrack.js"
 export { mergePatches } from "./usecases/mergePatches.js";
 export { Overlay } from "./usecases/Overlay.js";
 export { Spawner } from "./usecases/Spawner.js";
-export { ObservationGraph } from "./usecases/ObservationGraph.js";
-export { normalizeObservationGraph, topologicalTrackOrder, tryTopologicalOrder } from "./usecases/normalizeObservationGraph.js";
-export { observationEdgeKey, observationEdgeEquals } from "./usecases/observationEdge.js";
-export { createManualClock, createTickClock, assertClock } from "./ports/Clock.js";
+export { createManualClock, assertClock } from "./ports/Clock.js";
 export { assertInterpolator } from "./ports/Interpolator.js";
 export { assertScheduler } from "./ports/Scheduler.js";
-export { FakeClock } from "./runtime/FakeClock.js";
-export { PatchRegistry } from "./runtime/PatchRegistry.js";
-export { GraphRuntime, MotionRuntime, createGraphRuntime } from "./runtime/GraphRuntime.js";
-export { ProjectRuntime } from "./runtime/ProjectRuntime.js";
