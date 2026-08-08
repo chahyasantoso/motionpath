@@ -10,7 +10,8 @@ describe("ObservationGraph", () => {
     expect(graph.valid).toBe(true);
     expect(graph.nodeIds).toEqual(["source", "sink"]);
     expect(graph.order).toEqual(["source", "sink"]);
-    expect(graph.edgeKeys()).toEqual(["sourceoutputsink"]);
+    const expectedEdgeKey = [observationEdgeKey("source", "output", ""), "sink"].join(String.fromCharCode(0));
+    expect(graph.edgeKeys()).toEqual([expectedEdgeKey]);
     expect(Object.isFrozen(graph.nodes)).toBe(true);
     expect(Object.isFrozen(graph.edges[0])).toBe(true);
   });
