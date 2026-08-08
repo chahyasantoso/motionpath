@@ -102,7 +102,7 @@ export class ObservationState {
     try { this.addEdge(next); } catch (error) { this.addEdge(snapshot); throw error; }
   }
 
-  compose(targetId, rawData, ctx = new Map(), composeLeaf) {
+  compose(targetId, rawData, ctx = new Map(), composeLeaf, composeSource) {
     this.#assertAlive();
     const track = this.#tracks.get(targetId);
     if (!track) throw new Error(`Unknown observation target '${targetId}'.`);
@@ -112,16 +112,17 @@ export class ObservationState {
     if (cached === COMPOSING) return composeLeaf(track, base, ctx);
     if (cached !== undefined) return cached;
     ctx.set(targetId, COMPOSING);
+    const composeObserved = (source) => composeSource ? composeSource(source, ctx) : this.compose(source.id, undefined, ctx, composeLeaf, composeSource);
     let source = base;
     for (const edge of this.getEdges(targetId)) {
       if (edge.role !== "input" || !edge.mapFn) continue;
-      const contribution = edge.mapFn(this.compose(edge.source.id, undefined, ctx, composeLeaf));
+      const contribution = edge.mapFn(composeObserved(edge.source));
       if (contribution) source = { ...source, ...contribution };
     }
     let patch = composeLeaf(track, source, ctx);
     for (const edge of this.getEdges(targetId)) {
       if (edge.role !== "output" || !edge.mapFn) continue;
-      const contribution = edge.mapFn(this.compose(edge.source.id, undefined, ctx, composeLeaf));
+      const contribution = edge.mapFn(composeObserved(edge.source));
       if (contribution) patch = mergePatches(patch, contribution);
     }
     ctx.set(targetId, patch);
