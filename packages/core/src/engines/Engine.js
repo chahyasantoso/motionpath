@@ -27,7 +27,8 @@ export class Engine {
   unmount(object) { if (!object) return false; const handle = this.#handles.get(object); if (handle === undefined) return false; this.#handles.delete(object); this.#instances.delete(handle); this.#projectRuntime.unregisterInstance(handle, { destroy: true }); return true; }
   isOwned(object) { return Boolean(object) && this.#handles.has(object); }
   getTrack(id) { if (!this.#v4Project) return null; for (const object of this.#instances.values()) if (object && typeof object.progress === 'function' && object.id === id) return object; return null; }
-  getTrackConfig(id) { return this.#projectRuntime.getProjectLookup(id) ?? this.#v4Project?.getTrackConfig(id) ?? null; } get templates() { return this.#v4Project?.templates ?? []; } get eventBus() { return this.#dependencies.eventBus; }
+  getTrackConfig(id) { try { return this.#projectRuntime.getProjectLookup(id) ?? this.#v4Project?.getTrackConfig(id) ?? null; } catch (error) { if (/^Ambiguous track id/.test(error?.message ?? '')) return null; throw error; } }
+  get templates() { return this.#v4Project?.templates ?? []; } get eventBus() { return this.#dependencies.eventBus; }
   destroy() { if (this.#projectRuntime && !this.#projectRuntime.isDisposed) this.#projectRuntime.dispose(); this.#projectRuntime = new ProjectRuntime(); this.#instances.clear(); this.#handles = new WeakMap(); this.#v4Project = null; this.#dependencies.eventBus.clear(); }
 }
 export const engine = new Engine({ triggerDelegates: triggerDelegateRegistry });
