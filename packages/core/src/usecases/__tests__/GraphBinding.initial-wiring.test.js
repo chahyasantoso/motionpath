@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { GraphBinding } from "../GraphBinding.js";
 import { GraphPublisher } from "../GraphPublisher.js";
-import { buildRealGraph, chainMotion } from "../../__fixtures__/graphTracks.js";
+import { makeTrack } from "../../__fixtures__/graphTracks.js";
+import { normalizeObservationGraph } from "../normalizeObservationGraph.js";
 
 describe("P2-03 GraphBinding initial wiring", () => {
   it("installs authored edges and composition ownership in one binding step", () => {
-    const { graph, tracks } = buildRealGraph(chainMotion(3));
-    for (const track of tracks.values()) track.removeObserved?.(track.observedSources[0]);
+    const motion = { tracks: [{ id: "n0" }, { id: "n1", observes: [{ source: "n0" }] }, { id: "n2", observes: [{ source: "n1" }] }] };
+    const graph = normalizeObservationGraph(motion);
+    const tracks = new Map(["n0", "n1", "n2"].map((id) => [id, makeTrack(id)]));
     const initialEdges = graph.edges.map((edge) => ({
       ...edge,
       mapFn: (patch) => ({ [`from_${edge.source}`]: patch.transform }),
