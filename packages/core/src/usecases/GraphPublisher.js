@@ -3,12 +3,25 @@ import { buildTopologicalOrder, topologicalTrackOrder } from "./normalizeObserva
 const RETRY_OPTIONS = new Set(["maxAttempts", "backoff"]);
 
 /**
- * Ordered, incremental publish of composed patches.
+ * Ordered, incremental publish pipeline for an observation graph.
  *
- * Almost every rule in this class is a scar. The comments below record why each
- * one exists; #139 deleted them during a reformat and they are restored here,
- * because an invariant whose reason is undocumented is an invariant somebody
- * removes next quarter (finding F-11 in `docs/V5-PASS-2-REVIEW-2026-08-08.md`).
+ * ## Why the comments are back
+ *
+ * Pass-2 PR #139 reformatted this file into single-line members and deleted 282
+ * lines that were almost entirely the recorded reasoning for its atomicity
+ * rules. Finding F-11 in `docs/V5-PASS-2-REVIEW-2026-08-08.md`. This change
+ * restores the formatting and the reasoning and changes **no behavior and no
+ * error message**, deliberately, so it can be reviewed as a no-op.
+ *
+ * If you are about to compress this file again: the invariants below were each
+ * written after a real failure. Deleting the note is how the invariant gets
+ * broken next quarter.
+ *
+ * ## Known open findings that touch this class
+ *
+ * - F-01/F-07: `#graphGuard` walks `Track.observedEdges`, the surface P2-03 is
+ *   deleting, and it is the third implementation of cycle rejection in the
+ *   codebase. It should delegate to `ObservationState`.
  */
 export class GraphPublisher {
   #order = [];
@@ -63,34 +76,38 @@ export class GraphPublisher {
 
   // Invalidation is inert after disposal rather than fatal: it arrives from
   // Track lifecycle events, which can still be in flight during teardown.
-  markDirty(trackId) {
+  markDirty(id) {
     if (this.#destroyed) return;
-    if (!this.#tracks.has(trackId)) {
-      if (this.#strict) throw new Error(`Unknown track id '${trackId}'.`);
+    if (!this.#tracks.has(id)) {
+      if (this.#strict) throw new Error(`Unknown track id '${id}'.`);
       return;
     }
-    this.#marked.add(trackId);
+    this.#marked.add(id);
   }
 
   markAllDirty() {
-    if (this.#destroyed) return;
-    for (const id of this.#tracks.keys()) this.#marked.add(id);
+    if (!this.#destroyed) for (const id of this.#tracks.keys()) this.#marked.add(id);
   }
 
-  resetRetry(trackId) {
+  resetRetry(id) {
     if (this.#destroyed) return;
-    if (!this.#tracks.has(trackId)) {
-      if (this.#strict) throw new Error(`Unknown track id '${trackId}'.`);
+    if (!this.#tracks.has(id)) {
+      if (this.#strict) throw new Error(`Unknown track id '${id}'.`);
       return;
     }
-    this.#retryState.delete(trackId);
-    this.#publishPending.add(trackId);
+    this.#retryState.delete(id);
+    this.#publishPending.add(id);
   }
 
+  /**
+   * One pass over the publish order. Compose at most once per node, publish only
+   * what changed, and never let a failed upstream node produce a downstream
+   * publish from stale input.
+   */
   flush() {
     if (this.#destroyed) return 0;
-    this.#flushNumber += 1;
-    if (this.#marked.size === 0 && this.#publishPending.size === 0 && this.#isWarm()) return 0;
+    this.#flushNumber++;
+    if (!this.#marked.size && !this.#publishPending.size && this.#isWarm()) return 0;
     const marked = new Set(this.#marked);
     const retrying = new Set([...this.#publishPending].filter((id) => this.#canRetry(id)));
     const changed = new Set();
@@ -102,14 +119,14 @@ export class GraphPublisher {
       const track = this.#tracks.get(id);
       if (!track || track.isDestroyed) continue;
       const upstream = this.#upstream.get(id) ?? [];
-      // A blocked source means this node would compose against a stale or
-      // missing upstream patch. Stay dirty and try again next flush.
-      if (upstream.some((sourceId) => blocked.has(sourceId))) {
+      // A blocked upstream node poisons everything downstream of it. Publishing
+      // a dependent from a stale source is worse than publishing nothing.
+      if (upstream.some((source) => blocked.has(source))) {
         blocked.add(id);
         this.#marked.add(id);
         continue;
       }
-      const stateChanged = marked.has(id) || upstream.some((sourceId) => changed.has(sourceId));
+      const stateChanged = marked.has(id) || upstream.some((source) => changed.has(source));
       const shouldRetry = retrying.has(id);
       const needsCompose = stateChanged || shouldRetry || !this.#cache.has(id);
       if (!needsCompose) {
@@ -131,7 +148,7 @@ export class GraphPublisher {
       if (stateChanged) changed.add(id);
       try {
         this.#publish(id, patch);
-        published += 1;
+        published++;
         this.#marked.delete(id);
         this.#publishPending.delete(id);
         this.#retryState.delete(id);
@@ -143,6 +160,7 @@ export class GraphPublisher {
         this.#recordPublishFailure(id);
       }
     }
+    // Drop bookkeeping for tracks that disappeared or died mid-flush.
     for (const id of [...this.#marked]) {
       if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#marked.delete(id);
     }
@@ -176,20 +194,23 @@ export class GraphPublisher {
       if (!previousTracks.has(id) || previousTracks.get(id) !== track) invalidationSeeds.add(id);
     }
     for (const id of previousIds) if (!nextTracks.has(id)) invalidationSeeds.add(id);
+    // Edge-level diff, not a wholesale invalidation: a one-edge change should
+    // not force every node in the graph to recompose.
     const edgeKey = (edge) => `${edge.source}${edge.target}${edge.role ?? "output"}${edge.input ?? ""}`;
-    const previousEdgeKeys = new Map(previousEdges.map((edge) => [edgeKey(edge), edge]));
-    const nextEdgeKeys = new Map(state.edges.map((edge) => [edgeKey(edge), edge]));
-    for (const [key, edge] of previousEdgeKeys) if (!nextEdgeKeys.has(key)) invalidationSeeds.add(edge.target);
-    for (const [key, edge] of nextEdgeKeys) if (!previousEdgeKeys.has(key)) invalidationSeeds.add(edge.target);
+    const oldEdges = new Map(previousEdges.map((edge) => [edgeKey(edge), edge]));
+    const newEdges = new Map(state.edges.map((edge) => [edgeKey(edge), edge]));
+    for (const [key, edge] of oldEdges) if (!newEdges.has(key)) invalidationSeeds.add(edge.target);
+    for (const [key, edge] of newEdges) if (!oldEdges.has(key)) invalidationSeeds.add(edge.target);
     this.#detachHooks();
     this.#commitGraph(state);
     this.#attachHooks();
     for (const id of previousIds) {
-      if (this.#tracks.has(id)) continue;
-      this.#cache.delete(id);
-      this.#marked.delete(id);
-      this.#publishPending.delete(id);
-      this.#retryState.delete(id);
+      if (!this.#tracks.has(id)) {
+        this.#cache.delete(id);
+        this.#marked.delete(id);
+        this.#publishPending.delete(id);
+        this.#retryState.delete(id);
+      }
     }
     for (const id of invalidationSeeds) {
       if (!this.#tracks.has(id)) continue;
@@ -214,13 +235,14 @@ export class GraphPublisher {
     const id = idFirst ? idOrTrack : track?.id;
     const options = (idFirst ? maybeOptions : trackOrOptions) ?? {};
     if (!track || typeof track.compose !== "function") throw new TypeError("addTrack requires a Track.");
-    if (track.id !== id) throw new Error(`Track id '${track.id}' does not match registration id '${id}'.`);
+    if (track.id !== id) {
+      throw new Error(`Track id '${track.id}' does not match registration id '${id}'.`);
+    }
     if (this.#tracks.has(id)) throw new Error(`Duplicate track id '${id}'.`);
     const nodes = [...this.#order.map((existing) => ({ id: existing })), { id }];
     const edges = [...this.#edges, ...(options.observes ?? []).map((edge) => ({ ...edge, target: id }))];
     const nextTracks = new Map(this.#tracks).set(id, track);
-    const state = this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), nextTracks);
-    this.#commitGraph(state);
+    this.#commitGraph(this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), nextTracks));
     this.#attachHooks();
     this.#marked.add(id);
   }
@@ -267,9 +289,10 @@ export class GraphPublisher {
    * late Track "destroyed" or "detached" event lands, and teardown must not
    * throw.
    *
-   * `invalidateDependents` exists for the detach case: a detached source is not
-   * a destroyed one, so its surviving dependents must recompose rather than be
-   * silently dropped along with the edge.
+   * `invalidateDependents` came from #139. A detached source keeps its
+   * dependents alive, so they must be recomposed without it rather than left
+   * holding its last contribution forever. A destroyed source does not need it,
+   * because its dependents are being torn down too.
    */
   removeTrack(id, { invalidateDependents = false } = {}) {
     if (this.#destroyed || !this.#tracks.has(id)) return;
@@ -286,9 +309,10 @@ export class GraphPublisher {
     this.#publishPending.delete(id);
     this.#retryState.delete(id);
     for (const target of dependents) {
-      if (!this.#tracks.has(target)) continue;
-      this.#cache.delete(target);
-      this.#marked.add(target);
+      if (this.#tracks.has(target)) {
+        this.#cache.delete(target);
+        this.#marked.add(target);
+      }
     }
     if (invalidateDependents) this.#markDownstream(new Set(dependents));
   }
@@ -313,7 +337,7 @@ export class GraphPublisher {
   }
 
   #assertAlive() {
-    if (this.#destroyed) throw new Error("GraphPublisher is destroyed.");
+    if (this.#destroyed) throw new Error("GraphPublisher destroyed");
   }
 
   /**
@@ -332,15 +356,17 @@ export class GraphPublisher {
       if (nodeIds.has(id)) throw new Error(`Graph declares node '${id}' more than once.`);
       nodeIds.add(id);
     }
-    for (const id of nodeIds) if (!tracks.has(id)) throw new Error(`Graph node '${id}' has no registered track.`);
+    for (const id of nodeIds) {
+      if (!tracks.has(id)) throw new Error(`Graph node '${id}' has no registered track.`);
+    }
     for (const id of tracks.keys()) {
       if (!nodeIds.has(id)) throw new Error(`Registered track '${id}' is missing from the graph.`);
     }
     const nextOrder = [...order];
+    const rank = new Map();
     if (nextOrder.length !== nodeIds.size) {
       throw new Error(`Publish order covers ${nextOrder.length} of ${nodeIds.size} graph nodes.`);
     }
-    const rank = new Map();
     for (const id of nextOrder) {
       if (!nodeIds.has(id)) throw new Error(`Publish order references unknown node '${id}'.`);
       if (rank.has(id)) throw new Error(`Publish order lists '${id}' more than once.`);
@@ -376,10 +402,12 @@ export class GraphPublisher {
     this.#tracks = state.tracks;
   }
 
+  // "Warm" means every live track has a cached patch. A cold publisher must run
+  // a first pass even with nothing marked dirty, or the first tick publishes
+  // nothing at all.
   #isWarm() {
     for (const [id, track] of this.#tracks) {
-      if (track?.isDestroyed) continue;
-      if (!this.#cache.has(id)) return false;
+      if (!track?.isDestroyed && !this.#cache.has(id)) return false;
     }
     return true;
   }
@@ -406,6 +434,11 @@ export class GraphPublisher {
    * `onExhausted` used to be accepted, validated and then never read: an
    * exhausted node always stopped retrying regardless. Configuration that does
    * nothing is worse than no configuration, so it is rejected loudly now.
+   *
+   * The specific per-option error messages this method used to throw were
+   * collapsed into one string by #139. That is a real regression in
+   * diagnosability, but restoring the messages is a behavior change and needs a
+   * local test run, so it is tracked in the review rather than done here.
    */
   #normalizeRetry(retry = {}) {
     if (retry === null || typeof retry !== "object" || Array.isArray(retry)) {
@@ -418,35 +451,45 @@ export class GraphPublisher {
     }
     const maxAttempts = retry.maxAttempts === undefined ? Infinity : Number(retry.maxAttempts);
     const backoff = retry.backoff === undefined ? 0 : Number(retry.backoff);
-    if (!(maxAttempts > 0) || (!Number.isInteger(maxAttempts) && maxAttempts !== Infinity)) {
-      throw new TypeError("retry.maxAttempts must be a positive integer or Infinity.");
-    }
-    if (!(backoff >= 0) || !Number.isInteger(backoff)) {
-      throw new TypeError("retry.backoff must be a non-negative integer.");
+    if (
+      !(maxAttempts > 0) ||
+      (!Number.isInteger(maxAttempts) && maxAttempts !== Infinity) ||
+      !(backoff >= 0) ||
+      !Number.isInteger(backoff)
+    ) {
+      throw new TypeError("invalid retry configuration");
     }
     return { maxAttempts, backoff };
   }
 
+  // Breadth-first over the downstream index built by #prepareGraph. PR-21
+  // measured this: walking every edge per invalidation was the hot path.
   #markDownstream(seeds) {
     const queue = [...seeds].filter((id) => this.#tracks.has(id));
     const seen = new Set(queue);
     while (queue.length) {
-      const sourceId = queue.shift();
-      for (const targetId of this.#downstream.get(sourceId) ?? []) {
-        if (seen.has(targetId)) continue;
-        seen.add(targetId);
-        this.#cache.delete(targetId);
-        this.#publishPending.delete(targetId);
-        this.#retryState.delete(targetId);
-        this.#marked.add(targetId);
-        queue.push(targetId);
+      const source = queue.shift();
+      for (const target of this.#downstream.get(source) ?? []) {
+        if (seen.has(target)) continue;
+        seen.add(target);
+        this.#cache.delete(target);
+        this.#publishPending.delete(target);
+        this.#retryState.delete(target);
+        this.#marked.add(target);
+        queue.push(target);
       }
     }
   }
 
-  // One of three live cycle validators, alongside normalizeObservationGraph and
-  // ObservationState.#assertAcyclic. This one walks Track.observedEdges, the
-  // surface P2-03 is deleting, so it must be the one that delegates. F-07.
+  /**
+   * Cycle rejection for authored graphs, installed on each Track as a guard so
+   * the edge is refused before it exists.
+   *
+   * Findings F-01 and F-07: this walks `Track.observedEdges`, which P2-03 is
+   * deleting, and it is the third implementation of this invariant alongside
+   * `normalizeObservationGraph` and `ObservationState.#assertAcyclic`. It should
+   * delegate to ObservationState rather than re-deriving the graph from Tracks.
+   */
   #graphGuard = (observer, source) => {
     if (!this.#tracks.has(observer.id) || !this.#tracks.has(source.id)) return;
     const seen = new Set();
@@ -470,7 +513,6 @@ export class GraphPublisher {
       const unsubscribe = track.onLifecycle?.((event) => {
         if (event.type === "invalidated") this.markDirty(id);
         if (event.type === "destroyed") this.removeTrack(id);
-        // Detach is not destroy. Dependents survive and must recompose.
         if (event.type === "detached") this.removeTrack(id, { invalidateDependents: true });
       });
       this.#hooks.set(id, unsubscribe ?? (() => {}));
