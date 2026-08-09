@@ -1,4 +1,5 @@
 import { StandaloneObservationAdapter } from "../usecases/StandaloneObservationAdapter.js";
+import { ScopedObservationAdapter } from "../usecases/ScopedObservationAdapter.js";
 
 /**
  * Project-scoped ownership and staged visibility boundary.
@@ -7,15 +8,19 @@ import { StandaloneObservationAdapter } from "../usecases/StandaloneObservationA
  * graph runtime are owned by the committed project, never by individual Motion
  * instances. Cross-motion and free-track behavior are explicit capabilities.
  *
- * Standalone observation uses one adapter per ProjectRuntime. That gives every
- * standalone Track created by one Engine a shared registry while keeping the
- * adapter lifecycle aligned with project/runtime disposal. Direct `new Track()`
- * callers that do not have a ProjectRuntime still use the compatibility fallback
- * in Track and must inject one shared adapter themselves for mutual observation.
+ * Standalone observation uses one adapter per ProjectRuntime. The scoped adapter
+ * is opt-in for migration verification only; the compatibility adapter remains
+ * the default until parity is proven across the full runtime.
  */
 export class ProjectRuntime {
   #active = null; #candidate = null; #instances = new Map(); #instanceMetadata = new Map(); #graphRuntime = null; #capabilities; #diagnostics = []; #disposed = false; #standaloneObservationAdapter;
-  constructor({ capabilities = {} } = {}) { this.#capabilities = Object.freeze({ crossMotion: capabilities.crossMotion === true, freeTracks: capabilities.freeTracks === true }); this.#standaloneObservationAdapter = new StandaloneObservationAdapter(); }
+  constructor({ capabilities = {}, observationOwnership = "compatibility" } = {}) {
+    this.#capabilities = Object.freeze({ crossMotion: capabilities.crossMotion === true, freeTracks: capabilities.freeTracks === true });
+    if (!['compatibility', 'scoped'].includes(observationOwnership)) throw new TypeError("ProjectRuntime observationOwnership must be 'compatibility' or 'scoped'.");
+    const Adapter = observationOwnership === "scoped" ? ScopedObservationAdapter : StandaloneObservationAdapter;
+    this.#standaloneObservationAdapter = new Adapter();
+  }
+  get observationOwnership() { return this.#standaloneObservationAdapter instanceof ScopedObservationAdapter ? "scoped" : "compatibility"; }
   get isDisposed() { return this.#disposed; } get isCommitted() { return this.#active !== null; } get project() { return this.#active?.project ?? null; } get projectId() { return this.#active?.project?.projectId ?? null; } get candidateProject() { return this.#candidate?.project ?? null; } get instanceCount() { return this.#instances.size; } get instances() { return new Map(this.#instances); } get membership() { return new Map(this.#active?.membership ?? []); } get candidateMembership() { return new Map(this.#candidate?.membership ?? []); } get graphRuntime() { return this.#graphRuntime; } get capabilities() { return { ...this.#capabilities }; } get diagnostics() { return this.#diagnostics.map((diagnostic) => ({ ...diagnostic })); } get pendingReferences() { return new Map(this.#active?.pending ?? []); } get candidatePendingReferences() { return new Map(this.#candidate?.pending ?? []); } get references() { return new Map(this.#active?.references ?? []); }
   get standaloneObservationAdapter() { if (this.#disposed) throw new Error("ProjectRuntime is disposed."); return this.#standaloneObservationAdapter; }
   get qualifiedMembershipOrder() { return [...this.membership.keys()].sort((a, b) => { const aFree = a.startsWith('~/'); const bFree = b.startsWith('~/'); if (aFree !== bFree) return aFree ? 1 : -1; return a.localeCompare(b); }); }
