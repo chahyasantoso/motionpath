@@ -1,37 +1,45 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 16:37 Jakarta  
+**Captured:** 2026-08-09 16:49 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
-**Phase:** P2-03 phase one, owner-first caller migration
+**Phase:** P2-03 phase three, cycle-authority cleanup
 
-## Current truth
+## Green evidence
 
-The P2-03 behavior matrix is green. Phase one now provides an explicit caller-owned
-scope for direct Track construction, lets `createTrack` accept `observationScope`
-or `projectRuntime`, and adds owner-first Track coverage without changing legacy
-compatibility behavior yet.
+The phase-two owner-first GraphBinding migration is green: unit tests, build,
+typecheck, packaging, default boundary, strict boundary, benchmark, and baseline
+checks all pass. Authored mutations now use the injected ObservationState controller;
+legacy hooks remain only for explicit compatibility and fault-injection coverage.
 
-## Phase one delivered
+## Phase three objective
 
-- `createTrack` accepts a caller-owned observation scope or ProjectRuntime;
-- direct Track owner-first mutation/read/composition coverage is locked;
-- duplicate-ID scope isolation remains covered;
-- strict boundary and benchmark jobs remain blocking CI checks.
+Remove the duplicate GraphPublisher cycle authority. `ObservationState` and graph
+normalization remain the intended authorities; GraphPublisher must stop walking
+Track observation edges and must stop installing `_setGraphGuard` on Tracks.
 
-## Next phase one work
+## Required implementation order
 
-Migrate existing direct Track tests and any production callers from facade names to
-`getObservationOwner()` or injected controller APIs. Do not remove the facade until
-that migration is complete and the compatibility contract has its own isolated tests.
+1. Migrate the disposal cycle test from Track-installed guard behavior to the
+   GraphBinding/ObservationState owner contract.
+2. Delete GraphPublisher's `#graphGuard`, guard attachment, and guard detachment.
+3. Keep cycle rejection before mutation in ObservationState and normalized graph
+   validation. Preserve standalone mutual-cycle composition, which is not authored
+   graph validation.
+4. Add a regression proving rejected authored cycles leave state, IR, publisher
+   order, and live composition unchanged.
+5. Run the full Node 24 matrix, including strict boundary, before touching the
+   compatibility facade.
 
-## Closure gates after caller migration
+## Still open after phase three
 
-1. Remove Track-installed legacy observation properties and methods.
-2. Remove GraphPublisher's Track-walking cycle guard and `_setGraphGuard`.
-3. Remove authored GraphBinding compatibility dual-write.
-4. Add repeated teardown evidence and a deterministic hot-path benchmark threshold.
-5. Refresh status, matrix, and implementation report on the final closure head.
+- Remove the Track-installed legacy facade after all direct callers/tests migrate.
+- Route direct `Track` and `createTrack` construction through explicit scopes by
+  default and retire the singleton fallback.
+- Add repeated teardown and deterministic hot-path benchmark evidence.
+- Refresh status, matrix, and implementation report on the final closure head.
 
 ## Guardrails
 
-Keep `publisherRendering`, `crossMotion`, `freeTracks`, and `observationOwnership` default-off/default-compatibility. Keep P2-04 topology/playback removal separate. Never hide a boundary finding with a scanner exception.
+Keep `publisherRendering`, `crossMotion`, `freeTracks`, and `observationOwnership`
+default-off/default-compatibility. Keep P2-04 topology/playback removal separate.
+Never weaken parity assertions or hide boundary findings with scanner exceptions.
