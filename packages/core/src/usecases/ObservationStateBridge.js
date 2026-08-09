@@ -12,8 +12,13 @@ export class ObservationStateBridge {
   constructor({ tracks = new Map(), edges } = {}) {
     this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks);
     this.#state = new ObservationState({ tracks: this.#tracks });
-    if (edges) for (const edge of edges) if (this.#tracks.has(edge.source) && this.#tracks.has(edge.target)) this.#state.addEdge(edge);
-    else this.#hydrateFromOwners();
+    if (edges) {
+      for (const edge of edges) {
+        if (this.#tracks.has(edge.source) && this.#tracks.has(edge.target)) this.#state.addEdge(edge);
+      }
+    } else {
+      this.#hydrateFromOwners();
+    }
     this.#controller = new ObservationTrackController({ state: this.#state, tracks: this.#tracks });
     this.#bindObserverSnapshots();
     this.#bindSourceCleanup();
