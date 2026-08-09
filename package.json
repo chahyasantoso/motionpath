@@ -18,7 +18,8 @@
     "reorg:physical": "node scripts/physical-reorg.mjs",
     "benchmark:rig": "node performance/rig-graph-benchmark.mjs && node performance/downstream-index-benchmark.mjs",
     "benchmark:v5:baseline": "node performance/v5-baseline.mjs",
-    "boundary:v5:pass2": "node scripts/v5-pass2-boundaries.mjs"
+    "boundary:v5:pass2": "node scripts/v5-pass2-boundaries.mjs",
+    "boundary:v5:pass2:strict": "node scripts/v5-pass2-boundaries.mjs --strict"
   },
   "dependencies": {
     "gsap": "^3.12.5",
