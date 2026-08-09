@@ -1,6 +1,5 @@
 import { ObservationState } from "./ObservationState.js";
 import { patchesEqual, trackComposeLeaf } from "./composeContext.js";
-import { observationEdgeKey } from "./observationEdge.js";
 
 /**
  * ObservationState owner used while live Track mutation is being extracted.
@@ -32,10 +31,7 @@ export class ObservationStateBridge {
   get state() { return this.#state; }
   get tracks() { return new Map(this.#tracks); }
 
-  /**
-   * Legacy hydration seam. It is intentionally one-way: later mutations must
-   * write ObservationState first and must not rebuild it from Track readers.
-   */
+  /** Legacy one-way hydration seam for callers that still construct live Tracks. */
   syncFromTracks() {
     if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
     for (const track of this.#tracks.values()) {
@@ -54,10 +50,7 @@ export class ObservationStateBridge {
     return this;
   }
 
-  /**
-   * Compares the owner state with normalized graph IR. This is the replacement
-   * for GraphBinding deriving its truth from Track.observedEdges.
-   */
+  /** Compare owner state with normalized graph IR, without reading Track edges. */
   assertGraphParity(graph) {
     if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
     const expected = new Set((graph?.edges ?? []).map((edge) => this.#key(edge)));
@@ -78,7 +71,6 @@ export class ObservationStateBridge {
     return true;
   }
 
-  /** State-only edge snapshots for transaction rollback and inspection. */
   getEdges(targetId) {
     if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
     return this.#state.getEdges(targetId);
@@ -91,21 +83,11 @@ export class ObservationStateBridge {
     for (const track of this.#tracks.values()) {
       for (const edge of track.observedEdges ?? []) {
         if (this.#tracks.has(edge.source.id)) {
-          live.push(this.#key({
-            source: edge.source.id,
-            target: track.id,
-            role: edge.role,
-            input: edge.input,
-          }));
+          live.push(this.#key({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input }));
         }
       }
       for (const edge of this.#state.getEdges(track.id)) {
-        shadow.push(this.#key({
-          source: edge.source.id,
-          target: track.id,
-          role: edge.role,
-          input: edge.input,
-        }));
+        shadow.push(this.#key({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input }));
       }
     }
     live.sort();
