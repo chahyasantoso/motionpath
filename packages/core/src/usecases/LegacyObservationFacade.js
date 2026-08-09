@@ -20,8 +20,13 @@ export function installLegacyObservationFacade(track) {
     [SET](source, mapFn, options = {}) {
       if (!source) { track.getObservationOwner()?.clearObserved(track); track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" }); return; }
       const owner = track.getObservationOwner?.();
-      source._adoptObservationOwner?.(owner);
-      track._adoptObservationOwner?.(owner);
+      // Authored Tracks expose an ObservationTrackController, not an adapter.
+      // Never pass that controller into Track owner adoption: it has no register
+      // lifecycle and doing so produced the observed owner.register failure.
+      if (typeof owner?.register === "function") {
+        source._adoptObservationOwner?.(owner);
+        track._adoptObservationOwner?.(owner);
+      }
       const role = options.role ?? "output";
       const input = role === "input" ? options.target : undefined;
       const previous = owner?.getEdges(track).find((edge) => edge.source === source && edge.role === role && edge.input === input);
@@ -32,15 +37,17 @@ export function installLegacyObservationFacade(track) {
     [REMOVE](source, options = {}) { return track.getObservationOwner()?.removeObserved(track, source, options); },
     [REPLACE](oldSource, newSource, mapFn, options = {}) {
       const owner = track.getObservationOwner?.();
-      oldSource?._adoptObservationOwner?.(owner);
-      newSource?._adoptObservationOwner?.(owner);
+      if (typeof owner?.register === "function") {
+        oldSource?._adoptObservationOwner?.(owner);
+        newSource?._adoptObservationOwner?.(owner);
+      }
       const oldEdges = owner?.getEdges(track).filter((edge) => edge.source === oldSource && (options.role === undefined || edge.role === options.role)) ?? [];
       const role = options.role ?? oldEdges[0]?.role ?? "output";
       const input = role === "input" ? (options.target ?? oldEdges[0]?.input) : undefined;
       owner?.replaceObserved(track, oldSource, newSource, mapFn, { ...options, role, target: input });
       for (const edge of oldEdges) {
         track._emitObservationLifecycle?.({ type: "edge-removed", track, source: oldSource, edge: { source: oldSource.id, target: track.id, role: edge.role, input: edge.input } });
-        track._emitObservationLifecycle?.({ type: "edge-added", track, source: newSource, edge: { source: newSource.id, target: track.id, role, input } });
+        track._emitObservationLifecycle?.({ type: "edge-added", track, source: newSource, edge: { source: newSource.id, target: track.id, role, input });
       }
       track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" });
     },
