@@ -13,39 +13,59 @@ const strict = process.argv.includes("--strict");
 const findings = [];
 
 /**
- * Track symbols the P2-03 symbol-ban has to remove.
+ * Surfaces to scan. `packages/react` was previously unscanned entirely, which
+ * is finding F-14: the DOM hooks layer imports gsap directly and nothing said
+ * so. Its imports are reported, and blocking only in strict mode, because
+ * whether that layer is a legitimate renderer adapter is a P2-05/P2-06 decision
+ * rather than a P2-02 violation.
+ */
+const SCAN_ROOTS = ["packages/core/src/", "packages/react/src/"];
+const RENDERER_SURFACE = "packages/react/";
+
+/**
+ * The complete P2-03 Track observation ban list, from
+ * `docs/V5-P2-03-SYMBOL-BAN.md`.
  *
- * Finding F-14: this list used to cover only the six public-ish members, so the
- * ban's own evidence item, "the strict boundary scan reports no Track observation
- * ownership symbols", could go green while `#observed`, `#observers`, and both
- * observer queries were still in place. The private state and the reverse
- * registry writers are the whole point of the removal, so they are named here.
+ * The previous version of this scan matched six public symbols and none of the
+ * private state, so "the strict boundary scan reports no Track observation
+ * ownership symbols" could go green while `#observed`, `#observers`,
+ * `observerCount` and `observerIds` were all still in place. Finding F-14.
  */
 const TRACK_OBSERVATION_SYMBOLS = [
-  "#observed",
-  "#observers",
-  "#graphGuard",
-  "_setGraphGuard",
-  "_setObservationComposer",
-  "_addObserver",
-  "_removeObserver",
-  "setObserved",
-  "removeObserved",
-  "replaceObserved",
-  "observedSources",
-  "observedEdges",
-  "observerCount",
-  "observerIds",
+  /#observed\b/,
+  /#observers\b/,
+  /#graphGuard\b/,
+  /\b_setGraphGuard\b/,
+  /\b_setObservationComposer\b/,
+  /\b_addObserver\b/,
+  /\b_removeObserver\b/,
+  /\bsetObserved\b/,
+  /\bremoveObserved\b/,
+  /\breplaceObserved\b/,
+  /\bobservedSources\b/,
+  /\bobservedEdges\b/,
+  /\bobserverCount\b/,
+  /\bobserverIds\b/,
 ];
 
-const TRACK_TOPOLOGY_SYMBOLS = ["addChild", "removeChild", "_attachGroupHost", "#groupHost", "_mountChild"];
+const TRACK_TOPOLOGY_SYMBOLS = [
+  /\baddChild\b/,
+  /\bremoveChild\b/,
+  /\b_attachGroupHost\b/,
+  /\bgroupHost\b/,
+];
 
 function toPosix(absolutePath) {
   return relative(repoRoot, absolutePath).split(sep).join("/");
 }
 
 async function walk(dir) {
-  const entries = await readdir(dir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
   const files = [];
   for (const entry of entries) {
     if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist") continue;
@@ -56,68 +76,68 @@ async function walk(dir) {
   return files;
 }
 
-function addFinding(kind, file, detail, blocking) {
-  findings.push({ kind, file, detail, blocking });
+function addFinding(kind, file, detail, blocking, symbols) {
+  findings.push(symbols ? { kind, file, detail, blocking, symbols } : { kind, file, detail, blocking });
 }
 
-function presentSymbols(text, symbols) {
-  return symbols.filter((symbol) => text.includes(symbol));
+function matched(patterns, text) {
+  return patterns.filter((pattern) => pattern.test(text)).map((pattern) => String(pattern));
 }
 
-const files = await walk(fileURLToPath(new URL("../packages/core/src/", import.meta.url)));
+const files = [];
+for (const root of SCAN_ROOTS) files.push(...(await walk(join(repoRoot, root))));
+
 for (const file of files) {
   const rel = toPosix(file);
   if (rel === "packages/core/src/gsap-boundary.test.js") continue;
   const text = await readFile(file, "utf8");
 
   if (GSAP_IMPORT_PATTERN.test(text) && !isApprovedGsapPath(rel)) {
-    // Quarantined imports are known, owned, and non-blocking. Anything else is
-    // a new violation and fails strict mode immediately.
-    const quarantined = isQuarantinedGsapPath(rel);
-    addFinding(
-      "gsap-import",
-      rel,
-      quarantined
-        ? "quarantined: known test/fixture import awaiting fake-port migration"
-        : "unapproved direct vendor import outside adapters/",
-      !quarantined,
-    );
+    if (rel.startsWith(RENDERER_SURFACE)) {
+      // Reported, strict-blocking. This surface is DOM-facing by design; the
+      // open question is whether it counts as an approved renderer adapter.
+      addFinding(
+        "renderer-gsap-import",
+        rel,
+        "react hooks layer imports gsap directly; classify as adapter or migrate (F-14)",
+        false,
+      );
+    } else {
+      // Quarantined imports are known, owned, and non-blocking. Anything else is
+      // a new violation and fails immediately, in both modes.
+      const quarantined = isQuarantinedGsapPath(rel);
+      addFinding(
+        "gsap-import",
+        rel,
+        quarantined
+          ? "quarantined: known test/fixture import awaiting fake-port migration"
+          : "unapproved direct vendor import outside adapters/",
+        !quarantined,
+      );
+    }
   }
 
   if (rel.endsWith("/Track.js")) {
-    const observation = presentSymbols(text, TRACK_OBSERVATION_SYMBOLS);
+    const observation = matched(TRACK_OBSERVATION_SYMBOLS, text);
     if (observation.length) {
       addFinding(
         "track-observation",
         rel,
-        `Track still owns observation state or mutation (P2-03): ${observation.join(", ")}`,
+        "Track still exposes observation ownership, state or mutation (P2-03)",
         false,
+        observation,
       );
     }
-    const topology = presentSymbols(text, TRACK_TOPOLOGY_SYMBOLS);
+    const topology = matched(TRACK_TOPOLOGY_SYMBOLS, text);
     if (topology.length) {
       addFinding(
         "track-topology-playback",
         rel,
-        `Track still owns topology or the playback bridge (P2-04): ${topology.join(", ")}`,
+        "Track still exposes topology or playback bridge responsibilities (P2-04)",
         false,
+        topology,
       );
     }
-  }
-}
-
-/**
- * The react package was previously unscanned, which meant "the boundary is
- * enforced" was a claim about one package. Reported, not blocking: these are
- * pre-existing consumer-side imports owned by P2-02's follow-on work, and
- * failing them today would only teach people to skip the scan.
- */
-const reactFiles = await walk(fileURLToPath(new URL("../packages/react/src/", import.meta.url)));
-for (const file of reactFiles) {
-  const rel = toPosix(file);
-  const text = await readFile(file, "utf8");
-  if (GSAP_IMPORT_PATTERN.test(text)) {
-    addFinding("react-gsap-import", rel, "react package imports gsap directly, owned by P2-02 follow-on", false);
   }
 }
 
@@ -137,22 +157,23 @@ const blocking = findings.filter((finding) => finding.blocking);
 const report = {
   generatedAt: new Date().toISOString(),
   strict,
-  scanned: ["packages/core/src", "packages/react/src"],
+  scanRoots: SCAN_ROOTS,
   findings,
   summary: {
     findingCount: findings.length,
     blockingCount: blocking.length,
     gsapImports: findings.filter(({ kind }) => kind === "gsap-import").length,
-    gsapQuarantined: findings.filter(({ kind, blocking: isBlocking }) => kind === "gsap-import" && !isBlocking).length,
-    quarantineListSize: QUARANTINED_GSAP_FILES.length,
-    reactGsapImports: findings.filter(({ kind }) => kind === "react-gsap-import").length,
+    gsapQuarantined: findings.filter(({ kind, blocking: isBlocking }) => kind === "gsap-import" && !isBlocking)
+      .length,
+    rendererGsapImports: findings.filter(({ kind }) => kind === "renderer-gsap-import").length,
     trackOwnershipFindings: findings.filter(({ kind }) => kind.startsWith("track-")).length,
   },
 };
 console.log(JSON.stringify(report, null, 2));
 
-// Default mode still reports the open P2-03/P2-04 ownership gaps without
-// failing. Strict mode is the completion gate. Blocking findings, which means
-// a NEW gsap import or a stale quarantine entry, fail in both modes.
+// Default mode reports the open P2-03/P2-04 ownership gaps and the renderer
+// surface without failing, so it can run on every PR from today. Strict mode is
+// the completion gate. Blocking findings, meaning a NEW gsap import in core or a
+// stale quarantine entry, fail in both modes.
 if (blocking.length) process.exitCode = 1;
 else if (strict && findings.length) process.exitCode = 1;

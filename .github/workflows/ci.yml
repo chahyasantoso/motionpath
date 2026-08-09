@@ -90,8 +90,11 @@ jobs:
       - run: npm ci
       - run: npm run pack:check
 
-  pass2-boundary:
-    name: v5 pass-2 boundary scan (node 24)
+  # Pass-2 finding F-12. The boundary scan existed and was documented as
+  # enforcement, but no job ran it. Blocking on new violations, reporting the
+  # known P2-03/P2-04 gaps. Swap to boundary:v5:pass2:strict when P2-03 lands.
+  boundary-scan:
+    name: pass-2 boundary scan (node 24)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
