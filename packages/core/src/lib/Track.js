@@ -155,19 +155,35 @@ export class Track {
     if (oldSource === newSource) {
       throw new Error("replaceObserved requires two different source tracks.");
     }
-    const oldEdges = this.#owner()?.getEdges(this)
+    const owner = this.#owner();
+    const oldEdges = owner?.getEdges(this)
       .filter((edge) => edge.source === oldSource
         && (opts.role === undefined || edge.role === opts.role));
-    if (!oldEdges?.length) throw new Error(`Track "${this.#id}" does not observe "${oldSource.id}".`);
-    const role = opts.role ?? oldEdges[0].role;
-    const input = role === "input" ? (opts.target ?? oldEdges[0].input) : undefined;
+
+    // GraphBinding owns authored state and applies its replacement before calling
+    // this compatibility facade. In that path the old edge is already gone, so
+    // recover its normalized role/input from the matching replacement edge.
+    // Standalone callers still take the normal old-edge path and let their adapter
+    // perform the mutation. This state-first tolerance is temporary until the
+    // remaining Track observation forwarding names are removed by P2-03.
+    const replacementEdges = oldEdges?.length ? [] : owner?.getEdges(this)
+      .filter((edge) => edge.source === newSource
+        && (opts.role === undefined || edge.role === opts.role));
+    const eventEdges = oldEdges?.length ? oldEdges : replacementEdges;
+    if (!eventEdges?.length) {
+      throw new Error(`Track "${this.#id}" does not observe "${oldSource.id}".`);
+    }
+    const role = opts.role ?? eventEdges[0].role;
+    const input = role === "input" ? (opts.target ?? eventEdges[0].input) : undefined;
     this.#graphGuard?.(this, newSource, { ...opts, role, target: input });
-    this.#owner()?.replaceObserved(this, oldSource, newSource, mapFn, {
-      ...opts,
-      role,
-      target: input,
-    });
-    for (const edge of oldEdges) {
+    if (oldEdges.length) {
+      owner?.replaceObserved(this, oldSource, newSource, mapFn, {
+        ...opts,
+        role,
+        target: input,
+      });
+    }
+    for (const edge of eventEdges) {
       this.#emitLifecycle({
         type: "edge-removed",
         track: this,
