@@ -67,6 +67,17 @@ export class ObservationStateBridge {
     for (const track of this.#tracks.values()) { if (track.isDestroyed || typeof track.composeLocal !== "function") continue; const live = track.compose(); const shadow = this.#state.compose(track.id, undefined, new Map(), trackComposeLeaf); if (!patchesEqual(live, shadow)) throw new Error(`ObservationState composition differs for track '${track.id}'.`); }
     return true;
   }
-  destroy() { if (this.#destroyed) return; this.#destroyed = true; for (const unsubscribe of this.#unsubscribers) unsubscribe(); this.#unsubscribers = []; this.#state.destroy(); this.#tracks.clear(); }
+  destroy() {
+    if (this.#destroyed) return;
+    this.#destroyed = true;
+    for (const unsubscribe of this.#unsubscribers) unsubscribe();
+    this.#unsubscribers = [];
+    for (const track of this.#tracks.values()) {
+      track._setObservationController?.(null);
+      track._setObservationObserverIds?.(null);
+    }
+    this.#state.destroy();
+    this.#tracks.clear();
+  }
   #key({ source, target, role = "output", input }) { return [source, target, role, input ?? ""].join(String.fromCharCode(0)); }
 }
