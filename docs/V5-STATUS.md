@@ -1,22 +1,22 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-09 11:56 Jakarta  
+**Status captured:** 2026-08-09 11:58 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
 **Canonical index:** [`docs/V5-README.md`](./V5-README.md)  
-**Implementation report:** [`V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md`](./V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md)  
+**Implementation report:** [`V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md`](./V5-PASS-2-IMPLEMENTOR-REPORT-2026-08-09.md)  
 **Next implementor handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)
 
 ## Executive status
 
-PR #142 is the frozen green repair baseline. PR #143 is green with characterization-only changes; the scoped-owner implementation is not active yet.
+PR #142 is the frozen green repair baseline. PR #143 is green with characterization-only changes plus an isolated scoped ownership seam; the existing adapter and runtime defaults are unchanged.
 
 ## Current progress
 
-Characterization now covers folds, public context IDs, cycle fallback, memoization, mapper replacement, duplicate IDs, lightweight tracks, and runtime disposal. This contract lock is the prerequisite for the scoped-owner redesign.
+The protocol is locked and the new owner seam has explicit tests for duplicate-ID isolation and lifecycle disposal. No production ownership switch is active yet.
 
 ## Next in line
 
-Characterize Track-level destroy observer snapshots, then extract scoped ownership behind the unchanged adapter API. Keep the global compatibility fallback until the new path is proven equivalent.
+Build an adapter-compatible integration harness around the scoped owner, then add a feature-flagged ProjectRuntime path. Compare it against the current adapter before changing defaults or deleting the global fallback.
 
 ## Guardrails
 
