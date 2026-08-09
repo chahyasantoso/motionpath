@@ -62,7 +62,10 @@ describe("P2-02 GSAP import boundary", () => {
 
   it("allows no production module outside adapters to import gsap directly", async () => {
     const production = (await gsapImporters()).filter((path) => {
-      const isTestOrFixture = path.includes("/__tests__/") || path.includes("/__fixtures__/") || /\.test\.[jt]sx?$/.test(path);
+      const isTestOrFixture =
+        path.includes("/__tests__/") ||
+        path.includes("/__fixtures__/") ||
+        /\.test\.[jt]sx?$/.test(path);
       return !isApprovedGsapPath(path) && !isTestOrFixture;
     });
     expect(production).toEqual([]);
@@ -77,15 +80,25 @@ describe("P2-02 GSAP import boundary", () => {
   });
 
   it("routes core orchestration through the adapter boundary instead of the vendor", async () => {
-    for (const path of ["lib/Motion.js", "lib/TriggerDelegate.js", "usecases/BuildTrackTween.js", "lib/gsapTickerClock.js"]) {
+    for (const path of [
+      "lib/Motion.js",
+      "lib/TriggerDelegate.js",
+      "usecases/BuildTrackTween.js",
+      "lib/gsapTickerClock.js",
+    ]) {
       const content = await readFile(join(coreSrc, path), "utf8");
-      expect(GSAP_IMPORT_PATTERN.test(content), `${path} must not import gsap directly`).toBe(false);
+      expect(
+        GSAP_IMPORT_PATTERN.test(content),
+        `${path} must not import gsap directly`,
+      ).toBe(false);
       expect(content).toMatch(/adapters\//);
     }
   });
 
   it("exposes the ticker clock from the adapter surface", async () => {
-    const { gsapTickerClock } = await import("./adapters/gsap/gsapTickerClock.js");
+    const { gsapTickerClock } = await import(
+      "./adapters/gsap/gsapTickerClock.js"
+    );
     const shimmed = await import("./lib/gsapTickerClock.js");
     expect(typeof gsapTickerClock.subscribe).toBe("function");
     expect(shimmed.gsapTickerClock).toBe(gsapTickerClock);

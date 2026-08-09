@@ -1,12 +1,38 @@
 # MotionPath v5 pass-2 completion matrix
 
-**Status captured:** 2026-08-09 08:30 Asia/Jakarta  
-**Control sheet:** pass-2 revision A  
-**Review:** [`V5-PASS-2-REVIEW-2026-08-08.md`](./V5-PASS-2-REVIEW-2026-08-08.md)  
-**Resolution log:** [`V5-PASS-2-REVIEW-STATUS.md`](./V5-PASS-2-REVIEW-STATUS.md)
+**Status captured:** 2026-08-10 06:44 Asia/Jakarta  
+**Active implementation:** Phase 1 in progress  
+**Branch:** `feat/pass2-track-facade-removal`  
+**PR context:** [#145](https://github.com/chahyasantoso/motionpath/pull/145), evidence only
 
-The current F-02 implementation uses one adapter per ProjectRuntime, with identity-keyed internal state so duplicate motion-local ids remain legal across qualified instances. The adapter preserves public ids while isolating state by Track object.
+No row is complete from a stale head, partial run, or docs-only claim. Each phase closes with one exact-head verification matrix and an updated handoff.
 
-The remaining matrix is unchanged: F-01 inversion of the bridge is next; F-03 duplicate Track bookkeeping, F-06/F-07 duplicate mutation and cycle paths, F-08 owner-layer decision, and F-10 full-model rebuild remain open. Track topology/playback and publisher rollout remain separate.
+| Phase / target | Status | Closure evidence or next proof |
+| --- | --- | --- |
+| Phase 0: clean baseline and evidence | **Closed** | Self-blocking readability allowlist and duplicate suites removed. |
+| Phase 1: one graph authority | **In progress** | First cut at `c57f862`: factory facade removed, lifecycle helper neutralized, GraphBinding override branch removed. Remaining: one owner, stable ObservationState, no bridge rebuild, cross-owner rejection, publisher mutation cut, exact-head green matrix. |
+| Qualified graph identity | Open | Canonical `motionId/trackId` and `~/trackId` normalization, ambiguity and cycle tests. |
+| Project-wide GraphRuntime | Open | Two-motion shared graph, one publisher, one PatchRegistry, one clock subscription. |
+| Authoritative patch publication | Open | ObservationState plus Track-local composition, immutable batches, no recursive graph walk through Track. |
+| Motion composite / Track leaf | Open | Move topology and playback out of Track; migrate host API and demos. |
+| Graph input validation | Open | Stable missing, unknown, duplicate, role-mismatch, and incompatible-source diagnostics. |
+| Cross-motion and free-track membership | Blocked by prerequisites | Enable only after qualified IDs and project-wide runtime are proven. |
+| Public API and type parity | Open | Remove runtime compatibility surface; update exports, declarations, docs, and examples. |
+| Lifecycle and rollback | Open | Owner-first teardown, idempotent disposal, mapper-preserving rollback, bind/mutate/unbind regression. |
+| Documentation handoff discipline | **Active** | Update status, matrix, handoff, and plan in every phase-closing commit with exact head and next action. |
 
-PR #140 is merged as `72e7289`; its 8-check run passed. The F-02 follow-up is on `v5` commit `8f33f4e` and awaits its CI run.
+## Phase 1 required verification
+
+```sh
+npm test -- --reporter=verbose
+npm run typecheck
+npm run build
+npm run pack:check
+npm run format:check
+npm run boundary:v5:pass2
+npm run boundary:v5:pass2:strict
+npm run benchmark:rig
+npm run benchmark:v5:baseline
+```
+
+The Phase 1 row closes only when all relevant results are green on the same final head and the docs are refreshed to that head.

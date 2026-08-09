@@ -14,9 +14,15 @@
   "schemaVersion": 4,
   "projectId": "my-page",
   "perspective": 1200,
-  "templates": [/* Template[]  — optional */],
-  "motions": [/* Motion[]    — required */],
-  "tracks": [/* Track[]     — optional, standalone */],
+  "templates": [
+    /* Template[]  — optional */
+  ],
+  "motions": [
+    /* Motion[]    — required */
+  ],
+  "tracks": [
+    /* Track[]     — optional, standalone */
+  ],
 }
 ```
 
@@ -40,7 +46,9 @@ A named, reusable bundle of keyframes. Templates have **no trigger and no lifecy
   "templateId": "card-rise",
   "duration": 1.2,
   "transformOrigin": "50% 50%",
-  "keyframes": {/* Keyframes */},
+  "keyframes": {
+    /* Keyframes */
+  },
 }
 ```
 
@@ -70,7 +78,9 @@ A Motion is **one trigger + one master GSAP timeline + N tracks**. Tracks under 
   },
   "stagger": 0.15,
   "staggerTransition": { "duration": 0.55, "ease": "power2.out" },
-  "tracks": [/* Track[] — at least 1 */],
+  "tracks": [
+    /* Track[] — at least 1 */
+  ],
 }
 ```
 
@@ -163,7 +173,9 @@ A Track is **one animatable entity**: a GSAP tween over a plain proxy object, pl
   "use": "card-rise",
   "duration": 1.2,
   "transformOrigin": "50% 50%",
-  "keyframes": {/* Keyframes */},
+  "keyframes": {
+    /* Keyframes */
+  },
 }
 ```
 

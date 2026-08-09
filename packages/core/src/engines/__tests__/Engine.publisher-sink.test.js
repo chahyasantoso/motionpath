@@ -23,15 +23,39 @@ const project = {
         {
           id: "parent",
           keyframes: {
-            x: { stops: [{ p: 0, v: 10 }, { p: 1, v: 30 }] },
-            y: { stops: [{ p: 0, v: 5 }, { p: 1, v: 15 }] },
-            rotation: { stops: [{ p: 0, v: 0 }, { p: 1, v: 90 }] },
+            x: {
+              stops: [
+                { p: 0, v: 10 },
+                { p: 1, v: 30 },
+              ],
+            },
+            y: {
+              stops: [
+                { p: 0, v: 5 },
+                { p: 1, v: 15 },
+              ],
+            },
+            rotation: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 90 },
+              ],
+            },
           },
         },
         {
           id: "child",
-          observes: [{ source: "parent", role: "input", target: "parentWorld" }],
-          keyframes: { boneLength: { stops: [{ p: 0, v: 10 }, { p: 1, v: 20 }] } },
+          observes: [
+            { source: "parent", role: "input", target: "parentWorld" },
+          ],
+          keyframes: {
+            boneLength: {
+              stops: [
+                { p: 0, v: 10 },
+                { p: 1, v: 20 },
+              ],
+            },
+          },
         },
       ],
     },
@@ -42,25 +66,46 @@ function testClock() {
   const listeners = new Set();
   let tick = 0;
   return {
-    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-    tick(delta = 16) { tick += 1; for (const listener of [...listeners]) listener({ tick, delta }); return tick; },
-    get listenerCount() { return listeners.size; },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    tick(delta = 16) {
+      tick += 1;
+      for (const listener of [...listeners]) listener({ tick, delta });
+      return tick;
+    },
+    get listenerCount() {
+      return listeners.size;
+    },
   };
 }
 
 function throwingDelegate() {
   return {
     destroyed: false,
-    build() { throw new Error("delegate build failed"); },
-    play() {}, pause() {}, seek() {}, reverse() {}, onComplete() {},
-    destroy() { this.destroyed = true; },
+    build() {
+      throw new Error("delegate build failed");
+    },
+    play() {},
+    pause() {},
+    seek() {},
+    reverse() {},
+    onComplete() {},
+    destroy() {
+      this.destroyed = true;
+    },
   };
 }
 
 describe("Engine publisher sink", () => {
   let engine;
   let clock;
-  afterEach(() => { engine?.destroy(); engine = undefined; clock = undefined; });
+  afterEach(() => {
+    engine?.destroy();
+    engine = undefined;
+    clock = undefined;
+  });
 
   describe("the gate", () => {
     it("is off by default and leaves the legacy path untouched", async () => {
@@ -79,9 +124,13 @@ describe("Engine publisher sink", () => {
 
     it("only accepts the literal boolean true", () => {
       for (const value of ["true", 1, {}, undefined, null, "yes"]) {
-        expect(new Engine({ publisherRendering: value }).publisherRendering).toBe(false);
+        expect(
+          new Engine({ publisherRendering: value }).publisherRendering,
+        ).toBe(false);
       }
-      expect(new Engine({ publisherRendering: true }).publisherRendering).toBe(true);
+      expect(new Engine({ publisherRendering: true }).publisherRendering).toBe(
+        true,
+      );
     });
 
     it("does not switch a motion that is already mounted", async () => {
@@ -111,7 +160,11 @@ describe("Engine publisher sink", () => {
       clock.tick();
 
       const patch = motion.getPatch("parent");
-      expect(patch).toMatchObject({ nodeId: "parent", status: "ready", revision: 1 });
+      expect(patch).toMatchObject({
+        nodeId: "parent",
+        status: "ready",
+        revision: 1,
+      });
       expect(Object.isFrozen(patch.values)).toBe(true);
       expect(motion.getPatch("child")).not.toBeNull();
     });
@@ -137,7 +190,9 @@ describe("Engine publisher sink", () => {
       const motion = engine.mountInstance("arm");
       const child = motion.getTrack("child");
 
-      expect(motion.compose("child", child.getSnapshot())).toEqual(child.compose(child.getSnapshot()));
+      expect(motion.compose("child", child.getSnapshot())).toEqual(
+        child.compose(child.getSnapshot()),
+      );
     });
 
     it("republishes with a new revision after the timeline advances", async () => {
@@ -162,7 +217,9 @@ describe("Engine publisher sink", () => {
       await engine.loadProject(project);
       const delegate = throwingDelegate();
 
-      expect(() => engine.mountWithDelegate("arm", delegate)).toThrow("delegate build failed");
+      expect(() => engine.mountWithDelegate("arm", delegate)).toThrow(
+        "delegate build failed",
+      );
 
       expect(delegate.destroyed).toBe(true);
       expect(engine.instanceCount).toBe(0);
@@ -204,7 +261,10 @@ describe("Engine publisher sink", () => {
       await engine.loadProject(project);
       const motion = engine.mountInstance("arm");
 
-      expect(() => { motion.destroy(); motion.destroy(); }).not.toThrow();
+      expect(() => {
+        motion.destroy();
+        motion.destroy();
+      }).not.toThrow();
       expect(clock.listenerCount).toBe(0);
     });
 

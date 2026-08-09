@@ -1,6 +1,7 @@
 /** Renderer-neutral clock port. */
 export function assertClock(clock, context = "Clock") {
-  if (!clock || typeof clock.subscribe !== "function") throw new TypeError(`${context} requires subscribe(listener).`);
+  if (!clock || typeof clock.subscribe !== "function")
+    throw new TypeError(`${context} requires subscribe(listener).`);
   return clock;
 }
 
@@ -8,10 +9,28 @@ export function createManualClock() {
   const listeners = new Set();
   let tickNumber = 0;
   return {
-    subscribe(listener) { if (typeof listener !== "function") throw new TypeError("Clock listener must be a function."); listeners.add(listener); return () => listeners.delete(listener); },
-    tick(delta = 0) { if (!(Number.isFinite(delta) && delta >= 0)) throw new TypeError("Clock delta must be a finite non-negative number."); tickNumber += 1; for (const listener of [...listeners]) listener({ tick: tickNumber, delta }); return tickNumber; },
-    get tickNumber() { return tickNumber; },
-    dispose() { listeners.clear(); },
+    subscribe(listener) {
+      if (typeof listener !== "function")
+        throw new TypeError("Clock listener must be a function.");
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    tick(delta = 0) {
+      if (!(Number.isFinite(delta) && delta >= 0))
+        throw new TypeError(
+          "Clock delta must be a finite non-negative number.",
+        );
+      tickNumber += 1;
+      for (const listener of [...listeners])
+        listener({ tick: tickNumber, delta });
+      return tickNumber;
+    },
+    get tickNumber() {
+      return tickNumber;
+    },
+    dispose() {
+      listeners.clear();
+    },
   };
 }
 
@@ -48,23 +67,50 @@ export function createTickClock(source) {
   const emit = (event) => {
     const delta = typeof event === "number" ? event : Number(event?.delta ?? 0);
     tickNumber += 1;
-    const payload = { tick: tickNumber, delta: Number.isFinite(delta) ? delta : 0 };
+    const payload = {
+      tick: tickNumber,
+      delta: Number.isFinite(delta) ? delta : 0,
+    };
     for (const listener of [...listeners]) listener(payload);
   };
-  const attach = () => { if (!unsubscribeSource && !disposed) unsubscribeSource = source.subscribe(emit) ?? null; };
-  const detach = () => { const unsubscribe = unsubscribeSource; unsubscribeSource = null; unsubscribe?.(); };
+  const attach = () => {
+    if (!unsubscribeSource && !disposed)
+      unsubscribeSource = source.subscribe(emit) ?? null;
+  };
+  const detach = () => {
+    const unsubscribe = unsubscribeSource;
+    unsubscribeSource = null;
+    unsubscribe?.();
+  };
   return {
     subscribe(listener) {
-      if (typeof listener !== "function") throw new TypeError("Clock listener must be a function.");
+      if (typeof listener !== "function")
+        throw new TypeError("Clock listener must be a function.");
       if (disposed) throw new Error("Clock is disposed.");
       listeners.add(listener);
       attach();
-      return () => { if (!listeners.delete(listener)) return; if (listeners.size === 0) detach(); };
+      return () => {
+        if (!listeners.delete(listener)) return;
+        if (listeners.size === 0) detach();
+      };
     },
-    get tickNumber() { return tickNumber; },
-    get listenerCount() { return listeners.size; },
-    get isAttached() { return unsubscribeSource !== null; },
-    get isDisposed() { return disposed; },
-    dispose() { if (disposed) return; disposed = true; listeners.clear(); detach(); },
+    get tickNumber() {
+      return tickNumber;
+    },
+    get listenerCount() {
+      return listeners.size;
+    },
+    get isAttached() {
+      return unsubscribeSource !== null;
+    },
+    get isDisposed() {
+      return disposed;
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      listeners.clear();
+      detach();
+    },
   };
 }

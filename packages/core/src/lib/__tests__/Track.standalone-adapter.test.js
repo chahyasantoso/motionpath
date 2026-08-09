@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { StandaloneObservationAdapter } from "../../usecases/StandaloneObservationAdapter.js";
+import { installLegacyObservationFacade } from "../../usecases/LegacyObservationFacade.js";
 import { Track } from "../Track.js";
 
 function makeTrack(id, adapter) {
-  return new Track({ id, observationAdapter: adapter, proxyState: { value: id }, plugins: [{ keys: ["value"], compose: (raw) => ({ value: raw.value }) }], resolvedTrack: { id, keyframes: {} } });
+  return installLegacyObservationFacade(
+    new Track({
+      id,
+      observationAdapter: adapter,
+      proxyState: { value: id },
+      plugins: [{ keys: ["value"], compose: (raw) => ({ value: raw.value }) }],
+      resolvedTrack: { id, keyframes: {} },
+    }),
+  );
 }
 
 describe("P2-03 Track standalone adapter routing", () => {

@@ -11,7 +11,9 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
   "schemaVersion": 1,
   "projectId": "iceCreamLanding",
   "perspective": 800,
-  "scenarios": [/* ... */]
+  "scenarios": [
+    /* ... */
+  ]
 }
 ```
 
@@ -33,7 +35,9 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
   "primary": true,
   "trigger": { "type": "time", "duration": 1.2 },
   "stagger": 0.15,
-  "elements": [/* ... */]
+  "elements": [
+    /* ... */
+  ]
 }
 ```
 
@@ -83,7 +87,9 @@ Consolidated, canonical schema reference. Supersedes `schrma_v1.0`, `Schema Upda
   "id": "sprinkle1",
   "duration": 0.8,
   "transformOrigin": "50% 50%",
-  "keyframes": {/* ... */}
+  "keyframes": {
+    /* ... */
+  }
 }
 ```
 
@@ -168,13 +174,17 @@ Two properties contributing different `ease` values at the same literal `p` perc
       "start": "top top",
       "end": "+=2000"
     },
-    "elements": [/* cone, scoop1, scoop2, scoop3 */]
+    "elements": [
+      /* cone, scoop1, scoop2, scoop3 */
+    ]
   },
   {
     "sceneId": "iceCreamSection",
     "timelineId": "iceCreamSection-master",
     "trigger": { "type": "scroll", "scrub": true },
-    "elements": [/* sprinkles, cherry, syrup */]
+    "elements": [
+      /* sprinkles, cherry, syrup */
+    ]
   }
 ]
 ```

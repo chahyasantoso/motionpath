@@ -90,7 +90,9 @@ describe("normalizeObservationGraph — edge key collisions (D12)", () => {
     });
 
     expect(
-      graph.errors.some((e) => e.ruleId === "track-observations-duplicate-edge"),
+      graph.errors.some(
+        (e) => e.ruleId === "track-observations-duplicate-edge",
+      ),
     ).toBe(true);
   });
 

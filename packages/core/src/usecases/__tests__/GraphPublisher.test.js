@@ -14,7 +14,11 @@ describe("GraphPublisher", () => {
   it("publishes dirty nodes once, in compiled order, with upstream context", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(2));
     const calls = [];
-    const publisher = new GraphPublisher({ graph, tracks, publish: (id, patch) => calls.push([id, patch]) });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks,
+      publish: (id, patch) => calls.push([id, patch]),
+    });
 
     publisher.markDirty("n1");
     publisher.markDirty("n1");
@@ -29,7 +33,11 @@ describe("GraphPublisher", () => {
   it("flushes all graph nodes in order and coalesces the next frame", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(2));
     const calls = [];
-    const publisher = new GraphPublisher({ graph, tracks, publish: (id) => calls.push(id) });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks,
+      publish: (id) => calls.push(id),
+    });
 
     publisher.markAllDirty();
     expect(publisher.flush()).toBe(2);

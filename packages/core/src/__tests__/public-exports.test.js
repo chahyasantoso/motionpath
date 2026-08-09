@@ -2,7 +2,9 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const packageFile = fileURLToPath(new URL("../../package.json", import.meta.url));
+const packageFile = fileURLToPath(
+  new URL("../../package.json", import.meta.url),
+);
 const rootFile = fileURLToPath(new URL("../index.js", import.meta.url));
 const packageJson = JSON.parse(await readFile(packageFile, "utf8"));
 const rootSource = await readFile(rootFile, "utf8");
@@ -18,7 +20,9 @@ describe("public package boundary", () => {
   });
 
   it("keeps migration runtime classes out of the supported root source", () => {
-    expect(rootSource).not.toMatch(/GraphRuntime|MotionRuntime|PatchRegistry|ProjectRuntime|GraphBinding|GraphPublisher/);
-    expect(rootSource).toContain('export { Engine }');
+    expect(rootSource).not.toMatch(
+      /GraphRuntime|MotionRuntime|PatchRegistry|ProjectRuntime|GraphBinding|GraphPublisher/,
+    );
+    expect(rootSource).toContain("export { Engine }");
   });
 });

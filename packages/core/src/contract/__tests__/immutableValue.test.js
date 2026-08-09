@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { isPlainObject, toImmutableList, toImmutableValue, toImmutableValues } from "../immutableValue.js";
+import {
+  isPlainObject,
+  toImmutableList,
+  toImmutableValue,
+  toImmutableValues,
+} from "../immutableValue.js";
 
 describe("P2-01 immutable value contract", () => {
   it("freezes every level of a supported nested value", () => {
-    const frozen = toImmutableValue({ transform: { scale: { x: 1 } }, path: [{ x: 0 }] });
+    const frozen = toImmutableValue({
+      transform: { scale: { x: 1 } },
+      path: [{ x: 0 }],
+    });
     expect(Object.isFrozen(frozen)).toBe(true);
     expect(Object.isFrozen(frozen.transform)).toBe(true);
     expect(Object.isFrozen(frozen.transform.scale)).toBe(true);
@@ -13,9 +21,15 @@ describe("P2-01 immutable value contract", () => {
 
   it("rejects mutation at every reachable level", () => {
     const frozen = toImmutableValue({ transform: { scale: 1 }, path: [0] });
-    expect(() => { frozen.transform.scale = 2; }).toThrow(TypeError);
-    expect(() => { frozen.path.push(1); }).toThrow(TypeError);
-    expect(() => { frozen.added = true; }).toThrow(TypeError);
+    expect(() => {
+      frozen.transform.scale = 2;
+    }).toThrow(TypeError);
+    expect(() => {
+      frozen.path.push(1);
+    }).toThrow(TypeError);
+    expect(() => {
+      frozen.added = true;
+    }).toThrow(TypeError);
     expect(frozen.transform.scale).toBe(1);
   });
 
@@ -30,11 +44,21 @@ describe("P2-01 immutable value contract", () => {
   });
 
   it("passes foreign references through by identity", () => {
-    class Sprite { constructor() { this.frame = 0; } }
+    class Sprite {
+      constructor() {
+        this.frame = 0;
+      }
+    }
     const sprite = new Sprite();
     const node = { nodeType: 1 };
     Object.setPrototypeOf(node, { fake: "element" });
-    const frozen = toImmutableValue({ sprite, node, fn: () => 1, when: new Date(0), set: new Set([1]) });
+    const frozen = toImmutableValue({
+      sprite,
+      node,
+      fn: () => 1,
+      when: new Date(0),
+      set: new Set([1]),
+    });
     expect(frozen.sprite).toBe(sprite);
     expect(frozen.node).toBe(node);
     expect(Object.isFrozen(sprite)).toBe(false);
@@ -73,8 +97,12 @@ describe("P2-01 immutable value contract", () => {
     expect(Object.isFrozen(list)).toBe(true);
     expect(Object.isFrozen(list[0])).toBe(true);
     expect(Object.isFrozen(list[0].meta)).toBe(true);
-    expect(() => { list.push({ id: "c" }); }).toThrow(TypeError);
-    expect(() => { list[0].id = "z"; }).toThrow(TypeError);
+    expect(() => {
+      list.push({ id: "c" });
+    }).toThrow(TypeError);
+    expect(() => {
+      list[0].id = "z";
+    }).toThrow(TypeError);
   });
 
   it("treats a missing list or record as empty rather than throwing", () => {

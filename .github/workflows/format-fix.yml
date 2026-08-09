@@ -1,0 +1,42 @@
+name: Format fix
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or ref to format
+        required: true
+        default: feat/pass2-track-facade-removal
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  format-fix:
+    name: apply Prettier formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: npm ci
+      - run: npm run format
+      - name: Commit formatting and lockfile changes
+        run: |
+          if git diff --quiet; then
+            echo "Formatting and dependencies are already clean."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json .
+          git commit -m "chore: pin Prettier and apply formatting"
+          git push origin HEAD:${{ inputs.ref }}

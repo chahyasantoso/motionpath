@@ -59,7 +59,7 @@ Phase 4 must preserve current group-host behavior, including autoplay.
 Replace:
 
 ```js
-engine.createGroupHost({ id, staggerTransition, autoplay })
+engine.createGroupHost({ id, staggerTransition, autoplay });
 ```
 
 with:
@@ -69,7 +69,7 @@ engine.createMotion({
   id,
   trigger: { type: "manual", autoplay },
   staggerTransition,
-})
+});
 ```
 
 The manual trigger contract must explicitly accept `autoplay: boolean`, defaulting to the current `createGroupHost()` behavior (`true`). The delegate must build its scheduler paused when `autoplay === false`, and start it when `autoplay === true`.

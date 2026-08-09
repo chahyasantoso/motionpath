@@ -23,11 +23,18 @@ export interface RuntimePlugin {
   readonly stage?: string;
   readonly priority?: number;
   claimsKey(key: string): boolean;
-  contribute(propKey: string, stops: readonly unknown[], track: unknown): {
+  contribute(
+    propKey: string,
+    stops: readonly unknown[],
+    track: unknown,
+  ): {
     percentPatch?: Record<string, Record<string, unknown>>;
     tweenVars?: Record<string, unknown>;
   };
-  compose(rawData: Record<string, unknown>, track: unknown): Record<string, unknown>;
+  compose(
+    rawData: Record<string, unknown>,
+    track: unknown,
+  ): Record<string, unknown>;
   load?(): Promise<void>;
   prepare?(track: unknown): void | Promise<void>;
 }
@@ -43,7 +50,9 @@ export interface RuntimeTriggerDelegate {
 }
 
 export interface RuntimeTriggerRegistry {
-  get(type: TriggerType | string): ((config: unknown) => RuntimeTriggerDelegate) | undefined;
+  get(
+    type: TriggerType | string,
+  ): ((config: unknown) => RuntimeTriggerDelegate) | undefined;
 }
 
 export interface RuntimeDependencies {

@@ -37,10 +37,13 @@ export const QUARANTINED_GSAP_FILES = [
 ];
 
 /** Matches a real ES import of the vendor package, not a mention in prose. */
-export const GSAP_IMPORT_PATTERN = /(?:^|\n)\s*import\s(?:[^\n;]*?\sfrom\s)?["']gsap(?:\/[^"']*)?["']/;
+export const GSAP_IMPORT_PATTERN =
+  /(?:^|\n)\s*import\s(?:[^\n;]*?\sfrom\s)?["']gsap(?:\/[^"']*)?["']/;
 
 export function isApprovedGsapPath(relativePath) {
-  return APPROVED_GSAP_PREFIXES.some((prefix) => relativePath.startsWith(prefix));
+  return APPROVED_GSAP_PREFIXES.some((prefix) =>
+    relativePath.startsWith(prefix),
+  );
 }
 
 export function isQuarantinedGsapPath(relativePath) {

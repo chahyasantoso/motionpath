@@ -7,14 +7,29 @@
  * the contract instead of the implementation detail.
  */
 import { describe, expect, it } from "vitest";
+import { GraphBinding } from "../GraphBinding.js";
 import { GraphPublisher } from "../GraphPublisher.js";
 import { buildRealGraph, chainMotion } from "../../__fixtures__/graphTracks.js";
 
 function publisherFor(motion) {
   const { graph, tracks } = buildRealGraph(motion);
   const published = [];
-  const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+  const publisher = new GraphPublisher({
+    graph,
+    tracks,
+    publish: (id) => published.push(id),
+  });
   return { graph, tracks, publisher, published };
+}
+
+function ownerEdges(binding, target) {
+  return binding.observationState
+    .getEdges(target)
+    .map(({ source, role, input }) => ({
+      source: source.id,
+      role,
+      input,
+    }));
 }
 
 describe("GraphPublisher disposal", () => {
@@ -68,23 +83,34 @@ describe("GraphPublisher disposal", () => {
     publisher.destroy();
 
     expect(() => publisher.applyGraph(graph, tracks)).toThrow(/destroyed/i);
-    expect(() => publisher.addEdge({ source: "n0", target: "n1" })).toThrow(/destroyed/i);
-    expect(() => publisher.removeEdge({ source: "n0", target: "n1" })).toThrow(/destroyed/i);
-    // removeTrack stays a no-op: it is the destroy path a Track lifecycle event
-    // lands on, and a late event must not blow up teardown.
+    expect(() => publisher.addEdge({ source: "n0", target: "n1" })).toThrow(
+      /destroyed/i,
+    );
+    expect(() => publisher.removeEdge({ source: "n0", target: "n1" })).toThrow(
+      /destroyed/i,
+    );
     expect(() => publisher.removeTrack("n0")).not.toThrow();
   });
 
-  it("installs the live cycle guard and takes it back off on disposal", () => {
-    const { publisher, tracks } = publisherFor(chainMotion(2));
-    const n0 = tracks.get("n0");
-    const n1 = tracks.get("n1");
+  it("leaves authored cycle validation with the owner across publisher disposal", () => {
+    const { graph, publisher, tracks } = publisherFor(chainMotion(2));
+    const binding = new GraphBinding({
+      graph,
+      tracks,
+      publisher,
+      ownsPublisher: false,
+    });
+    const before = ownerEdges(binding, "n0");
 
-    expect(() => n0.setObserved(n1, (patch) => patch, { role: "output" })).toThrow(/cycle/i);
+    expect(() =>
+      binding.addEdge({ source: "n1", target: "n0", role: "output" }),
+    ).toThrow(/cycle/i);
+    expect(ownerEdges(binding, "n0")).toEqual(before);
 
     publisher.destroy();
 
-    expect(() => n0.setObserved(n1, (patch) => patch, { role: "output" })).not.toThrow();
+    expect(ownerEdges(binding, "n0")).toEqual(before);
+    binding.destroy();
   });
 
   it("survives repeated destroy of its tracks after disposal", () => {

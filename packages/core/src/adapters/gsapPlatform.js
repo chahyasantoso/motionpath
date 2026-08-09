@@ -30,6 +30,8 @@ export function registerScrollTrigger() {
 export function createGsapPlatform({ enableScrollTrigger = true } = {}) {
   return Object.freeze({
     gsap,
-    registerScrollTrigger: enableScrollTrigger ? registerScrollTrigger : () => undefined,
+    registerScrollTrigger: enableScrollTrigger
+      ? registerScrollTrigger
+      : () => undefined,
   });
 }

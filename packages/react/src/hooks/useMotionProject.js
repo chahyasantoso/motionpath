@@ -8,8 +8,19 @@ export default function useMotionProject(project) {
     if (!projectRef.current) return;
     let cancelled = false;
     setIsLoaded(false);
-    engine.loadProject(projectRef.current).then(() => { if (!cancelled) setIsLoaded(true); }).catch((err) => { if (!cancelled) console.error("[useMotionProject] loadProject failed:", err); });
-    return () => { cancelled = true; engine.destroy(); };
+    engine
+      .loadProject(projectRef.current)
+      .then(() => {
+        if (!cancelled) setIsLoaded(true);
+      })
+      .catch((err) => {
+        if (!cancelled)
+          console.error("[useMotionProject] loadProject failed:", err);
+      });
+    return () => {
+      cancelled = true;
+      engine.destroy();
+    };
   }, [project]);
   return isLoaded;
 }

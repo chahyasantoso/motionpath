@@ -6,12 +6,21 @@
 import { describe, expect, it } from "vitest";
 import { GraphBinding } from "../GraphBinding.js";
 import { GraphPublisher } from "../GraphPublisher.js";
-import { buildRealGraph, chainMotion, diamondMotion, makeTrack } from "../../__fixtures__/graphTracks.js";
+import {
+  buildRealGraph,
+  chainMotion,
+  diamondMotion,
+  makeTrack,
+} from "../../__fixtures__/graphTracks.js";
 
 function bind(motion) {
   const { graph, tracks, composeCounts } = buildRealGraph(motion);
   const published = [];
-  const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+  const publisher = new GraphPublisher({
+    graph,
+    tracks,
+    publish: (id) => published.push(id),
+  });
   const binding = new GraphBinding({ graph, tracks, publisher });
   return { graph, tracks, publisher, binding, published, composeCounts };
 }
@@ -30,14 +39,19 @@ describe("GraphBinding — representations agree", () => {
     // validation test ever runs, so use a non-cyclic mismatch here.
     tracks.get("n1").setObserved(null);
     const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
-    expect(() => new GraphBinding({ graph, tracks, publisher })).toThrow(/live Track wiring|declared edges|mismatch/i);
+    expect(() => new GraphBinding({ graph, tracks, publisher })).toThrow(
+      /live Track wiring|declared edges|mismatch/i,
+    );
   });
 });
 
 describe("GraphBinding — atomic mutation", () => {
   it("rewires an edge and keeps publisher order valid", () => {
     const { binding, publisher, published } = bind(chainMotion(4));
-    binding.replaceEdge({ source: "n1", target: "n2", role: "output" }, { source: "n0", target: "n2", role: "output" });
+    binding.replaceEdge(
+      { source: "n1", target: "n2", role: "output" },
+      { source: "n0", target: "n2", role: "output" },
+    );
     const order = publisher.graphOrder;
     expect(order.indexOf("n0")).toBeLessThan(order.indexOf("n2"));
     published.length = 0;
@@ -63,7 +77,13 @@ describe("GraphBinding — atomic mutation", () => {
 
   it("registers a late track together with its edges", () => {
     const { binding, publisher, published } = bind(chainMotion(2));
-    binding.addTrack(makeTrack("late"), [{ source: "n1", role: "output", mapFn: (patch) => ({ from_n1: patch.transform }) }]);
+    binding.addTrack(makeTrack("late"), [
+      {
+        source: "n1",
+        role: "output",
+        mapFn: (patch) => ({ from_n1: patch.transform }),
+      },
+    ]);
     expect(publisher.graphOrder).toEqual(["n0", "n1", "late"]);
     published.length = 0;
     publisher.markDirty("n0");
@@ -74,9 +94,15 @@ describe("GraphBinding — atomic mutation", () => {
   it("leaves both Track state and publisher state untouched when a mutation is invalid", () => {
     const { binding, publisher } = bind(chainMotion(3));
     const orderBefore = publisher.graphOrder;
-    expect(() => binding.addEdge({ source: "n2", target: "n0", role: "output" })).toThrow();
+    expect(() =>
+      binding.addEdge({ source: "n2", target: "n0", role: "output" }),
+    ).toThrow();
     expect(publisher.graphOrder).toEqual(orderBefore);
-    expect(binding.graph.edges.some((edge) => edge.source === "n2" && edge.target === "n0")).toBe(false);
+    expect(
+      binding.graph.edges.some(
+        (edge) => edge.source === "n2" && edge.target === "n0",
+      ),
+    ).toBe(false);
   });
 
   it("drops a removed track from the graph and stops composing it", () => {
@@ -100,7 +126,11 @@ describe("GraphBinding — lifecycle", () => {
     expect(publisher.graphOrder).not.toContain("n1");
     expect(n2.observedSources).toHaveLength(0);
     expect(() => publisher.flush()).not.toThrow();
-    expect(binding.graph.edges.every((edge) => edge.source !== "n1" && edge.target !== "n1")).toBe(true);
+    expect(
+      binding.graph.edges.every(
+        (edge) => edge.source !== "n1" && edge.target !== "n1",
+      ),
+    ).toBe(true);
   });
 
   it("stops forwarding invalidation once destroyed", () => {
@@ -110,7 +140,9 @@ describe("GraphBinding — lifecycle", () => {
     binding.destroy();
     published.length = 0;
     tracks.get("n0").progress(0.5);
-    expect(() => binding.addEdge({ source: "n0", target: "n1", role: "output" })).toThrow(/destroyed/i);
+    expect(() =>
+      binding.addEdge({ source: "n0", target: "n1", role: "output" }),
+    ).toThrow(/destroyed/i);
     expect(published).toEqual([]);
   });
 });

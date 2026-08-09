@@ -11,15 +11,28 @@
 import { describe, expect, it, vi } from "vitest";
 import { GraphRuntime } from "../GraphRuntime.js";
 import { createTickClock } from "../../ports/Clock.js";
-import { buildRealGraph, chainMotion, diamondMotion } from "../../__fixtures__/graphTracks.js";
+import {
+  buildRealGraph,
+  chainMotion,
+  diamondMotion,
+} from "../../__fixtures__/graphTracks.js";
 
 function testClock() {
   const listeners = new Set();
   let tick = 0;
   return {
-    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-    tick(delta = 16) { tick += 1; for (const listener of [...listeners]) listener({ tick, delta }); return tick; },
-    get listenerCount() { return listeners.size; },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    tick(delta = 16) {
+      tick += 1;
+      for (const listener of [...listeners]) listener({ tick, delta });
+      return tick;
+    },
+    get listenerCount() {
+      return listeners.size;
+    },
   };
 }
 
@@ -34,7 +47,12 @@ describe("publisher evidence: compose once per node per tick", () => {
     clock.tick();
 
     // 'a' feeds both 'b' and 'c'. Composing it twice would be the naive result.
-    expect(Object.fromEntries(composeCounts)).toEqual({ a: 1, b: 1, c: 1, d: 1 });
+    expect(Object.fromEntries(composeCounts)).toEqual({
+      a: 1,
+      b: 1,
+      c: 1,
+      d: 1,
+    });
     runtime.dispose();
   });
 
@@ -52,7 +70,12 @@ describe("publisher evidence: compose once per node per tick", () => {
 
     tracks.get("n0").progress(0.5);
     clock.tick();
-    expect(Object.fromEntries(composeCounts)).toEqual({ n0: 2, n1: 2, n2: 2, n3: 2 });
+    expect(Object.fromEntries(composeCounts)).toEqual({
+      n0: 2,
+      n1: 2,
+      n2: 2,
+      n3: 2,
+    });
     runtime.dispose();
   });
 
@@ -61,7 +84,9 @@ describe("publisher evidence: compose once per node per tick", () => {
     const clock = testClock();
     const runtime = new GraphRuntime({ graph, tracks, clock });
     const flushes = [];
-    runtime.subscribe("n1", () => { flushes.push(runtime.flush()); });
+    runtime.subscribe("n1", () => {
+      flushes.push(runtime.flush());
+    });
 
     clock.tick();
 
@@ -79,12 +104,19 @@ describe("publisher evidence: subscriber scaling", () => {
       const clock = testClock();
       const runtime = new GraphRuntime({ graph, tracks, clock });
       const notified = new Array(subscriberCount).fill(0);
-      for (let i = 0; i < subscriberCount; i += 1) runtime.subscribe("n3", () => { notified[i] += 1; });
+      for (let i = 0; i < subscriberCount; i += 1)
+        runtime.subscribe("n3", () => {
+          notified[i] += 1;
+        });
 
       tracks.get("n0").progress(0.5);
       clock.tick();
 
-      measured.push({ subscriberCount, composes: total(composeCounts), delivered: notified.filter((n) => n === 1).length });
+      measured.push({
+        subscriberCount,
+        composes: total(composeCounts),
+        delivered: notified.filter((n) => n === 1).length,
+      });
       runtime.dispose();
     }
 
@@ -97,7 +129,8 @@ describe("publisher evidence: subscriber scaling", () => {
     const clock = testClock();
     const runtime = new GraphRuntime({ graph, tracks, clock });
     const received = [];
-    for (let i = 0; i < 5; i += 1) runtime.subscribe("n1", (patch) => received.push(patch));
+    for (let i = 0; i < 5; i += 1)
+      runtime.subscribe("n1", (patch) => received.push(patch));
 
     clock.tick();
 
@@ -122,7 +155,9 @@ describe("publisher evidence: subscriber scaling", () => {
 describe("publisher evidence: failure and lifecycle on a live clock", () => {
   it("isolates a compose failure and never throws into the ticker", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(2), {
-      onCompose: (id) => { if (id === "n1") throw new Error("plugin exploded"); },
+      onCompose: (id) => {
+        if (id === "n1") throw new Error("plugin exploded");
+      },
     });
     const clock = testClock();
     const runtime = new GraphRuntime({ graph, tracks, clock });
@@ -132,13 +167,17 @@ describe("publisher evidence: failure and lifecycle on a live clock", () => {
 
     expect(runtime.getPatch("n0")).not.toBeNull();
     expect(runtime.getPatch("n1")).toBeNull();
-    expect(runtime.diagnostics[0]).toMatchObject({ code: "GRAPH_FLUSH_FAILED" });
+    expect(runtime.diagnostics[0]).toMatchObject({
+      code: "GRAPH_FLUSH_FAILED",
+    });
     runtime.dispose();
   });
 
   it("still throws from a direct flush, because the caller asked", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(2), {
-      onCompose: (id) => { if (id === "n1") throw new Error("plugin exploded"); },
+      onCompose: (id) => {
+        if (id === "n1") throw new Error("plugin exploded");
+      },
     });
     const runtime = new GraphRuntime({ graph, tracks });
     runtime.publisher.markAllDirty();
@@ -164,7 +203,12 @@ describe("createTickClock", () => {
   it("normalizes a delta-only source and shares one upstream subscription", () => {
     const subscribe = vi.fn();
     let emit;
-    subscribe.mockImplementation((listener) => { emit = listener; return () => { emit = null; }; });
+    subscribe.mockImplementation((listener) => {
+      emit = listener;
+      return () => {
+        emit = null;
+      };
+    });
     const clock = createTickClock({ subscribe });
 
     const seen = [];
@@ -173,7 +217,10 @@ describe("createTickClock", () => {
     expect(subscribe).toHaveBeenCalledTimes(1);
 
     emit(16.7);
-    expect(seen).toEqual([["a", { tick: 1, delta: 16.7 }], ["b", { tick: 1, delta: 16.7 }]]);
+    expect(seen).toEqual([
+      ["a", { tick: 1, delta: 16.7 }],
+      ["b", { tick: 1, delta: 16.7 }],
+    ]);
 
     offA();
     expect(clock.isAttached).toBe(true);

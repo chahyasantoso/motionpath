@@ -15,8 +15,12 @@ describe v1 only and should not be treated as current.
 {
   "schemaVersion": 2,
   "perspective": "800px",
-  "templates": [/* Template[] */],
-  "motions": [/* Motion[] */]
+  "templates": [
+    /* Template[] */
+  ],
+  "motions": [
+    /* Motion[] */
+  ]
 }
 ```
 
@@ -25,7 +29,7 @@ describe v1 only and should not be treated as current.
 | `schemaVersion` | **yes**  | Must be exactly `2` (literal number). _(`schema-version.js`)_                                                                                                                                                 |
 | `perspective`   | no       | Root-level px string (e.g. `"800px"`). Only relevant if any track uses `z`/`rotationX`/`rotationY`/a 3D `path`. Missing it while using those triggers a **warning**, not an error. _(`perspective-usage.js`)_ |
 | `templates`     | no       | Array of reusable keyframe fragments. See §4.                                                                                                                                                                 |
-| `motions`       | no*      | Array of animation definitions. See §2. (*schema-structurally optional, but a project with none does nothing)                                                                                                 |
+| `motions`       | no\*     | Array of animation definitions. See §2. (\*schema-structurally optional, but a project with none does nothing)                                                                                                |
 
 ---
 
@@ -61,7 +65,9 @@ Every motion has exactly one driver, of one of two types.
   "sectionId": "iceCreamSection",
   "timelineId": "iceCreamSection-master",
   "primary": true,
-  "trigger": {/* Trigger */}
+  "trigger": {
+    /* Trigger */
+  }
 }
 ```
 
@@ -99,15 +105,15 @@ Delegate motions describe reusable, progress-driven animation resolved on demand
 
 All rules from `trigger-shape.js`:
 
-| Rule                                                                                  | Detail                                                                                                                                                                                                                                                                                               |
-| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `trigger.type`                                                                        | Required, exactly `"scroll"` or `"time"`.                                                                                                                                                                                                                                                            |
-| `scroll` requires `scrub`                                                             | Required, `boolean` or `number`.                                                                                                                                                                                                                                                                     |
-| **"scrub"** = `type === "scroll" && (scrub === true \|\| typeof scrub === "number")** | This exact predicate gates every rule below.                                                                                                                                                                                                                                                         |
-| `endTrigger`                                                                          | Only valid when scrub. Error otherwise.                                                                                                                                                                                                                                                              |
-| `repeat` / `yoyo` / `repeatDelay`                                                     | **Forbidden on scrub.** Error if present. Valid on `time` and scroll-observer (`scroll`+`scrub:false`).                                                                                                                                                                                              |
-| `delay`                                                                               | **Forbidden on scrub.** Valid on `time` and observer. **Known GSAP-community caveat, not independently verified**: on observer with multi-action `toggleActions`, `delay` reportedly applies on enter/enterBack but is skipped on leave/leaveBack. Not a concern for simple `"play none none none"`. |
-| track-level `duration`                                                                | **Forbidden on scrub** — checked per-track, error cites the offending track's `id`.                                                                                                                                                                                                                  |
+| Rule                                                                                    | Detail                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trigger.type`                                                                          | Required, exactly `"scroll"` or `"time"`.                                                                                                                                                                                                                                                            |
+| `scroll` requires `scrub`                                                               | Required, `boolean` or `number`.                                                                                                                                                                                                                                                                     |
+| **"scrub"** = `type === "scroll" && (scrub === true \|\| typeof scrub === "number")\*\* | This exact predicate gates every rule below.                                                                                                                                                                                                                                                         |
+| `endTrigger`                                                                            | Only valid when scrub. Error otherwise.                                                                                                                                                                                                                                                              |
+| `repeat` / `yoyo` / `repeatDelay`                                                       | **Forbidden on scrub.** Error if present. Valid on `time` and scroll-observer (`scroll`+`scrub:false`).                                                                                                                                                                                              |
+| `delay`                                                                                 | **Forbidden on scrub.** Valid on `time` and observer. **Known GSAP-community caveat, not independently verified**: on observer with multi-action `toggleActions`, `delay` reportedly applies on enter/enterBack but is skipped on leave/leaveBack. Not a concern for simple `"play none none none"`. |
+| track-level `duration`                                                                  | **Forbidden on scrub** — checked per-track, error cites the offending track's `id`.                                                                                                                                                                                                                  |
 
 Scroll-scrub extras (pass-through, not separately validated here): `pin`, `pinSpacing`, `snap`.
 
@@ -128,7 +134,9 @@ Scroll-scrub extras (pass-through, not separately validated here): `pin`, `pinSp
   "templateId": "enemyPathTemplate",
   "duration": 2,
   "transformOrigin": "50% 50%",
-  "keyframes": {/* same shape as track.keyframes */}
+  "keyframes": {
+    /* same shape as track.keyframes */
+  }
 }
 ```
 

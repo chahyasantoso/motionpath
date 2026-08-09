@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { gsap } from "gsap";
-import { ManualTriggerDelegate, TimeTriggerDelegate } from "../TriggerDelegate.js";
+import {
+  ManualTriggerDelegate,
+  TimeTriggerDelegate,
+} from "../TriggerDelegate.js";
 
 describe("Motion autoplay compatibility", () => {
   it("defaults time-trigger autoplay to true", () => {
