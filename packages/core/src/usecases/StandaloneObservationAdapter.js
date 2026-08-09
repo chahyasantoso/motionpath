@@ -1,8 +1,5 @@
 import { TrackObservationOwner } from "./TrackObservationOwner.js";
 
-const publicContexts = new WeakMap();
-const internalContexts = new WeakSet();
-
 /**
  * Standalone observation ownership for one explicit scope.
  *
@@ -195,24 +192,24 @@ export class StandaloneObservationAdapter {
 
   #internalContext(ctx) {
     if (!ctx) return new Map();
-    if (internalContexts.has(ctx)) return ctx;
-    let internal = publicContexts.get(ctx);
-    if (!internal) {
-      internal = new Map();
-      publicContexts.set(ctx, internal);
-      internalContexts.add(internal);
-      for (const [publicId, patch] of ctx) {
-        const track = this.#findTrack(publicId);
-        if (track) internal.set(this.#keys.get(track), patch);
-      }
+    const internal = new Map();
+    for (const [publicId, patch] of ctx) {
+      const track = this.#findTrack(publicId);
+      if (track) internal.set(this.#keys.get(track), patch);
     }
     return internal;
   }
 
   #composeSource(source, ctx) {
-    if (typeof source.compose === "function") return source.compose(undefined, ctx);
-    const key = this.#keys.get(source);
-    return this.#owner.compose(key, undefined, ctx);
+    if (typeof source.compose !== "function") {
+      return this.#owner.compose(source, undefined, ctx);
+    }
+    const publicContext = new Map();
+    for (const [key, patch] of ctx) {
+      const track = this.#owner.getTrack(key);
+      if (track) publicContext.set(track.id, patch);
+    }
+    return source.compose(undefined, publicContext);
   }
 
   #watchTrack(track) {
