@@ -11,6 +11,7 @@ export function createTrack(config, templates = [], options = {}) {
   const resolver = options.resolvePluginForKey || plugins?.resolve?.bind(plugins) || defaultResolvePlugin;
   const built = buildTrackTweenSync(resolvedTrack.id, resolvedTrack.keyframes || {}, resolvedTrack.duration ?? 1, resolvedTrack, resolver);
   const mode = config?.mode ?? resolvedTrack.mode ?? options.mode ?? "standalone";
-  const observationAdapter = options.observationAdapter ?? (mode === "standalone" ? new StandaloneObservationAdapter() : null);
+  const hasAdapterOption = Object.prototype.hasOwnProperty.call(options, "observationAdapter");
+  const observationAdapter = hasAdapterOption ? options.observationAdapter : mode === "standalone" ? new StandaloneObservationAdapter() : null;
   return new Track({ id: resolvedTrack.id, mode, interpolationTimeline: built.tween, proxyState: built.proxy, plugins: built.resolvedPlugins, resolvedTrack, layoutDelegate: config.layoutDelegate, eventBus: options.eventBus || options.dependencies?.eventBus, observationAdapter });
 }
