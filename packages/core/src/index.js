@@ -7,6 +7,7 @@ export { mergePatches } from "./usecases/mergePatches.js";
 export { Overlay } from "./usecases/Overlay.js";
 export { Spawner } from "./usecases/Spawner.js";
 export { Engine } from "./engines/Engine.js";
+export { createObservationScope } from "./runtime/createObservationScope.js";
 export { createManualClock, assertClock } from "./ports/Clock.js";
 export { assertInterpolator } from "./ports/Interpolator.js";
 export { assertScheduler } from "./ports/Scheduler.js";
