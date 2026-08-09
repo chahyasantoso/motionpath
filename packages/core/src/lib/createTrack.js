@@ -1,7 +1,6 @@
 import { resolveTrack } from "../usecases/ResolveTrack.js";
 import { buildTrackTweenSync } from "../usecases/BuildTrackTween.js";
 import { resolvePluginForKey as defaultResolvePlugin } from "../domain/plugins.js";
-import { installLegacyObservationFacade } from "../usecases/LegacyObservationFacade.js";
 import { defaultProjectRuntime } from "../runtime/defaultProjectRuntime.js";
 import { Track } from "./Track.js";
 
@@ -36,17 +35,15 @@ export function createTrack(config, templates = [], options = {}) {
     : mode === "standalone"
       ? (scopedAdapter ?? defaultProjectRuntime.standaloneObservationAdapter)
       : null;
-  return installLegacyObservationFacade(
-    new Track({
-      id: resolvedTrack.id,
-      mode,
-      interpolationTimeline: built.tween,
-      proxyState: built.proxy,
-      plugins: built.resolvedPlugins,
-      resolvedTrack,
-      layoutDelegate: config.layoutDelegate,
-      eventBus: options.eventBus || options.dependencies?.eventBus,
-      observationAdapter,
-    }),
-  );
+  return new Track({
+    id: resolvedTrack.id,
+    mode,
+    interpolationTimeline: built.tween,
+    proxyState: built.proxy,
+    plugins: built.resolvedPlugins,
+    resolvedTrack,
+    layoutDelegate: config.layoutDelegate,
+    eventBus: options.eventBus || options.dependencies?.eventBus,
+    observationAdapter,
+  });
 }
