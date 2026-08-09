@@ -1,11 +1,14 @@
 import { TrackObservationOwner } from "./TrackObservationOwner.js";
 
+const contextProjections = new WeakMap();
+
 /** Standalone observation ownership with private identity keys and public Track objects. */
 export class StandaloneObservationAdapter {
   #owner;
   #keys = new WeakMap();
   #tracks = new Map();
   #nextIdentity = 0;
+  #internalContexts = new WeakMap();
   #sourceUnsubscribers = new Map();
   #lifecycleUnsubscribers = new Map();
   #destroyed = false;
@@ -106,7 +109,10 @@ export class StandaloneObservationAdapter {
   compose(track, rawData, ctx) {
     this.#assertAlive();
     this.register(track);
-    return this.#owner.compose(this.#keys.get(track), rawData, ctx);
+    const internal = this.#contextFor(ctx);
+    const patch = this.#owner.compose(this.#keys.get(track), rawData, internal);
+    if (ctx && internal !== ctx) ctx.set(track.id, patch);
+    return patch;
   }
 
   destroy() {
@@ -118,6 +124,21 @@ export class StandaloneObservationAdapter {
     this.#lifecycleUnsubscribers.clear();
     this.#owner.destroy();
     this.#tracks.clear();
+  }
+
+  #contextFor(ctx) {
+    if (!ctx) return new Map();
+    const existing = this.#internalContexts.get(ctx);
+    if (existing) return existing;
+    const projected = contextProjections.get(ctx) ?? ctx;
+    const internal = new Map();
+    for (const [id, patch] of projected) {
+      const track = this.#findById(typeof id === "string" ? id.split("#")[0] : id);
+      if (track) internal.set(this.#keys.get(track), patch);
+    }
+    this.#internalContexts.set(ctx, internal);
+    contextProjections.set(internal, projected);
+    return internal;
   }
 
   #keyForPublic(value) {
