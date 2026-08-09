@@ -13,7 +13,7 @@
     "typecheck": "npm exec --yes --package=typescript@5.8.3 -- tsc --noEmit -p tsconfig.json",
     "pack:check": "npm pack --dry-run",
     "format": "prettier . --write",
-    "format:check": "npm exec --yes --package=prettier@3.6.2 -- prettier --check .",
+    "format:check": "prettier --check .",
     "reorg:physical": "node scripts/physical-reorg.mjs",
     "benchmark:rig": "node performance/rig-graph-benchmark.mjs && node performance/downstream-index-benchmark.mjs",
     "benchmark:v5:baseline": "node performance/v5-baseline.mjs",
@@ -31,6 +31,7 @@
     "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^6.0.3",
     "jsdom": "^29.1.1",
+    "prettier": "3.6.2",
     "vitest": "^4.1.10"
   }
 }
