@@ -1,8 +1,8 @@
 name: CI
 
 on:
-  # Protected branches use push validation. Feature branches also run on push
-  # because API-authored commits do not reliably enqueue pull_request checks.
+  # Protected branches use push validation. Feature branches use pull-request
+  # validation so every PR head has one authoritative matrix.
   push:
     branches:
       - master
@@ -11,9 +11,6 @@ on:
       - v4.2
       - v4.3
       - v5
-      - "feat/**"
-      - "fix/**"
-      - "test/**"
   pull_request:
     branches: [master, v4, v4.1, v4.2, v4.3, v5, main]
     types: [opened, synchronize, reopened]
