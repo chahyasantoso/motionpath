@@ -96,7 +96,7 @@ export class StandaloneObservationAdapter {
     const target = this.#keys.get(observer);
     if (!target) return;
     for (const edge of this.#owner.getEdges(target)) {
-      this.#owner.removeEdge({ source: this.#keyFor(this.#owner.tracks.get(edge.source)), target, role: edge.role, input: edge.input });
+      this.#owner.removeEdge({ source: edge.source, target, role: edge.role, input: edge.input });
     }
   }
 
@@ -162,7 +162,7 @@ export class StandaloneObservationAdapter {
   }
   #stateSources(targetOrTrack) {
     const track = this.#resolveTrack(targetOrTrack);
-    return track ? this.getEdges(track).map(({ source }) => source) : [];
+    return track ? this.#owner.getSources(this.#keys.get(track)) : [];
   }
   #internalContext(ctx) {
     if (!ctx) return new Map();
