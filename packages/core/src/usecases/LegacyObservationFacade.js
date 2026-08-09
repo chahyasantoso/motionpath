@@ -1,4 +1,3 @@
-const guards = new WeakMap();
 const originals = new WeakMap();
 const SET = "setObserved";
 const REMOVE = "removeObserved";
@@ -19,8 +18,6 @@ export function installLegacyObservationFacade(track) {
   if (!track || track[SET]) return track;
   const methods = {
     [SET](source, mapFn, options = {}) {
-      const guard = guards.get(track);
-      if (source) guard?.(track, source, options);
       if (!source) { track.getObservationOwner()?.clearObserved(track); track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" }); return; }
       const role = options.role ?? "output";
       const input = role === "input" ? options.target : undefined;
@@ -31,8 +28,6 @@ export function installLegacyObservationFacade(track) {
     },
     [REMOVE](source, options = {}) { return track.getObservationOwner()?.removeObserved(track, source, options); },
     [REPLACE](oldSource, newSource, mapFn, options = {}) {
-      const guard = guards.get(track);
-      guard?.(track, newSource, options);
       const owner = track.getObservationOwner();
       const oldEdges = owner?.getEdges(track).filter((edge) => edge.source === oldSource && (options.role === undefined || edge.role === options.role)) ?? [];
       const role = options.role ?? oldEdges[0]?.role ?? "output";
@@ -64,7 +59,6 @@ export function installLegacyObservationFacade(track) {
     [EDGES]: { configurable: true, get() { return (track.getObservationOwner()?.getEdges(track) ?? []).map((edge) => ({ ...edge, target: track.id })); } },
     [COUNT]: { configurable: true, get() { return track[IDS].length; } },
     [IDS]: { configurable: true, get() { return track.getObservationOwner()?.getObserverIds(track) ?? []; } },
-    _setGraphGuard: { configurable: true, writable: true, value(guard) { guards.set(track, guard ?? null); } },
   });
   return track;
 }
