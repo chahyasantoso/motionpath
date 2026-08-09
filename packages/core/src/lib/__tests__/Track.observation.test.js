@@ -72,17 +72,24 @@ describe("Track: destroyed guards (D8)", () => {
 });
 
 describe("Track: distinct observation edges (D9)", () => {
-  it("holds an input edge and an output edge from the same source simultaneously", () => {
-    const source = makeTrack("src");
-    source.progress(1);
-    const observer = makeTrack("obs");
-    observer.setObserved(source, () => ({ parentWorld: { x: 1, y: 2 } }), {
-      role: "input",
-    });
-    observer.setObserved(source, () => ({ tag: "out" }), { role: "output" });
-    expect(observer.observedEdges).toHaveLength(2);
-    expect(observer.compose().tag).toBe("out");
-  });
+  it(
+    "holds an input edge and an output edge from the same source simultaneously",
+    () => {
+      const source = makeTrack("src");
+      source.progress(1);
+      const observer = makeTrack("obs");
+      observer.setObserved(
+        source,
+        () => ({ parentWorld: { x: 1, y: 2 } }),
+        { role: "input" },
+      );
+      observer.setObserved(source, () => ({ tag: "out" }), {
+        role: "output",
+      });
+      expect(observer.observedEdges).toHaveLength(2);
+      expect(observer.compose().tag).toBe("out");
+    },
+  );
 
   it("keeps observedSources deduplicated by source (locked semantics)", () => {
     const source = makeTrack("src");
@@ -103,15 +110,18 @@ describe("Track: distinct observation edges (D9)", () => {
 });
 
 describe("Track: cycle rejection is scoped to graph membership (D6)", () => {
-  it("still allows mutual observation for standalone tracks (LOCKED, must stay green)", () => {
-    const a = makeTrack("cycle-a");
-    const b = makeTrack("cycle-b");
-    expect(() => {
-      a.setObserved(b, (patch) => ({ fromB: patch.transform }));
-      b.setObserved(a, (patch) => ({ fromA: patch.transform }));
-    }).not.toThrow();
-    expect(() => a.compose()).not.toThrow();
-  });
+  it(
+    "still allows mutual observation for standalone tracks (LOCKED, must stay green)",
+    () => {
+      const a = makeTrack("cycle-a");
+      const b = makeTrack("cycle-b");
+      expect(() => {
+        a.setObserved(b, (patch) => ({ fromB: patch.transform }));
+        b.setObserved(a, (patch) => ({ fromA: patch.transform }));
+      }).not.toThrow();
+      expect(() => a.compose()).not.toThrow();
+    },
+  );
 
   it("rejects a cycle-creating rewire once the tracks belong to a graph", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
@@ -123,11 +133,9 @@ describe("Track: cycle rejection is scoped to graph membership (D6)", () => {
       ownsPublisher: false,
     });
     expect(() =>
-      tracks
-        .get("n0")
-        .setObserved(tracks.get("n2"), (patch) => ({
-          fromN2: patch.transform,
-        })),
+      tracks.get("n0").setObserved(tracks.get("n2"), (patch) => ({
+        fromN2: patch.transform,
+      })),
     ).toThrow(/cycle/i);
     binding.destroy();
     publisher.destroy();
@@ -135,7 +143,11 @@ describe("Track: cycle rejection is scoped to graph membership (D6)", () => {
 
   it("leaves the graph untouched when a cycle-creating rewire is rejected", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
-    const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks,
+      publish: () => {},
+    });
     const binding = new GraphBinding({
       graph,
       tracks,
