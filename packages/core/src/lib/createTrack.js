@@ -19,14 +19,13 @@ export function createTrack(config, templates = [], options = {}) {
     resolver,
   );
   const mode = config?.mode ?? resolvedTrack.mode ?? options.mode ?? "standalone";
-  const hasAdapterOption = Object.prototype.hasOwnProperty.call(
-    options,
-    "observationAdapter",
-  );
+  const hasAdapterOption = Object.prototype.hasOwnProperty.call(options, "observationAdapter");
+  const scopedRuntime = options.observationScope ?? options.projectRuntime;
+  const scopedAdapter = scopedRuntime?.standaloneObservationAdapter;
   const observationAdapter = hasAdapterOption
     ? options.observationAdapter
     : mode === "standalone"
-      ? defaultProjectRuntime.standaloneObservationAdapter
+      ? scopedAdapter ?? defaultProjectRuntime.standaloneObservationAdapter
       : null;
   return new Track({
     id: resolvedTrack.id,
