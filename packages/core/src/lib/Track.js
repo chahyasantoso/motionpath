@@ -69,6 +69,7 @@ export class Track {
   get duration() { return this.#interpolationTimeline?.duration() ?? 0; }
   get isDestroyed() { return this.#destroyed; }
 
+  /** Progress updates notify subscribers before invalidating the graph owner. */
   progress(progress) {
     if (progress === undefined) {
       return this.#interpolationTimeline?.progress() ?? 0;
@@ -79,6 +80,7 @@ export class Track {
     this.#invalidate("progress");
   }
 
+  /** Snapshot is deliberately raw playhead state; plugins run only in compose. */
   getSnapshot() {
     this.#assertAlive();
     const { _gsap, ...rest } = this.#proxyState || {};
@@ -88,6 +90,7 @@ export class Track {
     };
   }
 
+  /** Local composition remains independent from graph observation composition. */
   composeLocal(raw) {
     this.#assertAlive();
     return composePatch(
@@ -98,6 +101,7 @@ export class Track {
     );
   }
 
+  /** The active owner supplies observation folds and per-call memoization. */
   compose(raw, context) {
     this.#assertAlive();
     return this.#owner()?.compose(this, raw, context) ?? this.composeLocal(raw);
@@ -137,6 +141,7 @@ export class Track {
     this.#emit(event);
   }
 
+  /** Legacy adoption is limited to standalone compatibility boundaries. */
   _adoptObservationOwner(owner) {
     if (
       this.#mode !== "standalone" ||
