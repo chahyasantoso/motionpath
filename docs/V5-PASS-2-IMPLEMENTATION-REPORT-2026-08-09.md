@@ -1,35 +1,31 @@
 # MotionPath v5 pass-2 implementation report
 
 **Date:** 2026-08-09, Asia/Jakarta  
-**Branch:** `feat/pass2-scoped-adapter-migration`  
-**Behavior head:** `32ada3e`, all eight original Node 24 checks green  
-**Closure work:** strict CI enforcement and reviewer findings are now recorded in the implementor review
+**Branch:** `feat/pass2-track-facade-removal`  
+**Head:** `6158ffd` before the CI/docs repair commit  
+**Active PR:** [#145](https://github.com/chahyasantoso/motionpath/pull/145)
 
-## Delivered behavior
+## Delivered in this slice
 
-- compatibility/scoped adapter parity across the locked scenario runner;
-- ProjectRuntime ownership selector and Engine integration with compatibility default;
-- scoped duplicate-ID isolation and compose-context memoization;
-- ObservationState-backed authored graph state and rollback metadata;
-- owner-backed observer snapshots and source-destroy cleanup;
-- readability protection for the core ownership files;
-- explicit cache-fuzz timeout after indexing the public-ID hot path;
-- strict pass-2 boundary scan and benchmark jobs wired as blocking CI checks;
-- corrected public ownership documentation.
+- GraphPublisher no longer owns a duplicate Track-walking cycle guard.
+- Track construction no longer installs the legacy observation facade automatically.
+- createTrack and compatibility fixtures install the facade explicitly.
+- Legacy mutations adopt both endpoints into one explicit adapter.
+- Standalone adapter composition preserves owner-scoped identity and memoization boundaries.
+- Readability protection was restored for Track and GraphPublisher.
+- CI trigger coverage is being repaired because the last three commits had zero checks.
 
-## Architectural closure still required
+## Current evidence
 
-P2-03 is not complete until the following are landed on the same final green head:
+The non-unit jobs had passed on the prior head, but the facade-removal matrix is not currently green. The latest red evidence is concentrated in direct Track compatibility tests, stale cycle-guard expectations, and standalone owner adoption/composition. The next run on the trigger-repaired head is the source of truth.
 
-1. Remove the Track-installed legacy observation facade after migrating production callers.
-2. Replace or explicitly close the direct-construction fallback with a caller-owned scope and isolation evidence.
-3. Remove GraphPublisher's Track-walking cycle guard and make ObservationState/controller the sole runtime authority.
-4. Remove authored GraphBinding compatibility dual-write and emit lifecycle changes from the owner.
-5. Add repeated teardown evidence and a deterministic hot-path benchmark threshold.
-6. Refresh status and matrix docs after the final closure run.
+## Next work
 
-P2-04 topology/playback removal, P2-02 GSAP quarantine cleanup, and P2-05 publisher rollout evidence remain separate work.
+1. Confirm nine push-triggered Node 24 jobs on the new head.
+2. Fix focused Track/adapter lifecycle and composition failures.
+3. Migrate stale tests from Track-installed publisher guards to GraphBinding/ObservationState.
+4. Refresh this report and the completion matrix only after the full matrix is green.
 
 ## Guardrails
 
-Do not weaken parity or lifecycle assertions. Preserve public Track IDs, mapper/input semantics, lifecycle ordering, and default-off rollout flags.
+Do not restore Track-owned edge maps, process-global observation state, or publisher cycle guards. Preserve public IDs, mapper/input semantics, lifecycle ordering, and all default-off rollout flags.

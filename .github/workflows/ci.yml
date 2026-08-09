@@ -1,8 +1,8 @@
 name: CI
 
 on:
-  # Keep push validation for protected integration branches. Feature/fix/test
-  # branches are validated by their pull_request workflow only.
+  # Protected branches use push validation. Feature branches also run on push
+  # because API-authored commits do not reliably enqueue pull_request checks.
   push:
     branches:
       - master
@@ -11,6 +11,9 @@ on:
       - v4.2
       - v4.3
       - v5
+      - "feat/**"
+      - "fix/**"
+      - "test/**"
   pull_request:
     branches: [master, v4, v4.1, v4.2, v4.3, v5, main]
     types: [opened, synchronize, reopened]
@@ -31,9 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run format:check:ci
 
@@ -44,9 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm test -- --reporter=verbose
 
@@ -57,9 +56,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run typecheck
 
@@ -70,9 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run build
 
@@ -83,9 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run pack:check
 
@@ -96,9 +89,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run boundary:v5:pass2
 
@@ -109,9 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run boundary:v5:pass2:strict
 
@@ -122,9 +111,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run benchmark:rig
 
@@ -135,9 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run benchmark:v5:baseline
       - uses: actions/upload-artifact@v4

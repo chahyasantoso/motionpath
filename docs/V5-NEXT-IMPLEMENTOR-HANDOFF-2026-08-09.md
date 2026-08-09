@@ -1,45 +1,34 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 16:49 Jakarta  
-**Branch:** `feat/pass2-scoped-adapter-migration`  
-**Phase:** P2-03 phase three, cycle-authority cleanup
+**Captured:** 2026-08-09 18:10 Jakarta  
+**Branch:** `feat/pass2-track-facade-removal`  
+**PR:** [#145](https://github.com/chahyasantoso/motionpath/pull/145)  
+**Phase:** P2-03 facade-removal migration
 
-## Green evidence
+## CI repair
 
-The phase-two owner-first GraphBinding migration is green: unit tests, build,
-typecheck, packaging, default boundary, strict boundary, benchmark, and baseline
-checks all pass. Authored mutations now use the injected ObservationState controller;
-legacy hooks remain only for explicit compatibility and fault-injection coverage.
+The previous three commits had zero checks because `.github/workflows/ci.yml` only ran push validation on protected branches and the API-authored updates did not reliably enqueue pull_request checks. Feature/fix/test push triggers are restored. Verify the next push creates nine Node 24 jobs before making more architectural changes.
 
-## Phase three objective
+## Current implementation
 
-Remove the duplicate GraphPublisher cycle authority. `ObservationState` and graph
-normalization remain the intended authorities; GraphPublisher must stop walking
-Track observation edges and must stop installing `_setGraphGuard` on Tracks.
+- `Track` no longer installs `LegacyObservationFacade` in its constructor.
+- `createTrack` and compatibility fixtures install the facade explicitly.
+- Legacy mutation now adopts the source and observer into one explicit standalone adapter.
+- GraphPublisher is scheduling-only; authored cycle authority is GraphBinding/ObservationState.
+- Track remains responsible for topology/playback until separate P2-04 work.
 
-## Required implementation order
+## Known red areas
 
-1. Migrate the disposal cycle test from Track-installed guard behavior to the
-   GraphBinding/ObservationState owner contract.
-2. Delete GraphPublisher's `#graphGuard`, guard attachment, and guard detachment.
-3. Keep cycle rejection before mutation in ObservationState and normalized graph
-   validation. Preserve standalone mutual-cycle composition, which is not authored
-   graph validation.
-4. Add a regression proving rejected authored cycles leave state, IR, publisher
-   order, and live composition unchanged.
-5. Run the full Node 24 matrix, including strict boundary, before touching the
-   compatibility facade.
+The last reported matrix still had failures in direct Track compatibility tests, standalone lifecycle/adoption tests, stale publisher cycle-guard expectations, and readability checks. Treat these as migration gaps to fix, not as reasons to restore Track-owned graph state or a process-global registry.
 
-## Still open after phase three
+## Required next order
 
-- Remove the Track-installed legacy facade after all direct callers/tests migrate.
-- Route direct `Track` and `createTrack` construction through explicit scopes by
-  default and retire the singleton fallback.
-- Add repeated teardown and deterministic hot-path benchmark evidence.
-- Refresh status, matrix, and implementation report on the final closure head.
+1. Confirm the push-triggered nine-job matrix appears on the current head.
+2. Run the focused Track/adapter suites and fix explicit-adapter adoption, standalone mutual-cycle composition, duplicate-ID isolation, and destroy cleanup.
+3. Migrate all remaining direct Track tests from implicit methods to explicit adapter/controller calls, preserving compatibility coverage only where explicitly intended.
+4. Update stale tests that expect `GraphPublisher` to install `_setGraphGuard`; authored cycle rejection must go through GraphBinding/ObservationState.
+5. Run the full matrix, including strict boundary, before closing P2-03.
 
 ## Guardrails
 
-Keep `publisherRendering`, `crossMotion`, `freeTracks`, and `observationOwnership`
-default-off/default-compatibility. Keep P2-04 topology/playback removal separate.
-Never weaken parity assertions or hide boundary findings with scanner exceptions.
+Keep `publisherRendering`, `crossMotion`, `freeTracks`, and `observationOwnership` default-off/default-compatibility. Keep P2-04 topology/playback removal separate. Never weaken assertions or scanner limits.

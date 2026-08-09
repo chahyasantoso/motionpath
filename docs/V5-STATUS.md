@@ -1,47 +1,37 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-09 16:49 Jakarta  
-**Branch:** `feat/pass2-scoped-adapter-migration`  
-**Phase-two status:** green, owner-first GraphBinding migration complete  
-**Next phase:** cycle-authority cleanup  
-**Implementor review:** [`V5-P2-03-IMPLEMENTOR-REVIEW-2026-08-09.md`](./V5-P2-03-IMPLEMENTOR-REVIEW-2026-08-09.md)  
-**Next handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)
+**Status captured:** 2026-08-09 18:10 Jakarta  
+**Branch:** `feat/pass2-track-facade-removal` at `6158ffd`  
+**Active PR:** [#145](https://github.com/chahyasantoso/motionpath/pull/145)  
+**Phase:** P2-03 facade-removal migration, CI trigger repair
 
 ## Executive status
 
-Phase two is green across the full Node 24 matrix, including strict boundary,
-unit tests, build, typecheck, packaging, benchmark, and baseline jobs. Authored
-GraphBinding mutations now use ObservationState/controller state directly. P2-03
-remains open only for the next architectural closures: duplicate cycle authority,
-legacy facade removal, direct singleton fallback retirement, and final teardown/
-performance evidence.
+The last three implementation commits had zero checks because CI only listened for protected-branch pushes and the API-authored updates did not enqueue a pull_request run. The workflow now also validates `feat/**`, `fix/**`, and `test/**` pushes, so the next branch update will produce the full Node 24 matrix.
+
+The facade-removal batch is not green yet. The current known failures are compatibility callers still assuming Track-installed methods, standalone compose ownership across independently created Tracks, stale publisher cycle-guard expectations, and readability drift. No failure is being hidden or marked complete.
 
 ## Evidence-backed architecture
 
 - Engine-created standalone Tracks share the injected ProjectRuntime adapter.
-- Direct callers have an explicit caller-owned observation scope.
-- Scoped ownership isolates duplicate IDs and preserves compose-context memoization.
-- ObservationState owns authored graph state after hydration and rollback.
-- GraphBinding uses the injected controller for authored mutations.
-- Strict boundary and benchmark jobs are blocking CI checks.
-- Compatibility remains default; scoped ownership is explicit opt-in.
+- Direct legacy callers are migrated through explicit adapter adoption.
+- Authored graph state and cycle validation belong to GraphBinding/ObservationState.
+- GraphPublisher no longer installs or walks a Track cycle guard.
+- Compatibility remains explicit and rollout flags remain default-off.
 
 ## Closure checklist
 
-- [x] Behavioral matrix and full Node 24 suite green.
-- [x] Strict boundary command is a blocking PR job.
-- [x] Benchmark and baseline jobs are blocking.
-- [x] Public ownership docs corrected.
-- [x] Caller-owned direct scope and isolation coverage added.
-- [x] Authored GraphBinding uses owner/controller state directly.
-- [ ] Remove GraphPublisher's duplicate Track-walking cycle guard.
-- [ ] Remove the Track-installed legacy facade after caller migration.
+- [x] GraphPublisher Track-walking cycle guard removed.
+- [x] Strict boundary and benchmark jobs are blocking in CI.
+- [x] Track construction no longer installs the legacy facade automatically.
+- [x] createTrack and compatibility fixtures install the facade explicitly.
+- [x] Direct legacy mutations adopt both endpoints into one explicit adapter.
+- [ ] Full Node 24 matrix green on the final facade-removal head.
+- [ ] Migrate remaining direct Track tests and stale cycle-guard expectations.
 - [ ] Retire the default singleton fallback from direct construction.
 - [ ] Add deterministic hot-path benchmark threshold and repeated teardown evidence.
-- [ ] Refresh status, matrix, review, and implementation report on final closure head.
+- [ ] Refresh status, matrix, review, and implementation report on the final green head.
 
-## Guardrails
+## Next implementor
 
-Keep `publisherRendering`, `crossMotion`, `freeTracks`, and `observationOwnership`
-default-off/default-compatibility. Keep P2-04 topology/playback removal separate.
-Never weaken assertions or hide boundary findings with scanner exceptions.
+Start from [V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md), then run the push-triggered Node 24 unit job first. Do not change P2-04 topology/playback or rollout defaults.
