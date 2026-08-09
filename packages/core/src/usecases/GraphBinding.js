@@ -19,7 +19,8 @@ export class GraphBinding {
     this.#publisher = publisher;
     this.#ownsPublisher = ownsPublisher !== false;
     this.#graph = this.#freeze(graph);
-    this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks });
+    const ownerEdges = initialEdges.length ? initialEdges : this.#captureTrackEdges();
+    this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks, edges: ownerEdges });
     this.#bindObservationComposition();
     if (initialEdges.length) this.#wireInitialEdges(initialEdges);
     this.#assertTrackGraphMatches();
@@ -34,25 +35,36 @@ export class GraphBinding {
   get observationState() { return this.#observationBridge?.state ?? null; }
   get isDestroyed() { return this.#destroyed; }
 
+  #captureTrackEdges() {
+    const edges = [];
+    for (const track of this.#tracks.values()) {
+      for (const edge of track.observedEdges ?? []) {
+        if (!this.#tracks.has(edge.source.id)) continue;
+        edges.push({
+          source: edge.source.id,
+          target: track.id,
+          role: edge.role,
+          input: edge.input,
+          mapFn: edge.mapFn,
+        });
+      }
+    }
+    return edges;
+  }
+
   replaceEdge(oldEdge, newEdge) {
     this.#assertAlive();
     const observer = this.#tracks.get(oldEdge.target ?? newEdge.target);
     const oldSource = this.#tracks.get(oldEdge.source);
     const newSource = this.#tracks.get(newEdge.source);
     if (!observer || !oldSource || !newSource) throw new Error("replaceEdge references an unknown track.");
-    const candidate = this.#candidateGraph((edges) => [
-      ...edges.filter((edge) => !observationEdgeEquals(edge, { ...oldEdge, target: observer.id })),
-      this.#normalizeEdge({ ...newEdge, target: observer.id }),
-    ]);
+    const candidate = this.#candidateGraph((edges) => [...edges.filter((edge) => !observationEdgeEquals(edge, { ...oldEdge, target: observer.id })), this.#normalizeEdge({ ...newEdge, target: observer.id })]);
     const role = newEdge.role ?? oldEdge.role;
     const input = role === "input" ? newEdge.input ?? newEdge.target : undefined;
     const replaced = this.#edgeSnapshots(observer, oldSource, { role: oldEdge.role });
     this.#transaction(
       () => this.#changeObservation(
-        () => this.#observationBridge.state.replaceEdge(
-          { source: oldSource.id, target: observer.id, role: oldEdge.role },
-          { source: newSource.id, target: observer.id, role, input, mapFn: newEdge.mapFn },
-        ),
+        () => this.#observationBridge.state.replaceEdge({ source: oldSource.id, target: observer.id, role: oldEdge.role }, { source: newSource.id, target: observer.id, role, input, mapFn: newEdge.mapFn }),
         () => observer.replaceObserved(oldSource, newSource, newEdge.mapFn, { role, target: input }),
       ),
       () => {
@@ -132,49 +144,12 @@ export class GraphBinding {
     }
   }
 
-  removeTrack(id, { destroy = true } = {}) {
-    if (this.#destroyed || !this.#tracks.has(id)) return;
-    const track = this.#tracks.get(id);
-    const candidate = this.#candidateGraph((edges) => edges.filter((edge) => edge.source !== id && edge.target !== id), (nodes) => nodes.filter((node) => node.id !== id));
-    this.#tracks.delete(id);
-    this.#observationBridge.state.unregister(id);
-    if (destroy && !track.isDestroyed) track.destroy?.();
-    this.#commit(candidate);
-  }
-
-  destroy() {
-    if (this.#destroyed) return;
-    this.#destroyed = true;
-    for (const unsubscribe of this.#unsubscribers) unsubscribe();
-    this.#unsubscribers = [];
-    this.#unbindObservationComposition();
-    this.#tracks = new Map();
-    this.#observationBridge?.destroy();
-    this.#observationBridge = null;
-    const publisher = this.#publisher;
-    this.#publisher = null;
-    if (this.#ownsPublisher) publisher?.destroy?.();
-  }
-
+  removeTrack(id, { destroy = true } = {}) { if (this.#destroyed || !this.#tracks.has(id)) return; const track = this.#tracks.get(id); const candidate = this.#candidateGraph((edges) => edges.filter((edge) => edge.source !== id && edge.target !== id), (nodes) => nodes.filter((node) => node.id !== id)); this.#tracks.delete(id); this.#observationBridge.state.unregister(id); if (destroy && !track.isDestroyed) track.destroy?.(); this.#commit(candidate); }
+  destroy() { if (this.#destroyed) return; this.#destroyed = true; for (const unsubscribe of this.#unsubscribers) unsubscribe(); this.#unsubscribers = []; this.#unbindObservationComposition(); this.#tracks = new Map(); this.#observationBridge?.destroy(); this.#observationBridge = null; const publisher = this.#publisher; this.#publisher = null; if (this.#ownsPublisher) publisher?.destroy?.(); }
   #edgeSnapshots(observer, source, { role, input } = {}) { return this.#observationBridge.state.getEdges(observer.id).filter((existing) => existing.source === source && (role === undefined || existing.role === role) && (role !== "input" || input === undefined || existing.input === input)); }
   #restoreEdge(observer, source, snapshot) { this.#observationBridge?.state.addEdge({ source: source.id, target: observer.id, role: snapshot.role, input: snapshot.input, mapFn: snapshot.mapFn }); observer.setObserved(source, snapshot.mapFn, { role: snapshot.role, target: snapshot.input }); }
   #detachEdge(observer, source, { role, input }) { this.#observationBridge?.state.removeEdge({ source: source.id, target: observer.id, role, input }); observer.removeObserved(source, { role, target: input }); }
-  #wireInitialEdges(edges) {
-    const undo = [];
-    try {
-      for (const edge of edges) {
-        const observer = this.#tracks.get(edge.target);
-        const source = this.#tracks.get(edge.source);
-        if (!observer || !source) throw new Error("GraphBinding initial edge references an unknown track.");
-        const role = edge.role ?? "output";
-        const input = role === "input" ? edge.input ?? edge.target : undefined;
-        this.#observationBridge.state.addEdge({ source: source.id, target: observer.id, role, input, mapFn: edge.mapFn ?? null });
-        observer.setObserved(source, edge.mapFn ?? null, { role, target: input });
-        undo.push(() => this.#detachEdge(observer, source, { role, input }));
-      }
-      this.#observationBridge.assertParity();
-    } catch (error) { for (const rollback of undo.reverse()) rollback(); this.#refreshObservationBridge(); throw error; }
-  }
+  #wireInitialEdges(edges) { const undo = []; try { for (const edge of edges) { const observer = this.#tracks.get(edge.target); const source = this.#tracks.get(edge.source); if (!observer || !source) throw new Error("GraphBinding initial edge references an unknown track."); const role = edge.role ?? "output"; const input = role === "input" ? edge.input ?? edge.target : undefined; this.#observationBridge.state.addEdge({ source: source.id, target: observer.id, role, input, mapFn: edge.mapFn ?? null }); observer.setObserved(source, edge.mapFn ?? null, { role, target: input }); undo.push(() => this.#detachEdge(observer, source, { role, input })); } this.#observationBridge.assertParity(); } catch (error) { for (const rollback of undo.reverse()) rollback(); this.#refreshObservationBridge(); throw error; } }
   #changeObservation(change, compatibility) { try { change(); compatibility(); } catch (error) { this.#refreshObservationBridge(); throw error; } }
   #transaction(wire, unwire, candidate) { const previousGraph = this.#graph; try { wire(); this.#commit(candidate); } catch (error) { this.#unwind([unwire]); this.#graph = previousGraph; this.#refreshObservationBridge(); throw error; } }
   #unwind(steps) { for (const step of [...steps].reverse()) { try { step(); } catch {} } }
@@ -188,16 +163,6 @@ export class GraphBinding {
   #unbindObservationComposition() { for (const track of this.#tracks.values()) track._setObservationComposer?.(null); }
   #syncPublisher() { this.#publisher.applyGraph(this.#graph, this.#tracks); }
   #subscribe() { for (const track of this.#tracks.values()) this.#subscribeTrack(track); }
-  #subscribeTrack(track) {
-    const unsubscribeLifecycle = track.onLifecycle?.((event) => {
-      if (this.#destroyed) return;
-      if (event.type === "destroyed") this.removeTrack(event.track.id);
-      if (event.type === "detached") this.removeTrack(event.track.id, { destroy: false });
-    });
-    if (unsubscribeLifecycle) this.#unsubscribers.push(unsubscribeLifecycle);
-    // ObservationStateBridge owns the single source-destroy subscription. Do
-    // not add a second no-op subscriber here: disposal must release exactly what
-    // GraphBinding itself owns, and source cleanup belongs to the state bridge.
-  }
+  #subscribeTrack(track) { const unsubscribeLifecycle = track.onLifecycle?.((event) => { if (this.#destroyed) return; if (event.type === "destroyed") this.removeTrack(event.track.id); if (event.type === "detached") this.removeTrack(event.track.id, { destroy: false }); }); if (unsubscribeLifecycle) this.#unsubscribers.push(unsubscribeLifecycle); }
   #assertAlive() { if (this.#destroyed) throw new Error("GraphBinding is destroyed."); }
 }
