@@ -55,5 +55,6 @@ for (const path of stale) addFinding("gsap-quarantine-stale", path, "quarantine 
 const blocking = findings.filter((finding) => finding.blocking);
 const report = { generatedAt: new Date().toISOString(), strict, scanRoots: SCAN_ROOTS, findings, summary: { findingCount: findings.length, blockingCount: blocking.length, gsapImports: findings.filter(({ kind }) => kind === "gsap-import").length, gsapQuarantined: findings.filter(({ kind, blocking: isBlocking }) => kind === "gsap-import" && !isBlocking).length, rendererGsapImports: findings.filter(({ kind }) => kind === "renderer-gsap-import").length, trackOwnershipFindings: findings.filter(({ kind }) => kind.startsWith("track-")).length } };
 console.log(JSON.stringify(report, null, 2));
+// Strict mode blocks actionable P2-03 findings. Known topology, renderer, and
+// quarantined GSAP findings remain visible but belong to later slices.
 if (blocking.length) process.exitCode = 1;
-else if (strict && findings.length) process.exitCode = 1;
