@@ -17,6 +17,15 @@ function clamp01(value) {
  * Observation ownership is external. Engine-created standalone Tracks receive
  * one adapter from ProjectRuntime; direct construction uses the default runtime
  * scope. Authored graph Tracks pass null because GraphBinding owns their edges.
+ *
+ * The compatibility fields below are deliberately still present during P2-03.
+ * They preserve the public Track protocol while GraphBinding migrates its reads
+ * to ObservationState. Removing them before that migration breaks rollback and
+ * source-destroy ordering, even though the adapter already owns the live graph.
+ *
+ * Edge mutation follows a strict order: adapter first, local compatibility view
+ * second, lifecycle notifications last. A failed migration must not publish an
+ * event for an edge that was not accepted by the owning graph.
  */
 export class Track {
   #id;
