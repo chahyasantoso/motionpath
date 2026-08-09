@@ -1,34 +1,20 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 12:03 Jakarta  
+**Captured:** 2026-08-09 12:09 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
 **Base:** green PR #142 at `184f194`
 
 ## Current truth
 
-PR #143 is green before the opt-in scoped harness slice. The proven adapter implementation remains unchanged. The new harness is isolated, default-off, and not wired into Track or ProjectRuntime.
-
-## Completed in this slice
-
-- Added `ScopedObservationAdapter` with private owner lifetime.
-- Preserved public IDs and `COMPOSING` fallback in the harness.
-- Added duplicate-ID isolation, mutual-cycle, and lifecycle tests.
+PR #143's pre-harness head was green. The opt-in scoped harness exposed two protocol bugs in its own tests: it returned internal edge source keys incorrectly and pre-seeded the root `COMPOSING` marker, skipping the root's edges. Both are corrected in the harness only; production adapter behavior remains untouched.
 
 ## Required verification
 
-Run the full Node 24 matrix on the harness commit before integrating it:
-
-```text
-npm test -- --reporter=verbose
-npm run typecheck
-npm run build
-npm run pack:check
-npm run boundary:v5:pass2
-```
+Run the full Node 24 matrix on commit `854f256` before integrating the harness. Do not wire it into Track or ProjectRuntime until the harness and protocol comparison suite are green.
 
 ## Next work
 
-If green, compare the harness against the existing adapter with the characterization suite, then add a default-off ProjectRuntime selector. Do not remove the global fallback or change defaults until equivalence is proven.
+Compare the scoped harness against the existing adapter across the locked characterization suite, then add a default-off ProjectRuntime selector. Remove the global fallback only after equivalence is proven.
 
 ## Guardrails
 
