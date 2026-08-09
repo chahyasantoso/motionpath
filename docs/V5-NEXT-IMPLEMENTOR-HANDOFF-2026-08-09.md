@@ -1,30 +1,34 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 18:40 Asia/Jakarta  
+**Captured:** 2026-08-09 19:55 Asia/Jakarta  
 **Branch:** `feat/pass2-track-facade-removal`  
-**Head:** `3a631a0a87279259c8c9a5c09836c68b20a6e409`  
 **PR:** [#145](https://github.com/chahyasantoso/motionpath/pull/145)  
 **Review:** [`V5-PR-145-SENIOR-IMPLEMENTOR-REVIEW-2026-08-09.md`](./V5-PR-145-SENIOR-IMPLEMENTOR-REVIEW-2026-08-09.md)  
 **Playbook:** [`V5-PR-145-IMPLEMENTOR-PLAYBOOK.md`](./V5-PR-145-IMPLEMENTOR-PLAYBOOK.md)
 
-## Current truth
+## Handoff truth
 
-Do not merge this head. A fresh CI matrix is in progress after the review and documentation update. The prior reviewed head had both unit-test jobs failing. Completion requires one authoritative fully green matrix on the exact final ref.
+The session reduced the functional failures to one readability failure. The failure reported `Track.js comment ratio is 2.4%, floor is 5%`; invariant comments were restored afterward. The next action is to run and inspect one fresh exact-head CI matrix. Do not merge based on the pre-fix 719/720 result.
 
-The playbook is the implementation contract. It sequences gate repair, unit correctness, explicit compatibility boundaries, cross-owner rejection, authored ownership transfer, lifecycle restoration, honest ownership-mode evidence, public types, and final verification.
+## Completed this session
 
-## Required order
+- Closed superseded PR #143.
+- Removed duplicate push validation for feature branches.
+- Removed the explicit format CI job per direction; readability unit guards remain.
+- Fixed authored-controller versus adapter owner confusion.
+- Fixed shared standalone scope adoption so multi-source and diamond composition retain all edges.
+- Removed GraphBinding authored double mutation, while preserving explicit rollback fault injection.
+- Fixed the Vite syntax error in `LegacyObservationFacade.js`.
+- Restored readability suites and manually formatted Track and ScopedObservationAdapter.
+- Restored Track invariant comments to satisfy the comment-ratio floor.
 
-1. Read the playbook and record the baseline.
-2. Fix the exact-head unit failures and duplicate CI execution.
-3. Make facade installation explicit and add runtime symbol-ban tests.
-4. Reject implicit cross-owner mutation and add no-edge-loss isolation tests.
-5. Make GraphBinding ownership transfer atomic and add bind/mutate/unbind tests.
-6. Restore remove/destroy lifecycle contracts and invalidation tests.
-7. Remove GraphBinding double mutation and decide whether ownership modes are independent or one mode.
-8. Finish TypeScript declarations, source formatting, and deterministic performance evidence.
-9. Run one authoritative full matrix, then refresh all docs and sign off.
+## Next order
 
-## Guardrails
+1. Run the fresh exact-head unit, build, typecheck, package, boundary, strict-boundary, and benchmark jobs.
+2. If green, add runtime symbol-ban evidence for authored Engine Tracks.
+3. Finish cross-owner rejection, stale-owner unbinding, lifecycle/invalidation, TypeScript, and independent ownership-mode evidence.
+4. Refresh status and matrix with the final commit and checks only, then sign off.
 
-Keep `publisherRendering`, `crossMotion`, and `freeTracks` default-off. Keep P2-04 topology/playback separate. Do not accept source-text absence as proof that the runtime Track surface is clean, and do not use alias-versus-alias tests as ownership parity evidence.
+## Do not drift
+
+Do not skip readability tests, weaken assertions, reintroduce Track-owned observation state, restore GraphPublisher cycle guards, or touch P2-04/topology/playback and rollout defaults.
