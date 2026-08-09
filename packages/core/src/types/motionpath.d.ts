@@ -7,11 +7,12 @@ export interface PathProperty { points: PathNode[]; stops: Stop[]; autoRotate?: 
 export type Keyframes = Record<string, AnimatedProperty | PathProperty>;
 export type TrackMode = "standalone" | "authored-graph";
 /**
- * Which owner holds standalone observation edges.
+ * Selects the owner used for standalone observation edges.
  *
- * `compatibility` is the default and uses the process-wide registry.
- * `scoped` gives each ProjectRuntime its own edge space and is opt-in while the
- * migration is verified. Both satisfy the same behavioural contract.
+ * `compatibility` is the default legacy API behavior. Engine-created Tracks
+ * share the owning ProjectRuntime adapter; direct Track construction uses the
+ * documented compatibility fallback until callers provide an explicit owner.
+ * `scoped` gives each ProjectRuntime an isolated edge space.
  */
 export type ObservationOwnership = "compatibility" | "scoped";
 export interface ScrollTrigger { type: "scroll"; scrub: boolean | number; trigger?: string | Element; start?: string; end?: string; endTrigger?: string | Element; pin?: boolean | string | Element; pinSpacing?: boolean; toggleActions?: string; }
