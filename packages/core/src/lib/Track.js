@@ -32,22 +32,11 @@ export class Track {
   #layoutDelegate;
   #standaloneObservationAdapter;
   #observationController = null;
-  #observationObserverIds = null;
   #groupHost = null;
   #destroyed = false;
   #destroying = false;
 
-  constructor({
-    id,
-    mode = "standalone",
-    interpolationTimeline,
-    proxyState,
-    plugins,
-    resolvedTrack,
-    layoutDelegate,
-    eventBus = defaultEventBus,
-    observationAdapter = null,
-  }) {
+  constructor({ id, mode = "standalone", interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate, eventBus = defaultEventBus, observationAdapter = null }) {
     this.#id = id;
     this.#mode = mode === "authored-graph" ? "authored-graph" : "standalone";
     this.#interpolationTimeline = interpolationTimeline;
@@ -93,14 +82,6 @@ export class Track {
     return this.#owner()?.compose(this, raw, context) ?? this.composeLocal(raw);
   }
 
-  get observerIds() {
-    return this.#observationObserverIds?.() ?? this.#owner()?.getObserverIds(this) ?? [];
-  }
-
-  get observerCount() {
-    return this.observerIds.length;
-  }
-
   onLifecycle(callback) {
     if (typeof callback !== "function") throw new TypeError("Track lifecycle callback must be a function.");
     this.#lifecycleSubscribers.add(callback);
@@ -119,10 +100,6 @@ export class Track {
     return () => this.#subscribers.delete(callback);
   }
 
-  _setObservationObserverIds(provider) {
-    this.#observationObserverIds = typeof provider === "function" ? provider : null;
-  }
-
   _setObservationController(controller) {
     this.#observationController = controller ?? null;
   }
@@ -137,9 +114,7 @@ export class Track {
   }
 
   #emitInvalidation(reason) {
-    for (const callback of [...this.#lifecycleSubscribers]) {
-      callback({ type: "invalidated", track: this, reason });
-    }
+    for (const callback of [...this.#lifecycleSubscribers]) callback({ type: "invalidated", track: this, reason });
   }
 
   #assertAlive() {
@@ -201,12 +176,12 @@ export class Track {
   }
   reverse() { this.#groupHost?.timeline.reverse(); }
 
-  /** Destroy reports owner-state observer IDs before releasing lifecycle hooks. */
+  /** Destroy delegates graph cleanup to the owner before releasing the leaf. */
   destroy() {
     if (this.#destroyed || this.#destroying) return;
     this.#destroying = true;
-    const observerIds = this.observerIds;
-    for (const callback of [...this.#destroySubscribers]) callback({ id: this.#id, observerIds });
+    const observers = this.#owner()?.getObserverIds?.(this) ?? [];
+    for (const callback of [...this.#destroySubscribers]) callback({ id: this.#id, observers });
     this.#owner()?.clearObserved?.(this);
     this.#destroyed = true;
     this.#standaloneObservationAdapter?.unregister(this);
@@ -215,7 +190,7 @@ export class Track {
     this.#parent = null;
     this.#host = null;
     this.#subscribers.clear();
-    for (const callback of [...this.#lifecycleSubscribers]) callback({ type: "destroyed", track: this, observerIds });
+    for (const callback of [...this.#lifecycleSubscribers]) callback({ type: "destroyed", track: this, observers });
     this.#destroySubscribers.clear();
     this.#lifecycleSubscribers.clear();
     if (this.#groupHost) {
