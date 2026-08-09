@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { StandaloneObservationAdapter } from "../StandaloneObservationAdapter.js";
+import { installLegacyObservationFacade } from "../LegacyObservationFacade.js";
 import { Track } from "../../lib/Track.js";
 
 function track(id) {
-  return new Track({ id, proxyState: { value: id }, plugins: [{ keys: ["value"], compose: (raw) => ({ value: raw.value }) }], resolvedTrack: { id, keyframes: {} } });
+  return installLegacyObservationFacade(new Track({ id, proxyState: { value: id }, plugins: [{ keys: ["value"], compose: (raw) => ({ value: raw.value }) }], resolvedTrack: { id, keyframes: {} } }));
 }
 
 describe("P2-03 standalone external ownership", () => {
@@ -19,7 +20,8 @@ describe("P2-03 standalone external ownership", () => {
 
   it("keeps authored graph Tracks unbound to standalone ownership", () => {
     const trackInstance = new Track({ id: "authored", mode: "authored-graph", proxyState: {}, plugins: [], resolvedTrack: { id: "authored", keyframes: {} } });
-    expect(trackInstance.observedSources).toEqual([]);
+    expect(trackInstance.getObservationOwner()).toBeNull();
+    expect("observedSources" in trackInstance).toBe(false);
     trackInstance.destroy();
   });
 });
