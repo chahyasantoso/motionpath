@@ -1,69 +1,26 @@
 import { composePatch } from "../usecases/ComposeTrackPatch.js";
-import { COMPOSING } from "../usecases/composeContext.js";
-import { mergePatches } from "../usecases/mergePatches.js";
-import { observationEdgeKey } from "../usecases/observationEdge.js";
 import { defaultProjectRuntime } from "../runtime/defaultProjectRuntime.js";
 import { defaultGaplessLayoutDelegate } from "./GaplessLayoutDelegate.js";
 import { eventBus as defaultEventBus } from "./eventBus.js";
 import { logger } from "./logger.js";
 
-function clamp01(value) {
-  return Math.max(0, Math.min(1, Number(value) || 0));
-}
+function clamp01(value) { return Math.max(0, Math.min(1, Number(value) || 0)); }
 
 /**
- * A Track is a playhead plus local plugin composition.
- *
- * Observation ownership is external. Engine-created standalone Tracks receive
- * one adapter from ProjectRuntime; direct construction uses the default runtime
- * scope. Authored graph Tracks pass null because GraphBinding owns their edges.
- *
- * The compatibility fields below are deliberately still present during P2-03.
- * They preserve the public Track protocol while GraphBinding migrates its reads
- * to ObservationState. Removing them before that migration breaks rollback and
- * source-destroy ordering, even though the adapter already owns the live graph.
- *
- * Edge mutation follows a strict order: adapter first, local compatibility view
- * second, lifecycle notifications last. A failed migration must not publish an
- * event for an edge that was not accepted by the owning graph.
+ * A Track is a playhead and local plugin composer. Observation ownership lives
+ * in the injected adapter/controller; Track keeps only the public forwarding
+ * surface during the compatibility window. GraphBinding supplies its controller
+ * after construction, while direct standalone Tracks use the runtime adapter.
  */
 export class Track {
-  #id;
-  #mode;
-  #interpolationTimeline;
-  #proxyState;
-  #plugins;
-  #resolvedTrack;
-  #eventBus;
-  #host = null;
-  #parent = null;
-  #children = new Map();
-  #subscribers = new Set();
-  #lifecycleSubscribers = new Set();
-  #destroySubscribers = new Set();
-  #currentOffset = 0;
-  #staggerOffset = 0;
-  #layoutDelegate;
-  #observed = new Map();
-  #graphGuard = null;
-  #observationComposer = null;
-  #standaloneObservationAdapter;
-  #observationObserverIds = null;
-  #groupHost = null;
-  #destroyed = false;
-  #destroying = false;
+  #id; #mode; #interpolationTimeline; #proxyState; #plugins; #resolvedTrack; #eventBus;
+  #host = null; #parent = null; #children = new Map(); #subscribers = new Set();
+  #lifecycleSubscribers = new Set(); #destroySubscribers = new Set(); #currentOffset = 0;
+  #staggerOffset = 0; #layoutDelegate; #graphGuard = null; #observationComposer = null;
+  #standaloneObservationAdapter; #observationController = null; #observationObserverIds = null;
+  #groupHost = null; #destroyed = false; #destroying = false;
 
-  constructor({
-    id,
-    mode = "standalone",
-    interpolationTimeline,
-    proxyState,
-    plugins,
-    resolvedTrack,
-    layoutDelegate,
-    eventBus = defaultEventBus,
-    observationAdapter = null,
-  }) {
+  constructor({ id, mode = "standalone", interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate, eventBus = defaultEventBus, observationAdapter = null }) {
     this.#id = id;
     this.#mode = mode === "authored-graph" ? "authored-graph" : "standalone";
     this.#interpolationTimeline = interpolationTimeline;
@@ -72,7 +29,6 @@ export class Track {
     this.#resolvedTrack = resolvedTrack;
     this.#layoutDelegate = layoutDelegate ?? defaultGaplessLayoutDelegate;
     this.#eventBus = eventBus;
-    // Track never constructs an adapter. Ownership belongs to a runtime.
     this.#standaloneObservationAdapter = this.#mode === "standalone"
       ? (observationAdapter ?? defaultProjectRuntime.standaloneObservationAdapter)
       : null;
@@ -93,255 +49,78 @@ export class Track {
     this.#notify();
     this.#invalidate("progress");
   }
-
   getSnapshot() {
     this.#assertAlive();
     const { _gsap, ...rest } = this.#proxyState || {};
     return { ...rest, progress: this.#interpolationTimeline?.progress() ?? 0 };
   }
-
   composeLocal(raw) {
     this.#assertAlive();
-    return composePatch(
-      this.#plugins,
-      raw ?? this.getSnapshot(),
-      this.#resolvedTrack,
-      `track "${this.#id}"`,
-    );
+    return composePatch(this.#plugins, raw ?? this.getSnapshot(), this.#resolvedTrack, `track "${this.#id}"`);
   }
-
   compose(raw, ctx) {
     this.#assertAlive();
     if (this.#observationComposer) return this.#observationComposer(raw, ctx);
-    if (this.#standaloneObservationAdapter) {
-      return this.#standaloneObservationAdapter.compose(this, raw, ctx);
-    }
-    ctx ??= new Map();
-    const cached = ctx.get(this.#id);
-    if (cached === COMPOSING) return this.composeLocal(raw);
-    if (cached !== undefined) return cached;
-    ctx.set(this.#id, COMPOSING);
-    let source = raw ?? this.getSnapshot();
-    for (const { source: observed, mapFn, role } of this.#observed.values()) {
-      if (role !== "input" || !mapFn) continue;
-      const contribution = mapFn(observed.compose(undefined, ctx));
-      if (contribution) source = { ...source, ...contribution };
-    }
-    let patch = this.composeLocal(source);
-    for (const { source: observed, mapFn, role } of this.#observed.values()) {
-      if (role !== "output" || !mapFn) continue;
-      const contribution = mapFn(observed.compose(undefined, ctx));
-      if (contribution) patch = mergePatches(patch, contribution);
-    }
-    ctx.set(this.#id, patch);
-    return patch;
+    return this.#owner()?.compose(this, raw, ctx) ?? this.composeLocal(raw);
   }
 
-  setObserved(track, mapFn, opts = {}) {
-    if (!track) {
-      this.#standaloneObservationAdapter?.clearObserved(this);
-      this.#clearObserved();
-      this.#invalidate("observation");
-      return;
-    }
-    if (track === this) throw new Error(`Track "${this.#id}" cannot observe itself.`);
-    if (track.isDestroyed) throw new Error(`Track "${track.id}" is destroyed.`);
-    const role = opts.role ?? "output";
-    const input = role === "input" ? opts.target : undefined;
-    this.#graphGuard?.(this, track, { role, input });
-    const key = observationEdgeKey(track.id, role, input);
-    const previous = this.#observed.get(key);
-    this.#standaloneObservationAdapter?.setObserved(this, track, mapFn, opts);
-    this.#observed.set(key, { source: track, mapFn: mapFn ?? null, role, input });
-    this.#emitLifecycle({
-      type: previous ? "edge-replaced" : "edge-added",
-      track: this,
-      source: track,
-      edge: { source: track.id, target: this.#id, role, input },
-    });
+  setObserved(source, mapFn, opts = {}) {
+    if (!source) { this.#owner()?.clearObserved(this); this.#invalidate("observation"); return; }
+    if (source === this) throw new Error(`Track "${this.#id}" cannot observe itself.`);
+    if (source.isDestroyed) throw new Error(`Track "${source.id}" is destroyed.`);
+    this.#graphGuard?.(this, source, opts);
+    const previous = this.#owner()?.getEdges(this).some((edge) => edge.source === source && (opts.role === undefined || edge.role === opts.role));
+    this.#owner()?.setObserved(this, source, mapFn, opts);
+    this.#emitLifecycle({ type: previous ? "edge-replaced" : "edge-added", track: this, source, edge: { source: source.id, target: this.#id, role: opts.role ?? "output", input: opts.role === "input" ? opts.target : undefined } });
     this.#invalidate("observation");
   }
 
-  removeObserved(track, opts = {}) {
-    if (!track) return;
-    this.#standaloneObservationAdapter?.removeObserved(this, track, opts);
-    const keys = [...this.#observed.entries()]
-      .filter(([, edge]) => edge.source === track
-        && (opts.role === undefined || edge.role === opts.role)
-        && (opts.role !== "input"
-          || opts.target === undefined
-          || edge.input === opts.target))
-      .map(([key]) => key);
-    for (const key of keys) this.#removeObservedKey(key);
-    if (keys.length) this.#invalidate("observation");
+  removeObserved(source, opts = {}) {
+    if (!source) return;
+    this.#owner()?.removeObserved(this, source, opts);
+    this.#emitLifecycle({ type: "edge-removed", track: this, source, edge: { source: source.id, target: this.#id, role: opts.role, input: opts.target } });
+    this.#invalidate("observation");
   }
 
   replaceObserved(oldSource, newSource, mapFn, opts = {}) {
-    if (!oldSource || !newSource) {
-      throw new TypeError("replaceObserved requires two source tracks.");
-    }
-    if (newSource === this) {
-      throw new Error(`Track "${this.#id}" cannot observe itself.`);
-    }
-    if (oldSource === newSource) {
-      throw new Error("replaceObserved requires two different source tracks.");
-    }
-    const replaced = [...this.#observed.entries()]
-      .filter(([, edge]) => edge.source === oldSource
-        && (opts.role === undefined || edge.role === opts.role));
-    if (!replaced.length) {
-      throw new Error(`Track "${this.#id}" does not observe "${oldSource.id}".`);
-    }
-    for (const [, edge] of replaced) {
-      this.#graphGuard?.(this, newSource, { role: edge.role, input: edge.input });
-    }
-    this.#standaloneObservationAdapter?.replaceObserved(
-      this,
-      oldSource,
-      newSource,
-      mapFn,
-      opts,
-    );
-    for (const [oldKey, edge] of replaced) {
-      const role = edge.role;
-      const input = role === "input" ? (opts.target ?? edge.input) : undefined;
-      const key = observationEdgeKey(newSource.id, role, input);
-      this.#observed.delete(oldKey);
-      this.#observed.set(key, { source: newSource, mapFn: mapFn ?? edge.mapFn, role, input });
-      this.#emitLifecycle({
-        type: "edge-removed",
-        track: this,
-        source: oldSource,
-        edge: { source: oldSource.id, target: this.#id, role: edge.role, input: edge.input },
-      });
-      this.#emitLifecycle({
-        type: "edge-added",
-        track: this,
-        source: newSource,
-        edge: { source: newSource.id, target: this.#id, role, input },
-      });
-    }
-    // Compatibility-mode replay: without an adapter, #observed still needs the
-    // old key removed and a fresh setObserved() run through the normal path.
-    if (!this.#standaloneObservationAdapter) {
-      for (const [oldKey] of replaced) this.#removeObservedKey(oldKey);
-      for (const [, edge] of replaced) {
-        this.setObserved(newSource, mapFn ?? edge.mapFn, {
-          role: edge.role,
-          target: edge.input,
-        });
-      }
-    }
+    if (!oldSource || !newSource) throw new TypeError("replaceObserved requires two source tracks.");
+    if (newSource === this) throw new Error(`Track "${this.#id}" cannot observe itself.`);
+    if (oldSource === newSource) throw new Error("replaceObserved requires two different source tracks.");
+    this.#graphGuard?.(this, newSource, opts);
+    this.#owner()?.replaceObserved(this, oldSource, newSource, mapFn, opts);
+    this.#emitLifecycle({ type: "edge-removed", track: this, source: oldSource, edge: { source: oldSource.id, target: this.#id, role: opts.role, input: opts.target } });
+    this.#emitLifecycle({ type: "edge-added", track: this, source: newSource, edge: { source: newSource.id, target: this.#id, role: opts.role, input: opts.target } });
     this.#invalidate("observation");
   }
 
-  get observedSources() {
-    if (this.#standaloneObservationAdapter) {
-      return this.#standaloneObservationAdapter.getSources(this);
-    }
-    return [...new Set([...this.#observed.values()].map((edge) => edge.source))];
-  }
-
-  get observedEdges() {
-    const source = this.#standaloneObservationAdapter
-      ? this.#standaloneObservationAdapter.getEdges(this)
-      : [...this.#observed.values()];
-    return source.map(({ source: observed, mapFn, role, input }) => ({
-      source: observed,
-      mapFn,
-      role,
-      input,
-      target: this.#id,
-    }));
-  }
-
-  // One source of truth: count exactly what observerIds reports.
+  get observedSources() { return this.#owner()?.getSources(this) ?? []; }
+  get observedEdges() { return (this.#owner()?.getEdges(this) ?? []).map((edge) => ({ ...edge, target: this.#id })); }
   get observerCount() { return this.observerIds.length; }
-  get observerIds() {
-    return this.#observationObserverIds?.()
-      ?? this.#standaloneObservationAdapter?.getObserverIds(this)
-      ?? [];
-  }
+  get observerIds() { return this.#observationObserverIds?.() ?? this.#owner()?.getObserverIds(this) ?? []; }
 
   onLifecycle(callback) {
-    if (typeof callback !== "function") {
-      throw new TypeError("Track lifecycle callback must be a function.");
-    }
+    if (typeof callback !== "function") throw new TypeError("Track lifecycle callback must be a function.");
     this.#lifecycleSubscribers.add(callback);
     return () => this.#lifecycleSubscribers.delete(callback);
   }
-
   onSourceDestroyed(callback) {
-    if (typeof callback !== "function") {
-      throw new TypeError("Track destroy callback must be a function.");
-    }
+    if (typeof callback !== "function") throw new TypeError("Track destroy callback must be a function.");
     this.#destroySubscribers.add(callback);
     return () => this.#destroySubscribers.delete(callback);
   }
-
-  subscribe(callback) {
-    this.#subscribers.add(callback);
-    callback(this.getSnapshot());
-    return () => this.#subscribers.delete(callback);
-  }
-
+  subscribe(callback) { this.#subscribers.add(callback); callback(this.getSnapshot()); return () => this.#subscribers.delete(callback); }
   _setGraphGuard(guard) { this.#graphGuard = guard ?? null; }
-  _setObservationComposer(composer) {
-    this.#observationComposer = typeof composer === "function" ? composer : null;
-  }
-  _setObservationObserverIds(provider) {
-    this.#observationObserverIds = typeof provider === "function" ? provider : null;
-  }
+  _setObservationComposer(composer) { this.#observationComposer = typeof composer === "function" ? composer : null; }
+  _setObservationObserverIds(provider) { this.#observationObserverIds = typeof provider === "function" ? provider : null; }
+  _setObservationController(controller) { this.#observationController = controller ?? null; }
 
-  #notify() {
-    const snapshot = this.getSnapshot();
-    for (const callback of this.#subscribers) callback(snapshot);
-  }
+  #owner() { return this.#observationController ?? this.#standaloneObservationAdapter; }
+  #notify() { const snapshot = this.getSnapshot(); for (const callback of this.#subscribers) callback(snapshot); }
+  #emitLifecycle(event) { if (this.#destroyed && event.type !== "destroyed") return; for (const callback of [...this.#lifecycleSubscribers]) callback(event); }
+  #invalidate(reason) { this.#emitLifecycle({ type: "invalidated", track: this, reason }); }
+  #assertAlive() { if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`); }
 
-  #emitLifecycle(event) {
-    if (this.#destroyed && event.type !== "destroyed") return;
-    for (const callback of [...this.#lifecycleSubscribers]) callback(event);
-  }
-
-  #invalidate(reason) {
-    this.#emitLifecycle({ type: "invalidated", track: this, reason });
-  }
-
-  #assertAlive() {
-    if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`);
-  }
-
-  #removeObservedKey(key) {
-    const edge = this.#observed.get(key);
-    if (!edge) return;
-    this.#observed.delete(key);
-    this.#standaloneObservationAdapter?.removeObserved(
-      this,
-      edge.source,
-      { role: edge.role, target: edge.input },
-    );
-    this.#emitLifecycle({
-      type: "edge-removed",
-      track: this,
-      source: edge.source,
-      edge: {
-        source: edge.source.id,
-        target: this.#id,
-        role: edge.role,
-        input: edge.input,
-      },
-    });
-  }
-
-  #clearObserved() {
-    for (const key of [...this.#observed.keys()]) this.#removeObservedKey(key);
-  }
-
-  _mount(host) {
-    if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`);
-    if (this.#host) throw new Error(`Track "${this.#id}" already mounted`);
-    this.#host = host;
-  }
+  _mount(host) { if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`); if (this.#host) throw new Error(`Track "${this.#id}" already mounted`); this.#host = host; }
   _unmount() { this.#host = null; }
   get isMounted() { return this.#host !== null; }
   get childCount() { return this.#children.size; }
@@ -350,32 +129,24 @@ export class Track {
   // Child topology and group-host bridging remain a separate P2-04 seam.
   addChild(child, opts = {}) {
     if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`);
-    if (child.#parent) {
-      throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`);
-    }
-    if (this.#children.has(child.id)) {
-      throw new Error(`Track "${child.id}" already has a child with id "${child.id}".`);
-    }
+    if (child.#parent) throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`);
+    if (this.#children.has(child.id)) throw new Error(`Track "${child.id}" already has a child with id "${child.id}".`);
     child.#parent = this;
     const stagger = opts.stagger ?? 0;
     child.#staggerOffset = stagger;
-    child.#currentOffset = this.#layoutDelegate.computeSpawnOffset(
-      [...this.#children.values()],
-      { stagger },
-    );
+    child.#currentOffset = this.#layoutDelegate.computeSpawnOffset([...this.#children.values()], { stagger });
     this.#children.set(child.id, child);
     if (this.#host) this.#host._mountChild(child, child.#currentOffset);
     this.#eventBus.emit("child:spawned", { id: child.id, parentId: this.#id });
     this.#invalidate("children");
   }
-
   removeChild(id) {
     const child = this.#children.get(id);
     if (!child) return;
     const siblings = [...this.#children.values()];
     this.#children.delete(id);
     child.#parent = null;
-    child.#clearObserved();
+    child.#owner()?.clearObserved(child);
     if (this.#host) this.#host._unmountChild(child);
     for (const target of this.#layoutDelegate.computeReflow(siblings, child, {})) {
       target.child.#currentOffset = target.offset;
@@ -384,21 +155,10 @@ export class Track {
     child.#emitLifecycle({ type: "detached", track: child, parent: this });
     this.#eventBus.emit("child:removing", { id: child.id, parentId: this.#id });
   }
-
-  _attachGroupHost(groupHost) {
-    if (this.#groupHost) {
-      throw new Error(`Track "${this.#id}" is already a group host.`);
-    }
-    this.#groupHost = groupHost;
-  }
-
+  _attachGroupHost(groupHost) { if (this.#groupHost) throw new Error(`Track "${this.#id}" is already a group host.`); this.#groupHost = groupHost; }
   play() { this.#groupHost?.timeline.play(); }
   pause() { this.#groupHost?.timeline.pause(); }
-  seek(progress) {
-    if (!this.#groupHost) return this.progress(progress);
-    if (progress === undefined) return this.#groupHost.timeline.progress();
-    this.#groupHost.timeline.progress(clamp01(progress));
-  }
+  seek(progress) { if (!this.#groupHost) return this.progress(progress); if (progress === undefined) return this.#groupHost.timeline.progress(); this.#groupHost.timeline.progress(clamp01(progress)); }
   reverse() { this.#groupHost?.timeline.reverse(); }
 
   /** Destroy reports owner-state observer IDs before unregistering this Track. */
@@ -406,10 +166,8 @@ export class Track {
     if (this.#destroyed || this.#destroying) return;
     this.#destroying = true;
     const observerIds = this.observerIds;
-    for (const callback of [...this.#destroySubscribers]) {
-      callback({ id: this.#id, observerIds });
-    }
-    this.#clearObserved();
+    for (const callback of [...this.#destroySubscribers]) callback({ id: this.#id, observerIds });
+    this.#owner()?.clearObserved(this);
     this.#destroyed = true;
     this.#observationComposer = null;
     this.#standaloneObservationAdapter?.unregister(this);
@@ -422,18 +180,7 @@ export class Track {
     this.#emitLifecycle({ type: "destroyed", track: this, observerIds });
     this.#destroySubscribers.clear();
     this.#lifecycleSubscribers.clear();
-    if (this.#groupHost) {
-      this.#groupHost.group.destroy();
-      this.#groupHost.timeline.kill();
-      this.#groupHost = null;
-    }
-    try {
-      this.#interpolationTimeline?.kill();
-    } catch (error) {
-      logger.warn(
-        `track "${this.#id}", failed to kill interpolation timeline during destroy()`,
-        error,
-      );
-    }
+    if (this.#groupHost) { this.#groupHost.group.destroy(); this.#groupHost.timeline.kill(); this.#groupHost = null; }
+    try { this.#interpolationTimeline?.kill(); } catch (error) { logger.warn(`track "${this.#id}", failed to kill interpolation timeline during destroy()`, error); }
   }
 }
