@@ -4,10 +4,10 @@ import { patchesEqual, trackComposeLeaf } from "./composeContext.js";
 /**
  * ObservationState owner used while live Track mutation is being extracted.
  *
- * The bridge may hydrate once from legacy Track edges for compatibility. After
- * construction, every check is state-only: Track projections are never read to
- * decide whether the owner is correct. This makes ObservationState the
- * authoritative writer and keeps Track as a temporary compatibility reader.
+ * The bridge may hydrate from legacy Track edges only during construction. After
+ * that, parity checks are state-only. It also supplies the temporary public
+ * observer snapshot contract from owner state, so Track no longer needs a
+ * reverse observer index of its own.
  */
 export class ObservationStateBridge {
   #tracks;
@@ -26,15 +26,13 @@ export class ObservationStateBridge {
     } else {
       this.#hydrateFromTracks();
     }
+    this.#bindObserverProviders();
   }
 
   get state() { return this.#state; }
   get tracks() { return new Map(this.#tracks); }
 
-  /**
-   * Construction-only compatibility hydration. Do not call this after the
-   * bridge has been created: later mutations belong to ObservationState.
-   */
+  /** Construction-only compatibility hydration. */
   #hydrateFromTracks() {
     for (const track of this.#tracks.values()) {
       for (const edge of track.observedEdges ?? []) {
@@ -50,7 +48,13 @@ export class ObservationStateBridge {
     }
   }
 
-  /** Compare owner state with normalized graph IR, without reading Track edges. */
+  /** Temporary lifecycle bridge until Track's public observer snapshot is gone. */
+  #bindObserverProviders() {
+    for (const track of this.#tracks.values()) {
+      track._setObservationObserverIds?.(() => this.#state.getObserverIds(track.id));
+    }
+  }
+
   assertGraphParity(graph) {
     if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
     const expected = new Set((graph?.edges ?? []).map((edge) => this.#key(edge)));
@@ -71,10 +75,7 @@ export class ObservationStateBridge {
     return true;
   }
 
-  /**
-   * State integrity check. This intentionally does not inspect Track readers.
-   * `assertGraphParity(graph)` is the graph-level contract used by GraphBinding.
-   */
+  /** State integrity check. This intentionally does not inspect Track readers. */
   assertParity() {
     if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
     for (const track of this.#tracks.values()) {
@@ -104,6 +105,7 @@ export class ObservationStateBridge {
   destroy() {
     if (this.#destroyed) return;
     this.#destroyed = true;
+    for (const track of this.#tracks.values()) track._setObservationObserverIds?.(null);
     this.#state.destroy();
     this.#tracks.clear();
   }
