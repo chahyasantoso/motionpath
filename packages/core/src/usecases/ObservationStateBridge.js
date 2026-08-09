@@ -5,10 +5,8 @@ import { patchesEqual, trackComposeLeaf } from "./composeContext.js";
 /**
  * ObservationState owner used while live Track mutation is being extracted.
  *
- * The bridge may hydrate from legacy Track edges only during construction. After
- * that, parity checks are state-only. It also supplies the temporary public
- * observer snapshot contract from owner state, so Track no longer needs a
- * reverse observer index of its own.
+ * The bridge hydrates legacy edges only during construction. After that, state
+ * is authoritative and the controller is the only Track-facing mutation seam.
  */
 export class ObservationStateBridge {
   #tracks;
@@ -93,7 +91,10 @@ export class ObservationStateBridge {
     this.#destroyed = true;
     for (const unsubscribe of this.#unsubscribers) unsubscribe();
     this.#unsubscribers = [];
-    for (const track of this.#tracks.values()) track._setObservationObserverIds?.(null);
+    for (const track of this.#tracks.values()) {
+      track._setObservationObserverIds?.(null);
+      track._setObservationController?.(null);
+    }
     this.#state.destroy();
     this.#tracks.clear();
   }
