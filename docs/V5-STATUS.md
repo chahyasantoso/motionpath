@@ -1,9 +1,9 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-09 13:05 Jakarta  
+**Status captured:** 2026-08-09 13:20 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
-**Latest code head:** `99e37de` (parity fix, CI re-run pending)  
-**Last fully green head:** `48b6799`  
+**Latest verified head:** `99e37de` (full Node 24 matrix green)  
+**Integration head:** `44c3f7c` (CI re-run pending)  
 **Safe frozen baseline:** PR #142 at `184f194`  
 **Canonical index:** [`docs/V5-README.md`](./V5-README.md)  
 **Implementation report:** [`V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md`](./V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md)  
@@ -11,48 +11,58 @@
 
 ## Executive status
 
-PR #143 is draft and went red at `51ec544`, which is the expanded parity runner
-doing exactly what it was built for. Two failures, both the `unregisterObserver`
-scenario, both pointing at **compatibility** ownership rather than at the scoped
-adapter: the locked contract failed in compatibility mode, and the two modes
-disagreed. Scoped held the contract on its own.
+P2-03 adapter parity is **proven**. The full Node 24 matrix is green on `99e37de`
+with one scenario runner driving both ownership modes across every locked
+contract, checked mode against mode and both against locked literals.
 
-The defect is fixed at `8456f8c` with a regression lock at `99e37de`. The full
-Node 24 matrix has not been re-run yet, so no head is claimed as verified.
+On top of that, scoped ownership now has a **controlled runtime integration
+path**: one explicit `observationOwnership` option on `Engine`, forwarded to the
+`ProjectRuntime` it owns, reaching every standalone Track the library builds.
+Default is unchanged. An engine that passes nothing is byte-for-byte the engine
+that shipped before.
 
-## The defect, for the record
+PR #143 stays draft until the matrix is re-run on the integration commits.
 
-`StandaloneObservationAdapter` refcounts its module-global registry entries. The
-already-registered branch of `register()` incremented that count on every call,
-and `setObserved`, `replaceObserved` and `compose` all re-register their
-endpoints. One holder that mutates two edges therefore counted three, so
-`unregister()` decremented to two, never reached zero, and never reached
-`#owner.unregister(key)`.
+## What the parity gate caught
 
-`removeSourceEdges` runs unconditionally, so the outgoing half of the track's
-wiring was always torn down. The incoming half was not: the source kept the
-unregistered observer in its observer set and `getObserverIds` kept resolving it,
-for the life of the process. The refcount now counts holders, one per adapter per
-Track, which is what it was always meant to mean.
+Two defects, both in **compatibility** ownership, neither visible before one
+runner drove both owners:
 
-This is the second bug in this slice that only existed in compatibility
-ownership. The one-runner-both-adapters gate is earning its keep.
+1. `clearObserved` passed Track objects into an API that matches on private
+   identity keys, so it removed nothing. Masked by `Track.setObserved(null)`,
+   which clears edge by edge afterwards.
+2. The module-global registry refcount counted `register()` calls instead of
+   holders. Edge mutation re-registers its endpoints, so the count never reached
+   zero, `unregister` never reached `#owner.unregister(key)`, and a source kept
+   listing a destroyed observer for the life of the process.
+
+The integration path then caught a third: `Engine.destroy()` rebuilt its
+`ProjectRuntime` with constructor defaults, so a scoped engine silently became a
+compatibility engine after any destroy. Ownership now survives the rebuild.
 
 ## Current state
 
-Scoped ownership is implemented as a default-off harness and a `ProjectRuntime`
-selector. Compatibility ownership remains the production default. Parity now
-covers output folds, input folds, repeated mapper replacement and repeated swaps,
-mutual cycles, diamond memoization, lightweight edges, destroy snapshots, detach,
-duplicate public ids, shared compose contexts, `clearObserved`, `unregister`,
-post-destroy reads, error paths, the public adapter surface, and `ProjectRuntime`
-disposal in both modes.
+| Layer | Ownership status |
+|---|---|
+| `ObservationState` / `TrackObservationOwner` | Shared by both owners, unchanged |
+| `StandaloneObservationAdapter` | Production default, module globals intact |
+| `ScopedObservationAdapter` | Full contract parity, opt-in |
+| `ProjectRuntime` | One adapter per runtime, mode selected explicitly |
+| `Engine` | Injects the runtime adapter into every standalone Track (F-02 closed) |
+| `Track` | Still holds the compatibility reverse index, P2-03 deletion target |
+
+Parity coverage: output folds, input folds, repeated mapper replacement and
+repeated swaps, mutual cycles, diamond memoization, lightweight edges, destroy
+snapshots, detach, duplicate public ids, shared compose contexts, `clearObserved`,
+`unregister`, post-destroy reads, error paths, public adapter surface,
+`ProjectRuntime` disposal, and the full `Engine` construction path.
 
 ## Next in line
 
-Run the complete Node 24 matrix on `99e37de`. If it is green, parity is proven
-and the next slice is a controlled runtime integration path, still behind the
-explicit `observationOwnership` option.
+Run the matrix on `44c3f7c`. Then the open decision is whether the default moves
+to scoped, which requires deleting the module globals rather than flipping a
+flag: the remaining compatibility hazards all live in that shared registry and
+cannot be fixed inside the adapter. See the handoff.
 
 ## Guardrails
 
@@ -60,4 +70,4 @@ Do not merge scoped ownership based on green docs-only commits. Verify the lates
 code head. When parity fails, fix the adapter: never relax a `LOCKED` entry, and
 never assume the scoped side is the wrong one. Do not weaken readability or
 boundary tests. Keep `publisherRendering`, `crossMotion`, and `freeTracks`
-default-off.
+default-off, and keep `observationOwnership` defaulting to `compatibility`.
