@@ -8,8 +8,13 @@ export class ObservationStateBridge {
   constructor({ tracks = new Map(), edges } = {}) {
     this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks);
     this.#state = new ObservationState({ tracks: this.#tracks });
-    if (edges) for (const edge of edges) if (this.#tracks.has(edge.source) && this.#tracks.has(edge.target)) this.#state.addEdge(edge);
-    else this.#hydrateFromOwners();
+    if (edges) {
+      for (const edge of edges) {
+        if (this.#tracks.has(edge.source) && this.#tracks.has(edge.target)) this.#state.addEdge(edge);
+      }
+    } else {
+      this.#hydrateFromOwners();
+    }
     this.#controller = new ObservationTrackController({ state: this.#state, tracks: this.#tracks });
     this.#bindSourceCleanup();
   }
@@ -17,7 +22,9 @@ export class ObservationStateBridge {
   #hydrateFromOwners() {
     for (const track of this.#tracks.values()) {
       const owner = track.getObservationOwner?.();
-      for (const edge of owner?.getEdges?.(track) ?? []) if (this.#tracks.has(edge.source.id)) this.#state.addEdge({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input, mapFn: edge.mapFn });
+      for (const edge of owner?.getEdges?.(track) ?? []) {
+        if (this.#tracks.has(edge.source.id)) this.#state.addEdge({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input, mapFn: edge.mapFn });
+      }
     }
   }
   #bindSourceCleanup() {
