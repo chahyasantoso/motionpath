@@ -77,8 +77,9 @@ export class ScopedObservationAdapter {
       const known = this.#findTrack(publicId);
       if (known) internal.set(this.#keys.get(known), patch);
     }
+    // The owner must set the root marker itself. Pre-seeding this key would
+    // make ObservationState return the local leaf before traversing edges.
     ctx.set(track.id, COMPOSING);
-    internal.set(this.#keys.get(track), COMPOSING);
     const patch = this.#owner.compose(this.#keys.get(track), rawData, internal);
     ctx.set(track.id, patch);
     return patch;
