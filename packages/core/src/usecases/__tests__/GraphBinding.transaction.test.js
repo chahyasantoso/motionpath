@@ -29,6 +29,16 @@ function declaredEdgeKeys(graph) {
   return graph.edges.map((edge) => edgeKey(edge.source, edge.target, edge.role, edge.input)).sort();
 }
 
+function ownerEdgeKeys(binding) {
+  const keys = [];
+  for (const [target] of binding.tracks) {
+    for (const edge of binding.observationState.getEdges(target)) {
+      keys.push(edgeKey(edge.source.id, target, edge.role, edge.input));
+    }
+  }
+  return keys.sort();
+}
+
 function observerCounts(tracks) {
   return Object.fromEntries([...tracks].map(([id, track]) => [id, track.observerCount]));
 }
@@ -59,7 +69,7 @@ function expectRestored(binding, publisher, before, label) {
   expect(binding.graph.nodes.map((node) => node.id).sort(), `${label}: node set changed`).toEqual(before.nodes);
 }
 
-describe("GraphBinding — addTrack rolls back at every failing edge index", () => {
+describe("GraphBinding: addTrack rolls back at every failing edge index", () => {
   const observes = [
     { source: "n0", mapFn: (patch) => ({ from_n0: patch.transform }) },
     { source: "n1", mapFn: (patch) => ({ from_n1: patch.transform }) },
@@ -87,7 +97,6 @@ describe("GraphBinding — addTrack rolls back at every failing edge index", () 
       expectRestored(binding, publisher, before, `failAt ${failAt}`);
       expect(binding.tracks.has("late")).toBe(false);
       expect(late.observedEdges, "the rejected track kept a live edge").toHaveLength(0);
-      // And the publisher is still a working publisher, not a wedged one.
       publisher.markDirty("n0");
       publisher.flush();
       expect(published).toEqual(["n0", "n1", "n2"]);
@@ -120,7 +129,7 @@ describe("GraphBinding — addTrack rolls back at every failing edge index", () 
   });
 });
 
-describe("GraphBinding — rolls back when the publisher rejects the commit", () => {
+describe("GraphBinding: rolls back when the publisher rejects the commit", () => {
   function failNextApply(publisher) {
     const real = publisher.applyGraph.bind(publisher);
     let armed = true;
@@ -150,7 +159,6 @@ describe("GraphBinding — rolls back when the publisher rejects the commit", ()
     expect(() => binding.removeEdge({ source: "n1", target: "n2", role: "output" })).toThrow(/publisher rejected/);
 
     expectRestored(binding, publisher, before, "removeEdge");
-    // A restored edge with a dropped mapFn is a silent data loss, not a rollback.
     expect(tracks.get("n2").compose()).toEqual(patchBefore);
     expect(tracks.get("n2").compose().from_n1).toBeDefined();
   });
@@ -185,7 +193,29 @@ describe("GraphBinding — rolls back when the publisher rejects the commit", ()
   });
 });
 
-describe("GraphBinding — membership in both directions", () => {
+describe("GraphBinding: cycle rejection is failure-atomic", () => {
+  it("preserves owner state, IR, publisher order, and live composition", () => {
+    const { binding, publisher, tracks } = bind(chainMotion(3));
+    tracks.get("n0").progress(0.4);
+    tracks.get("n1").progress(0.6);
+    const before = snapshot(binding, publisher);
+    const ownerBefore = ownerEdgeKeys(binding);
+    const compositionBefore = tracks.get("n2").compose();
+
+    expect(() => binding.addEdge({
+      source: "n2",
+      target: "n0",
+      role: "output",
+      mapFn: (patch) => ({ from_n2: patch.transform }),
+    })).toThrow(/cycle/i);
+
+    expectRestored(binding, publisher, before, "rejected cycle");
+    expect(ownerEdgeKeys(binding)).toEqual(ownerBefore);
+    expect(tracks.get("n2").compose()).toEqual(compositionBefore);
+  });
+});
+
+describe("GraphBinding: membership in both directions", () => {
   it("rejects construction when a declared node has no live Track", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
