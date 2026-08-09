@@ -21,11 +21,14 @@ export function installLegacyObservationFacade(track) {
       if (!source) { track.getObservationOwner()?.clearObserved(track); track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" }); return; }
       const trackOwner = track.getObservationOwner?.();
       const sourceOwner = source.getObservationOwner?.();
-      const owner = typeof sourceOwner?.register === "function" ? sourceOwner : trackOwner;
-      if (typeof owner?.register === "function") {
-        source._adoptObservationOwner?.(owner);
-        track._adoptObservationOwner?.(owner);
-      }
+      // Legacy compatibility keeps all edges for an observer in its current
+      // scope. Only an independently-created source is adopted into that scope.
+      const owner = typeof trackOwner?.register === "function"
+        ? trackOwner
+        : typeof sourceOwner?.register === "function'
+          ? sourceOwner
+          : trackOwner;
+      if (typeof owner?.register === "function") source._adoptObservationOwner?.(owner);
       const role = options.role ?? "output";
       const input = role === "input" ? options.target : undefined;
       const previous = owner?.getEdges(track).find((edge) => edge.source === source && edge.role === role && edge.input === input);
@@ -37,11 +40,14 @@ export function installLegacyObservationFacade(track) {
     [REPLACE](oldSource, newSource, mapFn, options = {}) {
       const owner = track.getObservationOwner?.();
       const sourceOwner = oldSource?.getObservationOwner?.();
-      const mutationOwner = typeof sourceOwner?.register === "function" ? sourceOwner : owner;
+      const mutationOwner = typeof owner?.register === "function"
+        ? owner
+        : typeof sourceOwner?.register === "function"
+          ? sourceOwner
+          : owner;
       if (typeof mutationOwner?.register === "function") {
         oldSource?._adoptObservationOwner?.(mutationOwner);
         newSource?._adoptObservationOwner?.(mutationOwner);
-        track._adoptObservationOwner?.(mutationOwner);
       }
       const oldEdges = mutationOwner?.getEdges(track).filter((edge) => edge.source === oldSource && (options.role === undefined || edge.role === options.role)) ?? [];
       const role = options.role ?? oldEdges[0]?.role ?? "output";
@@ -49,7 +55,7 @@ export function installLegacyObservationFacade(track) {
       mutationOwner?.replaceObserved(track, oldSource, newSource, mapFn, { ...options, role, target: input });
       for (const edge of oldEdges) {
         track._emitObservationLifecycle?.({ type: "edge-removed", track, source: oldSource, edge: { source: oldSource.id, target: track.id, role: edge.role, input: edge.input } });
-        track._emitObservationLifecycle?.({ type: "edge-added", track, source: newSource, edge: { source: newSource.id, target: track.id, role, input } });
+        track._emitObservationLifecycle?.({ type: "edge-added", track, source: newSource, edge: { source: newSource.id, target: track.id, role, input });
       }
       track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" });
     },
