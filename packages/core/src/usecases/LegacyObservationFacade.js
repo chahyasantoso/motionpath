@@ -12,9 +12,7 @@ const IDS = "observerIds";
 export function createDestroyEvent(id, ids) { return { id, observerIds: ids }; }
 
 /** Returns true only when a caller explicitly replaces a legacy mutation hook. */
-export function hasMutationOverride(track, name) {
-  return originals.get(track)?.[name] !== track?.[name];
-}
+export function hasMutationOverride(track, name) { return originals.get(track)?.[name] !== track?.[name]; }
 
 /** Transitional v4 facade. The Track class no longer declares graph APIs. */
 export function installLegacyObservationFacade(track) {
@@ -32,7 +30,30 @@ export function installLegacyObservationFacade(track) {
       track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" });
     },
     [REMOVE](source, options = {}) { return track.getObservationOwner()?.removeObserved(track, source, options); },
-    [REPLACE](oldSource, newSource, mapFn, options = {}) { return track.getObservationOwner()?.replaceObserved(track, oldSource, newSource, mapFn, options); },
+    [REPLACE](oldSource, newSource, mapFn, options = {}) {
+      const guard = guards.get(track);
+      guard?.(track, newSource, options);
+      const owner = track.getObservationOwner();
+      const oldEdges = owner?.getEdges(track).filter((edge) => edge.source === oldSource && (options.role === undefined || edge.role === options.role)) ?? [];
+      const role = options.role ?? oldEdges[0]?.role ?? "output";
+      const input = role === "input" ? (options.target ?? oldEdges[0]?.input) : undefined;
+      owner?.replaceObserved(track, oldSource, newSource, mapFn, { ...options, role, target: input });
+      for (const edge of oldEdges) {
+        track._emitObservationLifecycle?.({
+          type: "edge-removed",
+          track,
+          source: oldSource,
+          edge: { source: oldSource.id, target: track.id, role: edge.role, input: edge.input },
+        });
+        track._emitObservationLifecycle?.({
+          type: "edge-added",
+          track,
+          source: newSource,
+          edge: { source: newSource.id, target: track.id, role, input },
+        });
+      }
+      track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" });
+    },
   };
   originals.set(track, methods);
   Object.defineProperties(track, {
