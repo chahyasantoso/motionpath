@@ -13,6 +13,10 @@ function clamp01(value) {
  * Track is a playhead and local plugin composer. Observation graph state lives
  * in the injected owner, not in this leaf object. The compatibility facade is
  * installed as an external, temporary surface for existing v4 callers.
+ *
+ * Legacy names setObserved, removeObserved, replaceObserved, observedSources,
+ * observedEdges, observerCount, and observerIds intentionally live in the
+ * external facade, not in this class. The strict boundary scans executable code.
  */
 export class Track {
   #id;
