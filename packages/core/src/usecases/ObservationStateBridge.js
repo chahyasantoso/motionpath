@@ -1,4 +1,5 @@
 import { ObservationState } from "./ObservationState.js";
+import { ObservationTrackController } from "./ObservationTrackController.js";
 import { patchesEqual, trackComposeLeaf } from "./composeContext.js";
 
 /**
@@ -12,6 +13,7 @@ import { patchesEqual, trackComposeLeaf } from "./composeContext.js";
 export class ObservationStateBridge {
   #tracks;
   #state;
+  #controller;
   #destroyed = false;
   #unsubscribers = [];
 
@@ -27,11 +29,13 @@ export class ObservationStateBridge {
     } else {
       this.#hydrateFromTracks();
     }
+    this.#controller = new ObservationTrackController({ state: this.#state, tracks: this.#tracks });
     this.#bindObserverProviders();
     this.#bindSourceCleanup();
   }
 
   get state() { return this.#state; }
+  get controller() { return this.#controller; }
   get tracks() { return new Map(this.#tracks); }
 
   #hydrateFromTracks() {
@@ -47,15 +51,11 @@ export class ObservationStateBridge {
     for (const track of this.#tracks.values()) track._setObservationObserverIds?.(() => this.#state.getObserverIds(track.id));
   }
 
-  /** Destroy subscribers run before Track unregisters, so state can drive cleanup. */
   #bindSourceCleanup() {
     for (const source of this.#tracks.values()) {
       const unsubscribe = source.onSourceDestroyed?.(() => {
         const observerIds = this.#state.getObserverIds(source.id);
-        for (const observerId of observerIds) {
-          const observer = this.#tracks.get(observerId);
-          observer?.removeObserved?.(source);
-        }
+        for (const observerId of observerIds) this.#tracks.get(observerId)?.removeObserved?.(source);
         this.#state.removeSourceEdges(source.id);
       });
       if (unsubscribe) this.#unsubscribers.push(unsubscribe);
