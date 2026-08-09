@@ -7,6 +7,11 @@ const EDGES = "observedEdges";
 const COUNT = "observerCount";
 const IDS = "observerIds";
 
+/** Builds the legacy destroy event without coupling Track to the observer field name. */
+export function createDestroyEvent(id, ids) {
+  return { id, observerIds: ids };
+}
+
 /** Transitional v4 facade. The Track class no longer declares graph APIs. */
 export function installLegacyObservationFacade(track) {
   if (!track || track[SET]) return track;
