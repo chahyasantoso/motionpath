@@ -2,26 +2,28 @@
 
 **Date:** 2026-08-09, Asia/Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
-**Scope:** scoped standalone-adapter migration after PR #142
+**Scope:** failure-log analysis, PR #142 repair baseline, and scoped-adapter migration review
 
 ## Current decision
 
-PR #142 is frozen at the last green baseline. This branch deliberately isolates the next architectural slice: replacing module-global standalone observation ownership with caller-scoped adapters and dedicated regression tests.
+PR #142 remains the frozen green repair baseline. The first PR #143 scoped-adapter implementation was reverted on this branch after its Node 24 run expanded to 33 failures. The failure cluster was not independent regressions: the adapter rewrite changed the established composition-context protocol, so ordinary standalone folds returned empty patches, mutual observation recursed, and diamond memoization broke.
 
-## Migration completed here
+## What is retained
 
-`StandaloneObservationAdapter` now owns a private `TrackObservationOwner`. `ProjectRuntime` remains the lifecycle owner and injects one adapter across the Engine's standalone Tracks. Directly constructed Tracks can retain private adapters, while an observer adapter adopts an independently constructed source when an edge is created.
+- Explicit-null handling in `createTrack`.
+- GraphBinding rollback that restores ObservationState and Track wiring, including `mapFn`.
+- O(1) lookup improvements on the hot observation path.
+- Readability and destroy re-entrancy fixes.
 
-The adapter keeps private identity keys internally, but public compose contexts remain keyed by Track IDs. `COMPOSING` markers are translated into the adapter's private namespace before graph composition and translated back at the public boundary. This is what prevents mutual observation recursion without leaking private keys to consumers.
+## What was reverted
 
-## Dedicated evidence
+The private-owner migration is not merged. A private `TrackObservationOwner` per adapter is architecturally desirable, but it cannot replace the current compatibility layer by changing ownership alone. The existing `COMPOSING` marker, public Track-ID context, lightweight test-track behavior, and cross-adapter fallback are part of the compatibility contract and need explicit characterization before any implementation swap.
 
-`StandaloneObservationAdapter.scoped.test.js` covers duplicate public IDs across scopes, cross-adapter mutual observation, and disposal isolation. These are intentionally separate from the PR #142 repair tests so a later ownership change cannot hide a compatibility regression behind the repair gate.
+## Correct next design
 
-## Review guardrails
+1. Keep the green adapter implementation untouched.
+2. Add characterization tests against the current contract first: output/input folds, mapFn replacement, mutual cycles, diamond memoization, public context keys, lightweight tracks, destroy snapshots, duplicate IDs, and runtime disposal.
+3. Introduce an ownership abstraction behind the existing adapter API, preserving the exact compose protocol.
+4. Switch one ProjectRuntime path at a time, run the full suite, and only then remove the global compatibility fallback.
 
-This branch must pass the full unit suite, typecheck, build, package dry run, format, boundary scan, and benchmarks before review. Do not merge it into `v5` merely because PR #142 is green. Keep publisher rendering, cross-motion, and free-track defaults off.
-
-## Next slice after this branch
-
-Invert GraphBinding ownership so ObservationState is the writer and graph authority. Migrate remaining Track observation readers, then delete duplicate Track observation maps in a separately reviewed change.
+Do not merge PR #143 as a migration yet. Do not flip publisher rendering, cross-motion, or free-track defaults.

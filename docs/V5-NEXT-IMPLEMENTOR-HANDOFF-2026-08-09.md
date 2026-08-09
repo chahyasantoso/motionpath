@@ -1,30 +1,25 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 11:44 Asia/Jakarta  
+**Captured:** 2026-08-09 11:49 Asia/Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
 **Base:** green PR #142 at `184f194`
 
 ## Current truth
 
-PR #142 is the frozen repair baseline. The scoped-adapter migration is isolated on this branch and must not be merged as part of the repair PR without its own green evidence.
+The initial PR #143 scoped-adapter rewrite caused 33 unit failures and has been rolled back to the known green adapter baseline. Do not merge the migration branch in its current draft form. PR #142 remains the safe repair baseline.
 
-## Completed in this migration slice
+## Why the migration failed
 
-- Removed module-global standalone ownership.
-- Scoped `TrackObservationOwner` to each `StandaloneObservationAdapter`.
-- Preserved public Track-ID compose contexts and `COMPOSING` cycle fallback.
-- Added dedicated tests for duplicate IDs, cross-adapter mutual observation, and disposal isolation.
+The rewrite changed more than ownership: it changed the composition protocol. Private adapter keys replaced public Track-ID context keys without preserving every `COMPOSING` marker and fallback path. That broke standalone output/input folds, mutual observation, diamond memoization, and lightweight test tracks. This was a design mismatch, not a flaky CI run.
 
-## Required verification
+## Required next sequence
 
-```text
-npm test -- --reporter=verbose
-npm run typecheck
-npm run build
-npm run pack:check
-npm run boundary:v5:pass2
-```
+1. Add characterization tests for the current green protocol before changing implementation.
+2. Extract a scoped ownership interface behind `StandaloneObservationAdapter` without changing `compose`, `getEdges`, `getSources`, or lifecycle semantics.
+3. Preserve public IDs at the API boundary and translate markers only inside the owner, with explicit tests for recursive cycles and cache reuse.
+4. Migrate ProjectRuntime injection in one small commit.
+5. Run full Node 24 CI after each slice. Keep the global fallback until the scoped path is proven equivalent.
 
-## Next work
+## Guardrails
 
-If this branch is green, review and merge it separately. Then begin F-01 ownership inversion: make ObservationState receive graph writes first, migrate GraphBinding, ObservationStateBridge, and GraphPublisher reads, and only afterward remove Track's duplicate observation maps.
+Keep PR #142 frozen and green. Do not merge PR #143 yet. Keep `publisherRendering`, `crossMotion`, and `freeTracks` default-off.
