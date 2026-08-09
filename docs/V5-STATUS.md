@@ -1,6 +1,6 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-09 11:58 Jakarta  
+**Status captured:** 2026-08-09 12:03 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
 **Canonical index:** [`docs/V5-README.md`](./V5-README.md)  
 **Implementation report:** [`V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md`](./V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md)  
@@ -8,16 +8,16 @@
 
 ## Executive status
 
-PR #142 is the frozen green repair baseline. PR #143 is green with characterization-only changes plus an isolated scoped ownership seam; the existing adapter and runtime defaults are unchanged.
+PR #143 is green through the characterization phase. The opt-in scoped adapter harness is now added on the same draft branch, default-off and not wired into production runtime behavior. It needs its own full CI verification.
 
 ## Current progress
 
-The protocol is locked and the new owner seam has explicit tests for duplicate-ID isolation and lifecycle disposal. No production ownership switch is active yet.
+The existing composition protocol is locked. The harness has private ownership, public-ID contexts, cycle fallback, duplicate-ID isolation, and explicit disposal tests.
 
 ## Next in line
 
-Build an adapter-compatible integration harness around the scoped owner, then add a feature-flagged ProjectRuntime path. Compare it against the current adapter before changing defaults or deleting the global fallback.
+Run the full matrix, compare harness and existing adapter behavior, then add a default-off ProjectRuntime selector. Keep the global fallback until equivalence is proven.
 
 ## Guardrails
 
-Do not merge the scoped migration until its full CI matrix is green. Keep `publisherRendering`, `crossMotion`, and `freeTracks` default-off. Do not weaken readability or boundary tests.
+Do not merge the harness until its full CI matrix is green. Keep `publisherRendering`, `crossMotion`, and `freeTracks` default-off. Do not weaken readability or boundary tests.
