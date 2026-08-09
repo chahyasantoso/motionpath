@@ -2,8 +2,7 @@ name: CI
 
 on:
   # Keep push validation for protected integration branches. Feature/fix/test
-  # branches are validated by their pull_request workflow only, otherwise each
-  # update creates a duplicate check set on the PR.
+  # branches are validated by their pull_request workflow only.
   push:
     branches:
       - master
@@ -103,11 +102,23 @@ jobs:
       - run: npm ci
       - run: npm run boundary:v5:pass2
 
+  strict-boundary-scan:
+    name: strict pass-2 boundary scan (node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run boundary:v5:pass2:strict
+
   rig-benchmark:
     name: rig graph benchmark (node 24)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -121,7 +132,6 @@ jobs:
     name: v5 baseline report (node 24)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
