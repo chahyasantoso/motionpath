@@ -52,9 +52,6 @@ describe("P2-03 standalone composition protocol characterization", () => {
     adapter.setObserved(b, a, (patch) => ({ fromA: patch.leaf }));
 
     expect(() => adapter.compose(a)).not.toThrow();
-    // Locked Track behavior: the back-edge falls back to the plugin/local leaf
-    // to terminate the cycle, but its mapper is not recursively re-folded into
-    // the already composing root patch.
     expect(adapter.compose(a)).toEqual({ leaf: "a", fromB: "b" });
     adapter.destroy();
   });
@@ -75,6 +72,42 @@ describe("P2-03 standalone composition protocol characterization", () => {
     adapter.compose(d);
     expect(calls).toHaveBeenCalledTimes(4);
     expect(calls.mock.calls.filter(([id]) => id === "a")).toHaveLength(1);
+    adapter.destroy();
+  });
+
+  it("replaces a repeated edge mapper without duplicating the edge", () => {
+    const source = track("source");
+    const observer = track("observer");
+    const adapter = new StandaloneObservationAdapter({ tracks: [source, observer] });
+
+    adapter.setObserved(observer, source, () => ({ value: "first" }));
+    adapter.setObserved(observer, source, () => ({ value: "second" }));
+
+    expect(adapter.getEdges(observer)).toHaveLength(1);
+    expect(adapter.compose(observer).value).toBe("second");
+    adapter.destroy();
+  });
+
+  it("keeps duplicate public IDs distinct inside one ownership scope", () => {
+    const left = track("bone", "left");
+    const right = track("bone", "right");
+    const adapter = new StandaloneObservationAdapter({ tracks: [left, right] });
+
+    adapter.setObserved(right, left, (patch) => ({ fromLeft: patch.leaf }));
+
+    expect(adapter.getSources(right)).toEqual([left]);
+    expect(adapter.compose(right)).toEqual({ leaf: "right", fromLeft: "left" });
+    adapter.destroy();
+  });
+
+  it("keeps lightweight tracks valid when no compose method is present", () => {
+    const source = track("source");
+    const observer = track("observer");
+    const adapter = new StandaloneObservationAdapter({ tracks: [source, observer] });
+
+    adapter.setObserved(observer, source);
+
+    expect(() => adapter.compose(observer)).not.toThrow();
     adapter.destroy();
   });
 });
