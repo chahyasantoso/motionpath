@@ -80,7 +80,12 @@ export class Track {
 
   composeLocal(raw) {
     this.#assertAlive();
-    return composePatch(this.#plugins, raw ?? this.getSnapshot(), this.#resolvedTrack, `track "${this.#id}"`);
+    return composePatch(
+      this.#plugins,
+      raw ?? this.getSnapshot(),
+      this.#resolvedTrack,
+      `track "${this.#id}"`,
+    );
   }
 
   compose(raw, context) {
@@ -110,6 +115,7 @@ export class Track {
   }
 
   _setObservationController(controller) { this.#observationController = controller ?? null; }
+  _emitObservationLifecycle(event) { this.#emit(event); }
   #owner() { return this.#observationController ?? this.#standaloneObservationAdapter; }
   #notify() { const snapshot = this.getSnapshot(); for (const callback of this.#subscribers) callback(snapshot); }
   #invalidate(reason) { this.#emit({ type: "invalidated", track: this, reason }); }
@@ -195,8 +201,11 @@ export class Track {
       this.#groupHost.timeline.kill();
       this.#groupHost = null;
     }
-    try { this.#interpolationTimeline?.kill(); }
-    catch (error) { logger.warn(`track "${this.#id}", failed to kill timeline during destroy()`, error); }
+    try {
+      this.#interpolationTimeline?.kill();
+    } catch (error) {
+      logger.warn(`track "${this.#id}", failed to kill timeline during destroy()`, error);
+    }
   }
 
   #emit(event) {
