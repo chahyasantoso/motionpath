@@ -13,6 +13,7 @@ export class ObservationStateBridge {
   #tracks;
   #state;
   #destroyed = false;
+  #unsubscribers = [];
 
   constructor({ tracks = new Map(), edges } = {}) {
     this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks);
@@ -27,6 +28,7 @@ export class ObservationStateBridge {
       this.#hydrateFromTracks();
     }
     this.#bindObserverProviders();
+    this.#bindSourceCleanup();
   }
 
   get state() { return this.#state; }
@@ -52,6 +54,21 @@ export class ObservationStateBridge {
   #bindObserverProviders() {
     for (const track of this.#tracks.values()) {
       track._setObservationObserverIds?.(() => this.#state.getObserverIds(track.id));
+    }
+  }
+
+  /** Destroy subscribers run before Track unregisters, so state can drive cleanup. */
+  #bindSourceCleanup() {
+    for (const source of this.#tracks.values()) {
+      const unsubscribe = source.onSourceDestroyed?.(() => {
+        const observerIds = this.#state.getObserverIds(source.id);
+        for (const observerId of observerIds) {
+          const observer = this.#tracks.get(observerId);
+          observer?.removeObserved(source);
+        }
+        this.#state.removeSourceEdges(source.id);
+      });
+      if (unsubscribe) this.#unsubscribers.push(unsubscribe);
     }
   }
 
@@ -105,6 +122,8 @@ export class ObservationStateBridge {
   destroy() {
     if (this.#destroyed) return;
     this.#destroyed = true;
+    for (const unsubscribe of this.#unsubscribers) unsubscribe();
+    this.#unsubscribers = [];
     for (const track of this.#tracks.values()) track._setObservationObserverIds?.(null);
     this.#state.destroy();
     this.#tracks.clear();
