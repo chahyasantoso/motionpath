@@ -21,6 +21,8 @@ const RETRY_OPTIONS = new Set(["maxAttempts", "backoff"]);
  *
  * Lifecycle hooks are limited to invalidation and disposal bookkeeping. They
  * never install mutation guards or alter authored observation ownership.
+ *
+ * These comments are part of the guarded readability contract for this hot path.
  */
 export class GraphPublisher {
   #order = [];
