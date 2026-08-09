@@ -7,8 +7,8 @@ function track(id, owner) {
     id,
     observationAdapter: owner.standaloneObservationAdapter,
     proxyState: { value: id },
-    plugins: [],
-    resolvedTrack: { id, keyframes: {} },
+    plugins: [{ keys: ["value"], compose: (raw) => ({ value: raw.value }) }],
+    resolvedTrack: { id, keyframes: { value: {} } },
   });
 }
 
@@ -26,7 +26,7 @@ describe("phase one owner-first observation migration", () => {
 
     expect(scope.standaloneObservationAdapter.getSources(observer)).toEqual([source]);
     expect(scope.standaloneObservationAdapter.getObserverIds(source)).toEqual(["observer"]);
-    expect(observer.compose()).toEqual({ upstream: "source" });
+    expect(observer.compose()).toEqual({ value: "observer", upstream: "source" });
     scope.dispose();
   });
 
