@@ -1,34 +1,32 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 14:51 Jakarta  
+**Captured:** 2026-08-09 15:00 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
-**Latest green baseline:** `c74601f`, 129 files and 712 tests green  
-**Current slice:** `030a326` + `65521e`, verification pending  
+**Last green head:** `c74601f`, 129 files and 712 tests green  
+**Latest fix head:** `7f04915`, verification pending  
 **Base:** green PR #142 at `184f194`
 
 ## Current truth
 
-The large P2-03 projection cut is implemented but not yet verified. Track no longer
-stores `#observed` or composes from local observation state. Its observation API,
-edge readers, clearing, replacement, composition, and observer IDs route through
-the injected owner facade; standalone Tracks use the runtime adapter and authored
-Tracks use GraphBinding's ObservationTrackController.
+The large P2-03 projection cut is in place but the fix head still needs the matrix.
+The failed run was useful and specific: Track had been rewritten into dense lines,
+its comment ratio fell below the guard, and replacement events lost the old edge's
+role when `opts.role` was omitted. `7f04915` restores readable formatting and derives
+replacement roles/inputs from owner-state edges.
 
-## Completed in this slice
+## What is now true
 
-- Removed Track's local observation map and local composition walker.
-- Added owner-backed Track forwarding for mutation, readers, compose and cleanup.
-- Injected GraphBinding's state-backed controller into authored Tracks.
-- Made controller replacement tolerate GraphBinding's state-first transaction order.
-- Kept compatibility public methods while callers migrate; no default changes.
+- ProjectRuntime is the only adapter construction owner.
+- Process-global compatibility adapter state is gone.
+- ObservationState owns graph state after construction hydration.
+- GraphBinding injects the state-backed ObservationTrackController into authored Tracks.
+- Track forwards observation mutation, composition, edge reads, observer IDs, clearing,
+  and destroy cleanup through the owner facade; no local edge/reverse maps remain.
+- Compatibility remains the default; scoped remains explicit opt-in.
 
-## Verification required
+## Required verification
 
-Run the build first, then the full matrix. Expected follow-ups are likely contract
-adjustments in mocks and lifecycle tests because authored Tracks now require the
-controller for observation writes. Strict P2-03 boundary will still report public
-compatibility symbols and graph-guard forwarding until those callers are migrated;
-do not hide them with scanner exceptions.
+Run in this order:
 
 ```text
 npm run build
@@ -39,8 +37,17 @@ npm run boundary:v5:pass2
 npm run boundary:v5:pass2:strict
 ```
 
-## Next after green
+Expected focus: GraphBinding rollback/replacement, direct standalone Track parity,
+source-destroy snapshots, and readability. If anything disagrees between owner modes,
+assume compatibility is wrong until proven otherwise. Do not weaken assertions.
 
-Migrate remaining direct callers from Track observation methods/readers to the
-controller, then delete the compatibility forwarding names and remove the strict
-boundary findings. Keep child topology/playback for P2-04.
+## Next slice after green
+
+Migrate any remaining direct callers off Track compatibility names, then remove the
+forwarding symbols from Track and make strict P2-03 boundary green. Keep child
+ topology/playback removal separate as P2-04.
+
+## Guardrails
+
+Do not flip `publisherRendering`, `crossMotion`, `freeTracks`, or
+`observationOwnership` defaults. Do not hide findings with boundary exceptions.
