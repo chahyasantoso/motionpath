@@ -1,6 +1,6 @@
 import { composePatch } from "../usecases/ComposeTrackPatch.js";
 import { createDestroyEvent } from "../usecases/LegacyObservationFacade.js";
-import { defaultProjectRuntime } from "../runtime/defaultProjectRuntime.js";
+import { StandaloneObservationAdapter } from "../usecases/StandaloneObservationAdapter.js";
 import { defaultGaplessLayoutDelegate } from "./GaplessLayoutDelegate.js";
 import { eventBus as defaultEventBus } from "./eventBus.js";
 import { logger } from "./logger.js";
@@ -47,7 +47,7 @@ export class Track {
     this.#layoutDelegate = layoutDelegate ?? defaultGaplessLayoutDelegate;
     this.#eventBus = eventBus;
     this.#standaloneObservationAdapter = this.#mode === "standalone"
-      ? (observationAdapter ?? defaultProjectRuntime.standaloneObservationAdapter)
+      ? (observationAdapter ?? new StandaloneObservationAdapter())
       : null;
     this.#standaloneObservationAdapter?.register(this);
   }
