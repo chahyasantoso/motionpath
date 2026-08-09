@@ -1,4 +1,5 @@
 import { TrackObservationOwner } from "./TrackObservationOwner.js";
+import { COMPOSING } from "./composeContext.js";
 
 /**
  * Standalone observation ownership for one explicit scope.
@@ -150,9 +151,12 @@ export class StandaloneObservationAdapter {
   compose(track, rawData, ctx) {
     this.#assertAlive();
     this.register(track);
-    const internal = this.#internalContext(ctx);
+    const publicContext = ctx ?? new Map();
+    const internal = this.#internalContext(publicContext);
+    publicContext.set(track.id, COMPOSING);
+    internal.set(this.#keys.get(track), COMPOSING);
     const patch = this.#owner.compose(this.#keys.get(track), rawData, internal);
-    if (ctx && internal !== ctx) ctx.set(track.id, patch);
+    publicContext.set(track.id, patch);
     return patch;
   }
 
@@ -192,9 +196,7 @@ export class StandaloneObservationAdapter {
   }
 
   #internalContext(ctx) {
-    if (!ctx) return new Map();
     const internal = new Map();
-    this.#publicContexts.set(internal, ctx);
     for (const [publicId, patch] of ctx) {
       const track = this.#findTrack(publicId);
       if (track) internal.set(this.#keys.get(track), patch);
@@ -204,9 +206,14 @@ export class StandaloneObservationAdapter {
 
   #composeSource(source, ctx) {
     if (typeof source.compose !== "function") {
-      return this.#owner.compose(source, undefined, ctx);
+      const key = this.#keys.get(source);
+      return this.#owner.compose(key, undefined, ctx);
     }
-    const publicContext = this.#publicContexts.get(ctx) ?? new Map();
+    const publicContext = new Map();
+    for (const [key, patch] of ctx) {
+      const track = this.#owner.getTrack(key);
+      if (track) publicContext.set(track.id, patch);
+    }
     return source.compose(undefined, publicContext);
   }
 
