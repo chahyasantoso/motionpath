@@ -44,7 +44,7 @@ export class ScopedObservationAdapter {
     this.register(track);
     return this.#owner.getEdges(this.#keys.get(track)).map((edge) => ({
       ...edge,
-      source: this.#owner.getTrack(edge.source),
+      source: edge.source,
       target: track.id,
     }));
   }
@@ -102,7 +102,9 @@ export class ScopedObservationAdapter {
     if (typeof source.compose === "function") {
       return source.compose(undefined, this.#publicContext(ctx));
     }
-    return this.#owner.compose(this.#keys.get(source), undefined, ctx);
+    const key = this.#keys.get(source);
+    if (!key) return source.getSnapshot?.() ?? {};
+    return this.#owner.compose(key, undefined, ctx);
   }
 
   #publicContext(ctx) {
