@@ -1,27 +1,33 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-09 11:11 Asia/Jakarta  
-**Branch:** `fix/pass2-f02-regressions-v2`  
+**Status captured:** 2026-08-09 11:44 Asia/Jakarta  
+**Branch:** `feat/pass2-scoped-adapter-migration`  
 **Canonical index:** [`docs/V5-README.md`](./V5-README.md)  
 **Implementation report:** [`V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md`](./V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md)  
 **Next implementor handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)
 
 ## Executive status
 
-Pass-2 repair work is green on the current branch after resolving the attached three-failure run. PR #142 remains draft pending review. The fixes cover rollback integrity, fuzz-path performance, Track readability, and scoped standalone ownership.
+PR #142 remains the frozen green repair baseline. Scoped standalone ownership is implemented on this separate migration branch with dedicated tests; it is not yet approved for merge until the full CI matrix is green.
 
-## Completed
+## Completed repair baseline
 
-- Explicit-null handling in `createTrack` preserves authored-graph Tracks without standalone adapters.
+- Explicit-null handling in `createTrack` preserves authored-graph ownership semantics.
 - GraphBinding rollback restores ObservationState and live Track wiring, including map functions.
-- O(1) observation lookups remove the registry-clone timeout path.
-- Track readability reasoning and destroy re-entrancy protection are restored.
-- Standalone observation ownership is now scoped to ProjectRuntime or an explicitly injected adapter, with no module-global registry.
+- Fuzz-path registry cloning was removed from the hot lookup.
+- Track and owner readability gates are green.
+
+## Completed migration slice
+
+- No module-global standalone registry remains on this branch.
+- ProjectRuntime owns one adapter for its runtime lifetime.
+- Public compose contexts expose Track IDs only.
+- Duplicate-ID scope isolation, mutual observation, and disposal isolation have dedicated tests.
 
 ## Next in line
 
-F-01 ownership inversion: ObservationState becomes the writer and graph authority. Migrate remaining Track observation readers in GraphBinding, ObservationStateBridge, and GraphPublisher before deleting Track's duplicate observation maps.
+F-01 ownership inversion: ObservationState becomes the writer and graph authority. Migrate remaining Track observation readers before deleting Track's duplicate observation maps.
 
 ## Guardrails
 
-Keep `publisherRendering`, `crossMotion`, and `freeTracks` default-off. Do not weaken readability or boundary tests. Run the full verification checklist before merging.
+Keep `publisherRendering`, `crossMotion`, and `freeTracks` default-off. Do not weaken readability or boundary tests. Do not merge this migration until its full verification checklist passes.
