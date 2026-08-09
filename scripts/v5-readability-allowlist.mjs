@@ -17,6 +17,7 @@
 export const READABILITY_GUARDED_FILES = [
   "packages/core/src/lib/Track.js",
   "packages/core/src/usecases/GraphPublisher.js",
+  "packages/core/src/usecases/ScopedObservationAdapter.js",
 ];
 
 /** Long enough for real code, short enough that a whole class cannot hide on it. */
