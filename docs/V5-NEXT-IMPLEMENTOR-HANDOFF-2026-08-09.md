@@ -1,39 +1,42 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 14:03 Jakarta  
+**Captured:** 2026-08-09 14:22 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
-**Latest green baseline:** `c8bc9a8`, full suite green  
-**Current slice:** `1310614` + `4e13839`, verification pending  
+**Latest green baseline:** `c74601f`, 129 files and 712 tests green  
+**Current slice:** `a125083` + `86ff633`, verification pending  
 **Base:** green PR #142 at `184f194`
 
 ## Current truth
 
 P2-03 adapter parity and the full Node 24 matrix are green through the controlled
-Engine path. The bridge cut has started: `ObservationStateBridge` hydrates from
-Track projections only during construction. Its parity and integrity checks now
-read owner state, not Track readers, so post-construction Track drift cannot
-rewrite or invalidate the owner graph.
+Engine path. The state-authoritative graph slice is now wired through lifecycle:
+ObservationStateBridge supplies Track observer IDs from owner state and removes
+source dependents before Track teardown. Track no longer has a reverse observer
+map; `observerCount` and `observerIds` share one owner-backed source of truth.
 
 ## Completed in this slice
 
-- Added state-only `ObservationStateBridge.assertParity()`.
-- Kept construction-only legacy hydration private.
-- Added `assertGraphParity(graph)` as the GraphBinding IR contract.
-- Updated bridge tests to lock one-way hydration and state authority.
-- GraphBinding validates normalized graph IR against ObservationState and rechecks
-  after commits.
-- Strict boundary mode blocks P2-03 Track ownership symbols.
+- Track reverse observer index removed: no `#observers`, `_addObserver`, or
+  `_removeObserver`.
+- `observerCount` derives from `observerIds`, preventing fallback divergence.
+- ObservationStateBridge binds the temporary public observer snapshot provider.
+- Source-destroy subscribers remove dependent Track edges from owner state before
+  the source unregisters, preserving destroy snapshot ordering.
+- Bridge parity and graph checks remain state-only after construction.
+- Added tests for owner observer IDs, one-way hydration, drift immunity, graph
+  parity, and source cleanup.
 
-## Next jobs
+## Remaining work
 
-1. Verify this cut with the full matrix and strict boundary report.
-2. Make GraphBinding initial wiring pass explicit owner edges wherever mapFns are
-   available, then remove its remaining post-construction Track edge reads.
-3. Replace Track's reverse observer index with adapter/state observer IDs. Delete
-   `#observers`, `_addObserver`, `_removeObserver`, and the destroy snapshot's
-   dependency on Track-owned reverse state. The authored GraphBinding lifecycle
-   callback must remove source state before Track cleanup.
-4. Remove the remaining Track observation symbols and make strict boundary green.
+1. Run the full matrix and strict boundary scan on this slice.
+2. Remove the remaining Track-owned observation compatibility projection
+   (`#observed`, `setObserved`, `removeObserved`, `replaceObserved`, and related
+   public readers) by routing the complete Track observation contract through
+   the injected owner/state facade. Preserve direct standalone behavior and the
+   authored GraphBinding transaction contract before deleting the symbols.
+3. Once Track observation symbols are gone, make strict P2-03 boundary green.
+4. Keep topology/playback findings for P2-04; do not mix that deletion into this
+   ownership cut.
 
 ## Guardrails
 
