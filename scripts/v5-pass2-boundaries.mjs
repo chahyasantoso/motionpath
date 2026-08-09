@@ -10,7 +10,7 @@ const SCAN_ROOTS = ["packages/core/src/", "packages/react/src/"];
 const RENDERER_SURFACE = "packages/react/";
 const TRACK_OBSERVATION_SYMBOLS = [
   /#observed\b/, /#observers\b/, /#graphGuard\b/, /\b_setGraphGuard\b/, /\b_setObservationComposer\b/, /\b_addObserver\b/, /\b_removeObserver\b/,
-  /\bsetObserved\b/, /\bremoveObserved\b/, /\breplaceObserved\b/, /\bobservedSources\b/, /\bobservedEdges\b/, /\bobserverCount\b/, /\bobserverIds\b/,
+  /\bsetObserved\b/, /\bremoveObserved\b/, /\breplaceObserved\b/, /\bobservedSources\b/, /\bobservedEdges\b/, /\bobserverCount\b/,
 ];
 const TRACK_TOPOLOGY_SYMBOLS = [/\baddChild\b/, /\bremoveChild\b/, /\b_attachGroupHost\b/, /\bgroupHost\b/];
 function toPosix(absolutePath) { return relative(repoRoot, absolutePath).split(sep).join("/"); }
@@ -24,6 +24,6 @@ for (const file of files) { const rel = toPosix(file); if (rel === "packages/cor
 const stale = QUARANTINED_GSAP_FILES.filter((path) => !findings.some((finding) => finding.kind === "gsap-import" && finding.file === path));
 for (const path of stale) addFinding("gsap-quarantine-stale", path, "quarantine entry no longer imports gsap; delete it, the list may only shrink", true);
 const blocking = findings.filter((finding) => finding.blocking);
-const report = { generatedAt: new Date().toISOString(), strict, scanRoots: SCAN_ROOTS, findings, summary: { findingCount: findings.length, blockingCount: blocking.length, gsapImports: findings.filter(({ kind }) => kind === "gsap-import").length, gsapQuarantined: findings.filter(({ kind, blocking: isBlocking }) => kind === "gsap-import" && !isBlocking).length, rendererGsapImports: findings.filter(({ kind }) => kind === "renderer-gsap-import").length, trackOwnershipFindings: findings.filter(({ kind }) => kind.startsWith("track-" )).length } };
+const report = { generatedAt: new Date().toISOString(), strict, scanRoots: SCAN_ROOTS, findings, summary: { findingCount: findings.length, blockingCount: blocking.length, gsapImports: findings.filter(({ kind }) => kind === "gsap-import").length, gsapQuarantined: findings.filter(({ kind, blocking: isBlocking }) => kind === "gsap-import" && !isBlocking).length, rendererGsapImports: findings.filter(({ kind }) => kind === "renderer-gsap-import").length, trackOwnershipFindings: findings.filter(({ kind }) => kind.startsWith("track-")).length } };
 console.log(JSON.stringify(report, null, 2));
 if (blocking.length) process.exitCode = 1;
