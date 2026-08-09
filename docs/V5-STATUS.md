@@ -1,41 +1,44 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-09 16:33 Jakarta  
+**Status captured:** 2026-08-09 16:49 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
-**Latest closure work:** caller-owned direct observation scope factory  
+**Phase-two status:** green, owner-first GraphBinding migration complete  
+**Next phase:** cycle-authority cleanup  
 **Implementor review:** [`V5-P2-03-IMPLEMENTOR-REVIEW-2026-08-09.md`](./V5-P2-03-IMPLEMENTOR-REVIEW-2026-08-09.md)  
 **Next handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)
 
 ## Executive status
 
-The P2-03 behavior slice remains green. The latest closure work adds an explicit
-caller-owned `createObservationScope()` for direct users and locks duplicate-ID
-isolation across independent scopes. P2-03 is still not architecturally closed:
-the Track facade, singleton fallback migration, cycle authority, and authored
-GraphBinding dual-write still need final removal or explicit deprecation evidence.
+Phase two is green across the full Node 24 matrix, including strict boundary,
+unit tests, build, typecheck, packaging, benchmark, and baseline jobs. Authored
+GraphBinding mutations now use ObservationState/controller state directly. P2-03
+remains open only for the next architectural closures: duplicate cycle authority,
+legacy facade removal, direct singleton fallback retirement, and final teardown/
+performance evidence.
 
 ## Evidence-backed architecture
 
 - Engine-created standalone Tracks share the injected ProjectRuntime adapter.
-- Direct consumers can now create and dispose an isolated observation scope.
+- Direct callers have an explicit caller-owned observation scope.
 - Scoped ownership isolates duplicate IDs and preserves compose-context memoization.
-- ObservationState owns authored graph state after construction hydration.
-- Strict boundary enforcement and benchmark jobs are blocking CI checks.
-- Compatibility remains the default; scoped ownership is explicit opt-in.
+- ObservationState owns authored graph state after hydration and rollback.
+- GraphBinding uses the injected controller for authored mutations.
+- Strict boundary and benchmark jobs are blocking CI checks.
+- Compatibility remains default; scoped ownership is explicit opt-in.
 
 ## Closure checklist
 
-- [x] Behavioral matrix and full Node 24 suite green at reviewed behavior head.
+- [x] Behavioral matrix and full Node 24 suite green.
 - [x] Strict boundary command is a blocking PR job.
 - [x] Benchmark and baseline jobs are blocking.
 - [x] Public ownership docs corrected.
-- [x] Caller-owned direct scope factory and duplicate-ID isolation test added.
-- [ ] Remove Track-installed legacy facade after production caller migration.
-- [ ] Route direct Track/createTrack construction through explicit scopes by default.
-- [ ] Make ObservationState/controller the sole runtime cycle authority.
-- [ ] Remove authored GraphBinding dual-write.
-- [ ] Add hot-path benchmark threshold and repeated teardown evidence.
-- [ ] Refresh this file again on the final closure head.
+- [x] Caller-owned direct scope and isolation coverage added.
+- [x] Authored GraphBinding uses owner/controller state directly.
+- [ ] Remove GraphPublisher's duplicate Track-walking cycle guard.
+- [ ] Remove the Track-installed legacy facade after caller migration.
+- [ ] Retire the default singleton fallback from direct construction.
+- [ ] Add deterministic hot-path benchmark threshold and repeated teardown evidence.
+- [ ] Refresh status, matrix, review, and implementation report on final closure head.
 
 ## Guardrails
 
