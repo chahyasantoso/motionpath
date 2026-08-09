@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { GraphBinding } from "../GraphBinding.js";
 import { GraphPublisher } from "../GraphPublisher.js";
-import { buildRealGraph, chainMotion, makeTrack } from "../../__fixtures__/graphTracks.js";
+import {
+  buildRealGraph,
+  chainMotion,
+  makeTrack,
+} from "../../__fixtures__/graphTracks.js";
 
 function bind(motion) {
   const { graph, tracks } = buildRealGraph(motion);
@@ -11,12 +15,14 @@ function bind(motion) {
 }
 
 function stateEdges(binding, target) {
-  return binding.observationState.getEdges(target).map(({ source, role, input, mapFn }) => ({
-    source: source.id,
-    role,
-    input,
-    mapper: typeof mapFn === "function" ? "fn" : "none",
-  }));
+  return binding.observationState
+    .getEdges(target)
+    .map(({ source, role, input, mapFn }) => ({
+      source: source.id,
+      role,
+      input,
+      mapper: typeof mapFn === "function" ? "fn" : "none",
+    }));
 }
 
 describe("GraphBinding state authority", () => {
@@ -36,10 +42,13 @@ describe("GraphBinding state authority", () => {
       throw new Error("state authority rejected candidate");
     };
 
-    expect(() => binding.removeEdge({ source: "n1", target: "n2", role: "output" }))
-      .toThrow(/state authority rejected/);
+    expect(() =>
+      binding.removeEdge({ source: "n1", target: "n2", role: "output" }),
+    ).toThrow(/state authority rejected/);
     expect(stateEdges(binding, "n2")).toEqual(before);
-    expect(binding.observationState.getEdges("n2")[0].mapFn).toEqual(expect.any(Function));
+    expect(binding.observationState.getEdges("n2")[0].mapFn).toEqual(
+      expect.any(Function),
+    );
     binding.destroy();
   });
 
@@ -52,10 +61,17 @@ describe("GraphBinding state authority", () => {
       throw new Error("replace rejected candidate");
     };
 
-    expect(() => binding.replaceEdge(
-      { source: "n1", target: "n2", role: "output" },
-      { source: "n0", target: "n2", role: "output", mapFn: () => ({ replaced: true }) },
-    )).toThrow(/replace rejected/);
+    expect(() =>
+      binding.replaceEdge(
+        { source: "n1", target: "n2", role: "output" },
+        {
+          source: "n0",
+          target: "n2",
+          role: "output",
+          mapFn: () => ({ replaced: true }),
+        },
+      ),
+    ).toThrow(/replace rejected/);
     expect(stateEdges(binding, "n2")).toEqual(before);
     binding.destroy();
   });
@@ -65,9 +81,13 @@ describe("GraphBinding state authority", () => {
     const before = stateEdges(binding, "n2");
     const late = makeTrack("late");
     const realSetObserved = late.setObserved.bind(late);
-    late.setObserved = () => { throw new Error("late wiring rejected"); };
+    late.setObserved = () => {
+      throw new Error("late wiring rejected");
+    };
 
-    expect(() => binding.addTrack(late, [{ source: "n0" }])).toThrow(/late wiring rejected/);
+    expect(() => binding.addTrack(late, [{ source: "n0" }])).toThrow(
+      /late wiring rejected/,
+    );
     expect(stateEdges(binding, "n2")).toEqual(before);
     expect(binding.observationState.getEdges("late")).toEqual([]);
     expect(binding.tracks.has("late")).toBe(false);

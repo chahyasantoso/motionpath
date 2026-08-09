@@ -16,12 +16,118 @@ import { graphInputsRule } from "./rules/graph-inputs.js";
 import { resolveTrack } from "../usecases/ResolveTrack.js";
 import { normalizeObservationGraph } from "../usecases/normalizeObservationGraph.js";
 
-const motionRules = [triggerShapeRule, easeCollisionRule, staggerShapeRule, perspectiveUsageRule];
-const trackRules = [stopCountRule, stopShapeRule, stopSequenceRule, pathXYExclusivityRule, pathShapeRule, imageSequenceRule];
+const motionRules = [
+  triggerShapeRule,
+  easeCollisionRule,
+  staggerShapeRule,
+  perspectiveUsageRule,
+];
+const trackRules = [
+  stopCountRule,
+  stopShapeRule,
+  stopSequenceRule,
+  pathXYExclusivityRule,
+  pathShapeRule,
+  imageSequenceRule,
+];
 const crossMotionRules = [elementUniquenessRule];
-function isValidShape(schema) { return schema !== null && typeof schema === "object" && Array.isArray(schema.motions); }
-export function hasFatalErrors(errors) { return Array.isArray(errors) && errors.some((e) => e && e.severity === "error"); }
-export function validateObservationGraph(motion) { const graph = normalizeObservationGraph(motion); return graph.errors.map((error) => ({ ...error, severity: "error" })); }
-export function validateProject(schema) { const errors = []; errors.push(...runSafely(schemaVersionRule, schema, "$")); if (!isValidShape(schema)) { if (schema && typeof schema === "object") errors.push({ ruleId: "invalid-shape", severity: "error", message: "schema.motions must be an array.", path: "$.motions" }); return errors; } errors.push(...runSafely(motionStructureRule, schema)); errors.push(...runSafely(trackObservationsRule, schema)); errors.push(...runSafely(graphInputsRule, schema)); const context = { schema }; for (const [i, motion] of schema.motions.entries()) { const motionPath = `motions[${i}]`; const resolvedTracks = []; if (motion && typeof motion === "object" && Array.isArray(motion.tracks)) for (const track of motion.tracks) resolvedTracks.push(resolveTrack(track, schema.templates)); const resolvedMotion = motion && typeof motion === "object" ? { ...motion, tracks: resolvedTracks } : motion; for (const rule of motionRules) errors.push(...runSafely(rule, resolvedMotion, context, motionPath)); if (motion && typeof motion === "object" && Array.isArray(motion.tracks)) for (const [j] of motion.tracks.entries()) for (const rule of trackRules) errors.push(...runSafely(rule, resolvedTracks[j], resolvedMotion, context, `${motionPath}.tracks[${j}]`)); } if (Array.isArray(schema.tracks)) for (const [k, track] of schema.tracks.entries()) { const trackPath = `tracks[${k}]`; const resolvedTrack = runSafelyValue(() => resolveTrack(track, schema.templates), null); const standaloneHost = { id: null, trigger: undefined, tracks: [resolvedTrack] }; for (const rule of trackRules) errors.push(...runSafely(rule, resolvedTrack, standaloneHost, context, trackPath)); } for (const rule of crossMotionRules) errors.push(...runSafely(rule, schema.motions, context)); return errors; }
-function runSafely(rule, ...args) { try { return rule(...args); } catch (e) { return [{ ruleId: "internal-error", severity: "error", message: `Validator rule threw unexpectedly: ${e.message}`, path: String(args.at(-1)) }]; } }
-function runSafelyValue(fn, fallback) { try { return fn(); } catch { return fallback; } }
+function isValidShape(schema) {
+  return (
+    schema !== null &&
+    typeof schema === "object" &&
+    Array.isArray(schema.motions)
+  );
+}
+export function hasFatalErrors(errors) {
+  return (
+    Array.isArray(errors) && errors.some((e) => e && e.severity === "error")
+  );
+}
+export function validateObservationGraph(motion) {
+  const graph = normalizeObservationGraph(motion);
+  return graph.errors.map((error) => ({ ...error, severity: "error" }));
+}
+export function validateProject(schema) {
+  const errors = [];
+  errors.push(...runSafely(schemaVersionRule, schema, "$"));
+  if (!isValidShape(schema)) {
+    if (schema && typeof schema === "object")
+      errors.push({
+        ruleId: "invalid-shape",
+        severity: "error",
+        message: "schema.motions must be an array.",
+        path: "$.motions",
+      });
+    return errors;
+  }
+  errors.push(...runSafely(motionStructureRule, schema));
+  errors.push(...runSafely(trackObservationsRule, schema));
+  errors.push(...runSafely(graphInputsRule, schema));
+  const context = { schema };
+  for (const [i, motion] of schema.motions.entries()) {
+    const motionPath = `motions[${i}]`;
+    const resolvedTracks = [];
+    if (motion && typeof motion === "object" && Array.isArray(motion.tracks))
+      for (const track of motion.tracks)
+        resolvedTracks.push(resolveTrack(track, schema.templates));
+    const resolvedMotion =
+      motion && typeof motion === "object"
+        ? { ...motion, tracks: resolvedTracks }
+        : motion;
+    for (const rule of motionRules)
+      errors.push(...runSafely(rule, resolvedMotion, context, motionPath));
+    if (motion && typeof motion === "object" && Array.isArray(motion.tracks))
+      for (const [j] of motion.tracks.entries())
+        for (const rule of trackRules)
+          errors.push(
+            ...runSafely(
+              rule,
+              resolvedTracks[j],
+              resolvedMotion,
+              context,
+              `${motionPath}.tracks[${j}]`,
+            ),
+          );
+  }
+  if (Array.isArray(schema.tracks))
+    for (const [k, track] of schema.tracks.entries()) {
+      const trackPath = `tracks[${k}]`;
+      const resolvedTrack = runSafelyValue(
+        () => resolveTrack(track, schema.templates),
+        null,
+      );
+      const standaloneHost = {
+        id: null,
+        trigger: undefined,
+        tracks: [resolvedTrack],
+      };
+      for (const rule of trackRules)
+        errors.push(
+          ...runSafely(rule, resolvedTrack, standaloneHost, context, trackPath),
+        );
+    }
+  for (const rule of crossMotionRules)
+    errors.push(...runSafely(rule, schema.motions, context));
+  return errors;
+}
+function runSafely(rule, ...args) {
+  try {
+    return rule(...args);
+  } catch (e) {
+    return [
+      {
+        ruleId: "internal-error",
+        severity: "error",
+        message: `Validator rule threw unexpectedly: ${e.message}`,
+        path: String(args.at(-1)),
+      },
+    ];
+  }
+}
+function runSafelyValue(fn, fallback) {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
+}

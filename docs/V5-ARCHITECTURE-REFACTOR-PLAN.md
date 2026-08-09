@@ -164,20 +164,20 @@ Adapters
 
 ## Phase-to-PR traceability
 
-| Architecture phase | Implementation PRs | Primary gate |
-|---|---:|---|
-| Phase 0: characterization and guardrails | PR-00 to PR-01 | CI green, baseline captured, old path unchanged |
-| Phase 1: lifecycle and graph transaction repair | PR-02 to PR-03 | no leaks or graph/live-state divergence; cycle guard intact |
-| Phase 2: runtime scope and compatibility boundary | PR-04 to PR-05 | addressable runtime, deterministic clock and patch contract |
-| Phase 3: publisher migration and shadow validation | PR-06 to PR-08 | fixture equivalence, then live Spiral equivalence |
-| Phase 4: manual-trigger Motion compatibility | PR-09 | autoplay and control parity |
-| Phase 5: composite collapse and recursive scheduling | PR-10 to PR-13 | one composite, arbitrary-depth nesting, recursive disposal |
-| Phase 6: ports and adapter isolation | PR-12 to PR-13 | no forbidden GSAP imports, fake-backed core |
-| Phase 7: FK input contract and ObservationGraph extraction | PR-14 to PR-15 | explicit mode validation, Track is a leaf |
-| Phase 8: publish-only same-motion runtime | PR-16 | compose once per node per tick |
-| Phase 9: project membership and ProjectRuntime | PR-17 to PR-18 | atomic staged commit, one runtime owner |
-| Phase 10: cross-motion/free-track capability | PR-19 | policy, determinism, canary performance |
-| Phase 11: Engine/API cleanup and measured optimization | PR-20 to PR-21 | public boundary and measured wins only |
+| Architecture phase                                         | Implementation PRs | Primary gate                                                |
+| ---------------------------------------------------------- | -----------------: | ----------------------------------------------------------- |
+| Phase 0: characterization and guardrails                   |     PR-00 to PR-01 | CI green, baseline captured, old path unchanged             |
+| Phase 1: lifecycle and graph transaction repair            |     PR-02 to PR-03 | no leaks or graph/live-state divergence; cycle guard intact |
+| Phase 2: runtime scope and compatibility boundary          |     PR-04 to PR-05 | addressable runtime, deterministic clock and patch contract |
+| Phase 3: publisher migration and shadow validation         |     PR-06 to PR-08 | fixture equivalence, then live Spiral equivalence           |
+| Phase 4: manual-trigger Motion compatibility               |              PR-09 | autoplay and control parity                                 |
+| Phase 5: composite collapse and recursive scheduling       |     PR-10 to PR-13 | one composite, arbitrary-depth nesting, recursive disposal  |
+| Phase 6: ports and adapter isolation                       |     PR-12 to PR-13 | no forbidden GSAP imports, fake-backed core                 |
+| Phase 7: FK input contract and ObservationGraph extraction |     PR-14 to PR-15 | explicit mode validation, Track is a leaf                   |
+| Phase 8: publish-only same-motion runtime                  |              PR-16 | compose once per node per tick                              |
+| Phase 9: project membership and ProjectRuntime             |     PR-17 to PR-18 | atomic staged commit, one runtime owner                     |
+| Phase 10: cross-motion/free-track capability               |              PR-19 | policy, determinism, canary performance                     |
+| Phase 11: Engine/API cleanup and measured optimization     |     PR-20 to PR-21 | public boundary and measured wins only                      |
 
 **Ordering note:** PR-12 and PR-13 are grouped under both Phase 5 and Phase 6 because adapter isolation is required to prove recursive scheduling cleanly; PR-13 is the hard recursion gate, not a duplicate implementation phase.
 

@@ -9,7 +9,11 @@
 import { describe, expect, it } from "vitest";
 import { GraphBinding } from "../../usecases/GraphBinding.js";
 import { GraphPublisher } from "../../usecases/GraphPublisher.js";
-import { buildRealGraph, chainMotion, makeTrack } from "../../__fixtures__/graphTracks.js";
+import {
+  buildRealGraph,
+  chainMotion,
+  makeTrack,
+} from "../../__fixtures__/graphTracks.js";
 
 describe("Track.removeChild — graph invalidation", () => {
   it("drops the removed child from the publish order", () => {
@@ -26,7 +30,11 @@ describe("Track.removeChild — graph invalidation", () => {
   it("invalidates the dependents that lost a source", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     const published = [];
-    const publisher = new GraphPublisher({ graph, tracks, publish: (id, patch) => published.push([id, patch]) });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks,
+      publish: (id, patch) => published.push([id, patch]),
+    });
     publisher.markAllDirty();
     publisher.flush();
     tracks.get("n0").addChild(tracks.get("n1"));
@@ -97,10 +105,16 @@ describe("Track.replaceObserved — replacement additions", () => {
     const types = events.map((event) => event.type);
     expect(types).toContain("edge-removed");
     expect(types).toContain("edge-added");
-    expect(types.indexOf("edge-removed")).toBeLessThan(types.indexOf("edge-added"));
+    expect(types.indexOf("edge-removed")).toBeLessThan(
+      types.indexOf("edge-added"),
+    );
 
     const added = events.find((event) => event.type === "edge-added");
-    expect(added.edge).toMatchObject({ source: "a", target: "c", role: "output" });
+    expect(added.edge).toMatchObject({
+      source: "a",
+      target: "c",
+      role: "output",
+    });
     expect(added.source).toBe(a);
   });
 
@@ -112,8 +126,10 @@ describe("Track.replaceObserved — replacement additions", () => {
 
     const edges = new Set(["b->c"]);
     c.onLifecycle((event) => {
-      if (event.type === "edge-removed") edges.delete(`${event.edge.source}->${event.edge.target}`);
-      if (event.type === "edge-added" || event.type === "edge-replaced") edges.add(`${event.edge.source}->${event.edge.target}`);
+      if (event.type === "edge-removed")
+        edges.delete(`${event.edge.source}->${event.edge.target}`);
+      if (event.type === "edge-added" || event.type === "edge-replaced")
+        edges.add(`${event.edge.source}->${event.edge.target}`);
     });
 
     c.replaceObserved(b, a, (patch) => ({ up: patch.transform }));

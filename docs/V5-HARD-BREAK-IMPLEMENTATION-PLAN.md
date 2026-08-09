@@ -183,7 +183,7 @@ The key rule:
 Cross-owner mutation must fail before changing either side:
 
 ```js
-runtimeA.addEdge(trackFromRuntimeB, trackFromRuntimeA)
+runtimeA.addEdge(trackFromRuntimeB, trackFromRuntimeA);
 // throws: cross-runtime observation ownership is not allowed
 ```
 
@@ -268,7 +268,7 @@ Preserve bare IDs only as an authored-schema convenience. Resolve them during no
 
 ```js
 {
-  source: "parent"
+  source: "parent";
 }
 ```
 
@@ -360,9 +360,9 @@ Current shape:
 
 ```js
 if (publisherRendering) {
-  GraphRuntime
+  GraphRuntime;
 } else {
-  GraphPublisher + GraphBinding
+  GraphPublisher + GraphBinding;
 }
 ```
 
@@ -432,8 +432,8 @@ GSAP implements the production adapter. Tests use a fake interpolator.
 Make Motion receive a scheduler:
 
 ```js
-scheduler.to(track, vars)
-scheduler.timeline(vars)
+scheduler.to(track, vars);
+scheduler.timeline(vars);
 ```
 
 GSAP implements the production scheduler. Tests use a fake scheduler.
@@ -496,7 +496,7 @@ Do not preserve `createMotionHost()` as a compatibility alias.
 Upgrade plugin metadata from:
 
 ```js
-inputs: ["parentWorld"]
+inputs: ["parentWorld"];
 ```
 
 to:
@@ -550,7 +550,7 @@ Do not enable them before Phases 4 through 9 are complete. Otherwise namespace, 
 For free Tracks:
 
 ```js
-engine.adopt(track)
+engine.adopt(track);
 ```
 
 registers the Track as:

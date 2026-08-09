@@ -3,11 +3,27 @@ import { Motion } from "../Motion.js";
 import { ManualTriggerDelegate } from "../TriggerDelegate.js";
 import { Track } from "../Track.js";
 import { gsap } from "gsap";
-function track(id) { const proxy = { opacity: 0 }; return new Track({ id, interpolationTimeline: gsap.to(proxy, { opacity: 1, duration: 1, paused: true }), proxyState: proxy, plugins: [], resolvedTrack: { id, keyframes: {} } }); }
+function track(id) {
+  const proxy = { opacity: 0 };
+  return new Track({
+    id,
+    interpolationTimeline: gsap.to(proxy, {
+      opacity: 1,
+      duration: 1,
+      paused: true,
+    }),
+    proxyState: proxy,
+    plugins: [],
+    resolvedTrack: { id, keyframes: {} },
+  });
+}
 
 describe("Motion-owned composite scheduling", () => {
   it("schedules mounted tracks through Motion and supports dynamic child slots", () => {
-    const motion = new Motion({ id: "motion", triggerDelegate: new ManualTriggerDelegate() });
+    const motion = new Motion({
+      id: "motion",
+      triggerDelegate: new ManualTriggerDelegate(),
+    });
     motion.init();
     const parent = track("parent");
     const child = track("child");
@@ -19,7 +35,10 @@ describe("Motion-owned composite scheduling", () => {
     motion.destroy();
   });
   it("repeated initialization does not create duplicate scheduler slots", () => {
-    const motion = new Motion({ id: "motion", triggerDelegate: new ManualTriggerDelegate() });
+    const motion = new Motion({
+      id: "motion",
+      triggerDelegate: new ManualTriggerDelegate(),
+    });
     const parent = track("parent");
     motion.mount(parent, 0);
     motion.init();
@@ -28,7 +47,10 @@ describe("Motion-owned composite scheduling", () => {
     motion.destroy();
   });
   it("removes a child slot without destroying the child", () => {
-    const motion = new Motion({ id: "motion", triggerDelegate: new ManualTriggerDelegate() });
+    const motion = new Motion({
+      id: "motion",
+      triggerDelegate: new ManualTriggerDelegate(),
+    });
     motion.init();
     const parent = track("parent");
     const child = track("child");

@@ -3,22 +3,42 @@ import { ObservationState } from "../ObservationState.js";
 import { ObservationTrackController } from "../ObservationTrackController.js";
 
 function track(id, leaf = id) {
-  return { id, getSnapshot: () => ({ leaf }), composeLocal: (raw) => ({ leaf: raw?.leaf ?? leaf }) };
+  return {
+    id,
+    getSnapshot: () => ({ leaf }),
+    composeLocal: (raw) => ({ leaf: raw?.leaf ?? leaf }),
+  };
 }
 
 describe("P2-03 ObservationTrackController", () => {
   function setup() {
     const source = track("source", "s");
     const observer = track("observer", "o");
-    const tracks = new Map([[source.id, source], [observer.id, observer]]);
+    const tracks = new Map([
+      [source.id, source],
+      [observer.id, observer],
+    ]);
     const state = new ObservationState({ tracks, validateCycles: false });
-    return { source, observer, state, controller: new ObservationTrackController({ state, tracks }) };
+    return {
+      source,
+      observer,
+      state,
+      controller: new ObservationTrackController({ state, tracks }),
+    };
   }
 
   it("owns edge mutation and preserves input/output identity", () => {
     const { source, observer, controller } = setup();
-    controller.setObserved(observer, source, () => ({ injected: true }), { role: "input", target: "target" });
-    controller.setObserved(observer, source, (patch) => ({ from: patch.leaf }), { role: "output" });
+    controller.setObserved(observer, source, () => ({ injected: true }), {
+      role: "input",
+      target: "target",
+    });
+    controller.setObserved(
+      observer,
+      source,
+      (patch) => ({ from: patch.leaf }),
+      { role: "output" },
+    );
 
     expect(controller.getSources(observer)).toEqual([source]);
     expect(controller.getEdges(observer)).toHaveLength(2);
@@ -29,7 +49,9 @@ describe("P2-03 ObservationTrackController", () => {
     const { source, observer, controller } = setup();
     const replacement = track("replacement", "r");
     controller.setObserved(observer, source, (patch) => ({ from: patch.leaf }));
-    controller.replaceObserved(observer, source, replacement, (patch) => ({ from: patch.leaf }));
+    controller.replaceObserved(observer, source, replacement, (patch) => ({
+      from: patch.leaf,
+    }));
     expect(controller.getSources(observer)).toEqual([replacement]);
     expect(controller.compose(observer)).toEqual({ leaf: "o", from: "r" });
 

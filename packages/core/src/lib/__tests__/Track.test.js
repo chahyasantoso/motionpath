@@ -23,14 +23,16 @@ function createDummyTrack(id = "test-track", opts = {}) {
   ];
   const resolvedTrack = { id, keyframes: { x: {}, y: {} } };
 
-  return installLegacyObservationFacade(new Track({
-    id,
-    interpolationTimeline: tween,
-    proxyState: proxy,
-    plugins,
-    resolvedTrack,
-    layoutDelegate: opts.layoutDelegate,
-  }));
+  return installLegacyObservationFacade(
+    new Track({
+      id,
+      interpolationTimeline: tween,
+      proxyState: proxy,
+      plugins,
+      resolvedTrack,
+      layoutDelegate: opts.layoutDelegate,
+    }),
+  );
 }
 
 describe("Track (v4 first-class playhead owner)", () => {
@@ -48,7 +50,12 @@ describe("Track (v4 first-class playhead owner)", () => {
   it("should be directly tweenable by GSAP accessor duck-typing without proxy objects", () => {
     const track = createDummyTrack("gsap-tweened-track");
     expect(track.progress()).toBe(0);
-    const tween = gsap.to(track, { progress: 1, duration: 0.1, ease: "none", paused: true });
+    const tween = gsap.to(track, {
+      progress: 1,
+      duration: 0.1,
+      ease: "none",
+      paused: true,
+    });
     tween.progress(0.5);
     expect(track.progress()).toBe(0.5);
     expect(track.getSnapshot().x).toBe(50);
@@ -58,9 +65,13 @@ describe("Track (v4 first-class playhead owner)", () => {
     const track = createDummyTrack("sub-track");
     const subscriber = vi.fn();
     track.subscribe(subscriber);
-    expect(subscriber).toHaveBeenCalledWith(expect.objectContaining({ x: 0, y: 0, progress: 0 }));
+    expect(subscriber).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 0, y: 0, progress: 0 }),
+    );
     track.progress(1);
-    expect(subscriber).toHaveBeenLastCalledWith(expect.objectContaining({ x: 100, y: 200, progress: 1 }));
+    expect(subscriber).toHaveBeenLastCalledWith(
+      expect.objectContaining({ x: 100, y: 200, progress: 1 }),
+    );
     const composed = track.compose();
     expect(composed).toEqual({ transform: "translate3d(100px, 200px, 0px)" });
   });
@@ -71,7 +82,9 @@ describe("Track (v4 first-class playhead owner)", () => {
     const child = createDummyTrack("child");
     parentA.addChild(child, { stagger: 0.1 });
     expect(child.parent).toBe(parentA);
-    expect(() => parentB.addChild(child, { stagger: 0.1 })).toThrow(/already a child/);
+    expect(() => parentB.addChild(child, { stagger: 0.1 })).toThrow(
+      /already a child/,
+    );
   });
 
   it("should throw when addChild is called with a NEW object sharing an existing child id", () => {
@@ -79,7 +92,9 @@ describe("Track (v4 first-class playhead owner)", () => {
     const childA = createDummyTrack("duplicate-id");
     const childB = createDummyTrack("duplicate-id");
     parent.addChild(childA, { stagger: 0.1 });
-    expect(() => parent.addChild(childB, { stagger: 0.1 })).toThrow(/already has a child with id/);
+    expect(() => parent.addChild(childB, { stagger: 0.1 })).toThrow(
+      /already has a child with id/,
+    );
     expect(parent.getChild("duplicate-id")).toBe(childA);
   });
 
@@ -135,7 +150,9 @@ describe("Track (v4 first-class playhead owner)", () => {
     });
 
     it("honors an injected custom LayoutDelegate (StaticLayoutDelegate never reflows, even mid-chain)", () => {
-      const parent = createDummyTrack("static-parent", { layoutDelegate: new StaticLayoutDelegate() });
+      const parent = createDummyTrack("static-parent", {
+        layoutDelegate: new StaticLayoutDelegate(),
+      });
       const c0 = createDummyTrack("sc0");
       const c1 = createDummyTrack("sc1");
       const c2 = createDummyTrack("sc2");
@@ -152,7 +169,9 @@ describe("Track (v4 first-class playhead owner)", () => {
       const source = createDummyTrack("source");
       source.progress(0.5);
       const follower = createDummyTrack("follower");
-      follower.setObserved(source, (composed) => ({ observedTransform: composed.transform }));
+      follower.setObserved(source, (composed) => ({
+        observedTransform: composed.transform,
+      }));
       const out = follower.compose();
       expect(out.observedTransform).toBe("translate3d(50px, 100px, 0px)");
       expect(out.transform).toBe("translate3d(0px, 0px, 0px)");
@@ -162,8 +181,12 @@ describe("Track (v4 first-class playhead owner)", () => {
       const source = createDummyTrack("source2");
       source.progress(1);
       const follower = createDummyTrack("follower2");
-      follower.setObserved(source, (composed) => ({ transform: composed.transform }));
-      expect(follower.compose().transform).toBe("translate3d(100px, 200px, 0px)");
+      follower.setObserved(source, (composed) => ({
+        transform: composed.transform,
+      }));
+      expect(follower.compose().transform).toBe(
+        "translate3d(100px, 200px, 0px)",
+      );
     });
 
     it("is cycle-safe: mutual observation resolves synchronously without stack overflow", () => {
@@ -192,7 +215,9 @@ describe("Track (v4 first-class playhead owner)", () => {
       const source = createDummyTrack("replace-source");
       const follower = createDummyTrack("replace-follower");
       follower.setObserved(source, () => ({ tag: "first" }));
-      expect(() => follower.setObserved(source, () => ({ tag: "second" }))).not.toThrow();
+      expect(() =>
+        follower.setObserved(source, () => ({ tag: "second" })),
+      ).not.toThrow();
       expect(follower.compose().tag).toBe("second");
       expect(follower.observedSources).toHaveLength(1);
     });
@@ -219,9 +244,25 @@ describe("Track (v4 first-class playhead owner)", () => {
 
     it("memoizes a diamond-shared source within a single compose() call", () => {
       const proxy = { x: 0, y: 0 };
-      const tween = gsap.to(proxy, { x: 100, y: 200, duration: 1, ease: "none", paused: true });
-      const pluginComposeSpy = vi.fn((raw) => ({ transform: `translate3d(${raw.x ?? 0}px, ${raw.y ?? 0}px, 0px)` }));
-      const d = installLegacyObservationFacade(new Track({ id: "diamond-d", interpolationTimeline: tween, proxyState: proxy, plugins: [{ keys: ["x", "y"], compose: pluginComposeSpy }], resolvedTrack: { id: "diamond-d", keyframes: { x: {}, y: {} } } }));
+      const tween = gsap.to(proxy, {
+        x: 100,
+        y: 200,
+        duration: 1,
+        ease: "none",
+        paused: true,
+      });
+      const pluginComposeSpy = vi.fn((raw) => ({
+        transform: `translate3d(${raw.x ?? 0}px, ${raw.y ?? 0}px, 0px)`,
+      }));
+      const d = installLegacyObservationFacade(
+        new Track({
+          id: "diamond-d",
+          interpolationTimeline: tween,
+          proxyState: proxy,
+          plugins: [{ keys: ["x", "y"], compose: pluginComposeSpy }],
+          resolvedTrack: { id: "diamond-d", keyframes: { x: {}, y: {} } },
+        }),
+      );
       const b = createDummyTrack("diamond-b");
       const c = createDummyTrack("diamond-c");
       b.setObserved(d, (composed) => ({ fromD: composed.transform }));
@@ -241,7 +282,17 @@ describe("Track (v4 first-class playhead owner)", () => {
       const parent = createDummyTrack("fk-parent");
       parent.progress(0.5);
       const child = createDummyTrack("fk-child");
-      child.setObserved(parent, (pw) => ({ parentWorld: { x: pw.x ?? 0, y: pw.y ?? 0, rotation: pw.rotation ?? 0 } }), { role: "input" });
+      child.setObserved(
+        parent,
+        (pw) => ({
+          parentWorld: {
+            x: pw.x ?? 0,
+            y: pw.y ?? 0,
+            rotation: pw.rotation ?? 0,
+          },
+        }),
+        { role: "input" },
+      );
       expect(() => child.compose()).not.toThrow();
     });
 
@@ -250,7 +301,9 @@ describe("Track (v4 first-class playhead owner)", () => {
       source.progress(1);
       const follower = createDummyTrack("role-output-follower");
       follower.setObserved(source, (pw) => ({ transform: pw.transform }));
-      expect(follower.compose().transform).toBe("translate3d(100px, 200px, 0px)");
+      expect(follower.compose().transform).toBe(
+        "translate3d(100px, 200px, 0px)",
+      );
     });
 
     it("input fold runs before output fold within the same compose() call", () => {

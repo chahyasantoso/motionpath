@@ -8,7 +8,12 @@ import {
 } from "../v4.js";
 
 const animatedOpacity = {
-  opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
+  opacity: {
+    stops: [
+      { p: 0, v: 0 },
+      { p: 1, v: 1 },
+    ],
+  },
 };
 
 const fixtures = [
@@ -29,8 +34,17 @@ const fixtures = [
             },
             {
               id: "child",
-              observes: [{ source: "source", role: "input", target: "parentWorld" }],
-              keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 10 }] } },
+              observes: [
+                { source: "source", role: "input", target: "parentWorld" },
+              ],
+              keyframes: {
+                x: {
+                  stops: [
+                    { p: 0, v: 0 },
+                    { p: 1, v: 10 },
+                  ],
+                },
+              },
             },
           ],
         },
@@ -75,7 +89,9 @@ describe("v4 canonical contract", () => {
   for (const fixture of fixtures) {
     it(`validates and parses: ${fixture.name}`, async () => {
       expect(
-        validateProject(fixture.schema).filter((error) => error.severity === "error"),
+        validateProject(fixture.schema).filter(
+          (error) => error.severity === "error",
+        ),
       ).toEqual([]);
       await expect(parseV4Project(fixture.schema)).resolves.toMatchObject({
         getMotionConfig: expect.any(Function),
@@ -85,8 +101,8 @@ describe("v4 canonical contract", () => {
 
   it("rejects unsupported schema versions with the canonical version", () => {
     const errors = validateProject({ schemaVersion: 3, motions: [] });
-    expect(errors.find((error) => error.ruleId === "schema-version").message).toContain(
-      "must be 4",
-    );
+    expect(
+      errors.find((error) => error.ruleId === "schema-version").message,
+    ).toContain("must be 4");
   });
 });

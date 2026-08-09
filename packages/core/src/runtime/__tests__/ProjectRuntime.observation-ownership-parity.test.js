@@ -11,7 +11,11 @@ import { ProjectRuntime } from "../ProjectRuntime.js";
  */
 
 function track(id, leaf = id) {
-  return { id, getSnapshot: () => ({ leaf }), composeLocal: (raw) => ({ leaf: raw?.leaf ?? leaf }) };
+  return {
+    id,
+    getSnapshot: () => ({ leaf }),
+    composeLocal: (raw) => ({ leaf: raw?.leaf ?? leaf }),
+  };
 }
 
 function throwsWith(action, pattern) {
@@ -19,7 +23,10 @@ function throwsWith(action, pattern) {
     action();
     return { threw: false, matched: false };
   } catch (error) {
-    return { threw: true, matched: pattern.test(String(error?.message ?? error)) };
+    return {
+      threw: true,
+      matched: pattern.test(String(error?.message ?? error)),
+    };
   }
 }
 
@@ -55,7 +62,10 @@ function ownershipSnapshot(options) {
     () => runtime.standaloneObservationAdapter,
     /disposed/i,
   );
-  snapshot.composeAfterDisposeThrows = throwsWith(() => adapter.compose(observer), /destroyed/i);
+  snapshot.composeAfterDisposeThrows = throwsWith(
+    () => adapter.compose(observer),
+    /destroyed/i,
+  );
   snapshot.disposeIsIdempotent = safeCall(() => runtime.dispose());
   return snapshot;
 }
@@ -86,16 +96,18 @@ describe("P2-03 ProjectRuntime observation ownership parity", () => {
   });
 
   it("behaves identically in scoped ownership", () => {
-    expect(ownershipSnapshot({ observationOwnership: "scoped" })).toEqual(LOCKED);
+    expect(ownershipSnapshot({ observationOwnership: "scoped" })).toEqual(
+      LOCKED,
+    );
   });
 
   it("reports the requested ownership mode without changing behaviour", () => {
     const compatibility = new ProjectRuntime();
     const scoped = new ProjectRuntime({ observationOwnership: "scoped" });
-    expect([compatibility.observationOwnership, scoped.observationOwnership]).toEqual([
-      "compatibility",
-      "scoped",
-    ]);
+    expect([
+      compatibility.observationOwnership,
+      scoped.observationOwnership,
+    ]).toEqual(["compatibility", "scoped"]);
     compatibility.dispose();
     scoped.dispose();
   });

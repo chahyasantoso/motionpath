@@ -6,7 +6,14 @@ import { createTrack } from "../createTrack.js";
 function track(id, mode) {
   const proxy = { x: 0 };
   const tween = gsap.to(proxy, { x: 1, duration: 1, paused: true });
-  return new Track({ id, mode, interpolationTimeline: tween, proxyState: proxy, plugins: [{ keys: ["x"], compose: (raw) => ({ x: raw.x }) }], resolvedTrack: { id, keyframes: { x: {} } } });
+  return new Track({
+    id,
+    mode,
+    interpolationTimeline: tween,
+    proxyState: proxy,
+    plugins: [{ keys: ["x"], compose: (raw) => ({ x: raw.x }) }],
+    resolvedTrack: { id, keyframes: { x: {} } },
+  });
 }
 
 describe("explicit Track mode", () => {
@@ -22,11 +29,32 @@ describe("explicit Track mode", () => {
   });
 });
 
-
 describe("createTrack mode propagation", () => {
   it("preserves config mode for authored and explicit standalone tracks", () => {
-    const authored = createTrack({ id: "motion/bone", mode: "authored-graph", keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } });
-    const standalone = createTrack({ id: "~/free", mode: "standalone", keyframes: { x: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } });
+    const authored = createTrack({
+      id: "motion/bone",
+      mode: "authored-graph",
+      keyframes: {
+        x: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: 1 },
+          ],
+        },
+      },
+    });
+    const standalone = createTrack({
+      id: "~/free",
+      mode: "standalone",
+      keyframes: {
+        x: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: 1 },
+          ],
+        },
+      },
+    });
     expect(authored.mode).toBe("authored-graph");
     expect(standalone.mode).toBe("standalone");
     authored.destroy();

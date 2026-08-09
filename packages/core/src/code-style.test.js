@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { READABILITY_GUARDED_FILES, checkReadability } from "../../../scripts/v5-readability-allowlist.mjs";
+import {
+  READABILITY_GUARDED_FILES,
+  checkReadability,
+} from "../../../scripts/v5-readability-allowlist.mjs";
 
 /**
  * Pass-2 P2-00, finding F-11.
@@ -25,8 +28,12 @@ describe("P2-00 readability floor", () => {
   });
 
   it("guards the two files that already lost their reasoning once", () => {
-    expect(READABILITY_GUARDED_FILES).toContain("packages/core/src/lib/Track.js");
-    expect(READABILITY_GUARDED_FILES).toContain("packages/core/src/usecases/GraphPublisher.js");
+    expect(READABILITY_GUARDED_FILES).toContain(
+      "packages/core/src/lib/Track.js",
+    );
+    expect(READABILITY_GUARDED_FILES).toContain(
+      "packages/core/src/usecases/GraphPublisher.js",
+    );
   });
 
   it("fails a file that folds statements onto one line", () => {

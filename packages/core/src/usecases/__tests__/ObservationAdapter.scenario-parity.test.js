@@ -39,7 +39,8 @@ function makeTrack(id, leaf = id, onCompose = () => {}) {
       return () => destroySubscribers.delete(callback);
     },
     emitDetached() {
-      for (const callback of [...lifecycleSubscribers]) callback({ type: "detached", track: this });
+      for (const callback of [...lifecycleSubscribers])
+        callback({ type: "detached", track: this });
     },
     /** Mirrors Track.destroy(): subscribers read observerIds off the event. */
     emitDestroySnapshot() {
@@ -68,7 +69,10 @@ function throwsWith(action, pattern) {
     action();
     return { threw: false, matched: false };
   } catch (error) {
-    return { threw: true, matched: pattern.test(String(error?.message ?? error)) };
+    return {
+      threw: true,
+      matched: pattern.test(String(error?.message ?? error)),
+    };
   }
 }
 
@@ -105,7 +109,9 @@ const SCENARIOS = {
       role: "input",
       target: "target",
     });
-    adapter.setObserved(target, source, (patch) => ({ from: patch.leaf }), { role: "output" });
+    adapter.setObserved(target, source, (patch) => ({ from: patch.leaf }), {
+      role: "output",
+    });
     const result = {
       edges: edgeShape(adapter, target),
       // One source, two roles, one entry. Dedupe is by Track identity.
@@ -129,14 +135,18 @@ const SCENARIOS = {
       edges: edgeShape(adapter, observer),
       composed: adapter.compose(observer),
     };
-    adapter.replaceObserved(observer, first, second, (patch) => ({ value: patch.leaf }));
+    adapter.replaceObserved(observer, first, second, (patch) => ({
+      value: patch.leaf,
+    }));
     const afterFirstSwap = {
       edges: edgeShape(adapter, observer),
       composed: adapter.compose(observer),
       firstObservers: adapter.getObserverIds(first),
       secondObservers: adapter.getObserverIds(second),
     };
-    adapter.replaceObserved(observer, second, third, (patch) => ({ value: patch.leaf }));
+    adapter.replaceObserved(observer, second, third, (patch) => ({
+      value: patch.leaf,
+    }));
     const afterSecondSwap = {
       edges: edgeShape(adapter, observer),
       composed: adapter.compose(observer),
@@ -330,8 +340,13 @@ const SCENARIOS = {
       observerIds: adapter.getObserverIds(source),
       tracked: adapter.tracks.size,
       composeThrows: throwsWith(() => adapter.compose(observer), /destroyed/i),
-      registerThrows: throwsWith(() => adapter.register(makeTrack("late")), /destroyed/i),
-      removeObservedIsSafe: safeCall(() => adapter.removeObserved(observer, source)),
+      registerThrows: throwsWith(
+        () => adapter.register(makeTrack("late")),
+        /destroyed/i,
+      ),
+      removeObservedIsSafe: safeCall(() =>
+        adapter.removeObserved(observer, source),
+      ),
       destroyIsIdempotent: safeCall(() => adapter.destroy()),
     };
   },
@@ -343,7 +358,10 @@ const SCENARIOS = {
     const adapter = new Adapter({ tracks: [source, observer] });
     adapter.setObserved(observer, source, (patch) => ({ from: patch.leaf }));
     const result = {
-      registerWithoutId: throwsWith(() => adapter.register({}), /requires a track/i),
+      registerWithoutId: throwsWith(
+        () => adapter.register({}),
+        /requires a track/i,
+      ),
       selfObservation: throwsWith(
         () => adapter.setObserved(observer, observer, () => ({})),
         /cannot observe itself/i,
@@ -352,7 +370,9 @@ const SCENARIOS = {
         () => adapter.replaceObserved(observer, stranger, source, () => ({})),
         /does not observe/i,
       ),
-      removeUnknownIsSafe: safeCall(() => adapter.removeObserved(observer, stranger)),
+      removeUnknownIsSafe: safeCall(() =>
+        adapter.removeObserved(observer, stranger),
+      ),
       edges: edgeShape(adapter, observer),
     };
     adapter.destroy();
@@ -412,7 +432,11 @@ const LOCKED = {
     composed: { leaf: "o" },
     observerIds: ["observer"],
   },
-  destroySnapshot: { before: ["observer"], snapshotIds: ["observer"], after: [] },
+  destroySnapshot: {
+    before: ["observer"],
+    snapshotIds: ["observer"],
+    after: [],
+  },
   detached: {
     before: [{ source: "source", role: "output", mapper: "fn" }],
     after: [],
@@ -448,7 +472,12 @@ const LOCKED = {
       observerEdges: [{ source: "source", role: "output", mapper: "fn" }],
       downstreamEdges: [{ source: "observer", role: "output", mapper: "fn" }],
     },
-    after: { observerEdges: [], downstreamEdges: [], sourceObservers: [], tracked: 2 },
+    after: {
+      observerEdges: [],
+      downstreamEdges: [],
+      sourceObservers: [],
+      tracked: 2,
+    },
   },
   afterDestroy: {
     isDestroyed: true,
@@ -476,8 +505,11 @@ describe("P2-03 observation adapter scenario parity", () => {
   });
 
   it("exposes one public adapter contract", () => {
-    const surface = (Adapter) => Object.getOwnPropertyNames(Adapter.prototype).sort();
-    expect(surface(ScopedObservationAdapter)).toEqual(surface(StandaloneObservationAdapter));
+    const surface = (Adapter) =>
+      Object.getOwnPropertyNames(Adapter.prototype).sort();
+    expect(surface(ScopedObservationAdapter)).toEqual(
+      surface(StandaloneObservationAdapter),
+    );
   });
 
   for (const [name, scenario] of Object.entries(SCENARIOS)) {
@@ -490,7 +522,9 @@ describe("P2-03 observation adapter scenario parity", () => {
     });
 
     it(`produces identical results in both ownership modes: ${name}`, () => {
-      expect(scenario(ScopedObservationAdapter)).toEqual(scenario(StandaloneObservationAdapter));
+      expect(scenario(ScopedObservationAdapter)).toEqual(
+        scenario(StandaloneObservationAdapter),
+      );
     });
   }
 });

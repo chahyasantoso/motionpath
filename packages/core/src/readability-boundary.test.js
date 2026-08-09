@@ -32,7 +32,9 @@ describe("P2 readability boundary", () => {
       const lines = (await readProtected(relativePath)).split("\n");
       lines.forEach((line, index) => {
         if (line.length > MAX_LINE_LENGTH) {
-          violations.push(`${relativePath}:${index + 1} is ${line.length} chars`);
+          violations.push(
+            `${relativePath}:${index + 1} is ${line.length} chars`,
+          );
         }
       });
     }
@@ -48,7 +50,9 @@ describe("P2 readability boundary", () => {
         if (trimmed.startsWith("*") || trimmed.startsWith("//")) return;
         const statements = (line.match(/;/g) ?? []).length;
         if (statements > MAX_STATEMENTS_PER_LINE) {
-          violations.push(`${relativePath}:${index + 1} has ${statements} statements`);
+          violations.push(
+            `${relativePath}:${index + 1} has ${statements} statements`,
+          );
         }
       });
     }
@@ -58,7 +62,10 @@ describe("P2 readability boundary", () => {
   it("keeps the recorded reasoning in place", async () => {
     for (const relativePath of PROTECTED_FILES) {
       const source = await readProtected(relativePath);
-      expect(source, `${relativePath} lost its explanatory block comments`).toMatch(/\/\*\*/);
+      expect(
+        source,
+        `${relativePath} lost its explanatory block comments`,
+      ).toMatch(/\/\*\*/);
     }
   });
 

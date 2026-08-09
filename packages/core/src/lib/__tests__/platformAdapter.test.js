@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGsapPlatform, registerScrollTrigger } from "../../adapters/gsapPlatform.js";
+import {
+  createGsapPlatform,
+  registerScrollTrigger,
+} from "../../adapters/gsapPlatform.js";
 
 describe("GSAP platform adapter", () => {
   it("exposes an explicit registration boundary", () => {

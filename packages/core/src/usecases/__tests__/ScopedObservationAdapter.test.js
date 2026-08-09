@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { ScopedObservationAdapter } from "../ScopedObservationAdapter.js";
 
 function track(id, leaf = id) {
-  return { id, getSnapshot: () => ({ leaf }), composeLocal: (raw) => ({ leaf: raw?.leaf ?? leaf }) };
+  return {
+    id,
+    getSnapshot: () => ({ leaf }),
+    composeLocal: (raw) => ({ leaf: raw?.leaf ?? leaf }),
+  };
 }
 
 describe("P2-03 scoped adapter harness", () => {

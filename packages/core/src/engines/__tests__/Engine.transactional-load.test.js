@@ -14,7 +14,12 @@ const stableProject = {
         {
           id: "stable-track",
           keyframes: {
-            opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
+            opacity: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 1 },
+              ],
+            },
           },
         },
       ],
@@ -33,7 +38,12 @@ const failingProject = {
         {
           id: "failing-track",
           keyframes: {
-            reloadFailure: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] },
+            reloadFailure: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 1 },
+              ],
+            },
           },
         },
       ],
@@ -50,7 +60,10 @@ describe("Engine transactional project loading", () => {
         lazy: true,
         load: () => Promise.reject(new Error("plugin load failed")),
         contribute: () => ({
-          percentPatch: { "0%": { reloadFailure: 0 }, "100%": { reloadFailure: 1 } },
+          percentPatch: {
+            "0%": { reloadFailure: 0 },
+            "100%": { reloadFailure: 1 },
+          },
         }),
         compose: (raw) => ({ reloadFailure: raw.reloadFailure }),
       }),
@@ -75,7 +88,11 @@ describe("Engine transactional project loading", () => {
     await engine.loadProject(stableProject);
     const mounted = engine.mountInstance("stable-motion");
 
-    await engine.loadProject({ ...stableProject, projectId: "replacement", motions: [] });
+    await engine.loadProject({
+      ...stableProject,
+      projectId: "replacement",
+      motions: [],
+    });
 
     expect(engine.getTrackConfig("stable-track")).toBeNull();
     expect(engine.instanceCount).toBe(0);

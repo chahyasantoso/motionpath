@@ -23,16 +23,38 @@ const project = {
         {
           id: "parent",
           keyframes: {
-            x: { stops: [{ p: 0, v: 10 }, { p: 1, v: 30 }] },
-            y: { stops: [{ p: 0, v: 5 }, { p: 1, v: 15 }] },
-            rotation: { stops: [{ p: 0, v: 0 }, { p: 1, v: 90 }] },
+            x: {
+              stops: [
+                { p: 0, v: 10 },
+                { p: 1, v: 30 },
+              ],
+            },
+            y: {
+              stops: [
+                { p: 0, v: 5 },
+                { p: 1, v: 15 },
+              ],
+            },
+            rotation: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 90 },
+              ],
+            },
           },
         },
         {
           id: "child",
-          observes: [{ source: "parent", role: "input", target: "parentWorld" }],
+          observes: [
+            { source: "parent", role: "input", target: "parentWorld" },
+          ],
           keyframes: {
-            boneLength: { stops: [{ p: 0, v: 10 }, { p: 1, v: 20 }] },
+            boneLength: {
+              stops: [
+                { p: 0, v: 10 },
+                { p: 1, v: 20 },
+              ],
+            },
           },
         },
       ],
@@ -43,19 +65,26 @@ const project = {
 function throwingDelegate() {
   return {
     destroyed: false,
-    build() { throw new Error("delegate build failed"); },
+    build() {
+      throw new Error("delegate build failed");
+    },
     play() {},
     pause() {},
     seek() {},
     reverse() {},
     onComplete() {},
-    destroy() { this.destroyed = true; },
+    destroy() {
+      this.destroyed = true;
+    },
   };
 }
 
 describe("Engine graph ownership", () => {
   let engine;
-  afterEach(() => { engine?.destroy(); engine = undefined; });
+  afterEach(() => {
+    engine?.destroy();
+    engine = undefined;
+  });
 
   it("attaches the graph binding to the motion that owns it", async () => {
     engine = new Engine();
@@ -76,7 +105,9 @@ describe("Engine graph ownership", () => {
     const parent = motion.getTrack("parent");
     const child = motion.getTrack("child");
 
-    expect(() => parent.setObserved(child, (patch) => patch, { role: "output" })).toThrow(/cycle/i);
+    expect(() =>
+      parent.setObserved(child, (patch) => patch, { role: "output" }),
+    ).toThrow(/cycle/i);
   });
 
   it("disposes the binding and its publisher when the motion is destroyed", async () => {
@@ -98,7 +129,10 @@ describe("Engine graph ownership", () => {
     const motion = engine.mountInstance("arm");
     const binding = motion.graphBinding;
 
-    expect(() => { motion.destroy(); motion.destroy(); }).not.toThrow();
+    expect(() => {
+      motion.destroy();
+      motion.destroy();
+    }).not.toThrow();
     expect(() => binding.destroy()).not.toThrow();
     expect(motion.graphBinding).toBe(null);
   });
@@ -136,7 +170,9 @@ describe("Engine graph ownership", () => {
     await engine.loadProject(project);
     const delegate = throwingDelegate();
 
-    expect(() => engine.mountWithDelegate("arm", delegate)).toThrow("delegate build failed");
+    expect(() => engine.mountWithDelegate("arm", delegate)).toThrow(
+      "delegate build failed",
+    );
 
     expect(delegate.destroyed).toBe(true);
     expect(engine.instanceCount).toBe(0);

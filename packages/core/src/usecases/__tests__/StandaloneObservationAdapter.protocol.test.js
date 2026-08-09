@@ -16,10 +16,17 @@ describe("P2-03 standalone composition protocol characterization", () => {
   it("preserves output folds and public context keys", () => {
     const source = track("source");
     const observer = track("observer");
-    const adapter = new StandaloneObservationAdapter({ tracks: [source, observer] });
+    const adapter = new StandaloneObservationAdapter({
+      tracks: [source, observer],
+    });
     const context = new Map();
-    adapter.setObserved(observer, source, (patch) => ({ fromSource: patch.leaf }));
-    expect(adapter.compose(observer, undefined, context)).toEqual({ leaf: "observer", fromSource: "source" });
+    adapter.setObserved(observer, source, (patch) => ({
+      fromSource: patch.leaf,
+    }));
+    expect(adapter.compose(observer, undefined, context)).toEqual({
+      leaf: "observer",
+      fromSource: "source",
+    });
     expect([...context.keys()]).toEqual(["observer"]);
     adapter.destroy();
   });
@@ -27,8 +34,13 @@ describe("P2-03 standalone composition protocol characterization", () => {
   it("applies input folds before the local composer", () => {
     const source = track("source");
     const target = track("target", "base");
-    const adapter = new StandaloneObservationAdapter({ tracks: [source, target] });
-    adapter.setObserved(target, source, () => ({ leaf: "injected" }), { role: "input", target: "target" });
+    const adapter = new StandaloneObservationAdapter({
+      tracks: [source, target],
+    });
+    adapter.setObserved(target, source, () => ({ leaf: "injected" }), {
+      role: "input",
+      target: "target",
+    });
     expect(adapter.compose(target)).toEqual({ leaf: "injected" });
     adapter.destroy();
   });
@@ -64,7 +76,9 @@ describe("P2-03 standalone composition protocol characterization", () => {
   it("replaces a repeated edge mapper without duplicating the edge", () => {
     const source = track("source");
     const observer = track("observer");
-    const adapter = new StandaloneObservationAdapter({ tracks: [source, observer] });
+    const adapter = new StandaloneObservationAdapter({
+      tracks: [source, observer],
+    });
     adapter.setObserved(observer, source, () => ({ value: "first" }));
     adapter.setObserved(observer, source, () => ({ value: "second" }));
     expect(adapter.getEdges(observer)).toHaveLength(1);
@@ -85,7 +99,9 @@ describe("P2-03 standalone composition protocol characterization", () => {
   it("keeps lightweight tracks valid when no compose method is present", () => {
     const source = track("source");
     const observer = track("observer");
-    const adapter = new StandaloneObservationAdapter({ tracks: [source, observer] });
+    const adapter = new StandaloneObservationAdapter({
+      tracks: [source, observer],
+    });
     adapter.setObserved(observer, source);
     expect(() => adapter.compose(observer)).not.toThrow();
     adapter.destroy();
@@ -94,7 +110,9 @@ describe("P2-03 standalone composition protocol characterization", () => {
   it("reports observer IDs before source cleanup", () => {
     const source = track("source");
     const observer = track("observer");
-    const adapter = new StandaloneObservationAdapter({ tracks: [source, observer] });
+    const adapter = new StandaloneObservationAdapter({
+      tracks: [source, observer],
+    });
     adapter.setObserved(observer, source, (patch) => ({ from: patch.leaf }));
     const ids = adapter.getObserverIds(source);
     expect(ids).toEqual(["observer"]);

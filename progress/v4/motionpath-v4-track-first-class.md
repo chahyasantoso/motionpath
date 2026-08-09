@@ -53,7 +53,9 @@ function autoPlay(
   "templates": [
     /* unchanged from v2/v3: reusable keyframe fragments, referenced via track.use */
   ],
-  "motions": [/* zero or more — only needed when a trigger is involved */],
+  "motions": [
+    /* zero or more — only needed when a trigger is involved */
+  ],
   "tracks": [
     /* zero or more — bare, manually/externally driven tracks with NO trigger */
   ]

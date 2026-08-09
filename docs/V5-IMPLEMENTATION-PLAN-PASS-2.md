@@ -97,12 +97,12 @@ Every package should land as one focused change on `v5` or its immediately prece
 
 This document is accepted as **pass-2 revision A**, effective 2026-08-08, on branch `v5`.
 
-| Item | Decision |
-|---|---|
-| Scope | P2-00 through P2-07 exactly as written above. No renaming to PR-24 and no new top-level checkpoint. |
-| Owner | @chahyasantoso owns every work package and the completion matrix until reassigned in writing here. |
-| Entry condition | P2-00 must land before any other package. P2-01 and P2-02 unblock immediately after it. |
-| Authority | The completion matrix is the control sheet. A package is complete only when its gate is green and the matrix row cites merged evidence. |
-| Revision rule | Any change to scope, ordering, or gates requires a new revision letter recorded in this table, not an inline edit. |
+| Item            | Decision                                                                                                                                |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope           | P2-00 through P2-07 exactly as written above. No renaming to PR-24 and no new top-level checkpoint.                                     |
+| Owner           | @chahyasantoso owns every work package and the completion matrix until reassigned in writing here.                                      |
+| Entry condition | P2-00 must land before any other package. P2-01 and P2-02 unblock immediately after it.                                                 |
+| Authority       | The completion matrix is the control sheet. A package is complete only when its gate is green and the matrix row cites merged evidence. |
+| Revision rule   | Any change to scope, ordering, or gates requires a new revision letter recorded in this table, not an inline edit.                      |
 
 Acceptance authorizes implementation of the packages above. It does not mark any package complete, does not change any default flag, and does not enable cross-motion or free-track behavior.

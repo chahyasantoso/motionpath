@@ -32,16 +32,16 @@ This is structural, not a discipline problem. Every change has to be correct twi
 
 Eight distinct things. All deletable.
 
-| # | Surface | Location | Shape |
-|---|---|---|---|
-| C1 | Legacy v4 observation API monkey-patched onto Track | `usecases/LegacyObservationFacade.js`, installed by `createTrack.js` | 4.5 KB of `Object.defineProperties` installing `setObserved`, `removeObserved`, `replaceObserved`, `observedSources`, `observedEdges`, `observerCount`, `observerIds` |
-| C2 | Implicit owner re-homing | `Track._adoptObservationOwner`, called from the facade | Source of the cross-owner defects that Phase 3 of the playbook exists to fix |
-| C3 | Two ownership modes | `Engine.js`: `OBSERVATION_OWNERSHIP_MODES`, `resolveObservationOwnership()` | ~30 lines plus a 12-line comment explaining why the mode must survive `destroy()`. The senior review calls this a "fake two-mode rollout" |
-| C4 | Duplicate owner implementations | `StandaloneObservationAdapter` + `TrackObservationOwner` + `createObservationOwner` vs `ScopedObservationAdapter` | Two answers to one question |
-| C5 | Shadow/parity scaffolding | `ObservationStateBridge.js` | 4.3 KB whose public value is `assertParity`, `assertGraphParity`, `assertCompositionParity`. Pure oracle, no product behavior |
-| C6 | Rollout flags pinned off | `publisherRendering`, `crossMotion`, `freeTracks`, `observationOwnership` | `Engine.#mountMotion` branches into two different runtimes (`GraphRuntime` vs `GraphPublisher` + `GraphBinding`). Each flag doubles the state space every test must cover |
-| C7 | Three cycle validators | `normalizeObservationGraph`, `ObservationState.#assertAcyclic`, `GraphPublisher.#graphGuard` | Recorded as F-07, still open |
-| C8 | Legacy composite and playback bridge | `Engine.createMotionHost`, `Track._attachGroupHost` / `play` / `pause` / `seek` / `reverse` / `addChild` / `removeChild` | Deferred as P2-04, i.e. a second migration already scheduled |
+| #   | Surface                                             | Location                                                                                                                 | Shape                                                                                                                                                                     |
+| --- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | Legacy v4 observation API monkey-patched onto Track | `usecases/LegacyObservationFacade.js`, installed by `createTrack.js`                                                     | 4.5 KB of `Object.defineProperties` installing `setObserved`, `removeObserved`, `replaceObserved`, `observedSources`, `observedEdges`, `observerCount`, `observerIds`     |
+| C2  | Implicit owner re-homing                            | `Track._adoptObservationOwner`, called from the facade                                                                   | Source of the cross-owner defects that Phase 3 of the playbook exists to fix                                                                                              |
+| C3  | Two ownership modes                                 | `Engine.js`: `OBSERVATION_OWNERSHIP_MODES`, `resolveObservationOwnership()`                                              | ~30 lines plus a 12-line comment explaining why the mode must survive `destroy()`. The senior review calls this a "fake two-mode rollout"                                 |
+| C4  | Duplicate owner implementations                     | `StandaloneObservationAdapter` + `TrackObservationOwner` + `createObservationOwner` vs `ScopedObservationAdapter`        | Two answers to one question                                                                                                                                               |
+| C5  | Shadow/parity scaffolding                           | `ObservationStateBridge.js`                                                                                              | 4.3 KB whose public value is `assertParity`, `assertGraphParity`, `assertCompositionParity`. Pure oracle, no product behavior                                             |
+| C6  | Rollout flags pinned off                            | `publisherRendering`, `crossMotion`, `freeTracks`, `observationOwnership`                                                | `Engine.#mountMotion` branches into two different runtimes (`GraphRuntime` vs `GraphPublisher` + `GraphBinding`). Each flag doubles the state space every test must cover |
+| C7  | Three cycle validators                              | `normalizeObservationGraph`, `ObservationState.#assertAcyclic`, `GraphPublisher.#graphGuard`                             | Recorded as F-07, still open                                                                                                                                              |
+| C8  | Legacy composite and playback bridge                | `Engine.createMotionHost`, `Track._attachGroupHost` / `play` / `pause` / `seek` / `reverse` / `addChild` / `removeChild` | Deferred as P2-04, i.e. a second migration already scheduled                                                                                                              |
 
 Plus the tests that exist only to hold these together: `ObservationAdapter.scenario-parity.test.js` (17.8 KB), `ScopedObservationAdapter.parity.test.js`, `ObservationState.composition-parity.test.js`, `GraphBinding.observation-state-parity.test.js`, `ObservationStateBridge.test.js`, `Track.v43.test.js`, `Track.observation.test.js`, `Track.owner-first.test.js`, `createTrack.standalone-adapter.test.js`. Roughly 55 KB of test source whose subject is the seam, not the product.
 
@@ -129,13 +129,13 @@ Drop the rest. Roughly half of #145 is facade plumbing.
 
 ## 8. Cost comparison
 
-| | Current trajectory | Hard break |
-|---|---|---|
-| Remaining scope | P2-03 sign-off (8 open gates), then P2-04, then Phases 3-8 of the addendum | WP0-WP8, one branch |
-| Net code movement | Add facades, add parity tests, add status docs | Delete ~20 KB source, ~55 KB tests, ~15 planning docs |
-| Correctness burden | Every change correct twice, plus proof they agree | Once |
-| Realistic effort | Open-ended; four hours produced 100 commits and one unresolved readability failure | 2-3 focused days; tests are the long pole |
-| Failure mode | Parity drift, doc drift, gates policing gates | A bounded red window on a throwaway branch |
+|                    | Current trajectory                                                                 | Hard break                                            |
+| ------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Remaining scope    | P2-03 sign-off (8 open gates), then P2-04, then Phases 3-8 of the addendum         | WP0-WP8, one branch                                   |
+| Net code movement  | Add facades, add parity tests, add status docs                                     | Delete ~20 KB source, ~55 KB tests, ~15 planning docs |
+| Correctness burden | Every change correct twice, plus proof they agree                                  | Once                                                  |
+| Realistic effort   | Open-ended; four hours produced 100 commits and one unresolved readability failure | 2-3 focused days; tests are the long pole             |
+| Failure mode       | Parity drift, doc drift, gates policing gates                                      | A bounded red window on a throwaway branch            |
 
 ## 9. Bottom line
 

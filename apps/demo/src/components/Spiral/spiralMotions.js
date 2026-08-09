@@ -103,7 +103,9 @@ export function createSpiralProject({
     schemaVersion: 4,
     projectId: "spiral-zuma-page",
     perspective: 1200,
-    motions: [createSpiralBallScene({ spiralPathPoints, ballTravelSeconds, ballSize })],
+    motions: [
+      createSpiralBallScene({ spiralPathPoints, ballTravelSeconds, ballSize }),
+    ],
     tracks: createSpiralTransitionTracks({ ballSize }),
   };
 }

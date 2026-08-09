@@ -56,18 +56,31 @@ export class Track {
     this.#resolvedTrack = resolvedTrack;
     this.#layoutDelegate = layoutDelegate ?? defaultGaplessLayoutDelegate;
     this.#eventBus = eventBus;
-    this.#standaloneObservationAdapter = this.#mode === "standalone"
-      ? (observationAdapter ?? new StandaloneObservationAdapter())
-      : null;
+    this.#standaloneObservationAdapter =
+      this.#mode === "standalone"
+        ? (observationAdapter ?? new StandaloneObservationAdapter())
+        : null;
     this.#standaloneObservationAdapter?.register(this);
   }
 
-  get id() { return this.#id; }
-  get mode() { return this.#mode; }
-  get currentOffset() { return this.#currentOffset; }
-  get parent() { return this.#parent; }
-  get duration() { return this.#interpolationTimeline?.duration() ?? 0; }
-  get isDestroyed() { return this.#destroyed; }
+  get id() {
+    return this.#id;
+  }
+  get mode() {
+    return this.#mode;
+  }
+  get currentOffset() {
+    return this.#currentOffset;
+  }
+  get parent() {
+    return this.#parent;
+  }
+  get duration() {
+    return this.#interpolationTimeline?.duration() ?? 0;
+  }
+  get isDestroyed() {
+    return this.#destroyed;
+  }
 
   /** Progress updates notify subscribers before invalidating the graph owner. */
   progress(progress) {
@@ -147,7 +160,8 @@ export class Track {
       this.#mode !== "standalone" ||
       !owner ||
       owner === this.#standaloneObservationAdapter
-    ) return;
+    )
+      return;
     this.#standaloneObservationAdapter?.unregister(this);
     this.#standaloneObservationAdapter = owner;
     owner.register(this);

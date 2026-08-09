@@ -18,12 +18,12 @@ for what is copied versus retained by reference.
 
 ## Supported value shape
 
-| Shape | Treatment |
-|---|---|
-| Primitives, `null`, `undefined` | Returned as-is |
-| Arrays | Cloned element-wise, then frozen |
-| Plain objects (`Object.prototype` or null prototype) | Cloned key-wise, then frozen |
-| Everything else | **Foreign reference:** returned by identity, untouched and unfrozen |
+| Shape                                                | Treatment                                                           |
+| ---------------------------------------------------- | ------------------------------------------------------------------- |
+| Primitives, `null`, `undefined`                      | Returned as-is                                                      |
+| Arrays                                               | Cloned element-wise, then frozen                                    |
+| Plain objects (`Object.prototype` or null prototype) | Cloned key-wise, then frozen                                        |
+| Everything else                                      | **Foreign reference:** returned by identity, untouched and unfrozen |
 
 "Everything else" explicitly includes DOM nodes, class instances, functions,
 `Map`, `Set`, `Date`, and typed arrays. The runtime neither owns those objects
@@ -56,11 +56,11 @@ reason.
 
 ## Where it is enforced
 
-| Boundary | Enforced by |
-|---|---|
-| Published patches | `PatchRegistry.publish` via `runtime/immutablePatchValue.js` |
-| Normalized graph nodes, edges, diagnostics | `ObservationGraph` constructor |
-| Committed graph snapshots | `GraphBinding` internal freeze |
+| Boundary                                   | Enforced by                                                  |
+| ------------------------------------------ | ------------------------------------------------------------ |
+| Published patches                          | `PatchRegistry.publish` via `runtime/immutablePatchValue.js` |
+| Normalized graph nodes, edges, diagnostics | `ObservationGraph` constructor                               |
+| Committed graph snapshots                  | `GraphBinding` internal freeze                               |
 
 ## Coverage
 
@@ -70,7 +70,7 @@ reason.
 
 ## Non-goals for P2-01
 
-- No change to what the graph or the publisher *does*. This package changes
+- No change to what the graph or the publisher _does_. This package changes
   reachability of mutation, not behavior.
 - No support added for `Map`, `Set`, or class instances as graph or patch
   values. If a future plugin needs one, it gets an explicit contract change

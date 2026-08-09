@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { observationEdgeEquals, observationEdgeKey } from "../observationEdge.js";
+import {
+  observationEdgeEquals,
+  observationEdgeKey,
+} from "../observationEdge.js";
 
 describe("observation edge identity", () => {
   it("separates concatenation-collision ids", () => {
@@ -15,13 +18,17 @@ describe("observation edge identity", () => {
   });
 
   it("compares normalized edge records by semantic identity", () => {
-    expect(observationEdgeEquals(
-      { source: "a", role: "input", input: "parentWorld" },
-      { source: "a", role: "input", input: "parentWorld" },
-    )).toBe(true);
-    expect(observationEdgeEquals(
-      { source: "a", role: "input", input: "x" },
-      { source: "a", role: "input", input: "y" },
-    )).toBe(false);
+    expect(
+      observationEdgeEquals(
+        { source: "a", role: "input", input: "parentWorld" },
+        { source: "a", role: "input", input: "parentWorld" },
+      ),
+    ).toBe(true);
+    expect(
+      observationEdgeEquals(
+        { source: "a", role: "input", input: "x" },
+        { source: "a", role: "input", input: "y" },
+      ),
+    ).toBe(false);
   });
 });

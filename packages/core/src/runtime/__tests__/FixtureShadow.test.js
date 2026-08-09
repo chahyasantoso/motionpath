@@ -1,11 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { GraphRuntime } from "../GraphRuntime.js";
-import { composeLegacyPatches, compareShadowPatches, shadowFixture } from "../FixtureShadow.js";
-import { buildRealGraph, chainMotion, diamondMotion, independentChainsMotion } from "../../__fixtures__/graphTracks.js";
+import {
+  composeLegacyPatches,
+  compareShadowPatches,
+  shadowFixture,
+} from "../FixtureShadow.js";
+import {
+  buildRealGraph,
+  chainMotion,
+  diamondMotion,
+  independentChainsMotion,
+} from "../../__fixtures__/graphTracks.js";
 
 function makeRuntime(motion) {
   const built = buildRealGraph(motion);
-  return { ...built, runtime: new GraphRuntime({ graph: built.graph, tracks: built.tracks }) };
+  return {
+    ...built,
+    runtime: new GraphRuntime({ graph: built.graph, tracks: built.tracks }),
+  };
 }
 
 describe("fixture shadow mode", () => {
@@ -31,8 +43,16 @@ describe("fixture shadow mode", () => {
     const legacy = composeLegacyPatches(built.graph, built.tracks);
     built.runtime.publisher.markAllDirty();
     built.runtime.flush();
-    const published = new Map([...built.runtime.patches.snapshot()].map(([id, patch]) => [id, patch.values]));
-    expect(compareShadowPatches(legacy, published)).toEqual({ equal: true, mismatches: [] });
+    const published = new Map(
+      [...built.runtime.patches.snapshot()].map(([id, patch]) => [
+        id,
+        patch.values,
+      ]),
+    );
+    expect(compareShadowPatches(legacy, published)).toEqual({
+      equal: true,
+      mismatches: [],
+    });
   });
 
   it("does not hide structure or status mismatches behind numeric tolerance", () => {
@@ -50,6 +70,11 @@ describe("fixture shadow mode", () => {
     expect([...built.runtime.patches.snapshot().keys()]).toEqual(["d"]);
     built.runtime.publisher.markDirty("a");
     built.runtime.flush();
-    expect([...built.runtime.patches.snapshot().keys()]).toEqual(["d", "a", "b", "c"]);
+    expect([...built.runtime.patches.snapshot().keys()]).toEqual([
+      "d",
+      "a",
+      "b",
+      "c",
+    ]);
   });
 });

@@ -429,7 +429,9 @@ function switchToTrack(
   "templates": [
     /* unchanged: reusable keyframe fragments, referenced via track.use */
   ],
-  "motions": [/* zero or more — only when a trigger is involved */],
+  "motions": [
+    /* zero or more — only when a trigger is involved */
+  ],
   "tracks": [
     /* zero or more — bare tracks, no trigger, driven manually/by event/by autoPlay */
   ]
@@ -516,9 +518,25 @@ Track-ID uniqueness stays **project-wide** across `motions[*].tracks[]` and top-
   "tracks": [
     {
       "id": "enemy-lane-1",
-      "keyframes": { "path": { "points": [/* waypoints */] } }
+      "keyframes": {
+        "path": {
+          "points": [
+            /* waypoints */
+          ]
+        }
+      }
     },
-    { "id": "projectile-arc", "keyframes": { "x": [/*...*/], "y": [/*...*/] } }
+    {
+      "id": "projectile-arc",
+      "keyframes": {
+        "x": [
+          /*...*/
+        ],
+        "y": [
+          /*...*/
+        ]
+      }
+    }
   ]
 }
 ```

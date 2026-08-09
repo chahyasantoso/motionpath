@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { GraphBinding } from "../../usecases/GraphBinding.js";
 import { GraphPublisher } from "../../usecases/GraphPublisher.js";
-import { buildRealGraph, chainMotion, makeTrack } from "../../__fixtures__/graphTracks.js";
+import {
+  buildRealGraph,
+  chainMotion,
+  makeTrack,
+} from "../../__fixtures__/graphTracks.js";
 
 describe("Track: observer deregistration (D7)", () => {
   it("removes itself from its observers when destroyed", () => {
@@ -55,7 +59,11 @@ describe("Track: destroyed guards (D8)", () => {
   it("is dropped from its publisher when destroyed", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     const published = [];
-    const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks,
+      publish: (id) => published.push(id),
+    });
     tracks.get("n2").destroy();
     publisher.markDirty("n0");
     expect(() => publisher.flush()).not.toThrow();
@@ -68,7 +76,9 @@ describe("Track: distinct observation edges (D9)", () => {
     const source = makeTrack("src");
     source.progress(1);
     const observer = makeTrack("obs");
-    observer.setObserved(source, () => ({ parentWorld: { x: 1, y: 2 } }), { role: "input" });
+    observer.setObserved(source, () => ({ parentWorld: { x: 1, y: 2 } }), {
+      role: "input",
+    });
     observer.setObserved(source, () => ({ tag: "out" }), { role: "output" });
     expect(observer.observedEdges).toHaveLength(2);
     expect(observer.compose().tag).toBe("out");
@@ -106,8 +116,19 @@ describe("Track: cycle rejection is scoped to graph membership (D6)", () => {
   it("rejects a cycle-creating rewire once the tracks belong to a graph", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
-    const binding = new GraphBinding({ graph, tracks, publisher, ownsPublisher: false });
-    expect(() => tracks.get("n0").setObserved(tracks.get("n2"), (patch) => ({ fromN2: patch.transform }))).toThrow(/cycle/i);
+    const binding = new GraphBinding({
+      graph,
+      tracks,
+      publisher,
+      ownsPublisher: false,
+    });
+    expect(() =>
+      tracks
+        .get("n0")
+        .setObserved(tracks.get("n2"), (patch) => ({
+          fromN2: patch.transform,
+        })),
+    ).toThrow(/cycle/i);
     binding.destroy();
     publisher.destroy();
   });
@@ -115,9 +136,16 @@ describe("Track: cycle rejection is scoped to graph membership (D6)", () => {
   it("leaves the graph untouched when a cycle-creating rewire is rejected", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
-    const binding = new GraphBinding({ graph, tracks, publisher, ownsPublisher: false });
+    const binding = new GraphBinding({
+      graph,
+      tracks,
+      publisher,
+      ownsPublisher: false,
+    });
     const before = tracks.get("n0").observedSources.length;
-    expect(() => tracks.get("n0").setObserved(tracks.get("n2"), () => ({}))).toThrow();
+    expect(() =>
+      tracks.get("n0").setObserved(tracks.get("n2"), () => ({})),
+    ).toThrow();
     expect(tracks.get("n0").observedSources).toHaveLength(before);
     binding.destroy();
     publisher.destroy();
@@ -125,6 +153,8 @@ describe("Track: cycle rejection is scoped to graph membership (D6)", () => {
 
   it("rejects self-observation outright", () => {
     const track = makeTrack("solo");
-    expect(() => track.setObserved(track, (patch) => patch)).toThrow(/cannot observe itself/i);
+    expect(() => track.setObserved(track, (patch) => patch)).toThrow(
+      /cannot observe itself/i,
+    );
   });
 });

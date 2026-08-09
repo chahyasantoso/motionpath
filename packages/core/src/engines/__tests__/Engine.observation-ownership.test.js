@@ -45,7 +45,10 @@ function throwsWith(action, pattern) {
     action();
     return { threw: false, matched: false };
   } catch (error) {
-    return { threw: true, matched: pattern.test(String(error?.message ?? error)) };
+    return {
+      threw: true,
+      matched: pattern.test(String(error?.message ?? error)),
+    };
   }
 }
 
@@ -70,15 +73,24 @@ async function ownershipSnapshot(options) {
   const downstream = engine.createTrackInstance("t", { id: "down" });
 
   observer.setObserved(source, (patch) => ({ fromSource: patch.opacity }));
-  downstream.setObserved(observer, (patch) => ({ fromObserver: patch.opacity }));
+  downstream.setObserved(observer, (patch) => ({
+    fromObserver: patch.opacity,
+  }));
   // Repeated mutation on a live edge, which is what inflated the old refcount.
-  observer.setObserved(source, (patch) => ({ fromSource: patch.opacity, again: true }));
-  source.setObserved(downstream, (patch) => ({ fromDownstream: patch.opacity }));
+  observer.setObserved(source, (patch) => ({
+    fromSource: patch.opacity,
+    again: true,
+  }));
+  source.setObserved(downstream, (patch) => ({
+    fromDownstream: patch.opacity,
+  }));
 
   const wired = {
     // A non-empty edge list on the RUNTIME's adapter is the proof that every
     // standalone Track shares one owner instead of carrying its own (F-02).
-    runtimeAdapterSeesChain: adapter.getEdges(observer).map(({ source: from }) => from.id),
+    runtimeAdapterSeesChain: adapter
+      .getEdges(observer)
+      .map(({ source: from }) => from.id),
     observerSources: ids(observer.observedSources),
     downstreamSources: ids(downstream.observedSources),
     sourceObserverIds: [...adapter.getObserverIds(source)].sort(),
@@ -104,7 +116,10 @@ async function ownershipSnapshot(options) {
     // destroy() rebuilds the runtime. It must come back in the SAME mode.
     ownershipSurvivesDestroy: engine.projectRuntime.observationOwnership,
     ownershipReported: engine.observationOwnership,
-    composeAfterDestroyThrows: throwsWith(() => observer.compose(), /destroyed/i),
+    composeAfterDestroyThrows: throwsWith(
+      () => observer.compose(),
+      /destroyed/i,
+    ),
   };
 }
 
@@ -145,14 +160,21 @@ describe("P2-03 Engine observation ownership integration", () => {
 
   it("lets an injected ProjectRuntime own the mode and refuses to contradict it", async () => {
     const { ProjectRuntime } = await import("../../runtime/ProjectRuntime.js");
-    const scopedRuntime = new ProjectRuntime({ observationOwnership: "scoped" });
+    const scopedRuntime = new ProjectRuntime({
+      observationOwnership: "scoped",
+    });
     const engine = new Engine({ projectRuntime: scopedRuntime });
     expect(engine.observationOwnership).toBe("scoped");
     engine.destroy();
 
     const conflicting = new ProjectRuntime({ observationOwnership: "scoped" });
-    expect(() => new Engine({ projectRuntime: conflicting, observationOwnership: "compatibility" }))
-      .toThrow(/conflicts/i);
+    expect(
+      () =>
+        new Engine({
+          projectRuntime: conflicting,
+          observationOwnership: "compatibility",
+        }),
+    ).toThrow(/conflicts/i);
     conflicting.dispose();
   });
 
@@ -186,7 +208,10 @@ describe("P2-03 Engine observation ownership integration", () => {
       expect(snapshot.afterSourceDestroy.downstreamSources).toEqual(["obs"]);
       expect(snapshot.afterSourceDestroy.observerStillComposes).toBe(true);
       expect(snapshot.adapterDestroyedByEngineDestroy).toBe(true);
-      expect(snapshot.composeAfterDestroyThrows).toEqual({ threw: true, matched: true });
+      expect(snapshot.composeAfterDestroyThrows).toEqual({
+        threw: true,
+        matched: true,
+      });
     }
   });
 
@@ -199,18 +224,30 @@ describe("P2-03 Engine observation ownership integration", () => {
     await first.loadProject(project);
     await second.loadProject(project);
 
-    const firstSource = first.createTrackInstance("t", { id: "shared-probe-src" });
-    const firstObserver = first.createTrackInstance("t", { id: "shared-probe" });
-    firstObserver.setObserved(firstSource, (patch) => ({ fromFirst: patch.opacity }));
+    const firstSource = first.createTrackInstance("t", {
+      id: "shared-probe-src",
+    });
+    const firstObserver = first.createTrackInstance("t", {
+      id: "shared-probe",
+    });
+    firstObserver.setObserved(firstSource, (patch) => ({
+      fromFirst: patch.opacity,
+    }));
 
-    const secondSource = second.createTrackInstance("t", { id: "other-probe-src" });
-    const secondObserver = second.createTrackInstance("t", { id: "shared-probe" });
-    secondObserver.setObserved(secondSource, (patch) => ({ fromSecond: patch.opacity }));
+    const secondSource = second.createTrackInstance("t", {
+      id: "other-probe-src",
+    });
+    const secondObserver = second.createTrackInstance("t", {
+      id: "shared-probe",
+    });
+    secondObserver.setObserved(secondSource, (patch) => ({
+      fromSecond: patch.opacity,
+    }));
 
     const secondAdapter = second.projectRuntime.standaloneObservationAdapter;
-    expect(secondAdapter.getEdges("shared-probe").map(({ source }) => source.id)).toEqual([
-      "other-probe-src",
-    ]);
+    expect(
+      secondAdapter.getEdges("shared-probe").map(({ source }) => source.id),
+    ).toEqual(["other-probe-src"]);
 
     first.destroy();
     second.destroy();

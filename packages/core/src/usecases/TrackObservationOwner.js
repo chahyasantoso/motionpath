@@ -14,19 +14,30 @@ export class TrackObservationOwner {
   #composeSource;
   #destroyed = false;
 
-  constructor({ tracks = new Map(), validateCycles = false, composeSource } = {}) {
+  constructor({
+    tracks = new Map(),
+    validateCycles = false,
+    composeSource,
+  } = {}) {
     this.#state = new ObservationState({ tracks, validateCycles });
-    this.#composeSource = typeof composeSource === "function" ? composeSource : null;
+    this.#composeSource =
+      typeof composeSource === "function" ? composeSource : null;
   }
 
-  get state() { return this.#state; }
+  get state() {
+    return this.#state;
+  }
   /**
    * Clones the registry on every read. Callers on a hot path must use
    * `getTrack` instead: this owner is shared process-wide, so the clone grows
    * with every Track ever registered. Finding F-09.
    */
-  get tracks() { return this.#state.tracks; }
-  get isDestroyed() { return this.#destroyed; }
+  get tracks() {
+    return this.#state.tracks;
+  }
+  get isDestroyed() {
+    return this.#destroyed;
+  }
 
   register(track, key = track?.id) {
     this.#assertAlive();
@@ -55,10 +66,18 @@ export class TrackObservationOwner {
     return this.#state.replaceEdge(previous, next);
   }
 
-  getEdges(id) { return this.#state.getEdges(id); }
-  getSources(id) { return this.#state.getSources(id); }
-  getObserverIds(id) { return this.#state.getObserverIds(id); }
-  getTrack(key) { return this.#state.getTrack(key); }
+  getEdges(id) {
+    return this.#state.getEdges(id);
+  }
+  getSources(id) {
+    return this.#state.getSources(id);
+  }
+  getObserverIds(id) {
+    return this.#state.getObserverIds(id);
+  }
+  getTrack(key) {
+    return this.#state.getTrack(key);
+  }
 
   compose(id, rawData, ctx) {
     this.#assertAlive();

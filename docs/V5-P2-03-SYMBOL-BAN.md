@@ -39,13 +39,13 @@ Keep `_setObservationComposer` until `GraphBinding` stops routing composition th
 
 `Track.observedEdges` and the reverse registry are read outside Track. Each needs a replacement source, all of which exist on `ObservationState`:
 
-| Consumer | Reads | Replacement |
-|---|---|---|
-| `ObservationStateBridge.syncFromTracks()` / `assertParity()` | `track.observedEdges` | delete, once state is authoritative |
-| `GraphBinding.#assertTrackGraphMatches()` | `track.observedEdges` | `observationState.getEdges(id)` |
-| `GraphBinding.addEdge` / `removeEdge` / `replaceEdge` | `observer.observedEdges` for rollback snapshots | `observationState.getEdges(observer.id)` |
-| `GraphPublisher.#graphGuard` | `current.observedEdges` | delegate cycle checks to `ObservationState` |
-| `Track.destroy` observer reporting | `this.#observers` | `adapter.state.getObserverIds(id)`, returned rather than spliced in place |
+| Consumer                                                     | Reads                                           | Replacement                                                               |
+| ------------------------------------------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------- |
+| `ObservationStateBridge.syncFromTracks()` / `assertParity()` | `track.observedEdges`                           | delete, once state is authoritative                                       |
+| `GraphBinding.#assertTrackGraphMatches()`                    | `track.observedEdges`                           | `observationState.getEdges(id)`                                           |
+| `GraphBinding.addEdge` / `removeEdge` / `replaceEdge`        | `observer.observedEdges` for rollback snapshots | `observationState.getEdges(observer.id)`                                  |
+| `GraphPublisher.#graphGuard`                                 | `current.observedEdges`                         | delegate cycle checks to `ObservationState`                               |
+| `Track.destroy` observer reporting                           | `this.#observers`                               | `adapter.state.getObserverIds(id)`, returned rather than spliced in place |
 
 ## Required evidence before removal
 

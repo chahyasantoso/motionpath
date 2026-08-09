@@ -38,7 +38,11 @@ export const MIN_COMMENT_RATIO = 0.05;
 
 export function isCommentLine(line) {
   const trimmed = line.trim();
-  return trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*");
+  return (
+    trimmed.startsWith("//") ||
+    trimmed.startsWith("/*") ||
+    trimmed.startsWith("*")
+  );
 }
 
 export function countSemicolons(line) {
@@ -54,19 +58,26 @@ export function checkReadability(relativePath, source) {
   lines.forEach((line, index) => {
     const lineNumber = index + 1;
     if (line.length > MAX_LINE_LENGTH) {
-      violations.push(`${relativePath}:${lineNumber} line is ${line.length} chars, limit is ${MAX_LINE_LENGTH}`);
+      violations.push(
+        `${relativePath}:${lineNumber} line is ${line.length} chars, limit is ${MAX_LINE_LENGTH}`,
+      );
     }
     const semicolons = countSemicolons(line);
     if (semicolons > MAX_SEMICOLONS_PER_LINE) {
-      violations.push(`${relativePath}:${lineNumber} has ${semicolons} statements on one line`);
+      violations.push(
+        `${relativePath}:${lineNumber} has ${semicolons} statements on one line`,
+      );
     }
   });
   const meaningful = lines.filter((line) => line.trim().length > 0);
   const comments = meaningful.filter((line) => isCommentLine(line));
-  const ratio = meaningful.length === 0 ? 1 : comments.length / meaningful.length;
+  const ratio =
+    meaningful.length === 0 ? 1 : comments.length / meaningful.length;
   if (ratio < MIN_COMMENT_RATIO) {
     const percent = (ratio * 100).toFixed(1);
-    violations.push(`${relativePath} comment ratio is ${percent}%, floor is ${MIN_COMMENT_RATIO * 100}%`);
+    violations.push(
+      `${relativePath} comment ratio is ${percent}%, floor is ${MIN_COMMENT_RATIO * 100}%`,
+    );
   }
   return violations;
 }

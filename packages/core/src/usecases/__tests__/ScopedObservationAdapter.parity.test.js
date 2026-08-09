@@ -52,8 +52,13 @@ describe("P2-03 scoped adapter parity", () => {
     const source = track("source", "s");
     const target = track("target", "base");
     const adapter = new ScopedObservationAdapter({ tracks: [source, target] });
-    adapter.setObserved(target, source, () => ({ leaf: "input" }), { role: "input", target: "target" });
-    adapter.setObserved(target, source, (patch) => ({ from: patch.leaf }), { role: "output" });
+    adapter.setObserved(target, source, () => ({ leaf: "input" }), {
+      role: "input",
+      target: "target",
+    });
+    adapter.setObserved(target, source, (patch) => ({ from: patch.leaf }), {
+      role: "output",
+    });
     expect(adapter.compose(target)).toEqual({ leaf: "input", from: "s" });
     adapter.destroy();
   });
@@ -61,7 +66,9 @@ describe("P2-03 scoped adapter parity", () => {
   it("preserves repeated mapper replacement and observer IDs", () => {
     const source = track("source");
     const observer = track("observer");
-    const adapter = new ScopedObservationAdapter({ tracks: [source, observer] });
+    const adapter = new ScopedObservationAdapter({
+      tracks: [source, observer],
+    });
     adapter.setObserved(observer, source, () => ({ value: "first" }));
     adapter.setObserved(observer, source, () => ({ value: "second" }));
     expect(adapter.compose(observer).value).toBe("second");

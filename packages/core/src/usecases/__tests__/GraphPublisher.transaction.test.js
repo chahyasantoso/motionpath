@@ -8,13 +8,22 @@
  */
 import { describe, expect, it } from "vitest";
 import { GraphPublisher } from "../GraphPublisher.js";
-import { buildRealGraph, chainMotion, diamondMotion, makeTrack } from "../../__fixtures__/graphTracks.js";
+import {
+  buildRealGraph,
+  chainMotion,
+  diamondMotion,
+  makeTrack,
+} from "../../__fixtures__/graphTracks.js";
 
 describe("GraphPublisher — defensive track registry", () => {
   it("does not follow the caller's map after construction", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     const published = [];
-    const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks,
+      publish: (id) => published.push(id),
+    });
 
     tracks.delete("n1");
 
@@ -40,7 +49,11 @@ describe("GraphPublisher — defensive track registry", () => {
   it("copies an entries iterable just as defensively", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(2));
     const entries = [...tracks];
-    const publisher = new GraphPublisher({ graph, tracks: entries, publish: () => {} });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks: entries,
+      publish: () => {},
+    });
 
     expect(publisher.trackCount).toBe(2);
     expect(publisher.graphOrder).toEqual(["n0", "n1"]);
@@ -52,26 +65,36 @@ describe("GraphPublisher — membership in both directions", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     tracks.delete("n2");
 
-    expect(() => new GraphPublisher({ graph, tracks, publish: () => {} })).toThrow(/node 'n2' has no registered track/i);
+    expect(
+      () => new GraphPublisher({ graph, tracks, publish: () => {} }),
+    ).toThrow(/node 'n2' has no registered track/i);
   });
 
   it("rejects a registered track the graph does not declare", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     tracks.set("ghost", makeTrack("ghost"));
 
-    expect(() => new GraphPublisher({ graph, tracks, publish: () => {} })).toThrow(/track 'ghost' is missing from the graph/i);
+    expect(
+      () => new GraphPublisher({ graph, tracks, publish: () => {} }),
+    ).toThrow(/track 'ghost' is missing from the graph/i);
   });
 
   it("rejects an applyGraph whose tracks and nodes disagree, and stays usable", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     const published = [];
-    const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks,
+      publish: (id) => published.push(id),
+    });
     const orderBefore = publisher.graphOrder;
 
     const rebuilt = buildRealGraph(diamondMotion());
     rebuilt.tracks.delete("d");
 
-    expect(() => publisher.applyGraph(rebuilt.graph, rebuilt.tracks)).toThrow(/has no registered track/i);
+    expect(() => publisher.applyGraph(rebuilt.graph, rebuilt.tracks)).toThrow(
+      /has no registered track/i,
+    );
     expect(publisher.graphOrder).toEqual(orderBefore);
     expect(publisher.trackCount).toBe(3);
 
@@ -87,7 +110,11 @@ describe("GraphPublisher — atomic mutation", () => {
     const publisher = new GraphPublisher({ graph, tracks, publish: () => {} });
     const orderBefore = publisher.graphOrder;
 
-    expect(() => publisher.addTrack("late", makeTrack("late"), { observes: [{ source: "ghost" }] })).toThrow(/unknown track/i);
+    expect(() =>
+      publisher.addTrack("late", makeTrack("late"), {
+        observes: [{ source: "ghost" }],
+      }),
+    ).toThrow(/unknown track/i);
 
     expect(publisher.trackCount).toBe(3);
     expect(publisher.graphOrder).toEqual(orderBefore);
@@ -100,13 +127,19 @@ describe("GraphPublisher — atomic mutation", () => {
   it("leaves the schedule alone when an edge would close a cycle", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(3));
     const published = [];
-    const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks,
+      publish: (id) => published.push(id),
+    });
     publisher.markAllDirty();
     publisher.flush();
     published.length = 0;
     const orderBefore = publisher.graphOrder;
 
-    expect(() => publisher.addEdge({ source: "n2", target: "n0", role: "output" })).toThrow(/cycle/i);
+    expect(() =>
+      publisher.addEdge({ source: "n2", target: "n0", role: "output" }),
+    ).toThrow(/cycle/i);
 
     expect(publisher.graphOrder).toEqual(orderBefore);
     expect(publisher.flush()).toBe(0);
@@ -116,7 +149,11 @@ describe("GraphPublisher — atomic mutation", () => {
   it("keeps the order and the edge set consistent after a removal", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(4));
     const published = [];
-    const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+    const publisher = new GraphPublisher({
+      graph,
+      tracks,
+      publish: (id) => published.push(id),
+    });
 
     publisher.removeTrack("n2");
 
@@ -131,18 +168,42 @@ describe("GraphPublisher — retry configuration", () => {
   it("rejects the retry option that was accepted and then ignored", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(2));
 
-    expect(() => new GraphPublisher({ graph, tracks, publish: () => {}, retry: { onExhausted: "drop" } })).toThrow(/unknown retry option 'onExhausted'/i);
+    expect(
+      () =>
+        new GraphPublisher({
+          graph,
+          tracks,
+          publish: () => {},
+          retry: { onExhausted: "drop" },
+        }),
+    ).toThrow(/unknown retry option 'onExhausted'/i);
   });
 
   it("still accepts the options it actually honors", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(2));
 
-    expect(() => new GraphPublisher({ graph, tracks, publish: () => {}, retry: { maxAttempts: 2, backoff: 1 } })).not.toThrow();
+    expect(
+      () =>
+        new GraphPublisher({
+          graph,
+          tracks,
+          publish: () => {},
+          retry: { maxAttempts: 2, backoff: 1 },
+        }),
+    ).not.toThrow();
   });
 
   it("rejects a typo instead of silently defaulting", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(2));
 
-    expect(() => new GraphPublisher({ graph, tracks, publish: () => {}, retry: { maxAttempt: 2 } })).toThrow(/unknown retry option/i);
+    expect(
+      () =>
+        new GraphPublisher({
+          graph,
+          tracks,
+          publish: () => {},
+          retry: { maxAttempt: 2 },
+        }),
+    ).toThrow(/unknown retry option/i);
   });
 });

@@ -3,11 +3,25 @@ import { Track } from "../Track.js";
 import { installLegacyObservationFacade } from "../../usecases/LegacyObservationFacade.js";
 
 function fakeTimeline(counters) {
-  return { progress: () => 0, duration: () => 0, kill: () => { counters.kills += 1; } };
+  return {
+    progress: () => 0,
+    duration: () => 0,
+    kill: () => {
+      counters.kills += 1;
+    },
+  };
 }
 
 function makeTrack(counters, id = "reentrant") {
-  return installLegacyObservationFacade(new Track({ id, proxyState: { value: id }, plugins: [{ keys: ["value"], compose: (raw) => ({ value: raw.value }) }], resolvedTrack: { id, keyframes: {} }, interpolationTimeline: fakeTimeline(counters) }));
+  return installLegacyObservationFacade(
+    new Track({
+      id,
+      proxyState: { value: id },
+      plugins: [{ keys: ["value"], compose: (raw) => ({ value: raw.value }) }],
+      resolvedTrack: { id, keyframes: {} },
+      interpolationTimeline: fakeTimeline(counters),
+    }),
+  );
 }
 
 describe("P2-03 Track.destroy re-entrancy", () => {
@@ -15,8 +29,13 @@ describe("P2-03 Track.destroy re-entrancy", () => {
     const counters = { kills: 0 };
     const track = makeTrack(counters);
     const destroyedEvents = [];
-    track.onLifecycle((event) => { if (event.type === "destroyed") destroyedEvents.push(event); });
-    track.onSourceDestroyed(() => { expect(track.isDestroyed).toBe(false); track.destroy(); });
+    track.onLifecycle((event) => {
+      if (event.type === "destroyed") destroyedEvents.push(event);
+    });
+    track.onSourceDestroyed(() => {
+      expect(track.isDestroyed).toBe(false);
+      track.destroy();
+    });
     track.destroy();
     expect(destroyedEvents).toHaveLength(1);
     expect(counters.kills).toBe(1);

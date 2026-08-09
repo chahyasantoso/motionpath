@@ -14,16 +14,22 @@ import { buildRealGraph, chainMotion } from "../../__fixtures__/graphTracks.js";
 function publisherFor(motion) {
   const { graph, tracks } = buildRealGraph(motion);
   const published = [];
-  const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+  const publisher = new GraphPublisher({
+    graph,
+    tracks,
+    publish: (id) => published.push(id),
+  });
   return { graph, tracks, publisher, published };
 }
 
 function ownerEdges(binding, target) {
-  return binding.observationState.getEdges(target).map(({ source, role, input }) => ({
-    source: source.id,
-    role,
-    input,
-  }));
+  return binding.observationState
+    .getEdges(target)
+    .map(({ source, role, input }) => ({
+      source: source.id,
+      role,
+      input,
+    }));
 }
 
 describe("GraphPublisher disposal", () => {
@@ -77,17 +83,28 @@ describe("GraphPublisher disposal", () => {
     publisher.destroy();
 
     expect(() => publisher.applyGraph(graph, tracks)).toThrow(/destroyed/i);
-    expect(() => publisher.addEdge({ source: "n0", target: "n1" })).toThrow(/destroyed/i);
-    expect(() => publisher.removeEdge({ source: "n0", target: "n1" })).toThrow(/destroyed/i);
+    expect(() => publisher.addEdge({ source: "n0", target: "n1" })).toThrow(
+      /destroyed/i,
+    );
+    expect(() => publisher.removeEdge({ source: "n0", target: "n1" })).toThrow(
+      /destroyed/i,
+    );
     expect(() => publisher.removeTrack("n0")).not.toThrow();
   });
 
   it("leaves authored cycle validation with the owner across publisher disposal", () => {
     const { graph, publisher, tracks } = publisherFor(chainMotion(2));
-    const binding = new GraphBinding({ graph, tracks, publisher, ownsPublisher: false });
+    const binding = new GraphBinding({
+      graph,
+      tracks,
+      publisher,
+      ownsPublisher: false,
+    });
     const before = ownerEdges(binding, "n0");
 
-    expect(() => binding.addEdge({ source: "n1", target: "n0", role: "output" })).toThrow(/cycle/i);
+    expect(() =>
+      binding.addEdge({ source: "n1", target: "n0", role: "output" }),
+    ).toThrow(/cycle/i);
     expect(ownerEdges(binding, "n0")).toEqual(before);
 
     publisher.destroy();

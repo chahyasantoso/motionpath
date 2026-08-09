@@ -32,6 +32,8 @@ describe("P2-03 scoped ownership seam", () => {
     const owner = createObservationOwner();
     owner.destroy();
     expect(owner.isDestroyed).toBe(true);
-    expect(() => owner.register(track("dead", 0), "dead#track")).toThrow(/destroyed/i);
+    expect(() => owner.register(track("dead", 0), "dead#track")).toThrow(
+      /destroyed/i,
+    );
   });
 });

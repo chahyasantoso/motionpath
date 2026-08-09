@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createPluginRegistry, fkPlugin, resolvePluginForKey } from "../plugins.js";
+import {
+  createPluginRegistry,
+  fkPlugin,
+  resolvePluginForKey,
+} from "../plugins.js";
 
 describe("extracted core domain", () => {
   it("resolves built-in authored keys without legacy imports", () => {

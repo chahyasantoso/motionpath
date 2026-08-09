@@ -26,7 +26,9 @@ export const COMPOSING = Symbol("motionpath.composing");
  */
 export function trackComposeLeaf(track, rawData) {
   if (typeof track?.composeLocal !== "function") {
-    throw new TypeError(`Track '${track?.id ?? "?"}' does not expose composeLocal().`);
+    throw new TypeError(
+      `Track '${track?.id ?? "?"}' does not expose composeLocal().`,
+    );
   }
   return track.composeLocal(rawData);
 }
@@ -46,14 +48,24 @@ export function patchesEqual(a, b) {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
   if (a === null || b === null || typeof a !== "object") {
-    return typeof a === "number" && typeof b === "number" && Number.isNaN(a) && Number.isNaN(b);
+    return (
+      typeof a === "number" &&
+      typeof b === "number" &&
+      Number.isNaN(a) &&
+      Number.isNaN(b)
+    );
   }
   if (Array.isArray(a) !== Array.isArray(b)) return false;
   if (Array.isArray(a)) {
-    return a.length === b.length && a.every((value, index) => patchesEqual(value, b[index]));
+    return (
+      a.length === b.length &&
+      a.every((value, index) => patchesEqual(value, b[index]))
+    );
   }
   const keysA = Object.keys(a);
   const keysB = Object.keys(b);
   if (keysA.length !== keysB.length) return false;
-  return keysA.every((key) => Object.hasOwn(b, key) && patchesEqual(a[key], b[key]));
+  return keysA.every(
+    (key) => Object.hasOwn(b, key) && patchesEqual(a[key], b[key]),
+  );
 }

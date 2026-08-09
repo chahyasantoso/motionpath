@@ -60,7 +60,9 @@ export class ScopedObservationAdapter {
   register(track) {
     this.#assertAlive();
     if (!track?.id) {
-      throw new TypeError("ScopedObservationAdapter requires a track with an id.");
+      throw new TypeError(
+        "ScopedObservationAdapter requires a track with an id.",
+      );
     }
     if (this.#keys.has(track)) {
       this.#watchTrack(track);
@@ -196,9 +198,8 @@ export class ScopedObservationAdapter {
   }
 
   #unregister(trackOrId) {
-    const track = typeof trackOrId === "object"
-      ? trackOrId
-      : this.#findTrack(trackOrId);
+    const track =
+      typeof trackOrId === "object" ? trackOrId : this.#findTrack(trackOrId);
     const key = track ? this.#keys.get(track) : undefined;
     if (!key) return;
     this.#sourceUnsubscribers.get(track)?.();

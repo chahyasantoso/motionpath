@@ -24,9 +24,16 @@ describe("phase one owner-first observation migration", () => {
       (patch) => ({ upstream: patch.value }),
     );
 
-    expect(scope.standaloneObservationAdapter.getSources(observer)).toEqual([source]);
-    expect(scope.standaloneObservationAdapter.getObserverIds(source)).toEqual(["observer"]);
-    expect(observer.compose()).toEqual({ value: "observer", upstream: "source" });
+    expect(scope.standaloneObservationAdapter.getSources(observer)).toEqual([
+      source,
+    ]);
+    expect(scope.standaloneObservationAdapter.getObserverIds(source)).toEqual([
+      "observer",
+    ]);
+    expect(observer.compose()).toEqual({
+      value: "observer",
+      upstream: "source",
+    });
     scope.dispose();
   });
 

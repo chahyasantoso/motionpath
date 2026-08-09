@@ -9,7 +9,9 @@ function track(id, observedEdges = []) {
     observedEdges,
     getSnapshot: () => ({ id }),
     compose: () => ({ id }),
-    get observerIds() { return observerProvider?.() ?? []; },
+    get observerIds() {
+      return observerProvider?.() ?? [];
+    },
     onSourceDestroyed(callback) {
       destroySubscribers.add(callback);
       return () => destroySubscribers.delete(callback);
@@ -18,7 +20,8 @@ function track(id, observedEdges = []) {
       observerProvider = provider;
     },
     destroy() {
-      for (const callback of destroySubscribers) callback({ id, observerIds: this.observerIds });
+      for (const callback of destroySubscribers)
+        callback({ id, observerIds: this.observerIds });
     },
   };
 }
@@ -26,16 +29,30 @@ function track(id, observedEdges = []) {
 describe("P2-03 ObservationState bridge", () => {
   it("hydrates live Track edges once into owned observation state", () => {
     const source = track("source");
-    const target = track("target", [{ source, role: "output", input: undefined, mapFn: null }]);
-    const bridge = new ObservationStateBridge({ tracks: new Map([[source.id, source], [target.id, target]]) });
+    const target = track("target", [
+      { source, role: "output", input: undefined, mapFn: null },
+    ]);
+    const bridge = new ObservationStateBridge({
+      tracks: new Map([
+        [source.id, source],
+        [target.id, target],
+      ]),
+    });
     expect(bridge.state.getSources("target")).toEqual(["source"]);
     expect(bridge.assertParity()).toBe(true);
   });
 
   it("does not re-read drifted Track projections after construction", () => {
     const source = track("source");
-    const target = track("target", [{ source, role: "output", input: undefined, mapFn: null }]);
-    const bridge = new ObservationStateBridge({ tracks: new Map([[source.id, source], [target.id, target]]) });
+    const target = track("target", [
+      { source, role: "output", input: undefined, mapFn: null },
+    ]);
+    const bridge = new ObservationStateBridge({
+      tracks: new Map([
+        [source.id, source],
+        [target.id, target],
+      ]),
+    });
     target.observedEdges = [];
     expect(bridge.assertParity()).toBe(true);
     expect(bridge.state.getSources("target")).toEqual(["source"]);
@@ -43,16 +60,36 @@ describe("P2-03 ObservationState bridge", () => {
 
   it("compares owner state with normalized graph edges", () => {
     const source = track("source");
-    const target = track("target", [{ source, role: "output", input: undefined, mapFn: null }]);
-    const bridge = new ObservationStateBridge({ tracks: new Map([[source.id, source], [target.id, target]]) });
-    expect(() => bridge.assertGraphParity({ edges: [{ source: "source", target: "target", role: "output" }] })).not.toThrow();
-    expect(() => bridge.assertGraphParity({ edges: [] })).toThrow(/live Track wiring|declared edges|mismatch/i);
+    const target = track("target", [
+      { source, role: "output", input: undefined, mapFn: null },
+    ]);
+    const bridge = new ObservationStateBridge({
+      tracks: new Map([
+        [source.id, source],
+        [target.id, target],
+      ]),
+    });
+    expect(() =>
+      bridge.assertGraphParity({
+        edges: [{ source: "source", target: "target", role: "output" }],
+      }),
+    ).not.toThrow();
+    expect(() => bridge.assertGraphParity({ edges: [] })).toThrow(
+      /live Track wiring|declared edges|mismatch/i,
+    );
   });
 
   it("binds observer IDs to owner state and cleans dependents before source teardown", () => {
     const source = track("source");
-    const target = track("target", [{ source, role: "output", input: undefined, mapFn: null }]);
-    const bridge = new ObservationStateBridge({ tracks: new Map([[source.id, source], [target.id, target]]) });
+    const target = track("target", [
+      { source, role: "output", input: undefined, mapFn: null },
+    ]);
+    const bridge = new ObservationStateBridge({
+      tracks: new Map([
+        [source.id, source],
+        [target.id, target],
+      ]),
+    });
 
     expect(source.observerIds).toEqual(["target"]);
     source.destroy();
@@ -64,9 +101,20 @@ describe("P2-03 ObservationState bridge", () => {
   it("does not collide composite edge identities", () => {
     const sourceA = track("A");
     const sourceAB = track("AB");
-    const targetBC = track("BC", [{ source: sourceA, role: "output", input: undefined, mapFn: null }]);
-    const targetC = track("C", [{ source: sourceAB, role: "output", input: undefined, mapFn: null }]);
-    const bridge = new ObservationStateBridge({ tracks: new Map([[sourceA.id, sourceA], [sourceAB.id, sourceAB], [targetBC.id, targetBC], [targetC.id, targetC]]) });
+    const targetBC = track("BC", [
+      { source: sourceA, role: "output", input: undefined, mapFn: null },
+    ]);
+    const targetC = track("C", [
+      { source: sourceAB, role: "output", input: undefined, mapFn: null },
+    ]);
+    const bridge = new ObservationStateBridge({
+      tracks: new Map([
+        [sourceA.id, sourceA],
+        [sourceAB.id, sourceAB],
+        [targetBC.id, targetBC],
+        [targetC.id, targetC],
+      ]),
+    });
     expect(bridge.assertParity()).toBe(true);
   });
 });
