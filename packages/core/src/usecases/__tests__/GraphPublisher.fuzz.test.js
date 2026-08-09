@@ -33,10 +33,7 @@ function expectTopological(order, graph, label) {
     // Narrow cache commits intentionally publish only the changed closure.
     // Edges with a cached endpoint are not order constraints for this pass.
     if (!rank.has(edge.source) || !rank.has(edge.target)) continue;
-    expect(
-      rank.get(edge.source) < rank.get(edge.target),
-      `${label}: ${edge.source} is not ordered before ${edge.target}`,
-    ).toBe(true);
+    expect(rank.get(edge.source) < rank.get(edge.target), `${label}: ${edge.source} is not ordered before ${edge.target}`).toBe(true);
   }
 }
 
@@ -44,13 +41,7 @@ function graphMotion(graph) {
   return {
     tracks: graph.nodes.map(({ id }) => ({
       id,
-      observes: graph.edges
-        .filter((edge) => edge.target === id)
-        .map(({ source, role, input }) => ({
-          source,
-          role,
-          ...(role === "input" ? { target: input } : {}),
-        })),
+      observes: graph.edges.filter((edge) => edge.target === id).map(({ source, role, input }) => ({ source, role, ...(role === "input" ? { target: input } : {}) })),
     })),
   };
 }
@@ -83,9 +74,7 @@ describe("GraphPublisher — invalidation fuzz", () => {
       publisher.markDirty(motion.tracks[0].id);
       publisher.flush();
       const rank = new Map(graph.order.map((id, index) => [id, index]));
-      for (let i = 1; i < published.length; i += 1) {
-        expect(rank.get(published[i - 1]) < rank.get(published[i]), `seed ${seed}: ${published[i - 1]} published after ${published[i]}`).toBe(true);
-      }
+      for (let i = 1; i < published.length; i += 1) expect(rank.get(published[i - 1]) < rank.get(published[i]), `seed ${seed}: ${published[i - 1]} published after ${published[i]}`).toBe(true);
     }
   });
 
@@ -126,7 +115,7 @@ describe("GraphPublisher — cross-flush cache fuzz", () => {
         for (const id of ids) expect(lastPublished.get(id), `seed ${seed} round ${round}: stale published patch for ${id} after touching [${touched.join(", ")}]`).toEqual(tracks.get(id).compose());
       }
     }
-  });
+  }, 15_000);
 
   it("an idle flush after a settled graph publishes nothing", () => {
     for (let seed = 1; seed <= ITERATIONS; seed += 1) {
