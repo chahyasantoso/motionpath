@@ -1,47 +1,54 @@
-/**
- * Shared fixtures for graph-layer tests.
- *
- * Every helper here returns REAL `Track` instances. Graph tests must never
- * substitute object literals for tracks: the original GraphPublisher unit
- * tests did exactly that, and as a result the publisher shipped marked
- * "Complete" while being unable to publish a node's dependents at all.
- * See docs/V4.3-GRAPH-CORRECTNESS-PLAN.md.
- */
 import { gsap } from "gsap";
 import { Track } from "../lib/Track.js";
 import { normalizeObservationGraph } from "../usecases/normalizeObservationGraph.js";
 import { installLegacyObservationFacade } from "../usecases/LegacyObservationFacade.js";
+import { StandaloneObservationAdapter } from "../usecases/StandaloneObservationAdapter.js";
 
-/**
- * A real Track with a single two-key plugin, matching the shape used by the
- * existing Track.test.js fixtures so behavior stays comparable.
- *
- * @param {string} id
- * @param {{ onCompose?: (id: string) => void }} [options]
- */
+/** Shared real Track fixtures with explicit ownership. */
 export function makeTrack(id, options = {}) {
   const proxy = { x: 0, y: 0 };
   const tween = gsap.to(proxy, { x: 100, y: 200, duration: 1, ease: "none", paused: true });
-  const plugins = [{ keys: ["x", "y"], compose: (raw) => { options.onCompose?.(id); return { transform: `translate3d(${raw.x ?? 0}px, ${raw.y ?? 0}px, 0px)` }; } }];
-  const track = new Track({ id, interpolationTimeline: tween, proxyState: proxy, plugins, resolvedTrack: { id, keyframes: { x: {}, y: {} } } });
+  const plugins = [{
+    keys: ["x", "y"],
+    compose: (raw) => {
+      options.onCompose?.(id);
+      return { transform: `translate3d(${raw.x ?? 0}px, ${raw.y ?? 0}px, 0px)` };
+    },
+  }];
+  const track = new Track({
+    id,
+    observationAdapter: options.observationAdapter,
+    interpolationTimeline: tween,
+    proxyState: proxy,
+    plugins,
+    resolvedTrack: { id, keyframes: { x: {}, y: {} } },
+  });
   return installLegacyObservationFacade(track);
 }
 
-/** Normalize a declarative motion into graph IR and explicit compatibility test tracks. */
+/** Normalize a declarative motion and wire its real Tracks through one scope. */
 export function buildRealGraph(motion, options = {}) {
   const graph = normalizeObservationGraph(motion);
   const composeCounts = new Map();
-  const bump = (id) => { composeCounts.set(id, (composeCounts.get(id) ?? 0) + 1); options.onCompose?.(id); };
+  const bump = (id) => {
+    composeCounts.set(id, (composeCounts.get(id) ?? 0) + 1);
+    options.onCompose?.(id);
+  };
+  const observationAdapter = options.observationAdapter ?? new StandaloneObservationAdapter();
   const tracks = new Map();
-  for (const config of motion.tracks) tracks.set(config.id, makeTrack(config.id, { onCompose: bump }));
+  for (const config of motion.tracks) {
+    tracks.set(config.id, makeTrack(config.id, { onCompose: bump, observationAdapter }));
+  }
   for (const config of motion.tracks) {
     for (const edge of config.observes ?? []) {
-      const observer = tracks.get(config.id);
-      const source = tracks.get(edge.source);
-      observer.setObserved(source, (patch) => ({ [`from_${edge.source}`]: patch.transform }), { role: edge.role ?? "output" });
+      tracks.get(config.id).setObserved(
+        tracks.get(edge.source),
+        (patch) => ({ [`from_${edge.source}`]: patch.transform }),
+        { role: edge.role ?? "output" },
+      );
     }
   }
-  return { graph, tracks, composeCounts };
+  return { graph, tracks, composeCounts, observationAdapter };
 }
 
 export function diamondMotion() {
