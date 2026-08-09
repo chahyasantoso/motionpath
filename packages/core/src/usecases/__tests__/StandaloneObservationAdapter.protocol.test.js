@@ -52,7 +52,10 @@ describe("P2-03 standalone composition protocol characterization", () => {
     adapter.setObserved(b, a, (patch) => ({ fromA: patch.leaf }));
 
     expect(() => adapter.compose(a)).not.toThrow();
-    expect(adapter.compose(a)).toEqual({ leaf: "a", fromB: "b", fromA: "a" });
+    // Locked Track behavior: the back-edge falls back to the plugin/local leaf
+    // to terminate the cycle, but its mapper is not recursively re-folded into
+    // the already composing root patch.
+    expect(adapter.compose(a)).toEqual({ leaf: "a", fromB: "b" });
     adapter.destroy();
   });
 
