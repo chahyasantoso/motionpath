@@ -1,29 +1,43 @@
 import { TrackObservationOwner } from "./TrackObservationOwner.js";
-import { COMPOSING } from "./composeContext.js";
 
+let nextIdentity = 0;
+const globalTracks = new Map();
+const globalKeys = new WeakMap();
+const globalRefs = new Map();
+const tracksById = new Map();
+const publicContexts = new WeakMap();
+const internalContexts = new WeakSet();
 /**
- * Standalone observation ownership for one explicit scope.
+ * Module-global ownership, and a known smell.
  *
- * ProjectRuntime injects one instance across its standalone Tracks. Direct
- * Track callers get one adapter per Track by default, and cross-adapter edges
- * remain valid because the observer's adapter registers the source locally.
- * There is intentionally no module-global registry: ownership must die with
- * the runtime that created it.
+ * It exists so two Tracks that were each given their own adapter can still see
+ * one edge between them, which is the hole F-02 opened. The replacement is an
+ * explicit shared ownership object scoped to a ProjectRuntime or Motion, injected
+ * into the adapter. Do not build anything new on top of these globals.
+ *
+ * Two consequences to keep in mind while it is still here:
+ * - it lives for the whole process, so anything O(registry) inside it is
+ *   effectively unbounded. That is why nothing below reads `#owner.tracks`.
+ * - entries only leave on Track.destroy(), so a suite that drops Tracks without
+ *   destroying them keeps growing it.
  */
+const sharedOwner = new TrackObservationOwner({
+  validateCycles: false,
+  composeSource: (source, ctx) => (typeof source.compose === "function"
+    ? source.compose(undefined, ctx)
+    : sharedOwner.compose(globalKeys.get(source), undefined, ctx)),
+});
+
+/** Standalone observation ownership with private identity keys and public Track ids. */
 export class StandaloneObservationAdapter {
-  #owner;
+  #owner = sharedOwner;
   #keys = new WeakMap();
   #tracks = new Map();
+  #sourceUnsubscribers = new Map();
   #lifecycleUnsubscribers = new Map();
-  #publicContexts = new WeakMap();
-  #nextIdentity = 0;
   #destroyed = false;
 
   constructor({ tracks = [] } = {}) {
-    this.#owner = new TrackObservationOwner({
-      validateCycles: false,
-      composeSource: (source, ctx) => this.#composeSource(source, ctx),
-    });
     const registry = tracks instanceof Map ? [...tracks.values()] : tracks;
     for (const track of registry) this.register(track);
   }
@@ -31,12 +45,11 @@ export class StandaloneObservationAdapter {
   get state() {
     return {
       tracks: new Map(this.#tracks),
-      getEdges: (target) => this.getEdges(target),
-      getSources: (target) => this.getSources(target),
+      getEdges: (target) => this.#stateEdges(target),
+      getSources: (target) => this.#stateSources(target),
       getObserverIds: (source) => this.getObserverIds(source),
     };
   }
-
   get isDestroyed() { return this.#destroyed; }
   get tracks() { return new Map(this.#tracks); }
 
@@ -45,10 +58,23 @@ export class StandaloneObservationAdapter {
     if (!track?.id) {
       throw new TypeError("StandaloneObservationAdapter requires a track with an id.");
     }
-    if (this.#keys.has(track)) return track;
-    const key = `${track.id}#${++this.#nextIdentity}`;
+    const existingKey = globalKeys.get(track);
+    if (existingKey) {
+      this.#keys.set(track, existingKey);
+      this.#tracks.set(existingKey, track);
+      globalRefs.set(existingKey, (globalRefs.get(existingKey) ?? 0) + 1);
+      this.#watchTrack(track);
+      return track;
+    }
+    const key = `${track.id}#${++nextIdentity}`;
     this.#keys.set(track, key);
+    globalKeys.set(track, key);
     this.#tracks.set(key, track);
+    globalTracks.set(key, track);
+    const sameId = tracksById.get(track.id) ?? new Set();
+    sameId.add(track);
+    tracksById.set(track.id, sameId);
+    globalRefs.set(key, 1);
     this.#owner.register(track, key);
     this.#watchTrack(track);
     return track;
@@ -59,6 +85,17 @@ export class StandaloneObservationAdapter {
     this.#unregister(trackOrId);
   }
 
+  /**
+   * The hot read. `Track.observedEdges` lands here, which means the graph layer
+   * lands here: parity checks, the publisher's cycle guard and every fuzz
+   * assertion walk it.
+   *
+   * Finding F-09. This used to resolve each edge's source through
+   * `#owner.tracks`, a getter that CLONES the entire registry. One full Map copy
+   * per edge, against a registry that holds every Track in the process, so the
+   * cost grew with everything that ran before it. The graph mutation fuzz suite
+   * ran last and timed out on it. `getTrack` is the same lookup in O(1).
+   */
   getEdges(targetOrTrack) {
     const track = this.#resolveTrack(targetOrTrack);
     if (!track) return [];
@@ -130,7 +167,6 @@ export class StandaloneObservationAdapter {
   replaceObserved(observer, oldSource, newSource, mapFn, opts = {}) {
     this.#assertAlive();
     this.register(observer);
-    this.register(oldSource);
     this.register(newSource);
     return this.#owner.replaceEdge(
       {
@@ -151,12 +187,9 @@ export class StandaloneObservationAdapter {
   compose(track, rawData, ctx) {
     this.#assertAlive();
     this.register(track);
-    const publicContext = ctx ?? new Map();
-    const internal = this.#internalContext(publicContext);
-    publicContext.set(track.id, COMPOSING);
-    internal.set(this.#keys.get(track), COMPOSING);
+    const internal = this.#internalContext(ctx);
     const patch = this.#owner.compose(this.#keys.get(track), rawData, internal);
-    publicContext.set(track.id, patch);
+    if (ctx && internal !== ctx) ctx.set(track.id, patch);
     return patch;
   }
 
@@ -164,7 +197,7 @@ export class StandaloneObservationAdapter {
     if (this.#destroyed) return;
     for (const track of [...this.#tracks.values()]) this.#unregister(track);
     this.#destroyed = true;
-    this.#owner.destroy();
+    this.#sourceUnsubscribers.clear();
     this.#lifecycleUnsubscribers.clear();
   }
 
@@ -174,12 +207,51 @@ export class StandaloneObservationAdapter {
       : this.#findTrack(trackOrId);
     const key = track ? this.#keys.get(track) : undefined;
     if (!key) return;
+    this.#sourceUnsubscribers.get(track)?.();
+    this.#sourceUnsubscribers.delete(track);
     this.#lifecycleUnsubscribers.get(track)?.();
     this.#lifecycleUnsubscribers.delete(track);
     this.#owner.removeSourceEdges(key);
-    this.#owner.unregister(key);
+    const refs = (globalRefs.get(key) ?? 1) - 1;
+    if (refs <= 0) {
+      this.#owner.unregister(key);
+      globalRefs.delete(key);
+      globalTracks.delete(key);
+      const sameId = tracksById.get(track.id);
+      sameId?.delete(track);
+      if (!sameId?.size) tracksById.delete(track.id);
+      globalKeys.delete(track);
+    } else {
+      globalRefs.set(key, refs);
+    }
     this.#tracks.delete(key);
     this.#keys.delete(track);
+  }
+
+  #stateEdges(targetOrTrack) {
+    const track = this.#resolveTrack(targetOrTrack);
+    return track ? this.getEdges(track) : [];
+  }
+
+  #stateSources(targetOrTrack) {
+    const track = this.#resolveTrack(targetOrTrack);
+    return track ? this.#owner.getSources(this.#keys.get(track)) : [];
+  }
+
+  #internalContext(ctx) {
+    if (!ctx) return new Map();
+    if (internalContexts.has(ctx)) return ctx;
+    let internal = publicContexts.get(ctx);
+    if (!internal) {
+      internal = new Map();
+      publicContexts.set(ctx, internal);
+      internalContexts.add(internal);
+      for (const [publicId, patch] of ctx) {
+        const track = this.#findTrack(publicId);
+        if (track) internal.set(globalKeys.get(track), patch);
+      }
+    }
+    return internal;
   }
 
   #resolveTrack(trackOrId) {
@@ -189,41 +261,29 @@ export class StandaloneObservationAdapter {
   }
 
   #findTrack(id) {
-    for (const track of this.#tracks.values()) {
-      if (track.id === id) return track;
-    }
-    return null;
-  }
-
-  #internalContext(ctx) {
-    const internal = new Map();
-    for (const [publicId, patch] of ctx) {
-      const track = this.#findTrack(publicId);
-      if (track) internal.set(this.#keys.get(track), patch);
-    }
-    return internal;
-  }
-
-  #composeSource(source, ctx) {
-    if (typeof source.compose !== "function") {
-      const key = this.#keys.get(source);
-      return this.#owner.compose(key, undefined, ctx);
-    }
-    const publicContext = new Map();
-    for (const [key, patch] of ctx) {
-      const track = this.#owner.getTrack(key);
-      if (track) publicContext.set(track.id, patch);
-    }
-    return source.compose(undefined, publicContext);
+    return tracksById.get(id)?.values().next().value;
   }
 
   #watchTrack(track) {
-    if (typeof track.onLifecycle !== "function") return;
-    this.#lifecycleUnsubscribers.set(track, track.onLifecycle((event) => {
-      if (event?.type === "detached") {
-        this.#owner.removeSourceEdges(this.#keys.get(track));
-      }
-    }));
+    if (!track || this.#lifecycleUnsubscribers.has(track)) return;
+    if (typeof track.onLifecycle === "function") {
+      this.#lifecycleUnsubscribers.set(track, track.onLifecycle((event) => {
+        if (event?.type === "detached") {
+          this.#owner.removeSourceEdges(this.#keys.get(track));
+        }
+      }));
+    }
+    if (typeof track.onSourceDestroyed === "function") {
+      this.#sourceUnsubscribers.set(track, track.onSourceDestroyed((event) => {
+        if (event && Array.isArray(event.observerIds)) {
+          event.observerIds.splice(
+            0,
+            event.observerIds.length,
+            ...this.getObserverIds(track),
+          );
+        }
+      }));
+    }
   }
 
   #assertAlive() {
