@@ -67,7 +67,11 @@ export class StandaloneObservationAdapter {
     const track = this.#resolveTrack(targetOrTrack);
     if (!track) return [];
     const target = this.#keys.get(track);
-    return this.#owner.getEdges(target).map((edge) => ({ ...edge, source: edge.source, target: track.id }));
+    return this.#owner.getEdges(target).map((edge) => ({
+      ...edge,
+      source: this.#owner.tracks.get(edge.source) ?? edge.source,
+      target: track.id,
+    }));
   }
 
   getSources(targetOrTrack) {
@@ -82,7 +86,7 @@ export class StandaloneObservationAdapter {
   getObserverIds(sourceOrTrack) {
     const source = this.#resolveTrack(sourceOrTrack);
     if (!source) return [];
-    return this.#owner.getObserverIds(this.#keys.get(source)).map((key) => globalTracks.get(key)?.id).filter(Boolean);
+    return this.#owner.getObserverIds(this.#keys.get(source)).map((key) => this.#owner.tracks.get(key)?.id).filter(Boolean);
   }
 
   keyFor(track) { this.#assertAlive(); this.register(track); return this.#keys.get(track); }
@@ -91,7 +95,9 @@ export class StandaloneObservationAdapter {
     if (this.#destroyed || !observer?.id) return;
     const target = this.#keys.get(observer);
     if (!target) return;
-    for (const edge of this.#owner.getEdges(target)) this.#owner.removeEdge({ source: edge.source.id, target, role: edge.role, input: edge.input });
+    for (const edge of this.#owner.getEdges(target)) {
+      this.#owner.removeEdge({ source: this.#keyFor(this.#owner.tracks.get(edge.source)), target, role: edge.role, input: edge.input });
+    }
   }
 
   setObserved(observer, source, mapFn, { role = "output", target } = {}) {
@@ -156,7 +162,7 @@ export class StandaloneObservationAdapter {
   }
   #stateSources(targetOrTrack) {
     const track = this.#resolveTrack(targetOrTrack);
-    return track ? this.#owner.getSources(this.#keys.get(track)) : [];
+    return track ? this.getEdges(track).map(({ source }) => source) : [];
   }
   #internalContext(ctx) {
     if (!ctx) return new Map();
@@ -174,7 +180,7 @@ export class StandaloneObservationAdapter {
     return internal;
   }
   #resolveTrack(trackOrId) { return trackOrId && typeof trackOrId === "object" ? trackOrId : this.#findTrack(trackOrId); }
-  #findTrack(id) { return [...globalTracks.values()].find((track) => track.id === id); }
+  #findTrack(id) { return [...this.#owner.tracks.values()].find((track) => track.id === id); }
   #watchTrack(track) {
     if (!track || this.#lifecycleUnsubscribers.has(track)) return;
     if (typeof track.onLifecycle === "function") this.#lifecycleUnsubscribers.set(track, track.onLifecycle((event) => { if (event?.type === "detached") this.#owner.removeSourceEdges(this.#keys.get(track)); }));
