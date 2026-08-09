@@ -1,12 +1,12 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 11:58 Jakarta  
+**Captured:** 2026-08-09 12:02 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
 **Base:** green PR #142 at `184f194`
 
 ## Current truth
 
-PR #143 is green with characterization-only changes. The proven adapter implementation remains unchanged. The next safe code slice adds an isolated scoped ownership seam, not a runtime behavior switch.
+PR #143 is green with characterization-only changes. The proven adapter implementation remains unchanged; the protocol lock now includes destroy observer snapshots.
 
 ## Completed in this slice
 
@@ -18,15 +18,16 @@ PR #143 is green with characterization-only changes. The proven adapter implemen
 - Duplicate public IDs inside one scope.
 - Lightweight tracks without `.compose()`.
 - ProjectRuntime adapter lifetime and disposal.
-- `createObservationOwner` seam with explicit lifecycle and owner isolation tests.
+- Observer ID snapshot stability before source cleanup.
+- `createObservationOwner` lifecycle seam.
 
 ## Required next sequence
 
-1. Prove the scoped owner through an adapter-compatible integration harness, preserving the exact compose protocol.
-2. Add a feature-flagged ProjectRuntime path that can select the scoped owner without changing the default.
-3. Run full Node 24 CI, compare protocol results, then expand the flag coverage.
-4. Remove the global fallback only after default and scoped paths are behaviorally equivalent.
+1. Build an adapter-compatible scoped-owner harness that preserves these exact contracts.
+2. Add a feature-flagged ProjectRuntime path selecting the harness, default-off.
+3. Compare default and scoped paths through the full Node 24 suite.
+4. Remove the global fallback only after behavioral equivalence is proven.
 
 ## Guardrails
 
-Keep PR #142 frozen and green. Do not merge PR #143 until the scoped-owner integration path is separately green. Keep `publisherRendering`, `crossMotion`, and `freeTracks` default-off.
+Keep PR #142 frozen and green. Do not merge PR #143 until the scoped-owner implementation is separately green. Keep `publisherRendering`, `crossMotion`, and `freeTracks` default-off.
