@@ -20,9 +20,6 @@ export function installLegacyObservationFacade(track) {
     [SET](source, mapFn, options = {}) {
       if (!source) { track.getObservationOwner()?.clearObserved(track); track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" }); return; }
       const owner = track.getObservationOwner?.();
-      // Authored Tracks expose an ObservationTrackController, not an adapter.
-      // Never pass that controller into Track owner adoption: it has no register
-      // lifecycle and doing so produced the observed owner.register failure.
       if (typeof owner?.register === "function") {
         source._adoptObservationOwner?.(owner);
         track._adoptObservationOwner?.(owner);
@@ -47,7 +44,7 @@ export function installLegacyObservationFacade(track) {
       owner?.replaceObserved(track, oldSource, newSource, mapFn, { ...options, role, target: input });
       for (const edge of oldEdges) {
         track._emitObservationLifecycle?.({ type: "edge-removed", track, source: oldSource, edge: { source: oldSource.id, target: track.id, role: edge.role, input: edge.input } });
-        track._emitObservationLifecycle?.({ type: "edge-added", track, source: newSource, edge: { source: newSource.id, target: track.id, role, input });
+        track._emitObservationLifecycle?.({ type: "edge-added", track, source: newSource, edge: { source: newSource.id, target: track.id, role, input } });
       }
       track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" });
     },
