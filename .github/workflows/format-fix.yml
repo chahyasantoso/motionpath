@@ -26,16 +26,17 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - run: npm install --package-lock-only --ignore-scripts
       - run: npm ci
-      - run: npm exec --yes --package=prettier@3.6.2 -- prettier . --write
-      - name: Commit formatting changes
+      - run: npm run format
+      - name: Commit formatting and lockfile changes
         run: |
           if git diff --quiet; then
-            echo "Formatting is already clean."
+            echo "Formatting and dependencies are already clean."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "style: apply Prettier formatting"
+          git add package.json package-lock.json .
+          git commit -m "chore: pin Prettier and apply formatting"
           git push origin HEAD:${{ inputs.ref }}
