@@ -20,6 +20,11 @@ export class TrackObservationOwner {
   }
 
   get state() { return this.#state; }
+  /**
+   * Clones the registry on every read. Callers on a hot path must use
+   * `getTrack` instead: this owner is shared process-wide, so the clone grows
+   * with every Track ever registered. Finding F-09.
+   */
   get tracks() { return this.#state.tracks; }
   get isDestroyed() { return this.#destroyed; }
 
@@ -47,6 +52,8 @@ export class TrackObservationOwner {
   getEdges(id) { return this.#state.getEdges(id); }
   getSources(id) { return this.#state.getSources(id); }
   getObserverIds(id) { return this.#state.getObserverIds(id); }
+  /** O(1) key -> Track. The read `tracks` does in O(registry). */
+  getTrack(key) { return this.#state.getTrack(key); }
 
   compose(id, rawData, ctx) {
     this.#assertAlive();

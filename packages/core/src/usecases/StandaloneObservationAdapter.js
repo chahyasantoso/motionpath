@@ -7,6 +7,20 @@ const globalRefs = new Map();
 const tracksById = new Map();
 const publicContexts = new WeakMap();
 const internalContexts = new WeakSet();
+/**
+ * Module-global ownership, and a known smell.
+ *
+ * It exists so two Tracks that were each given their own adapter can still see
+ * one edge between them, which is the hole F-02 opened. The replacement is an
+ * explicit shared ownership object scoped to a ProjectRuntime or Motion, injected
+ * into the adapter. Do not build anything new on top of these globals.
+ *
+ * Two consequences to keep in mind while it is still here:
+ * - it lives for the whole process, so anything O(registry) inside it is
+ *   effectively unbounded. That is why nothing below reads `#owner.tracks`.
+ * - entries only leave on Track.destroy(), so a suite that drops Tracks without
+ *   destroying them keeps growing it.
+ */
 const sharedOwner = new TrackObservationOwner({
   validateCycles: false,
   composeSource: (source, ctx) => (typeof source.compose === "function"
@@ -71,13 +85,24 @@ export class StandaloneObservationAdapter {
     this.#unregister(trackOrId);
   }
 
+  /**
+   * The hot read. `Track.observedEdges` lands here, which means the graph layer
+   * lands here: parity checks, the publisher's cycle guard and every fuzz
+   * assertion walk it.
+   *
+   * Finding F-09. This used to resolve each edge's source through
+   * `#owner.tracks`, a getter that CLONES the entire registry. One full Map copy
+   * per edge, against a registry that holds every Track in the process, so the
+   * cost grew with everything that ran before it. The graph mutation fuzz suite
+   * ran last and timed out on it. `getTrack` is the same lookup in O(1).
+   */
   getEdges(targetOrTrack) {
     const track = this.#resolveTrack(targetOrTrack);
     if (!track) return [];
     const target = this.#keys.get(track);
     return this.#owner.getEdges(target).map((edge) => ({
       ...edge,
-      source: this.#owner.tracks.get(edge.source) ?? edge.source,
+      source: this.#owner.getTrack(edge.source) ?? edge.source,
       target: track.id,
     }));
   }
@@ -96,8 +121,10 @@ export class StandaloneObservationAdapter {
   getObserverIds(sourceOrTrack) {
     const source = this.#resolveTrack(sourceOrTrack);
     if (!source) return [];
+    // Same rule as getEdges: resolve keys one at a time, never clone the
+    // shared registry. Destroy paths call this per observer.
     return this.#owner.getObserverIds(this.#keys.get(source))
-      .map((key) => this.#owner.tracks.get(key)?.id)
+      .map((key) => this.#owner.getTrack(key)?.id)
       .filter(Boolean);
   }
 
