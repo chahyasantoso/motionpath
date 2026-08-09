@@ -3,18 +3,22 @@ import { ObservationStateBridge } from "../ObservationStateBridge.js";
 
 function track(id, observedEdges = []) {
   const destroySubscribers = new Set();
+  let observerProvider = null;
   return {
     id,
     observedEdges,
     getSnapshot: () => ({ id }),
     compose: () => ({ id }),
+    get observerIds() { return observerProvider?.() ?? []; },
     onSourceDestroyed(callback) {
       destroySubscribers.add(callback);
       return () => destroySubscribers.delete(callback);
     },
+    _setObservationObserverIds(provider) {
+      observerProvider = provider;
+    },
     destroy() {
-      const observerIds = [];
-      for (const callback of destroySubscribers) callback({ id, observerIds });
+      for (const callback of destroySubscribers) callback({ id, observerIds: this.observerIds });
     },
   };
 }
@@ -48,13 +52,11 @@ describe("P2-03 ObservationState bridge", () => {
   it("binds observer IDs to owner state and cleans dependents before source teardown", () => {
     const source = track("source");
     const target = track("target", [{ source, role: "output", input: undefined, mapFn: null }]);
-    const tracks = new Map([[source.id, source], [target.id, target]]);
-    const bridge = new ObservationStateBridge({ tracks });
+    const bridge = new ObservationStateBridge({ tracks: new Map([[source.id, source], [target.id, target]]) });
 
-    expect(target.observerIds?.()).toBeUndefined();
-    const observerIds = source.observerIds;
-    expect(observerIds).toBeUndefined();
+    expect(source.observerIds).toEqual(["target"]);
     source.destroy();
+    expect(source.observerIds).toEqual([]);
     expect(bridge.state.getObserverIds("source")).toEqual([]);
     bridge.destroy();
   });
