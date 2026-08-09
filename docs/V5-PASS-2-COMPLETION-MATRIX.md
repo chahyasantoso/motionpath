@@ -1,22 +1,22 @@
 # MotionPath v5 pass-2 completion matrix
 
-**Status captured:** 2026-08-09 13:20 Asia/Jakarta  
+**Status captured:** 2026-08-09 16:15 Asia/Jakarta  
 **Control sheet:** pass-2 revision A  
-**Current handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)
+**Implementor review:** [`V5-P2-03-IMPLEMENTOR-REVIEW-2026-08-09.md`](./V5-P2-03-IMPLEMENTOR-REVIEW-2026-08-09.md)
 
-No row may be marked complete from a green docs-only commit, and no row may be
-marked complete from a `continue-on-error` job.
+No row is complete from a docs-only commit or a non-blocking job.
 
-| Target rule | Current status | Next required evidence |
+| Target rule | Current status | Required closure evidence |
 |---|---|---|
-| Standalone adapter scope (F-02) | **Closed for the runtime path.** `ProjectRuntime` owns one adapter and `Engine` injects it into every standalone Track. | `createTrack` and the `Track` constructor stop building their own fallback adapter |
-| Standalone ownership is replaceable | **Proven.** One scenario runner, both owners, every locked contract, plus the full `Engine` path. Scoped is opt-in and green. | Matrix re-run on the integration commits |
-| Track is a leaf | Open. Track still owns the compatibility reverse index and the topology/playback seams. | Adapter-scope step above, then symbol-ban and lifecycle suites |
-| ObservationGraph owns graph state | Open. `GraphBinding` still projects from Track and the bridge still derives state from `Track.observedEdges`. | State-authoritative wiring, parity, rollback, source removal |
-| Graph/patch immutability | Merged P2-01 evidence valid and re-run green. | None outstanding for this pass |
-| GSAP isolation | Partial. Core boundary passes; the quarantine list is non-empty and `packages/react` imports gsap directly. | Strict boundary green and a shrinking quarantine |
-| Publisher authority | Default-off and incomplete. | Equivalence, retention, rollback, payload-shape evidence |
-| Gates are real | Improved. One PR workflow, full unit gate green, readability floor and boundary scan running. | Format gate covering source files, strict boundary scan blocking |
+| Standalone adapter scope (F-02) | **Behavior closed, architecture exception open.** Engine-created Tracks use one ProjectRuntime adapter; direct construction still uses the compatibility fallback. | Explicit caller-owned direct scope, or a documented singleton exception with isolation proof |
+| Standalone ownership parity | **Closed behaviorally.** Compatibility and scoped adapters share the locked scenario and runtime contracts. | Re-run on final closure head |
+| Track is a leaf | **Open.** No local edge maps remain, but Track still installs the legacy observation facade. | Migrate callers, remove facade installation, retain compatibility coverage outside Track |
+| ObservationState owns authored graph state | **Mostly closed.** State is authoritative for reads and rollback, but GraphBinding still dual-writes compatibility hooks. | Owner-only authored mutation and owner-generated lifecycle events |
+| Cycle authority | **Open.** Normalization, ObservationState, and GraphPublisher/legacy guard still overlap. | One runtime authority, GraphPublisher no Track walk |
+| Graph/patch immutability | **Closed for this pass.** Existing P2-01 evidence remains green. | None |
+| GSAP isolation | **Partial and separate.** Core boundary passes; quarantine and renderer imports remain. | P2-02/P2-05 cleanup, not a P2-03 blocker |
+| Publisher authority | **Separate and open.** Rendering remains default-off. | P2-05 equivalence, retention, payload-shape, rollback evidence |
+| Gates are real | **Improved.** Strict boundary and benchmark jobs are now blocking in CI. | Final closure run on exact merge ref |
 
 ## Rollout flags, all default-off
 
@@ -29,9 +29,6 @@ marked complete from a `continue-on-error` job.
 
 ## Current PR state
 
-- [#143](https://github.com/chahyasantoso/motionpath/pull/143) is draft. The full
-  Node 24 matrix is green at `99e37de`. Integration commits above it need a re-run.
-- [#142](https://github.com/chahyasantoso/motionpath/pull/142) is the frozen green
-  repair baseline at `184f194` and **must not merge**.
-- [#141](https://github.com/chahyasantoso/motionpath/pull/141) is closed as
-  superseded.
+- [#143](https://github.com/chahyasantoso/motionpath/pull/143) is draft and has a green behavioral matrix; strict closure is still required.
+- [#142](https://github.com/chahyasantoso/motionpath/pull/142) remains the frozen repair baseline and must not merge.
+- [#141](https://github.com/chahyasantoso/motionpath/pull/141) is closed as superseded.
