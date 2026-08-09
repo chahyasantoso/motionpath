@@ -1,7 +1,15 @@
 import { ObservationState } from "./ObservationState.js";
 import { patchesEqual, trackComposeLeaf } from "./composeContext.js";
+import { observationEdgeKey } from "./observationEdge.js";
 
-/** Shadow bridge used while live Track mutation is being extracted. */
+/**
+ * ObservationState owner used while live Track mutation is being extracted.
+ *
+ * The bridge may hydrate once from legacy Track edges for compatibility. After
+ * construction, callers should compare the normalized graph to `state`, not
+ * read Track edge projections again. That makes state the authoritative writer
+ * and keeps Track as a temporary compatibility reader only.
+ */
 export class ObservationStateBridge {
   #tracks;
   #state;
@@ -12,7 +20,7 @@ export class ObservationStateBridge {
     this.#state = new ObservationState({ tracks: this.#tracks });
     if (edges) {
       for (const edge of edges) {
-        if (this.#tracks.has(edge.source)) {
+        if (this.#tracks.has(edge.source) && this.#tracks.has(edge.target)) {
           this.#state.addEdge(edge);
         }
       }
@@ -24,6 +32,10 @@ export class ObservationStateBridge {
   get state() { return this.#state; }
   get tracks() { return new Map(this.#tracks); }
 
+  /**
+   * Legacy hydration seam. It is intentionally one-way: later mutations must
+   * write ObservationState first and must not rebuild it from Track readers.
+   */
   syncFromTracks() {
     if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
     for (const track of this.#tracks.values()) {
@@ -40,6 +52,36 @@ export class ObservationStateBridge {
     }
     this.assertParity();
     return this;
+  }
+
+  /**
+   * Compares the owner state with normalized graph IR. This is the replacement
+   * for GraphBinding deriving its truth from Track.observedEdges.
+   */
+  assertGraphParity(graph) {
+    if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
+    const expected = new Set((graph?.edges ?? []).map((edge) => this.#key(edge)));
+    const actual = new Set();
+    for (const track of this.#tracks.values()) {
+      for (const edge of this.#state.getEdges(track.id)) {
+        actual.add(this.#key({
+          source: edge.source.id,
+          target: track.id,
+          role: edge.role,
+          input: edge.input,
+        }));
+      }
+    }
+    if (actual.size !== expected.size || [...actual].some((key) => !expected.has(key))) {
+      throw new Error("ObservationState is out of parity with normalized graph IR.");
+    }
+    return true;
+  }
+
+  /** State-only edge snapshots for transaction rollback and inspection. */
+  getEdges(targetId) {
+    if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
+    return this.#state.getEdges(targetId);
   }
 
   assertParity() {
