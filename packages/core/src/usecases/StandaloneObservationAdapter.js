@@ -14,6 +14,7 @@ export class StandaloneObservationAdapter {
   #keys = new WeakMap();
   #tracks = new Map();
   #lifecycleUnsubscribers = new Map();
+  #publicContexts = new WeakMap();
   #nextIdentity = 0;
   #destroyed = false;
 
@@ -193,6 +194,7 @@ export class StandaloneObservationAdapter {
   #internalContext(ctx) {
     if (!ctx) return new Map();
     const internal = new Map();
+    this.#publicContexts.set(internal, ctx);
     for (const [publicId, patch] of ctx) {
       const track = this.#findTrack(publicId);
       if (track) internal.set(this.#keys.get(track), patch);
@@ -204,11 +206,7 @@ export class StandaloneObservationAdapter {
     if (typeof source.compose !== "function") {
       return this.#owner.compose(source, undefined, ctx);
     }
-    const publicContext = new Map();
-    for (const [key, patch] of ctx) {
-      const track = this.#owner.getTrack(key);
-      if (track) publicContext.set(track.id, patch);
-    }
+    const publicContext = this.#publicContexts.get(ctx) ?? new Map();
     return source.compose(undefined, publicContext);
   }
 
