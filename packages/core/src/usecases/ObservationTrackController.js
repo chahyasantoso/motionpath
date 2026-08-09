@@ -20,9 +20,9 @@ export class ObservationTrackController {
   replaceObserved(observer, oldSource, newSource, mapFn, opts = {}) {
     this.#register(observer); this.#register(newSource);
     const oldId = this.#id(oldSource); const targetId = this.#id(observer); const newId = this.#id(newSource);
-    const oldEdges = this.#state.getEdges(targetId).filter((edge) => edge.source === oldId && (opts.role === undefined || edge.role === opts.role));
+    const oldEdges = this.#state.getEdges(targetId).filter((edge) => this.#id(edge.source) === oldId && (opts.role === undefined || edge.role === opts.role));
     if (!oldEdges.length) {
-      const current = this.#state.getEdges(targetId).filter((edge) => edge.source === newId && (opts.role === undefined || edge.role === opts.role));
+      const current = this.#state.getEdges(targetId).filter((edge) => this.#id(edge.source) === newId && (opts.role === undefined || edge.role === opts.role));
       for (const edge of current) {
         observer._emitObservationLifecycle?.({ type: "edge-removed", track: observer, source: oldSource, edge: { source: oldSource.id, target: observer.id, role: edge.role, input: edge.input } });
         observer._emitObservationLifecycle?.({ type: "edge-added", track: observer, source: newSource, edge: { source: newSource.id, target: observer.id, role: edge.role, input: edge.input } });
