@@ -5,9 +5,9 @@ import { patchesEqual, trackComposeLeaf } from "./composeContext.js";
  * ObservationState owner used while live Track mutation is being extracted.
  *
  * The bridge may hydrate once from legacy Track edges for compatibility. After
- * construction, callers should compare the normalized graph to `state`, not
- * read Track edge projections again. That makes state the authoritative writer
- * and keeps Track as a temporary compatibility reader only.
+ * construction, every check is state-only: Track projections are never read to
+ * decide whether the owner is correct. This makes ObservationState the
+ * authoritative writer and keeps Track as a temporary compatibility reader.
  */
 export class ObservationStateBridge {
   #tracks;
@@ -24,16 +24,18 @@ export class ObservationStateBridge {
         }
       }
     } else {
-      this.syncFromTracks();
+      this.#hydrateFromTracks();
     }
   }
 
   get state() { return this.#state; }
   get tracks() { return new Map(this.#tracks); }
 
-  /** Legacy one-way hydration seam for callers that still construct live Tracks. */
-  syncFromTracks() {
-    if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
+  /**
+   * Construction-only compatibility hydration. Do not call this after the
+   * bridge has been created: later mutations belong to ObservationState.
+   */
+  #hydrateFromTracks() {
     for (const track of this.#tracks.values()) {
       for (const edge of track.observedEdges ?? []) {
         if (!this.#tracks.has(edge.source.id)) continue;
@@ -46,8 +48,6 @@ export class ObservationStateBridge {
         });
       }
     }
-    this.assertParity();
-    return this;
   }
 
   /** Compare owner state with normalized graph IR, without reading Track edges. */
@@ -71,29 +71,18 @@ export class ObservationStateBridge {
     return true;
   }
 
-  getEdges(targetId) {
-    if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
-    return this.#state.getEdges(targetId);
-  }
-
+  /**
+   * State integrity check. This intentionally does not inspect Track readers.
+   * `assertGraphParity(graph)` is the graph-level contract used by GraphBinding.
+   */
   assertParity() {
     if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
-    const live = [];
-    const shadow = [];
     for (const track of this.#tracks.values()) {
-      for (const edge of track.observedEdges ?? []) {
-        if (this.#tracks.has(edge.source.id)) {
-          live.push(this.#key({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input }));
+      for (const edge of this.#state.getEdges(track.id)) {
+        if (!edge.source || !this.#tracks.has(edge.source.id)) {
+          throw new Error("ObservationState contains an edge for an unknown source.");
         }
       }
-      for (const edge of this.#state.getEdges(track.id)) {
-        shadow.push(this.#key({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input }));
-      }
-    }
-    live.sort();
-    shadow.sort();
-    if (live.length !== shadow.length || live.some((key, index) => key !== shadow[index])) {
-      throw new Error("ObservationState is out of parity with live Track wiring.");
     }
     return true;
   }
@@ -102,7 +91,7 @@ export class ObservationStateBridge {
   assertCompositionParity() {
     if (this.#destroyed) throw new Error("ObservationStateBridge is destroyed.");
     for (const track of this.#tracks.values()) {
-      if (track.isDestroyed || typeof track.composeLocal !== "function" || typeof track.compose !== "function") continue;
+      if (track.isDestroyed || typeof track.composeLocal !== "function") continue;
       const live = track.compose();
       const shadow = this.#state.compose(track.id, undefined, new Map(), trackComposeLeaf);
       if (!patchesEqual(live, shadow)) {
