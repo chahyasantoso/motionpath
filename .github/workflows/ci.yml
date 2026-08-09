@@ -90,6 +90,19 @@ jobs:
       - run: npm ci
       - run: npm run pack:check
 
+  pass2-boundary:
+    name: v5 pass-2 boundary scan (node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run boundary:v5:pass2
+
   rig-benchmark:
     name: rig graph benchmark (node 24)
     runs-on: ubuntu-latest
