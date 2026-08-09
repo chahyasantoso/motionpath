@@ -1,16 +1,7 @@
 import { StandaloneObservationAdapter } from "../usecases/StandaloneObservationAdapter.js";
 import { ScopedObservationAdapter } from "../usecases/ScopedObservationAdapter.js";
 
-/**
- * Project-scoped ownership and staged visibility boundary.
- *
- * A candidate is invisible until commitCandidate succeeds. Membership and the
- * graph runtime are owned by the committed project, never by individual Motion
- * instances. Cross-motion and free-track behavior are explicit capabilities.
- *
- * Standalone observation uses one adapter per ProjectRuntime. The scoped adapter
- * is opt-in for migration verification only; compatibility remains the default.
- */
+/** Project-scoped ownership and staged visibility boundary. */
 export class ProjectRuntime {
   #active = null; #candidate = null; #instances = new Map(); #instanceMetadata = new Map(); #graphRuntime = null; #capabilities; #diagnostics = []; #disposed = false; #standaloneObservationAdapter; #observationOwnership;
   constructor({ capabilities = {}, observationOwnership = "compatibility" } = {}) {
@@ -28,7 +19,7 @@ export class ProjectRuntime {
   recordDiagnostic(code, details = {}) { const diagnostic = Object.freeze({ code, ...details }); this.#diagnostics.push(diagnostic); return diagnostic; }
   beginCandidate(project) { this.#assertAlive(); if (!project || typeof project !== "object") throw new TypeError("ProjectRuntime candidate must be an object."); if (this.#candidate) throw new Error("ProjectRuntime already has a candidate project."); const candidate = { project, instances: new Map(), metadata: new Map(), membership: new Map(), pending: new Map(), references: new Map(), resources: new Set() }; this.#candidate = candidate; return candidate; }
   registerCandidate(candidate, id, value, metadata = {}) { this.#assertCandidate(candidate); if (typeof id !== "string" || id.length === 0) throw new TypeError("ProjectRuntime candidate id must be a non-empty string."); if (candidate.membership.has(id)) throw new Error(`ProjectRuntime candidate already registers '${id}'.`); candidate.membership.set(id, { value, metadata: { ...metadata } }); candidate.pending.delete(id); if (value && typeof value.destroy === "function") candidate.resources.add(value); return value; }
-  registerPendingReference(candidate, id, metadata = {}) { this.#assertCandidate(candidate); if (typeof id !== "string" || id.length === 0) throw new TypeError("ProjectRuntime pending reference id must be a non-empty string."); if (candidate.membership.has(id)) throw new Error(`ProjectRuntime reference '${id}' is already resolved."); candidate.pending.set(id, { ...metadata, id, status: "pending" }); return candidate.pending.get(id); }
+  registerPendingReference(candidate, id, metadata = {}) { this.#assertCandidate(candidate); if (typeof id !== "string" || id.length === 0) throw new TypeError("ProjectRuntime pending reference id must be a non-empty string."); if (candidate.membership.has(id)) throw new Error(`ProjectRuntime reference '${id}' is already resolved.`); candidate.pending.set(id, { ...metadata, id, status: "pending" }); return candidate.pending.get(id); }
   registerReference(id, { sourceId, targetId, role = "output", input } = {}) { this.#assertAlive(); this.assertCapability("crossMotion"); this.#validateReference({ id, sourceId, targetId, role, input }); if (!this.#active) throw new Error("ProjectRuntime has no committed project."); if (this.#active.references.has(id)) throw new Error(`ProjectRuntime reference '${id}' already exists.`); const status = this.#instances.has(sourceId) ? "ready" : "pending"; const reference = Object.freeze({ id, sourceId, targetId, role, input, status }); this.#active.references.set(id, reference); if (status === "pending") this.#active.pending.set(id, { id, source: sourceId, target: targetId, role, input, status }); return reference; }
   #validateReference({ id, sourceId, targetId, role, input }) { for (const [name, value] of [["id", id], ["sourceId", sourceId], ["targetId", targetId]]) if (typeof value !== "string" || value.length === 0) throw new TypeError(`Reference ${name} must be a non-empty string.`); if (id.includes("/") || id.startsWith("~/")) throw new TypeError(`Reference id '${id}' must be local and cannot contain a qualified namespace.`); if (sourceId === targetId) throw new Error(`Reference '${id}' cannot observe itself.`); if (!["input", "output"].includes(role)) throw new TypeError(`Reference '${id}' role must be 'input' or 'output'.`); if (role === "input" && (typeof input !== "string" || input.length === 0)) throw new TypeError(`Reference '${id}' input role requires a non-empty input.`); if (role === "output" && input !== undefined) throw new TypeError(`Reference '${id}' output role cannot define input.`); }
   removeReference(id, { diagnostic = true } = {}) { this.#assertAlive(); if (!this.#active?.references.has(id)) return false; const reference = this.#active.references.get(id); this.#active.references.delete(id); this.#active.pending.delete(id); if (diagnostic) this.recordDiagnostic("REFERENCE_REMOVED", { referenceId: id, sourceId: reference.sourceId, targetId: reference.targetId }); return true; }
