@@ -6,7 +6,10 @@ const globalKeys = new WeakMap();
 const globalRefs = new Map();
 const publicContexts = new WeakMap();
 const internalContexts = new WeakSet();
-const sharedOwner = new TrackObservationOwner({ validateCycles: false, composeSource: (source, ctx) => (typeof source.compose === "function" ? source.compose(undefined, ctx) : sharedOwner.compose(globalKeys.get(source), undefined, ctx)) });
+const sharedOwner = new TrackObservationOwner({
+  validateCycles: false,
+  composeSource: (source, ctx) => (typeof source.compose === "function" ? source.compose(undefined, ctx) : sharedOwner.compose(globalKeys.get(source), undefined, ctx)),
+});
 
 /** Standalone observation ownership with private identity keys and public Track ids. */
 export class StandaloneObservationAdapter {
@@ -17,7 +20,7 @@ export class StandaloneObservationAdapter {
   register(track) { this.#assertAlive(); if (!track?.id) throw new TypeError("StandaloneObservationAdapter requires a track with an id."); const existingKey = globalKeys.get(track); if (existingKey) { this.#keys.set(track, existingKey); this.#tracks.set(existingKey, track); globalRefs.set(existingKey, (globalRefs.get(existingKey) ?? 0) + 1); this.#watchTrack(track); return track; } const key = `${track.id}#${++nextIdentity}`; this.#keys.set(track, key); globalKeys.set(track, key); this.#tracks.set(key, track); globalTracks.set(key, track); globalRefs.set(key, 1); this.#owner.register(track, key); this.#watchTrack(track); return track; }
   unregister(trackOrId) { if (this.#destroyed) return; this.#unregister(trackOrId); }
   getEdges(targetOrTrack) { const track = this.#resolveTrack(targetOrTrack); if (!track) return []; const target = this.#keys.get(track); return this.#owner.getEdges(target).map((edge) => ({ ...edge, source: edge.source, target: track.id })); }
-  getSources(targetOrTrack) { return this.getEdges(targetOrTrack).map(({ source }) => source.id).filter((id, index, ids) => ids.indexOf(id) === index); }
+  getSources(targetOrTrack) { const seen = new Set(); return this.getEdges(targetOrTrack).map(({ source }) => source).filter((source) => { if (seen.has(source)) return false; seen.add(source); return true; }); }
   getObserverIds(sourceOrTrack) { const source = this.#resolveTrack(sourceOrTrack); if (!source) return []; return this.#owner.getObserverIds(this.#keys.get(source)).map((key) => globalTracks.get(key)?.id).filter(Boolean); }
   keyFor(track) { this.#assertAlive(); this.register(track); return this.#keys.get(track); }
   clearObserved(observer) { if (this.#destroyed || !observer?.id) return; const target = this.#keys.get(observer); if (!target) return; for (const edge of this.#owner.getEdges(target)) this.#owner.removeEdge({ source: edge.source.id, target, role: edge.role, input: edge.input }); }
