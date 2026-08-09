@@ -4,6 +4,31 @@ import { toImmutableList } from "../contract/immutableValue.js";
 import { ObservationStateBridge } from "./ObservationStateBridge.js";
 import { trackComposeLeaf } from "./composeContext.js";
 
+/**
+ * Transactional bridge between the normalized graph IR, the publisher and the
+ * live Tracks.
+ *
+ * ## The rollback contract
+ *
+ * Every mutator writes in a fixed order: ObservationState first, then the live
+ * Track, then the publisher via #commit. #commit rebuilds the observation bridge
+ * FROM ObservationState, so ObservationState is the thing a rollback has to put
+ * back. A rollback that only restores the Track wiring is not a rollback: the
+ * rebuild immediately re-derives the post-mutation edge set from the state that
+ * was never unwound.
+ *
+ * That failure mode is invisible to edge-key parity, because every parity check
+ * in the suite reads keys off the Track. It shows up only in composition, as an
+ * edge that reappears and then contributes nothing, so:
+ *
+ * - the before-snapshots below come from ObservationState, which owns mapFn
+ * - unwire restores state before Track, mirroring the wire order
+ * - #restoreEdge is the only way an edge goes back, so mapFn cannot be dropped
+ *
+ * Still open, deliberately: #commit rebuilds the whole bridge on every mutation
+ * (F-10) and #assertTrackGraphMatches still derives live edges from Track, which
+ * is its job as the parity check but is also F-01.
+ */
 export class GraphBinding {
   #tracks; #publisher; #graph; #ownsPublisher; #observationBridge; #unsubscribers = []; #destroyed = false;
   constructor({ graph, tracks = new Map(), publisher, ownsPublisher = true, initialEdges = [] } = {}) {
@@ -11,13 +36,143 @@ export class GraphBinding {
     this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks); this.#publisher = publisher; this.#ownsPublisher = ownsPublisher !== false; this.#graph = this.#freeze(graph); this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks }); this.#bindObservationComposition(); if (initialEdges.length) this.#wireInitialEdges(initialEdges); this.#assertTrackGraphMatches(); this.#syncPublisher(); this.#subscribe();
   }
   get graph() { return this.#graph; } get tracks() { return new Map(this.#tracks); } getTrack(id) { return this.#tracks.get(id) ?? null; } get publisher() { return this.#publisher; } get observationState() { return this.#observationBridge?.state ?? null; } get isDestroyed() { return this.#destroyed; }
-  replaceEdge(oldEdge, newEdge) { this.#assertAlive(); const observer = this.#tracks.get(oldEdge.target ?? newEdge.target); const oldSource = this.#tracks.get(oldEdge.source); const newSource = this.#tracks.get(newEdge.source); if (!observer || !oldSource || !newSource) throw new Error("replaceEdge references an unknown track."); const candidate = this.#candidateGraph((edges) => [...edges.filter((edge) => !observationEdgeEquals(edge, { ...oldEdge, target: observer.id })), this.#normalizeEdge({ ...newEdge, target: observer.id })]); const role = newEdge.role ?? oldEdge.role; const input = role === "input" ? newEdge.input ?? newEdge.target : undefined; const replaced = observer.observedEdges.filter((edge) => edge.source === oldSource && (oldEdge.role === undefined || edge.role === oldEdge.role)); this.#transaction(() => this.#changeObservation(() => this.#observationBridge.state.replaceEdge({ source: oldSource.id, target: observer.id, role: oldEdge.role }, { source: newSource.id, target: observer.id, role, input, mapFn: newEdge.mapFn }), () => observer.replaceObserved(oldSource, newSource, newEdge.mapFn, { role, target: input })), () => { const [original] = replaced; if (original) observer.replaceObserved(newSource, oldSource, original.mapFn, { role: original.role, target: original.input }); this.#refreshObservationBridge(); }, candidate); }
-  addEdge(edge) { this.#assertAlive(); const observer = this.#tracks.get(edge.target); const source = this.#tracks.get(edge.source); if (!observer || !source) throw new Error("addEdge references an unknown track."); const candidate = this.#candidateGraph((edges) => [...edges, this.#normalizeEdge(edge)]); const role = edge.role ?? "output"; const input = role === "input" ? edge.input ?? edge.target : undefined; const previous = observer.observedEdges.find((existing) => existing.source === source && existing.role === role && existing.input === input); this.#transaction(() => this.#changeObservation(() => this.#observationBridge.state.addEdge({ source: source.id, target: observer.id, role, input, mapFn: edge.mapFn ?? null }), () => observer.setObserved(source, edge.mapFn ?? null, { role, target: input })), () => { if (previous) observer.setObserved(source, previous.mapFn, { role, target: input }); else observer.removeObserved(source, { role, target: input }); this.#refreshObservationBridge(); }, candidate); }
-  removeEdge(edge) { this.#assertAlive(); const observer = this.#tracks.get(edge.target); const source = this.#tracks.get(edge.source); if (!observer || !source) return; const candidate = this.#candidateGraph((edges) => edges.filter((existing) => !observationEdgeEquals(existing, this.#normalizeEdge(edge)))); const removed = observer.observedEdges.filter((existing) => existing.source === source && (edge.role === undefined || existing.role === edge.role) && (edge.role !== "input" || edge.input === undefined || existing.input === edge.input)); this.#transaction(() => this.#changeObservation(() => this.#observationBridge.state.removeEdge({ source: source.id, target: observer.id, role: edge.role, input: edge.input }), () => observer.removeObserved(source, { role: edge.role, target: edge.input })), () => { for (const original of removed) observer.setObserved(source, original.mapFn, { role: original.role, target: original.input }); this.#refreshObservationBridge(); }, candidate); }
+  replaceEdge(oldEdge, newEdge) {
+    this.#assertAlive();
+    const observer = this.#tracks.get(oldEdge.target ?? newEdge.target);
+    const oldSource = this.#tracks.get(oldEdge.source);
+    const newSource = this.#tracks.get(newEdge.source);
+    if (!observer || !oldSource || !newSource) throw new Error("replaceEdge references an unknown track.");
+    const candidate = this.#candidateGraph((edges) => [
+      ...edges.filter((edge) => !observationEdgeEquals(edge, { ...oldEdge, target: observer.id })),
+      this.#normalizeEdge({ ...newEdge, target: observer.id }),
+    ]);
+    const role = newEdge.role ?? oldEdge.role;
+    const input = role === "input" ? newEdge.input ?? newEdge.target : undefined;
+    const replaced = this.#edgeSnapshots(observer, oldSource, { role: oldEdge.role });
+    this.#transaction(
+      () => this.#changeObservation(
+        () => this.#observationBridge.state.replaceEdge(
+          { source: oldSource.id, target: observer.id, role: oldEdge.role },
+          { source: newSource.id, target: observer.id, role, input, mapFn: newEdge.mapFn },
+        ),
+        () => observer.replaceObserved(oldSource, newSource, newEdge.mapFn, { role, target: input }),
+      ),
+      () => {
+        const [original] = replaced;
+        if (!original) return;
+        // Drop the candidate edge from the state before restoring the original,
+        // otherwise the rebuild in #commit sees both.
+        this.#observationBridge?.state.removeEdge({ source: newSource.id, target: observer.id, role, input });
+        this.#observationBridge?.state.addEdge({
+          source: oldSource.id,
+          target: observer.id,
+          role: original.role,
+          input: original.input,
+          mapFn: original.mapFn,
+        });
+        observer.replaceObserved(newSource, oldSource, original.mapFn, { role: original.role, target: original.input });
+      },
+      candidate,
+    );
+  }
+  addEdge(edge) {
+    this.#assertAlive();
+    const observer = this.#tracks.get(edge.target);
+    const source = this.#tracks.get(edge.source);
+    if (!observer || !source) throw new Error("addEdge references an unknown track.");
+    const candidate = this.#candidateGraph((edges) => [...edges, this.#normalizeEdge(edge)]);
+    const role = edge.role ?? "output";
+    const input = role === "input" ? edge.input ?? edge.target : undefined;
+    // An add over an existing edge is a mapFn swap, so the rollback has to know
+    // whether it is removing an edge or restoring the one it overwrote.
+    const [previous] = this.#edgeSnapshots(observer, source, { role, input });
+    this.#transaction(
+      () => this.#changeObservation(
+        () => this.#observationBridge.state.addEdge({ source: source.id, target: observer.id, role, input, mapFn: edge.mapFn ?? null }),
+        () => observer.setObserved(source, edge.mapFn ?? null, { role, target: input }),
+      ),
+      () => {
+        if (previous) this.#restoreEdge(observer, source, previous);
+        else this.#detachEdge(observer, source, { role, input });
+      },
+      candidate,
+    );
+  }
+  removeEdge(edge) {
+    this.#assertAlive();
+    const observer = this.#tracks.get(edge.target);
+    const source = this.#tracks.get(edge.source);
+    if (!observer || !source) return;
+    const candidate = this.#candidateGraph((edges) => edges.filter((existing) => !observationEdgeEquals(existing, this.#normalizeEdge(edge))));
+    // One call can drop several edges when role or input is left open, so the
+    // snapshot is a list and every entry has to come back with its own mapFn.
+    const removed = this.#edgeSnapshots(observer, source, { role: edge.role, input: edge.input });
+    this.#transaction(
+      () => this.#changeObservation(
+        () => this.#observationBridge.state.removeEdge({ source: source.id, target: observer.id, role: edge.role, input: edge.input }),
+        () => observer.removeObserved(source, { role: edge.role, target: edge.input }),
+      ),
+      () => { for (const original of removed) this.#restoreEdge(observer, source, original); },
+      candidate,
+    );
+  }
   addTrack(track, observesOrOptions = []) { this.#assertAlive(); const observes = Array.isArray(observesOrOptions) ? observesOrOptions : observesOrOptions.observes ?? []; if (!track?.id) throw new TypeError("GraphBinding.addTrack requires a Track with an id."); if (this.#tracks.has(track.id)) throw new Error(`Duplicate track id '${track.id}'.`); const candidate = this.#candidateGraph((edges) => [...edges, ...observes.map((edge) => this.#normalizeEdge({ ...edge, target: track.id }))], (nodes) => [...nodes, { id: track.id }]); const resolved = observes.map((edge) => { const source = this.#tracks.get(edge.source); if (!source) throw new Error(`Unknown source track '${edge.source}'.`); const role = edge.role ?? "output"; return { source, role, input: role === "input" ? edge.input ?? edge.target : undefined, mapFn: edge.mapFn ?? null }; }); const previousGraph = this.#graph; const undo = []; this.#tracks.set(track.id, track); this.#observationBridge.state.register(track); try { for (const { source, role, input, mapFn } of resolved) { const rollback = () => { this.#observationBridge.state.removeEdge({ source: source.id, target: track.id, role, input }); track.removeObserved(source, { role, target: input }); }; undo.push(rollback); this.#observationBridge.state.addEdge({ source: source.id, target: track.id, role, input, mapFn }); track.setObserved(source, mapFn, { role, target: input }); } this.#commit(candidate); this.#subscribeTrack(track); } catch (error) { this.#unwind(undo); this.#observationBridge.state.unregister(track.id, { detach: false }); this.#tracks.delete(track.id); this.#graph = previousGraph; this.#refreshObservationBridge(); throw error; } }
   removeTrack(id, { destroy = true } = {}) { if (this.#destroyed || !this.#tracks.has(id)) return; const track = this.#tracks.get(id); const candidate = this.#candidateGraph((edges) => edges.filter((edge) => edge.source !== id && edge.target !== id), (nodes) => nodes.filter((node) => node.id !== id)); this.#tracks.delete(id); this.#observationBridge.state.unregister(id); if (destroy && !track.isDestroyed) track.destroy?.(); this.#commit(candidate); }
   destroy() { if (this.#destroyed) return; this.#destroyed = true; for (const unsubscribe of this.#unsubscribers) unsubscribe(); this.#unsubscribers = []; this.#unbindObservationComposition(); this.#tracks = new Map(); this.#observationBridge?.destroy(); this.#observationBridge = null; const publisher = this.#publisher; this.#publisher = null; if (this.#ownsPublisher) publisher?.destroy?.(); }
-  #wireInitialEdges(edges) { const undo = []; try { for (const edge of edges) { const observer = this.#tracks.get(edge.target); const source = this.#tracks.get(edge.source); if (!observer || !source) throw new Error("GraphBinding initial edge references an unknown track."); const role = edge.role ?? "output"; const input = role === "input" ? edge.input ?? edge.target : undefined; this.#observationBridge.state.addEdge({ source: source.id, target: observer.id, role, input, mapFn: edge.mapFn ?? null }); observer.setObserved(source, edge.mapFn ?? null, { role, target: input }); undo.push(() => observer.removeObserved(source, { role, target: input })); } this.#observationBridge.assertParity(); } catch (error) { for (const rollback of undo.reverse()) rollback(); this.#refreshObservationBridge(); throw error; } }
+  /**
+   * Before-snapshots come from ObservationState, not from Track.observedEdges.
+   *
+   * Two reasons. The state is the writer, so it is the copy a rollback has to
+   * restore, and it is the copy that carries mapFn through a bridge rebuild.
+   * And Track.observedEdges routes through the standalone adapter, which is both
+   * the surface P2-03 is deleting (F-01) and a measurably expensive read (F-09).
+   *
+   * The filter mirrors Track.removeObserved: an omitted role or input means
+   * "any", so one call can legitimately match several edges.
+   */
+  #edgeSnapshots(observer, source, { role, input } = {}) {
+    return this.#observationBridge.state.getEdges(observer.id).filter((existing) => existing.source === source
+      && (role === undefined || existing.role === role)
+      && (role !== "input" || input === undefined || existing.input === input));
+  }
+  /** Put an edge back exactly as it was, mapFn included, state before Track. */
+  #restoreEdge(observer, source, snapshot) {
+    this.#observationBridge?.state.addEdge({
+      source: source.id,
+      target: observer.id,
+      role: snapshot.role,
+      input: snapshot.input,
+      mapFn: snapshot.mapFn,
+    });
+    observer.setObserved(source, snapshot.mapFn, { role: snapshot.role, target: snapshot.input });
+  }
+  /** Unwind an edge that never committed. Both sides, state before Track. */
+  #detachEdge(observer, source, { role, input }) {
+    this.#observationBridge?.state.removeEdge({ source: source.id, target: observer.id, role, input });
+    observer.removeObserved(source, { role, target: input });
+  }
+  #wireInitialEdges(edges) {
+    const undo = [];
+    try {
+      for (const edge of edges) {
+        const observer = this.#tracks.get(edge.target);
+        const source = this.#tracks.get(edge.source);
+        if (!observer || !source) throw new Error("GraphBinding initial edge references an unknown track.");
+        const role = edge.role ?? "output";
+        const input = role === "input" ? edge.input ?? edge.target : undefined;
+        this.#observationBridge.state.addEdge({ source: source.id, target: observer.id, role, input, mapFn: edge.mapFn ?? null });
+        observer.setObserved(source, edge.mapFn ?? null, { role, target: input });
+        // Both sides, or the failed construction leaves edges in the state that
+        // no Track and no IR agrees with.
+        undo.push(() => this.#detachEdge(observer, source, { role, input }));
+      }
+      this.#observationBridge.assertParity();
+    } catch (error) {
+      for (const rollback of undo.reverse()) rollback();
+      this.#refreshObservationBridge();
+      throw error;
+    }
+  }
   #changeObservation(change, compatibility) { try { change(); compatibility(); } catch (error) { this.#refreshObservationBridge(); throw error; } }
   #transaction(wire, unwire, candidate) { const previousGraph = this.#graph; try { wire(); this.#commit(candidate); } catch (error) { this.#unwind([unwire]); this.#graph = previousGraph; this.#refreshObservationBridge(); throw error; } }
   #unwind(steps) { for (const step of [...steps].reverse()) { try { step(); } catch {} } }
