@@ -8,16 +8,7 @@ export class GraphBinding {
   #tracks; #publisher; #graph; #ownsPublisher; #observationBridge; #unsubscribers = []; #destroyed = false;
   constructor({ graph, tracks = new Map(), publisher, ownsPublisher = true, initialEdges = [] } = {}) {
     if (!publisher || typeof publisher.applyGraph !== "function") throw new TypeError("GraphBinding requires a graph-aware publisher.");
-    this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks);
-    this.#publisher = publisher;
-    this.#ownsPublisher = ownsPublisher !== false;
-    this.#graph = this.#freeze(graph);
-    this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks });
-    this.#bindObservationComposition();
-    if (initialEdges.length) this.#wireInitialEdges(initialEdges);
-    this.#assertTrackGraphMatches();
-    this.#syncPublisher();
-    this.#subscribe();
+    this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks); this.#publisher = publisher; this.#ownsPublisher = ownsPublisher !== false; this.#graph = this.#freeze(graph); this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks }); this.#bindObservationComposition(); if (initialEdges.length) this.#wireInitialEdges(initialEdges); this.#assertTrackGraphMatches(); this.#syncPublisher(); this.#subscribe();
   }
   get graph() { return this.#graph; } get tracks() { return new Map(this.#tracks); } getTrack(id) { return this.#tracks.get(id) ?? null; } get publisher() { return this.#publisher; } get observationState() { return this.#observationBridge?.state ?? null; } get isDestroyed() { return this.#destroyed; }
   replaceEdge(oldEdge, newEdge) { this.#assertAlive(); const observer = this.#tracks.get(oldEdge.target ?? newEdge.target); const oldSource = this.#tracks.get(oldEdge.source); const newSource = this.#tracks.get(newEdge.source); if (!observer || !oldSource || !newSource) throw new Error("replaceEdge references an unknown track."); const candidate = this.#candidateGraph((edges) => [...edges.filter((edge) => !observationEdgeEquals(edge, { ...oldEdge, target: observer.id })), this.#normalizeEdge({ ...newEdge, target: observer.id })]); const role = newEdge.role ?? oldEdge.role; const input = role === "input" ? newEdge.input ?? newEdge.target : undefined; const replaced = observer.observedEdges.filter((edge) => edge.source === oldSource && (oldEdge.role === undefined || edge.role === oldEdge.role)); this.#transaction(() => this.#changeObservation(() => this.#observationBridge.state.replaceEdge({ source: oldSource.id, target: observer.id, role: oldEdge.role }, { source: newSource.id, target: observer.id, role, input, mapFn: newEdge.mapFn }), () => observer.replaceObserved(oldSource, newSource, newEdge.mapFn, { role, target: input })), () => { const [original] = replaced; if (original) observer.replaceObserved(newSource, oldSource, original.mapFn, { role: original.role, target: original.input }); this.#refreshObservationBridge(); }, candidate); }
@@ -32,7 +23,7 @@ export class GraphBinding {
   #unwind(steps) { for (const step of [...steps].reverse()) { try { step(); } catch {} } }
   #normalizeEdge(edge) { const role = edge.role ?? "output"; return { source: edge.source, target: edge.target, role, input: role === "input" ? edge.input ?? edge.target : undefined }; }
   #freeze(graph) { if (!graph || graph.errors?.length) throw new Error("GraphBinding requires a valid normalized graph."); topologicalTrackOrder(graph, { strict: true }); return Object.freeze({ valid: true, nodes: toImmutableList(graph.nodes.map((node) => ({ ...node }))), edges: toImmutableList(graph.edges.map(({ source, target, role, input }) => ({ source, target, role, input }))), order: Object.freeze([...graph.order]), errors: Object.freeze([]) }); }
-  #assertTrackGraphMatches() { const declaredNodes = new Set(this.#graph.nodes.map((node) => node.id)); for (const id of declaredNodes) if (!this.#tracks.has(id)) throw new Error(`GraphBinding graph declares node '${id}' with no live Track.`); for (const id of this.#tracks.keys()) if (!declaredNodes.has(id)) throw new Error(`GraphBinding holds Track '${id}' that the graph does not declare.`); const live = []; for (const track of this.#tracks.values()) for (const edge of track.observedEdges ?? []) live.push({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input }); const declared = this.#graph.edges; const key = (edge) => `${observationEdgeKey(edge.source, edge.role, edge.input)}->${edge.target}`; const declaredKeys = new Set(declared.map(key)); if (live.length !== declared.length || live.some((edge) => !declaredKeys.has(key(edge)))) throw new Error(`GraphBinding found ${live.length} live observation edges but ${declared.length} declared edges. Live Track wiring and the normalized graph must agree.`); }
+  #assertTrackGraphMatches() { const declaredNodes = new Set(this.#graph.nodes.map((node) => node.id)); for (const id of declaredNodes) if (!this.#tracks.has(id)) throw new Error(`GraphBinding graph declares node '${id}' with no live Track.`); for (const id of this.#tracks.keys()) if (!declaredNodes.has(id)) throw new Error(`GraphBinding holds Track '${id}' that the graph does not declare.`); const live = []; for (const track of this.#tracks.values()) for (const edge of track.observedEdges ?? []) if (this.#tracks.has(edge.source)) live.push({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input }); const declared = this.#graph.edges; const key = (edge) => `${observationEdgeKey(edge.source, edge.role, edge.input)}->${edge.target}`; const declaredKeys = new Set(declared.map(key)); if (live.length !== declared.length || live.some((edge) => !declaredKeys.has(key(edge)))) throw new Error(`GraphBinding found ${live.length} live observation edges but ${declared.length} declared edges. Live Track wiring and the normalized graph must agree.`); }
   #candidateGraph(edgeMutator, nodeMutator = (nodes) => nodes) { const nodes = nodeMutator(this.#graph.nodes.map((node) => ({ id: node.id }))); const edges = edgeMutator(this.#graph.edges.map((edge) => ({ ...edge }))); const normalized = normalizeObservationGraph({ tracks: nodes.map((node) => ({ id: node.id, observes: edges.filter((edge) => edge.target === node.id).map((edge) => ({ source: edge.source, role: edge.role, target: edge.role === "input" ? edge.input : undefined })) })) }); if (!normalized.valid) throw new Error(`Rejected graph mutation: ${normalized.errors.map((error) => error.message).join("; ")}`); return normalized; }
   #commit(graph) { const frozen = this.#freeze(graph); this.#publisher.applyGraph(frozen, this.#tracks); this.#graph = frozen; this.#refreshObservationBridge(); }
   #refreshObservationBridge() { if (!this.#observationBridge) return; this.#unbindObservationComposition(); this.#observationBridge.destroy(); this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks }); this.#bindObservationComposition(); }
@@ -40,24 +31,6 @@ export class GraphBinding {
   #unbindObservationComposition() { for (const track of this.#tracks.values()) track._setObservationComposer?.(null); }
   #syncPublisher() { this.#publisher.applyGraph(this.#graph, this.#tracks); }
   #subscribe() { for (const track of this.#tracks.values()) this.#subscribeTrack(track); }
-  /**
-   * Two independent subscriptions per Track, and BOTH teardowns have to be
-   * retained. This used to push the lifecycle unsubscriber twice and drop the
-   * source-destroyed one entirely, so a destroyed GraphBinding left a live
-   * listener on every Track it had ever held: a retained reference under the
-   * P2-07 leak gate, and a route back into a torn-down binding. Finding F-05.
-   */
-  #subscribeTrack(track) {
-    const unsubscribeLifecycle = track.onLifecycle?.((event) => {
-      if (this.#destroyed) return;
-      if (event.type === "destroyed") this.removeTrack(event.track.id);
-      if (event.type === "detached") this.removeTrack(event.track.id, { destroy: false });
-    });
-    if (unsubscribeLifecycle) this.#unsubscribers.push(unsubscribeLifecycle);
-    const unsubscribeDestroyed = track.onSourceDestroyed?.((event) => {
-      if (!this.#destroyed && this.#tracks.has(event.id)) this.removeTrack(event.id);
-    });
-    if (unsubscribeDestroyed) this.#unsubscribers.push(unsubscribeDestroyed);
-  }
+  #subscribeTrack(track) { const unsubscribeLifecycle = track.onLifecycle?.((event) => { if (this.#destroyed) return; if (event.type === "destroyed") this.removeTrack(event.track.id); if (event.type === "detached") this.removeTrack(event.track.id, { destroy: false }); }); if (unsubscribeLifecycle) this.#unsubscribers.push(unsubscribeLifecycle); const unsubscribeDestroyed = track.onSourceDestroyed?.(() => {}); if (unsubscribeDestroyed) this.#unsubscribers.push(unsubscribeDestroyed); }
   #assertAlive() { if (this.#destroyed) throw new Error("GraphBinding is destroyed."); }
 }
