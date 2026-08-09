@@ -1,18 +1,20 @@
 const SET = "setObserved";
 const REMOVE = "removeObserved";
 const SOURCES = "observedSources";
+const EDGES = "observedEdges";
+const COUNT = "observerCount";
+const IDS = "observerIds";
 
-/**
- * Transitional facade for v4 callers. The Track class no longer owns or declares
- * observation APIs; this adapter is installed only for legacy direct callers while
- * GraphBinding and ObservationState migrate to the owner-first surface.
- */
+/** Transitional v4 facade. The Track class no longer declares graph APIs. */
 export function installLegacyObservationFacade(track) {
   if (!track || track[SET]) return track;
   Object.defineProperties(track, {
     [SET]: { value(source, mapFn, options = {}) { if (!source) return track.getObservationOwner()?.clearObserved(track); return track.getObservationOwner()?.setObserved(track, source, mapFn, options); }, configurable: true },
     [REMOVE]: { value(source, options = {}) { return track.getObservationOwner()?.removeObserved(track, source, options); }, configurable: true },
     [SOURCES]: { get() { return track.getObservationOwner()?.getSources(track) ?? []; }, configurable: true },
+    [EDGES]: { get() { return (track.getObservationOwner()?.getEdges(track) ?? []).map((edge) => ({ ...edge, target: track.id })); }, configurable: true },
+    [COUNT]: { get() { return track[IDS].length; }, configurable: true },
+    [IDS]: { get() { return track.getObservationOwner()?.getObserverIds(track) ?? []; }, configurable: true },
   });
   return track;
 }
