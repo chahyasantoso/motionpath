@@ -4,11 +4,14 @@ let nextIdentity = 0;
 const globalTracks = new Map();
 const globalKeys = new WeakMap();
 const globalRefs = new Map();
+const tracksById = new Map();
 const publicContexts = new WeakMap();
 const internalContexts = new WeakSet();
 const sharedOwner = new TrackObservationOwner({
   validateCycles: false,
-  composeSource: (source, ctx) => (typeof source.compose === "function" ? source.compose(undefined, ctx) : sharedOwner.compose(globalKeys.get(source), undefined, ctx)),
+  composeSource: (source, ctx) => (typeof source.compose === "function"
+    ? source.compose(undefined, ctx)
+    : sharedOwner.compose(globalKeys.get(source), undefined, ctx)),
 });
 
 /** Standalone observation ownership with private identity keys and public Track ids. */
@@ -38,7 +41,9 @@ export class StandaloneObservationAdapter {
 
   register(track) {
     this.#assertAlive();
-    if (!track?.id) throw new TypeError("StandaloneObservationAdapter requires a track with an id.");
+    if (!track?.id) {
+      throw new TypeError("StandaloneObservationAdapter requires a track with an id.");
+    }
     const existingKey = globalKeys.get(track);
     if (existingKey) {
       this.#keys.set(track, existingKey);
@@ -52,6 +57,9 @@ export class StandaloneObservationAdapter {
     globalKeys.set(track, key);
     this.#tracks.set(key, track);
     globalTracks.set(key, track);
+    const sameId = tracksById.get(track.id) ?? new Set();
+    sameId.add(track);
+    tracksById.set(track.id, sameId);
     globalRefs.set(key, 1);
     this.#owner.register(track, key);
     this.#watchTrack(track);
@@ -76,20 +84,28 @@ export class StandaloneObservationAdapter {
 
   getSources(targetOrTrack) {
     const seen = new Set();
-    return this.getEdges(targetOrTrack).map(({ source }) => source).filter((source) => {
-      if (seen.has(source)) return false;
-      seen.add(source);
-      return true;
-    });
+    return this.getEdges(targetOrTrack)
+      .map(({ source }) => source)
+      .filter((source) => {
+        if (seen.has(source)) return false;
+        seen.add(source);
+        return true;
+      });
   }
 
   getObserverIds(sourceOrTrack) {
     const source = this.#resolveTrack(sourceOrTrack);
     if (!source) return [];
-    return this.#owner.getObserverIds(this.#keys.get(source)).map((key) => this.#owner.tracks.get(key)?.id).filter(Boolean);
+    return this.#owner.getObserverIds(this.#keys.get(source))
+      .map((key) => this.#owner.tracks.get(key)?.id)
+      .filter(Boolean);
   }
 
-  keyFor(track) { this.#assertAlive(); this.register(track); return this.#keys.get(track); }
+  keyFor(track) {
+    this.#assertAlive();
+    this.register(track);
+    return this.#keys.get(track);
+  }
 
   clearObserved(observer) {
     if (this.#destroyed || !observer?.id) return;
@@ -104,19 +120,43 @@ export class StandaloneObservationAdapter {
     this.#assertAlive();
     this.register(observer);
     this.register(source);
-    return this.#owner.addEdge({ source: this.#keys.get(source), target: this.#keys.get(observer), role, input: role === "input" ? (target ?? observer.id) : undefined, mapFn: mapFn ?? null });
+    return this.#owner.addEdge({
+      source: this.#keys.get(source),
+      target: this.#keys.get(observer),
+      role,
+      input: role === "input" ? (target ?? observer.id) : undefined,
+      mapFn: mapFn ?? null,
+    });
   }
 
   removeObserved(observer, source, { role, target } = {}) {
     if (this.#destroyed || !observer?.id || !source?.id) return;
-    this.#owner.removeEdge({ source: this.#keys.get(source), target: this.#keys.get(observer), role, input: target });
+    this.#owner.removeEdge({
+      source: this.#keys.get(source),
+      target: this.#keys.get(observer),
+      role,
+      input: target,
+    });
   }
 
   replaceObserved(observer, oldSource, newSource, mapFn, opts = {}) {
     this.#assertAlive();
     this.register(observer);
     this.register(newSource);
-    return this.#owner.replaceEdge({ source: this.#keys.get(oldSource), target: this.#keys.get(observer), role: opts.role }, { source: this.#keys.get(newSource), target: this.#keys.get(observer), role: opts.role, input: opts.target, mapFn });
+    return this.#owner.replaceEdge(
+      {
+        source: this.#keys.get(oldSource),
+        target: this.#keys.get(observer),
+        role: opts.role,
+      },
+      {
+        source: this.#keys.get(newSource),
+        target: this.#keys.get(observer),
+        role: opts.role,
+        input: opts.target,
+        mapFn,
+      },
+    );
   }
 
   compose(track, rawData, ctx) {
@@ -137,7 +177,9 @@ export class StandaloneObservationAdapter {
   }
 
   #unregister(trackOrId) {
-    const track = typeof trackOrId === "object" ? trackOrId : this.#findTrack(trackOrId);
+    const track = typeof trackOrId === "object"
+      ? trackOrId
+      : this.#findTrack(trackOrId);
     const key = track ? this.#keys.get(track) : undefined;
     if (!key) return;
     this.#sourceUnsubscribers.get(track)?.();
@@ -150,8 +192,13 @@ export class StandaloneObservationAdapter {
       this.#owner.unregister(key);
       globalRefs.delete(key);
       globalTracks.delete(key);
+      const sameId = tracksById.get(track.id);
+      sameId?.delete(track);
+      if (!sameId?.size) tracksById.delete(track.id);
       globalKeys.delete(track);
-    } else globalRefs.set(key, refs);
+    } else {
+      globalRefs.set(key, refs);
+    }
     this.#tracks.delete(key);
     this.#keys.delete(track);
   }
@@ -160,10 +207,12 @@ export class StandaloneObservationAdapter {
     const track = this.#resolveTrack(targetOrTrack);
     return track ? this.getEdges(track) : [];
   }
+
   #stateSources(targetOrTrack) {
     const track = this.#resolveTrack(targetOrTrack);
     return track ? this.#owner.getSources(this.#keys.get(track)) : [];
   }
+
   #internalContext(ctx) {
     if (!ctx) return new Map();
     if (internalContexts.has(ctx)) return ctx;
@@ -179,12 +228,42 @@ export class StandaloneObservationAdapter {
     }
     return internal;
   }
-  #resolveTrack(trackOrId) { return trackOrId && typeof trackOrId === "object" ? trackOrId : this.#findTrack(trackOrId); }
-  #findTrack(id) { return [...this.#owner.tracks.values()].find((track) => track.id === id); }
+
+  #resolveTrack(trackOrId) {
+    return trackOrId && typeof trackOrId === "object"
+      ? trackOrId
+      : this.#findTrack(trackOrId);
+  }
+
+  #findTrack(id) {
+    return tracksById.get(id)?.values().next().value;
+  }
+
   #watchTrack(track) {
     if (!track || this.#lifecycleUnsubscribers.has(track)) return;
-    if (typeof track.onLifecycle === "function") this.#lifecycleUnsubscribers.set(track, track.onLifecycle((event) => { if (event?.type === "detached") this.#owner.removeSourceEdges(this.#keys.get(track)); }));
-    if (typeof track.onSourceDestroyed === "function") this.#sourceUnsubscribers.set(track, track.onSourceDestroyed((event) => { if (event && Array.isArray(event.observerIds)) event.observerIds.splice(0, event.observerIds.length, ...this.getObserverIds(track)); }));
+    if (typeof track.onLifecycle === "function") {
+      this.#lifecycleUnsubscribers.set(track, track.onLifecycle((event) => {
+        if (event?.type === "detached") {
+          this.#owner.removeSourceEdges(this.#keys.get(track));
+        }
+      }));
+    }
+    if (typeof track.onSourceDestroyed === "function") {
+      this.#sourceUnsubscribers.set(track, track.onSourceDestroyed((event) => {
+        if (event && Array.isArray(event.observerIds)) {
+          event.observerIds.splice(
+            0,
+            event.observerIds.length,
+            ...this.getObserverIds(track),
+          );
+        }
+      }));
+    }
   }
-  #assertAlive() { if (this.#destroyed) throw new Error("StandaloneObservationAdapter is destroyed."); }
+
+  #assertAlive() {
+    if (this.#destroyed) {
+      throw new Error("StandaloneObservationAdapter is destroyed.");
+    }
+  }
 }
