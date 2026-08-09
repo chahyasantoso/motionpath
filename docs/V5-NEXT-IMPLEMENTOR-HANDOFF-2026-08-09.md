@@ -1,38 +1,39 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 14:33 Jakarta  
+**Captured:** 2026-08-09 14:42 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
 **Latest green baseline:** `c74601f`, 129 files and 712 tests green  
-**Current slice:** `61980f3`, verification pending  
+**Current slice:** `92c30c3` + `70e846e`, verification pending  
 **Base:** green PR #142 at `184f194`
 
 ## Current truth
 
-P2-03 adapter parity and the full Node 24 matrix are green through the controlled
-Engine path. GraphBinding now captures the legacy Track edge projection once at
-construction and passes explicit owner edges into ObservationStateBridge. The
-bridge no longer needs to decide how to hydrate GraphBinding, and all later reads
-remain state-only.
+The remaining P2-03 job is the Track projection deletion. The first safe seam is
+landed: `ObservationTrackController` is a state-backed external facade for edge
+mutation, replacement, reads, clearing, composition, and observer IDs. It now
+registers endpoints before mutation, so direct facade use does not depend on
+Track-local reverse state.
 
-## Completed in this slice
+## Completed
 
-- GraphBinding explicit owner-edge capture at construction, preserving mapFns.
-- ObservationStateBridge state-only parity and owner-backed observer IDs.
-- Track reverse observer index removal and source-destroy cleanup through owner
-  state.
-- Subscription disposal fixed: GraphBinding no longer duplicates the bridge's
-  source-destroy subscription.
+- Adapter ownership is runtime-scoped and process globals are gone.
+- ObservationStateBridge hydrates once, then checks state only.
+- GraphBinding validates normalized IR against owner state and owns transaction
+  rollback snapshots there.
+- Track reverse observer index is gone; observer IDs/counts are owner-backed.
+- Source-destroy cleanup and subscription disposal are lifecycle-safe.
+- External observation controller contract is tested for input/output edges,
+  replacement, removal, clearing, composition, endpoint registration, and direct
+  observer-ID reads.
 
 ## Remaining jobs
 
-1. Run the full matrix and strict boundary scan on `61980f3`; check readability
-   first because Track/GraphBinding are protected files and dense rewrites are
-   not acceptable.
-2. Finish the P2-03 projection cut: move Track's remaining observation mutation
-   and reader methods behind an external owner facade, preserving direct
-   standalone behavior and GraphBinding rollback semantics.
-3. Remove the remaining Track observation symbols and make strict P2-03 boundary
-   green. Keep topology/playback findings for P2-04.
+1. Run the full matrix on `92c30c3`.
+2. Inject `ObservationTrackController` into Track construction for authored graphs
+   and route Track observation methods/readers through it, preserving standalone
+   adapter behavior during the transition.
+3. Delete Track's `#observed` projection and compatibility-only mutation branches.
+4. Make strict P2-03 boundary green. Keep child topology/playback for P2-04.
 
 ## Guardrails
 
