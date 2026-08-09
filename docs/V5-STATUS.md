@@ -1,37 +1,46 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-09 18:10 Jakarta  
-**Branch:** `feat/pass2-track-facade-removal` at `6158ffd`  
+**Status captured:** 2026-08-09 18:34 Asia/Jakarta  
+**Branch:** `feat/pass2-track-facade-removal` at `ddcc3ffbc6c1d51d18755c90b56c880fe5c7d8e7`  
 **Active PR:** [#145](https://github.com/chahyasantoso/motionpath/pull/145)  
-**Phase:** P2-03 facade-removal migration, CI trigger repair
+**Senior review:** [`V5-PR-145-SENIOR-IMPLEMENTOR-REVIEW-2026-08-09.md`](./V5-PR-145-SENIOR-IMPLEMENTOR-REVIEW-2026-08-09.md)  
+**Phase:** P2-03 facade-removal migration, blocked
 
 ## Executive status
 
-The last three implementation commits had zero checks because CI only listened for protected-branch pushes and the API-authored updates did not enqueue a pull_request run. The workflow now also validates `feat/**`, `fix/**`, and `test/**` pushes, so the next branch update will produce the full Node 24 matrix.
+PR #145 is not mergeable as P2-03 completion. The exact head ran two duplicate nine-job Node 24 matrices: both unit-test jobs failed and the other 16 jobs passed. The duplicate push and pull-request runs contradict the intended single authoritative matrix.
 
-The facade-removal batch is not green yet. The current known failures are compatibility callers still assuming Track-installed methods, standalone compose ownership across independently created Tracks, stale publisher cycle-guard expectations, and readability drift. No failure is being hidden or marked complete.
+The direction remains sound: Track-local observation maps and GraphPublisher's Track-walking cycle guard are removed, ObservationState is the intended authored owner, and strict boundary plus benchmark jobs are blocking. The implementation still has merge-blocking ownership and compatibility gaps.
 
-## Evidence-backed architecture
+## Confirmed blockers
 
-- Engine-created standalone Tracks share the injected ProjectRuntime adapter.
-- Direct legacy callers are migrated through explicit adapter adoption.
-- Authored graph state and cycle validation belong to GraphBinding/ObservationState.
-- GraphPublisher no longer installs or walks a Track cycle guard.
-- Compatibility remains explicit and rollout flags remain default-off.
+- `createTrack` installs `LegacyObservationFacade` unconditionally, including on Engine-authored graph Tracks.
+- Legacy edge mutation can silently move a Track between adapters and delete live edges in its previous scope.
+- GraphBinding can retain stale standalone owner state behind its controller; old edges may reappear after unbinding.
+- `removeObserved` no longer emits edge-removal or invalidation lifecycle events.
+- The destroyed lifecycle event no longer carries `observerIds`.
+- `compatibility` and `scoped` ownership are aliases of the same adapter, making parity and rollback claims non-independent.
+- GraphBinding late-track wiring can invoke a compatibility override and then mutate the controller again.
+- `format:check:ci` checks only package and workflow files, not source.
+- `createObservationScope` is exported in JavaScript without matching TypeScript declarations.
 
-## Closure checklist
+## Evidence-backed progress
 
+- [x] Track-local observation maps and reverse registry removed.
 - [x] GraphPublisher Track-walking cycle guard removed.
-- [x] Strict boundary and benchmark jobs are blocking in CI.
-- [x] Track construction no longer installs the legacy facade automatically.
-- [x] createTrack and compatibility fixtures install the facade explicitly.
-- [x] Direct legacy mutations adopt both endpoints into one explicit adapter.
-- [ ] Full Node 24 matrix green on the final facade-removal head.
-- [ ] Migrate remaining direct Track tests and stale cycle-guard expectations.
-- [ ] Retire the default singleton fallback from direct construction.
-- [ ] Add deterministic hot-path benchmark threshold and repeated teardown evidence.
-- [ ] Refresh status, matrix, review, and implementation report on the final green head.
+- [x] ObservationState/controller used for authored graph composition and mutation.
+- [x] Strict boundary and benchmark jobs are blocking and green on the reviewed head.
+- [x] Build, typecheck, package dry run, default boundary, strict boundary, and benchmarks pass.
+- [ ] Full unit suite green on the exact head.
+- [ ] One authoritative CI matrix per PR head.
+- [ ] Production authored Tracks free of the legacy runtime facade.
+- [ ] Cross-owner mutation rejects implicit ownership transfer.
+- [ ] Binding/unbinding cannot resurrect stale owner state.
+- [ ] Lifecycle and invalidation compatibility restored.
+- [ ] Ownership rollout is behaviorally meaningful or removed.
+- [ ] Public TypeScript surface matches JavaScript exports.
+- [ ] Source formatting is a real CI gate.
 
 ## Next implementor
 
-Start from [V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md), then run the push-triggered Node 24 unit job first. Do not change P2-04 topology/playback or rollout defaults.
+Follow [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md) in order. Keep P2-04 topology/playback and publisher rollout defaults out of this repair.
