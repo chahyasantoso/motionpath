@@ -1,15 +1,15 @@
 # Pass-2 review resolution log
 
 **Tracks:** [`V5-PASS-2-REVIEW-2026-08-08.md`](./V5-PASS-2-REVIEW-2026-08-08.md)  
-**Branch:** `v5-pass-2-p2-03-track-symbol-ban`, PR #140  
-**Updated:** 2026-08-09 07:16 Asia/Jakarta
+**Branch:** `v5`, after #140 merged  
+**Updated:** 2026-08-09 08:23 Asia/Jakarta
 
 One row per finding. A finding is **closed** only when the fix is on the branch and the gate that would catch a regression exists. "Deferred" means it has an owner and a work package, not that it was dismissed.
 
 | ID | Severity | Status | Where |
 |---|---|---|---|
 | F-01 ObservationState derived from Track | High | Open, blocks the symbol-ban | P2-03 removal design |
-| F-02 per-Track standalone adapters | High | Open, blocks the symbol-ban | P2-03 removal design |
+| F-02 per-Track standalone adapters | High | **Design landed, implementation slice landed** | `ProjectRuntime.standaloneObservationAdapter`, Engine injection, lifecycle test |
 | F-03 duplicate observation bookkeeping | High | Open, documented in `Track.js` | P2-03 removal design |
 | F-04 destroy re-entrancy | High | **Closed** | `Track.js` `#destroying` guard |
 | F-05 wrong unsubscriber pushed | Medium | **Closed** | `GraphBinding.#subscribeTrack` |
@@ -31,40 +31,21 @@ One row per finding. A finding is **closed** only when the fix is on the branch 
 | F-21 publisher built as a validator | Low | Open | P2-06 |
 | F-22 authored mapFn policy in the Engine | Low | Open | P2-06 |
 
-Closed: 6. Open: 16, all with a package.
+Closed: 6. F-02 is now implemented at the runtime boundary, but its legacy direct-Track fallback remains until the P2-03 removal slice. Open: 15, all with a package.
 
-## What landed for each closed finding
+## F-02 decision
 
-### F-04, destroy re-entrancy
+**Scope: one standalone observation adapter per ProjectRuntime.** This is the right boundary for the current architecture: every standalone Track created by one Engine shares one registry, while the adapter lifecycle ends with project/runtime disposal. Authored-graph Tracks explicitly pass `observationAdapter: null` and remain owned by GraphBinding.
 
-`Track` gained a `#destroying` flag set on entry to `destroy()`. The destroy-subscriber notification stays where it is, before `#destroyed` flips, so listeners can still read `observerIds` while the Track reports itself alive; the guard closes the re-entry window that `GraphBinding.removeTrack` opened. The teardown ordering and the reason for it are now written into the method.
+Direct `new Track()` construction remains a compatibility path. Without an owning ProjectRuntime, callers must inject one shared `StandaloneObservationAdapter` when they create related Tracks. The per-Track fallback is intentionally retained for isolated direct Tracks and is not evidence of cross-Track support. The next P2-03 slice removes the fallback once all direct callers have migrated.
 
-### F-05, wrong unsubscriber
+## What landed for F-02
 
-`#subscribeTrack` pushed `unsubscribe` where it meant `unsubscribeDestroyed`, so the lifecycle teardown was retained twice and the source-destroyed listener was never released. Both are retained now, with the leak recorded above the method.
-
-### F-11, readability gate
-
-Two parts.
-
-**Reasoning restored.** `GraphPublisher.js` is back to readable formatting with its invariant notes: the defensive registry copy, atomic `addTrack`, the post-disposal no-op on `removeTrack`, two-way membership validation, why the publish order is the schedule, why retry state is separate from invalidation, and why `#isWarm` forces a first pass. `#removeTrack`'s `invalidateDependents` parameter from #139 is now explained. Behavior and error strings are untouched, deliberately, so the change reviews as a no-op. `StandaloneObservationAdapter.js` and `TrackObservationOwner.js` are formatted too.
-
-**Gate added.** `packages/core/src/readability-boundary.test.js`, blocking under `npm test`. It is the mirror image of the GSAP quarantine: a PROTECTED list that may only grow, rather than an exception list that may only shrink. Protected files must stay under 140 columns, must not stack more than three statements on a line, and must still contain block comments. Five files are in it today.
-
-Why not just turn on `format:check`: roughly a dozen source files are currently dense one-liners, including `GraphBinding.js`, `ObservationState.js` and `ProjectRuntime.js`, so a repo-wide prettier job would fail on contact. The formatting sweep is its own slice. Until then the protected list is the ratchet.
-
-### F-12, boundary scan in CI
-
-New blocking `boundary-scan` job runs `npm run boundary:v5:pass2`. It fails on a new unapproved GSAP import in core or a stale quarantine entry, and reports the known P2-03/P2-04 ownership gaps without failing. `boundary:v5:pass2:strict` is now a script, ready to become the completion gate when P2-03 lands.
-
-### F-14, scan coverage
-
-The Track check now matches the full ban list from [`V5-P2-03-SYMBOL-BAN.md`](./V5-P2-03-SYMBOL-BAN.md), including `#observed`, `#observers`, `#graphGuard`, `_setObservationComposer`, `_addObserver`, `_removeObserver`, `observerCount` and `observerIds`, and reports which symbols matched rather than a yes/no. The scan also walks `packages/react/src` now: its five direct GSAP imports are reported as a distinct `renderer-gsap-import` tier, non-blocking today and strict-blocking, because whether the DOM hooks layer counts as an approved renderer adapter is a P2-05/P2-06 decision rather than a P2-02 violation.
-
-### F-16, quarantine count
-
-Ten entries, nine tests and one fixture. Read the count from `scripts/v5-gsap-allowlist.mjs`, never restate it.
+- `ProjectRuntime` constructs and owns one `StandaloneObservationAdapter`, exposes it read-only, and destroys it during runtime disposal.
+- `Engine.#trackOptions()` injects that adapter into all standalone `createTrack` paths.
+- Authored graph construction overrides it with `null`, so GraphBinding remains the only graph owner there.
+- A lifecycle test proves identity stability and disposal.
 
 ## Next
 
-The pre-merge set is done. What remains before Track observation state can be deleted is the ownership design, in this order: **F-02** decide and inject adapter scope, **F-01** invert the bridge so `ObservationState` writes and Track reads, **F-03** move `observerCount`/`observerIds` onto the adapter and prove equivalence. F-06, F-07, F-08 and F-10 fall out of that work. None of them is a formatting change and none should be attempted without a local test run.
+Now do F-01: invert the bridge so `ObservationState` is authoritative, migrate GraphBinding rollback/parity and GraphPublisher cycle consumers off `Track.observedEdges`, then move F-03 observer queries onto the adapter before deleting Track's duplicate state.
