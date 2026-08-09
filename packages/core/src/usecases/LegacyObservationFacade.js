@@ -21,11 +21,9 @@ export function installLegacyObservationFacade(track) {
       if (!source) { track.getObservationOwner()?.clearObserved(track); track._emitObservationLifecycle?.({ type: "invalidated", track, reason: "observation" }); return; }
       const trackOwner = track.getObservationOwner?.();
       const sourceOwner = source.getObservationOwner?.();
-      // Legacy compatibility keeps all edges for an observer in its current
-      // scope. Only an independently-created source is adopted into that scope.
       const owner = typeof trackOwner?.register === "function"
         ? trackOwner
-        : typeof sourceOwner?.register === "function'
+        : typeof sourceOwner?.register === "function"
           ? sourceOwner
           : trackOwner;
       if (typeof owner?.register === "function") source._adoptObservationOwner?.(owner);
