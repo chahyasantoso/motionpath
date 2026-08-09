@@ -1,5 +1,8 @@
 import { TrackObservationOwner } from "./TrackObservationOwner.js";
 
+const publicContexts = new WeakMap();
+const internalContexts = new WeakSet();
+
 /**
  * Standalone observation ownership for one explicit scope.
  *
@@ -13,7 +16,6 @@ export class StandaloneObservationAdapter {
   #owner;
   #keys = new WeakMap();
   #tracks = new Map();
-  #sourceUnsubscribers = new Map();
   #lifecycleUnsubscribers = new Map();
   #nextIdentity = 0;
   #destroyed = false;
@@ -21,7 +23,7 @@ export class StandaloneObservationAdapter {
   constructor({ tracks = [] } = {}) {
     this.#owner = new TrackObservationOwner({
       validateCycles: false,
-      composeSource: (source, ctx) => source.compose(undefined, ctx),
+      composeSource: (source, ctx) => this.#composeSource(source, ctx),
     });
     const registry = tracks instanceof Map ? [...tracks.values()] : tracks;
     for (const track of registry) this.register(track);
@@ -30,8 +32,8 @@ export class StandaloneObservationAdapter {
   get state() {
     return {
       tracks: new Map(this.#tracks),
-      getEdges: (target) => this.#stateEdges(target),
-      getSources: (target) => this.#stateSources(target),
+      getEdges: (target) => this.getEdges(target),
+      getSources: (target) => this.getSources(target),
       getObserverIds: (source) => this.getObserverIds(source),
     };
   }
@@ -150,7 +152,10 @@ export class StandaloneObservationAdapter {
   compose(track, rawData, ctx) {
     this.#assertAlive();
     this.register(track);
-    return this.#owner.compose(this.#keys.get(track), rawData, ctx);
+    const internal = this.#internalContext(ctx);
+    const patch = this.#owner.compose(this.#keys.get(track), rawData, internal);
+    if (ctx && internal !== ctx) ctx.set(track.id, patch);
+    return patch;
   }
 
   destroy() {
@@ -158,7 +163,6 @@ export class StandaloneObservationAdapter {
     for (const track of [...this.#tracks.values()]) this.#unregister(track);
     this.#destroyed = true;
     this.#owner.destroy();
-    this.#sourceUnsubscribers.clear();
     this.#lifecycleUnsubscribers.clear();
   }
 
@@ -168,22 +172,12 @@ export class StandaloneObservationAdapter {
       : this.#findTrack(trackOrId);
     const key = track ? this.#keys.get(track) : undefined;
     if (!key) return;
-    this.#sourceUnsubscribers.get(track)?.();
-    this.#sourceUnsubscribers.delete(track);
     this.#lifecycleUnsubscribers.get(track)?.();
     this.#lifecycleUnsubscribers.delete(track);
     this.#owner.removeSourceEdges(key);
     this.#owner.unregister(key);
     this.#tracks.delete(key);
     this.#keys.delete(track);
-  }
-
-  #stateEdges(targetOrTrack) {
-    return this.getEdges(targetOrTrack);
-  }
-
-  #stateSources(targetOrTrack) {
-    return this.getSources(targetOrTrack);
   }
 
   #resolveTrack(trackOrId) {
@@ -199,22 +193,35 @@ export class StandaloneObservationAdapter {
     return null;
   }
 
+  #internalContext(ctx) {
+    if (!ctx) return new Map();
+    if (internalContexts.has(ctx)) return ctx;
+    let internal = publicContexts.get(ctx);
+    if (!internal) {
+      internal = new Map();
+      publicContexts.set(ctx, internal);
+      internalContexts.add(internal);
+      for (const [publicId, patch] of ctx) {
+        const track = this.#findTrack(publicId);
+        if (track) internal.set(this.#keys.get(track), patch);
+      }
+    }
+    return internal;
+  }
+
+  #composeSource(source, ctx) {
+    if (typeof source.compose === "function") return source.compose(undefined, ctx);
+    const key = this.#keys.get(source);
+    return this.#owner.compose(key, undefined, ctx);
+  }
+
   #watchTrack(track) {
-    if (typeof track.onLifecycle === "function") {
-      this.#lifecycleUnsubscribers.set(track, track.onLifecycle((event) => {
-        if (event?.type === "detached") {
-          this.#owner.removeSourceEdges(this.#keys.get(track));
-        }
-      }));
-    }
-    if (typeof track.onSourceDestroyed === "function") {
-      this.#sourceUnsubscribers.set(track, track.onSourceDestroyed((event) => {
-        const observerIds = this.getObserverIds(track);
-        if (event && Array.isArray(event.observerIds)) {
-          event.observerIds.splice(0, event.observerIds.length, ...observerIds);
-        }
-      }));
-    }
+    if (typeof track.onLifecycle !== "function") return;
+    this.#lifecycleUnsubscribers.set(track, track.onLifecycle((event) => {
+      if (event?.type === "detached") {
+        this.#owner.removeSourceEdges(this.#keys.get(track));
+      }
+    }));
   }
 
   #assertAlive() {
