@@ -1,41 +1,39 @@
-import { observationEdgeEquals, observationEdgeKey } from "./observationEdge.js";
+import { observationEdgeEquals } from "./observationEdge.js";
 import { normalizeObservationGraph, topologicalTrackOrder } from "./normalizeObservationGraph.js";
 import { toImmutableList } from "../contract/immutableValue.js";
 import { ObservationStateBridge } from "./ObservationStateBridge.js";
 import { trackComposeLeaf } from "./composeContext.js";
 
 /**
- * Transactional bridge between the normalized graph IR, the publisher and the
- * live Tracks.
+ * Transactional bridge between normalized graph IR, publisher and live Tracks.
  *
- * ## The rollback contract
- *
- * Every mutator writes in a fixed order: ObservationState first, then the live
- * Track, then the publisher via #commit. #commit rebuilds the observation bridge
- * FROM ObservationState, so ObservationState is the thing a rollback has to put
- * back. A rollback that only restores the Track wiring is not a rollback: the
- * rebuild immediately re-derives the post-mutation edge set from the state that
- * was never unwound.
- *
- * That failure mode is invisible to edge-key parity, because every parity check
- * in the suite reads keys off the Track. It shows up only in composition, as an
- * edge that reappears and then contributes nothing, so:
- *
- * - the before-snapshots below come from ObservationState, which owns mapFn
- * - unwire restores state before Track, mirroring the wire order
- * - #restoreEdge is the only way an edge goes back, so mapFn cannot be dropped
- *
- * Still open, deliberately: #commit rebuilds the whole bridge on every mutation
- * (F-10) and #assertTrackGraphMatches still derives live edges from Track, which
- * is its job as the parity check but is also F-01.
+ * ObservationState is the graph owner. Track mutation remains as a compatibility
+ * projection until the remaining Track-owned observation seams are removed.
  */
 export class GraphBinding {
   #tracks; #publisher; #graph; #ownsPublisher; #observationBridge; #unsubscribers = []; #destroyed = false;
+
   constructor({ graph, tracks = new Map(), publisher, ownsPublisher = true, initialEdges = [] } = {}) {
     if (!publisher || typeof publisher.applyGraph !== "function") throw new TypeError("GraphBinding requires a graph-aware publisher.");
-    this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks); this.#publisher = publisher; this.#ownsPublisher = ownsPublisher !== false; this.#graph = this.#freeze(graph); this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks }); this.#bindObservationComposition(); if (initialEdges.length) this.#wireInitialEdges(initialEdges); this.#assertTrackGraphMatches(); this.#syncPublisher(); this.#subscribe();
+    this.#tracks = tracks instanceof Map ? new Map(tracks) : new Map(tracks);
+    this.#publisher = publisher;
+    this.#ownsPublisher = ownsPublisher !== false;
+    this.#graph = this.#freeze(graph);
+    this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks });
+    this.#bindObservationComposition();
+    if (initialEdges.length) this.#wireInitialEdges(initialEdges);
+    this.#assertTrackGraphMatches();
+    this.#syncPublisher();
+    this.#subscribe();
   }
-  get graph() { return this.#graph; } get tracks() { return new Map(this.#tracks); } getTrack(id) { return this.#tracks.get(id) ?? null; } get publisher() { return this.#publisher; } get observationState() { return this.#observationBridge?.state ?? null; } get isDestroyed() { return this.#destroyed; }
+
+  get graph() { return this.#graph; }
+  get tracks() { return new Map(this.#tracks); }
+  getTrack(id) { return this.#tracks.get(id) ?? null; }
+  get publisher() { return this.#publisher; }
+  get observationState() { return this.#observationBridge?.state ?? null; }
+  get isDestroyed() { return this.#destroyed; }
+
   replaceEdge(oldEdge, newEdge) {
     this.#assertAlive();
     const observer = this.#tracks.get(oldEdge.target ?? newEdge.target);
@@ -60,8 +58,6 @@ export class GraphBinding {
       () => {
         const [original] = replaced;
         if (!original) return;
-        // Drop the candidate edge from the state before restoring the original,
-        // otherwise the rebuild in #commit sees both.
         this.#observationBridge?.state.removeEdge({ source: newSource.id, target: observer.id, role, input });
         this.#observationBridge?.state.addEdge({
           source: oldSource.id,
@@ -75,6 +71,7 @@ export class GraphBinding {
       candidate,
     );
   }
+
   addEdge(edge) {
     this.#assertAlive();
     const observer = this.#tracks.get(edge.target);
@@ -83,8 +80,6 @@ export class GraphBinding {
     const candidate = this.#candidateGraph((edges) => [...edges, this.#normalizeEdge(edge)]);
     const role = edge.role ?? "output";
     const input = role === "input" ? edge.input ?? edge.target : undefined;
-    // An add over an existing edge is a mapFn swap, so the rollback has to know
-    // whether it is removing an edge or restoring the one it overwrote.
     const [previous] = this.#edgeSnapshots(observer, source, { role, input });
     this.#transaction(
       () => this.#changeObservation(
@@ -98,14 +93,13 @@ export class GraphBinding {
       candidate,
     );
   }
+
   removeEdge(edge) {
     this.#assertAlive();
     const observer = this.#tracks.get(edge.target);
     const source = this.#tracks.get(edge.source);
     if (!observer || !source) return;
     const candidate = this.#candidateGraph((edges) => edges.filter((existing) => !observationEdgeEquals(existing, this.#normalizeEdge(edge))));
-    // One call can drop several edges when role or input is left open, so the
-    // snapshot is a list and every entry has to come back with its own mapFn.
     const removed = this.#edgeSnapshots(observer, source, { role: edge.role, input: edge.input });
     this.#transaction(
       () => this.#changeObservation(
@@ -116,26 +110,81 @@ export class GraphBinding {
       candidate,
     );
   }
-  addTrack(track, observesOrOptions = []) { this.#assertAlive(); const observes = Array.isArray(observesOrOptions) ? observesOrOptions : observesOrOptions.observes ?? []; if (!track?.id) throw new TypeError("GraphBinding.addTrack requires a Track with an id."); if (this.#tracks.has(track.id)) throw new Error(`Duplicate track id '${track.id}'.`); const candidate = this.#candidateGraph((edges) => [...edges, ...observes.map((edge) => this.#normalizeEdge({ ...edge, target: track.id }))], (nodes) => [...nodes, { id: track.id }]); const resolved = observes.map((edge) => { const source = this.#tracks.get(edge.source); if (!source) throw new Error(`Unknown source track '${edge.source}'.`); const role = edge.role ?? "output"; return { source, role, input: role === "input" ? edge.input ?? edge.target : undefined, mapFn: edge.mapFn ?? null }; }); const previousGraph = this.#graph; const undo = []; this.#tracks.set(track.id, track); this.#observationBridge.state.register(track); try { for (const { source, role, input, mapFn } of resolved) { const rollback = () => { this.#observationBridge.state.removeEdge({ source: source.id, target: track.id, role, input }); track.removeObserved(source, { role, target: input }); }; undo.push(rollback); this.#observationBridge.state.addEdge({ source: source.id, target: track.id, role, input, mapFn }); track.setObserved(source, mapFn, { role, target: input }); } this.#commit(candidate); this.#subscribeTrack(track); } catch (error) { this.#unwind(undo); this.#observationBridge.state.unregister(track.id, { detach: false }); this.#tracks.delete(track.id); this.#graph = previousGraph; this.#refreshObservationBridge(); throw error; } }
-  removeTrack(id, { destroy = true } = {}) { if (this.#destroyed || !this.#tracks.has(id)) return; const track = this.#tracks.get(id); const candidate = this.#candidateGraph((edges) => edges.filter((edge) => edge.source !== id && edge.target !== id), (nodes) => nodes.filter((node) => node.id !== id)); this.#tracks.delete(id); this.#observationBridge.state.unregister(id); if (destroy && !track.isDestroyed) track.destroy?.(); this.#commit(candidate); }
-  destroy() { if (this.#destroyed) return; this.#destroyed = true; for (const unsubscribe of this.#unsubscribers) unsubscribe(); this.#unsubscribers = []; this.#unbindObservationComposition(); this.#tracks = new Map(); this.#observationBridge?.destroy(); this.#observationBridge = null; const publisher = this.#publisher; this.#publisher = null; if (this.#ownsPublisher) publisher?.destroy?.(); }
-  /**
-   * Before-snapshots come from ObservationState, not from Track.observedEdges.
-   *
-   * Two reasons. The state is the writer, so it is the copy a rollback has to
-   * restore, and it is the copy that carries mapFn through a bridge rebuild.
-   * And Track.observedEdges routes through the standalone adapter, which is both
-   * the surface P2-03 is deleting (F-01) and a measurably expensive read (F-09).
-   *
-   * The filter mirrors Track.removeObserved: an omitted role or input means
-   * "any", so one call can legitimately match several edges.
-   */
+
+  addTrack(track, observesOrOptions = []) {
+    this.#assertAlive();
+    const observes = Array.isArray(observesOrOptions) ? observesOrOptions : observesOrOptions.observes ?? [];
+    if (!track?.id) throw new TypeError("GraphBinding.addTrack requires a Track with an id.");
+    if (this.#tracks.has(track.id)) throw new Error(`Duplicate track id '${track.id}'.`);
+    const candidate = this.#candidateGraph(
+      (edges) => [...edges, ...observes.map((edge) => this.#normalizeEdge({ ...edge, target: track.id }))],
+      (nodes) => [...nodes, { id: track.id }],
+    );
+    const resolved = observes.map((edge) => {
+      const source = this.#tracks.get(edge.source);
+      if (!source) throw new Error(`Unknown source track '${edge.source}'.`);
+      const role = edge.role ?? "output";
+      return { source, role, input: role === "input" ? edge.input ?? edge.target : undefined, mapFn: edge.mapFn ?? null };
+    });
+    const previousGraph = this.#graph;
+    const undo = [];
+    this.#tracks.set(track.id, track);
+    this.#observationBridge.state.register(track);
+    try {
+      for (const { source, role, input, mapFn } of resolved) {
+        const rollback = () => {
+          this.#observationBridge.state.removeEdge({ source: source.id, target: track.id, role, input });
+          track.removeObserved(source, { role, target: input });
+        };
+        undo.push(rollback);
+        this.#observationBridge.state.addEdge({ source: source.id, target: track.id, role, input, mapFn });
+        track.setObserved(source, mapFn, { role, target: input });
+      }
+      this.#commit(candidate);
+      this.#subscribeTrack(track);
+    } catch (error) {
+      this.#unwind(undo);
+      this.#observationBridge.state.unregister(track.id, { detach: false });
+      this.#tracks.delete(track.id);
+      this.#graph = previousGraph;
+      this.#refreshObservationBridge();
+      throw error;
+    }
+  }
+
+  removeTrack(id, { destroy = true } = {}) {
+    if (this.#destroyed || !this.#tracks.has(id)) return;
+    const track = this.#tracks.get(id);
+    const candidate = this.#candidateGraph(
+      (edges) => edges.filter((edge) => edge.source !== id && edge.target !== id),
+      (nodes) => nodes.filter((node) => node.id !== id),
+    );
+    this.#tracks.delete(id);
+    this.#observationBridge.state.unregister(id);
+    if (destroy && !track.isDestroyed) track.destroy?.();
+    this.#commit(candidate);
+  }
+
+  destroy() {
+    if (this.#destroyed) return;
+    this.#destroyed = true;
+    for (const unsubscribe of this.#unsubscribers) unsubscribe();
+    this.#unsubscribers = [];
+    this.#unbindObservationComposition();
+    this.#tracks = new Map();
+    this.#observationBridge?.destroy();
+    this.#observationBridge = null;
+    const publisher = this.#publisher;
+    this.#publisher = null;
+    if (this.#ownsPublisher) publisher?.destroy?.();
+  }
+
   #edgeSnapshots(observer, source, { role, input } = {}) {
     return this.#observationBridge.state.getEdges(observer.id).filter((existing) => existing.source === source
       && (role === undefined || existing.role === role)
       && (role !== "input" || input === undefined || existing.input === input));
   }
-  /** Put an edge back exactly as it was, mapFn included, state before Track. */
+
   #restoreEdge(observer, source, snapshot) {
     this.#observationBridge?.state.addEdge({
       source: source.id,
@@ -146,11 +195,12 @@ export class GraphBinding {
     });
     observer.setObserved(source, snapshot.mapFn, { role: snapshot.role, target: snapshot.input });
   }
-  /** Unwind an edge that never committed. Both sides, state before Track. */
+
   #detachEdge(observer, source, { role, input }) {
     this.#observationBridge?.state.removeEdge({ source: source.id, target: observer.id, role, input });
     observer.removeObserved(source, { role, target: input });
   }
+
   #wireInitialEdges(edges) {
     const undo = [];
     try {
@@ -162,8 +212,6 @@ export class GraphBinding {
         const input = role === "input" ? edge.input ?? edge.target : undefined;
         this.#observationBridge.state.addEdge({ source: source.id, target: observer.id, role, input, mapFn: edge.mapFn ?? null });
         observer.setObserved(source, edge.mapFn ?? null, { role, target: input });
-        // Both sides, or the failed construction leaves edges in the state that
-        // no Track and no IR agrees with.
         undo.push(() => this.#detachEdge(observer, source, { role, input }));
       }
       this.#observationBridge.assertParity();
@@ -173,19 +221,97 @@ export class GraphBinding {
       throw error;
     }
   }
-  #changeObservation(change, compatibility) { try { change(); compatibility(); } catch (error) { this.#refreshObservationBridge(); throw error; } }
-  #transaction(wire, unwire, candidate) { const previousGraph = this.#graph; try { wire(); this.#commit(candidate); } catch (error) { this.#unwind([unwire]); this.#graph = previousGraph; this.#refreshObservationBridge(); throw error; } }
+
+  #changeObservation(change, compatibility) {
+    try {
+      change();
+      compatibility();
+    } catch (error) {
+      this.#refreshObservationBridge();
+      throw error;
+    }
+  }
+
+  #transaction(wire, unwire, candidate) {
+    const previousGraph = this.#graph;
+    try {
+      wire();
+      this.#commit(candidate);
+    } catch (error) {
+      this.#unwind([unwire]);
+      this.#graph = previousGraph;
+      this.#refreshObservationBridge();
+      throw error;
+    }
+  }
+
   #unwind(steps) { for (const step of [...steps].reverse()) { try { step(); } catch {} } }
   #normalizeEdge(edge) { const role = edge.role ?? "output"; return { source: edge.source, target: edge.target, role, input: role === "input" ? edge.input ?? edge.target : undefined }; }
   #freeze(graph) { if (!graph || graph.errors?.length) throw new Error("GraphBinding requires a valid normalized graph."); topologicalTrackOrder(graph, { strict: true }); return Object.freeze({ valid: true, nodes: toImmutableList(graph.nodes.map((node) => ({ ...node }))), edges: toImmutableList(graph.edges.map(({ source, target, role, input }) => ({ source, target, role, input }))), order: Object.freeze([...graph.order]), errors: Object.freeze([]) }); }
-  #assertTrackGraphMatches() { const declaredNodes = new Set(this.#graph.nodes.map((node) => node.id)); for (const id of declaredNodes) if (!this.#tracks.has(id)) throw new Error(`GraphBinding graph declares node '${id}' with no live Track.`); for (const id of this.#tracks.keys()) if (!declaredNodes.has(id)) throw new Error(`GraphBinding holds Track '${id}' that the graph does not declare.`); const live = []; for (const track of this.#tracks.values()) for (const edge of track.observedEdges ?? []) if (edge.source && this.#tracks.get(edge.source.id) === edge.source) live.push({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input }); const declared = this.#graph.edges; const key = (edge) => `${observationEdgeKey(edge.source, edge.role, edge.input)}->${edge.target}`; const declaredKeys = new Set(declared.map(key)); if (live.length !== declared.length || live.some((edge) => !declaredKeys.has(key(edge)))) throw new Error(`GraphBinding found ${live.length} live observation edges but ${declared.length} declared edges. Live Track wiring and the normalized graph must agree.`); }
-  #candidateGraph(edgeMutator, nodeMutator = (nodes) => nodes) { const nodes = nodeMutator(this.#graph.nodes.map((node) => ({ id: node.id }))); const edges = edgeMutator(this.#graph.edges.map((edge) => ({ ...edge }))); const normalized = normalizeObservationGraph({ tracks: nodes.map((node) => ({ id: node.id, observes: edges.filter((edge) => edge.target === node.id).map((edge) => ({ source: edge.source, role: edge.role, target: edge.role === "input" ? edge.input : undefined })) })) }); if (!normalized.valid) throw new Error(`Rejected graph mutation: ${normalized.errors.map((error) => error.message).join("; ")}`); return normalized; }
-  #commit(graph) { const frozen = this.#freeze(graph); this.#publisher.applyGraph(frozen, this.#tracks); this.#graph = frozen; this.#refreshObservationBridge(); }
-  #refreshObservationBridge() { if (!this.#observationBridge) return; const edges = []; for (const track of this.#tracks.values()) { for (const edge of this.#observationBridge.state.getEdges(track.id)) edges.push({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input, mapFn: edge.mapFn }); } this.#unbindObservationComposition(); this.#observationBridge.destroy(); this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks, edges }); this.#bindObservationComposition(); }
-  #bindObservationComposition() { const bridge = this.#observationBridge; if (!bridge) return; for (const track of this.#tracks.values()) track._setObservationComposer?.((rawData, ctx) => bridge.state.compose(track.id, rawData, ctx, trackComposeLeaf)); }
+
+  #assertTrackGraphMatches() {
+    const declaredNodes = new Set(this.#graph.nodes.map((node) => node.id));
+    for (const id of declaredNodes) if (!this.#tracks.has(id)) throw new Error(`GraphBinding graph declares node '${id}' with no live Track.`);
+    for (const id of this.#tracks.keys()) if (!declaredNodes.has(id)) throw new Error(`GraphBinding holds Track '${id}' that the graph does not declare.`);
+    this.#observationBridge.assertGraphParity(this.#graph);
+  }
+
+  #candidateGraph(edgeMutator, nodeMutator = (nodes) => nodes) {
+    const nodes = nodeMutator(this.#graph.nodes.map((node) => ({ id: node.id })));
+    const edges = edgeMutator(this.#graph.edges.map((edge) => ({ ...edge })));
+    const normalized = normalizeObservationGraph({
+      tracks: nodes.map((node) => ({
+        id: node.id,
+        observes: edges.filter((edge) => edge.target === node.id).map((edge) => ({ source: edge.source, role: edge.role, target: edge.role === "input" ? edge.input : undefined })),
+      })),
+    });
+    if (!normalized.valid) throw new Error(`Rejected graph mutation: ${normalized.errors.map((error) => error.message).join("; ")}`);
+    return normalized;
+  }
+
+  #commit(graph) {
+    const frozen = this.#freeze(graph);
+    this.#publisher.applyGraph(frozen, this.#tracks);
+    this.#graph = frozen;
+    this.#refreshObservationBridge();
+    this.#observationBridge.assertGraphParity(this.#graph);
+  }
+
+  #refreshObservationBridge() {
+    if (!this.#observationBridge) return;
+    const edges = [];
+    for (const track of this.#tracks.values()) {
+      for (const edge of this.#observationBridge.state.getEdges(track.id)) {
+        edges.push({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input, mapFn: edge.mapFn });
+      }
+    }
+    this.#unbindObservationComposition();
+    this.#observationBridge.destroy();
+    this.#observationBridge = new ObservationStateBridge({ tracks: this.#tracks, edges });
+    this.#bindObservationComposition();
+  }
+
+  #bindObservationComposition() {
+    const bridge = this.#observationBridge;
+    if (!bridge) return;
+    for (const track of this.#tracks.values()) {
+      track._setObservationComposer?.((rawData, ctx) => bridge.state.compose(track.id, rawData, ctx, trackComposeLeaf));
+    }
+  }
+
   #unbindObservationComposition() { for (const track of this.#tracks.values()) track._setObservationComposer?.(null); }
   #syncPublisher() { this.#publisher.applyGraph(this.#graph, this.#tracks); }
   #subscribe() { for (const track of this.#tracks.values()) this.#subscribeTrack(track); }
-  #subscribeTrack(track) { const unsubscribeLifecycle = track.onLifecycle?.((event) => { if (this.#destroyed) return; if (event.type === "destroyed") this.removeTrack(event.track.id); if (event.type === "detached") this.removeTrack(event.track.id, { destroy: false }); }); if (unsubscribeLifecycle) this.#unsubscribers.push(unsubscribeLifecycle); const unsubscribeDestroyed = track.onSourceDestroyed?.(() => {}); if (unsubscribeDestroyed) this.#unsubscribers.push(unsubscribeDestroyed); }
+  #subscribeTrack(track) {
+    const unsubscribeLifecycle = track.onLifecycle?.((event) => {
+      if (this.#destroyed) return;
+      if (event.type === "destroyed") this.removeTrack(event.track.id);
+      if (event.type === "detached") this.removeTrack(event.track.id, { destroy: false });
+    });
+    if (unsubscribeLifecycle) this.#unsubscribers.push(unsubscribeLifecycle);
+    const unsubscribeDestroyed = track.onSourceDestroyed?.(() => {});
+    if (unsubscribeDestroyed) this.#unsubscribers.push(unsubscribeDestroyed);
+  }
+
   #assertAlive() { if (this.#destroyed) throw new Error("GraphBinding is destroyed."); }
 }
