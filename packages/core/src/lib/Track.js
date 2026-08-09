@@ -235,6 +235,11 @@ export class Track {
         edge: { source: newSource.id, target: this.#id, role, input },
       });
     }
+    // Compatibility-mode replay: the adapter path above only exists when an
+    // adapter is present. Without one, #observed still needs the old key
+    // removed and a fresh setObserved() run so the guard check, observer
+    // index, and lifecycle events all fire through their normal single path
+    // instead of being duplicated here.
     if (!this.#standaloneObservationAdapter) {
       for (const [oldKey] of replaced) this.#removeObservedKey(oldKey);
       for (const [, edge] of replaced) {
@@ -361,6 +366,11 @@ export class Track {
     this.#clearObserved();
   }
 
+  // Everything from here through play/pause/seek/reverse is child-topology and
+  // group-host bridging. It exists only because a Track can still be built
+  // outside a Motion. Once Motion is the sole owner of recursive composition
+  // and child slots, this block is deleted outright, not migrated: it is a
+  // bridge to the old shape, not a feature Track itself is meant to keep.
   _mount(host) {
     if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`);
     if (this.#host) throw new Error(`Track "${this.#id}" already mounted`);
