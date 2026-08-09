@@ -179,14 +179,11 @@ export class StandaloneObservationAdapter {
   }
 
   #stateEdges(targetOrTrack) {
-    const track = this.#resolveTrack(targetOrTrack);
-    return track ? this.getEdges(track) : [];
+    return this.getEdges(targetOrTrack);
   }
 
   #stateSources(targetOrTrack) {
-    const track = this.#resolveTrack(targetOrTrack);
-    return track ? this.#owner.getSources(this.#keys.get(track))
-      .map((key) => this.#owner.getTrack(key) ?? key) : [];
+    return this.getSources(targetOrTrack);
   }
 
   #resolveTrack(trackOrId) {
