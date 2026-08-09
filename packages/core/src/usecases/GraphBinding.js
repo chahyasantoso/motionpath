@@ -40,6 +40,24 @@ export class GraphBinding {
   #unbindObservationComposition() { for (const track of this.#tracks.values()) track._setObservationComposer?.(null); }
   #syncPublisher() { this.#publisher.applyGraph(this.#graph, this.#tracks); }
   #subscribe() { for (const track of this.#tracks.values()) this.#subscribeTrack(track); }
-  #subscribeTrack(track) { const unsubscribe = track.onLifecycle?.((event) => { if (this.#destroyed) return; if (event.type === "destroyed") this.removeTrack(event.track.id); if (event.type === "detached") this.removeTrack(event.track.id, { destroy: false }); }); if (unsubscribe) this.#unsubscribers.push(unsubscribe); const unsubscribeDestroyed = track.onSourceDestroyed?.((event) => { if (!this.#destroyed && this.#tracks.has(event.id)) this.removeTrack(event.id); }); if (unsubscribeDestroyed) this.#unsubscribers.push(unsubscribe); }
+  /**
+   * Two independent subscriptions per Track, and BOTH teardowns have to be
+   * retained. This used to push the lifecycle unsubscriber twice and drop the
+   * source-destroyed one entirely, so a destroyed GraphBinding left a live
+   * listener on every Track it had ever held: a retained reference under the
+   * P2-07 leak gate, and a route back into a torn-down binding. Finding F-05.
+   */
+  #subscribeTrack(track) {
+    const unsubscribeLifecycle = track.onLifecycle?.((event) => {
+      if (this.#destroyed) return;
+      if (event.type === "destroyed") this.removeTrack(event.track.id);
+      if (event.type === "detached") this.removeTrack(event.track.id, { destroy: false });
+    });
+    if (unsubscribeLifecycle) this.#unsubscribers.push(unsubscribeLifecycle);
+    const unsubscribeDestroyed = track.onSourceDestroyed?.((event) => {
+      if (!this.#destroyed && this.#tracks.has(event.id)) this.removeTrack(event.id);
+    });
+    if (unsubscribeDestroyed) this.#unsubscribers.push(unsubscribeDestroyed);
+  }
   #assertAlive() { if (this.#destroyed) throw new Error("GraphBinding is destroyed."); }
 }
