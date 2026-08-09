@@ -35,6 +35,17 @@ jobs:
       - run: npm ci
       - run: npm test -- --reporter=verbose
 
+  format-check:
+    name: Prettier format check (node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run format:check
+
   typecheck:
     name: typecheck (node 24)
     runs-on: ubuntu-latest
