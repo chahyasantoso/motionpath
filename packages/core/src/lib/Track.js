@@ -15,8 +15,8 @@ function clamp01(value) {
  * installed as an external, temporary surface for existing v4 callers.
  *
  * Legacy names setObserved, removeObserved, replaceObserved, observedSources,
- * observedEdges, observerCount, and observerIds intentionally live in the
- * external facade, not in this class. The strict boundary scans executable code.
+ * observedEdges, and _setGraphGuard intentionally live in the external facade,
+ * not in this class. The strict boundary scans executable code.
  */
 export class Track {
   #id;
@@ -41,17 +41,7 @@ export class Track {
   #destroyed = false;
   #destroying = false;
 
-  constructor({
-    id,
-    mode = "standalone",
-    interpolationTimeline,
-    proxyState,
-    plugins,
-    resolvedTrack,
-    layoutDelegate,
-    eventBus = defaultEventBus,
-    observationAdapter = null,
-  }) {
+  constructor({ id, mode = "standalone", interpolationTimeline, proxyState, plugins, resolvedTrack, layoutDelegate, eventBus = defaultEventBus, observationAdapter = null }) {
     this.#id = id;
     this.#mode = mode === "authored-graph" ? "authored-graph" : "standalone";
     this.#interpolationTimeline = interpolationTimeline;
@@ -90,12 +80,7 @@ export class Track {
 
   composeLocal(raw) {
     this.#assertAlive();
-    return composePatch(
-      this.#plugins,
-      raw ?? this.getSnapshot(),
-      this.#resolvedTrack,
-      `track "${this.#id}"`,
-    );
+    return composePatch(this.#plugins, raw ?? this.getSnapshot(), this.#resolvedTrack, `track "${this.#id}"`);
   }
 
   compose(raw, context) {
@@ -107,17 +92,13 @@ export class Track {
   getObservationOwner() { return this.#owner(); }
 
   onLifecycle(callback) {
-    if (typeof callback !== "function") {
-      throw new TypeError("Track lifecycle callback must be a function.");
-    }
+    if (typeof callback !== "function") throw new TypeError("Track lifecycle callback must be a function.");
     this.#lifecycleSubscribers.add(callback);
     return () => this.#lifecycleSubscribers.delete(callback);
   }
 
   onSourceDestroyed(callback) {
-    if (typeof callback !== "function") {
-      throw new TypeError("Track destroy callback must be a function.");
-    }
+    if (typeof callback !== "function") throw new TypeError("Track destroy callback must be a function.");
     this.#destroySubscribers.add(callback);
     return () => this.#destroySubscribers.delete(callback);
   }
@@ -128,26 +109,11 @@ export class Track {
     return () => this.#subscribers.delete(callback);
   }
 
-  _setObservationController(controller) {
-    this.#observationController = controller ?? null;
-  }
-
-  #owner() {
-    return this.#observationController ?? this.#standaloneObservationAdapter;
-  }
-
-  #notify() {
-    const snapshot = this.getSnapshot();
-    for (const callback of this.#subscribers) callback(snapshot);
-  }
-
-  #invalidate(reason) {
-    this.#emit({ type: "invalidated", track: this, reason });
-  }
-
-  #assertAlive() {
-    if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`);
-  }
+  _setObservationController(controller) { this.#observationController = controller ?? null; }
+  #owner() { return this.#observationController ?? this.#standaloneObservationAdapter; }
+  #notify() { const snapshot = this.getSnapshot(); for (const callback of this.#subscribers) callback(snapshot); }
+  #invalidate(reason) { this.#emit({ type: "invalidated", track: this, reason }); }
+  #assertAlive() { if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`); }
 
   _mount(host) {
     if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`);
@@ -163,19 +129,12 @@ export class Track {
   // Child topology and group-host bridging remain a separate P2-04 seam.
   addChild(child, opts = {}) {
     if (this.#destroyed) throw new Error(`Track "${this.#id}" is destroyed.`);
-    if (child.#parent) {
-      throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`);
-    }
-    if (this.#children.has(child.id)) {
-      throw new Error(`Track "${child.id}" already has a child with id "${child.id}".`);
-    }
+    if (child.#parent) throw new Error(`Track "${child.id}" is already a child of "${child.#parent.id}"`);
+    if (this.#children.has(child.id)) throw new Error(`Track "${child.id}" already has a child with id "${child.id}".`);
     child.#parent = this;
     const stagger = opts.stagger ?? 0;
     child.#staggerOffset = stagger;
-    child.#currentOffset = this.#layoutDelegate.computeSpawnOffset(
-      [...this.#children.values()],
-      { stagger },
-    );
+    child.#currentOffset = this.#layoutDelegate.computeSpawnOffset([...this.#children.values()], { stagger });
     this.#children.set(child.id, child);
     if (this.#host) this.#host._mountChild(child, child.#currentOffset);
     this.#eventBus.emit("child:spawned", { id: child.id, parentId: this.#id });
@@ -200,9 +159,7 @@ export class Track {
   }
 
   _attachGroupHost(groupHost) {
-    if (this.#groupHost) {
-      throw new Error(`Track "${this.#id}" is already a group host.`);
-    }
+    if (this.#groupHost) throw new Error(`Track "${this.#id}" is already a group host.`);
     this.#groupHost = groupHost;
   }
 
@@ -220,9 +177,7 @@ export class Track {
     if (this.#destroyed || this.#destroying) return;
     this.#destroying = true;
     const observerIds = this.#owner()?.getObserverIds?.(this) ?? [];
-    for (const callback of [...this.#destroySubscribers]) {
-      callback({ id: this.#id, observerIds });
-    }
+    for (const callback of [...this.#destroySubscribers]) callback({ id: this.#id, observerIds });
     this.#owner()?.clearObserved?.(this);
     this.#owner()?.removeSourceEdges?.(this);
     this.#destroyed = true;
@@ -240,14 +195,8 @@ export class Track {
       this.#groupHost.timeline.kill();
       this.#groupHost = null;
     }
-    try {
-      this.#interpolationTimeline?.kill();
-    } catch (error) {
-      logger.warn(
-        `track "${this.#id}", failed to kill interpolation timeline during destroy()`,
-        error,
-      );
-    }
+    try { this.#interpolationTimeline?.kill(); }
+    catch (error) { logger.warn(`track "${this.#id}", failed to kill timeline during destroy()`, error); }
   }
 
   #emit(event) {
