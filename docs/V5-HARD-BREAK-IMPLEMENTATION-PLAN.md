@@ -1,455 +1,247 @@
 # MotionPath v5 hard-break implementation plan
 
 **Repo:** `chahyasantoso/motionpath`  
-**Base studied:** `c955297`  
-**Branch:** `feat/pass2-track-facade-removal`  
-**Date:** 2026-08-09  
-**Decision:** remove runtime compatibility while preserving the useful v5 architecture foundation and the v4 authored project schema.
+**Reviewed branch:** `feat/pass2-track-facade-removal`  
+**Reviewed plan commit:** `1c77071006edef287d9683d9fac869812dad9591`  
+**Reviewed PR:** [#145](https://github.com/chahyasantoso/motionpath/pull/145)  
+**Date:** 2026-08-10  
+**Decision:** make the runtime break now, preserve the v4 authored schema, and deliver the architecture in five vertical phases instead of fourteen horizontal migrations.
 
 ## Executive decision
 
-The optimal solution is a **hard API break, not a hard architecture reset**.
+Yes, this can be faster.
 
-Delete the v4 compatibility projection, but keep and finish the valuable v5 runtime infrastructure:
+The previous plan had the right destination but too many handoffs. It postponed test migration and public API cleanup until the end, separated tightly coupled runtime changes, and treated migration scaffolding as if it deserved product-level phases.
+
+The target remains:
 
 ```text
 Engine
   owns one ProjectRuntime
 
 ProjectRuntime
-  owns one ObservationGraph       immutable normalized plan
-  owns one ObservationState       mutable live wiring
-  owns one GraphPublisher
-  owns one Clock
+  owns one qualified ObservationGraph
+  owns one ObservationState
+  owns one GraphBinding
+  owns one GraphPublisher and PatchRegistry
+  owns one Clock subscription
 
 Motion
-  owns recursive topology,
-  scheduling, triggers, and playback
+  owns topology, scheduling, triggers, and playback
 
 Track
-  owns interpolation and plugin composition only
-
-GraphBinding
-  owns graph mutations and transactions,
-  but never stores a second copy of graph state
+  owns playhead state, interpolation, and local plugin composition only
 
 Adapters
   own GSAP, DOM, React, clocks, and browser capabilities
 ```
 
-The key clarification is:
+Keep the v4 JSON contract (`schemaVersion: 4`) for this release. Break the runtime API deliberately.
 
-- `ObservationGraph` is the immutable graph IR.
-- `ObservationState` is the mutable committed runtime state.
-- `GraphBinding` is the transaction coordinator.
-- `GraphPublisher` is the flush and cache layer.
+## Senior review findings
 
-Keep that split. It is sound architecture. The original plan simply failed to name both halves.
+### 1. PR #145 is not a mergeable foundation
 
-## Scope and non-goals
+At review time it contains 238 commits, 226 changed files, about 15,000 additions, broad formatting churn, and a failing unit-test job. The boundary, build, typecheck, package, format, and benchmark jobs pass, but a green perimeter does not compensate for a red behavior gate.
+
+Do not keep repairing this PR. Freeze it as evidence, then rebuild the hard break on a clean branch with focused commits.
+
+### 2. The current runtime still has multiple authorities
+
+The code currently has all of these mutation surfaces:
+
+- `GraphBinding` mutates graph state;
+- `ObservationState` mutates live edges;
+- `GraphPublisher` exposes `addTrack`, `removeTrack`, `addEdge`, and `removeEdge`;
+- `ObservationStateBridge` is rebuilt after commits;
+- standalone adapters can own a separate graph;
+- `Track` can adopt another owner.
+
+That is the root problem. The hard break should establish one command path:
+
+```text
+ProjectRuntime API
+  -> GraphBinding transaction
+       -> candidate ObservationGraph
+       -> candidate/live ObservationState mutation
+       -> GraphPublisher.applyGraph()
+       -> commit or rollback
+```
+
+`GraphPublisher` must not expose public graph mutation methods after this cut. It publishes an already committed graph.
+
+### 3. “ObservationState is authoritative” is not yet true
+
+`GraphBinding.#refreshObservationBridge()` destroys and recreates the bridge and state after every commit. That makes state replaceable migration material, not the stable live owner described by the architecture.
+
+Keep one `ObservationState` instance for the lifetime of a loaded project. Transactions mutate it in place with an explicit undo journal. Delete `ObservationStateBridge` once its useful scenarios are captured.
+
+### 4. ProjectRuntime does not yet own the mounted graph
+
+`Engine.#mountMotion()` still creates a `GraphRuntime`, `GraphBinding`, or `GraphPublisher` per Motion. `ProjectRuntime.attachGraphRuntime()` exists, but the main mount path does not use it as the single project owner.
+
+The first meaningful runtime milestone is not another facade cleanup. It is mounting two Motions into one project graph and proving one clock-driven flush.
+
+### 5. Publisher rendering is not authoritative yet
+
+`GraphRuntime.compose()` calls `track.compose()`, and `Track.compose()` delegates back to its observation owner. That keeps recursive Track composition in the publisher path.
+
+The publisher path should compose through `ObservationState` plus the Track's local composer. A graph-owned Track must never recursively walk graph dependencies on its own.
+
+### 6. Lifecycle ownership needs one explicit rule
+
+`Track.destroy()`, `GraphBinding` lifecycle hooks, `ObservationState`, adapters, `Motion.destroy()`, and `ProjectRuntime.dispose()` can all participate in teardown. This is where double destroy and stale edge bugs will hide.
+
+Use this rule:
+
+> The owner removes graph membership and subscriptions first; the contained object releases local resources second. Destruction is idempotent everywhere.
+
+Also, an injected `ProjectRuntime` must not be silently replaced by `Engine.destroy()`. Either the Engine owns and recreates its runtime, or it borrows and only detaches from it.
+
+### 7. Tests must move with behavior
+
+Do not defer test rewriting to a late phase. Every compatibility test should be converted or deleted in the same commit that removes the compatibility behavior. A final “rewrite tests” phase creates a large red zone and slows the work.
+
+## Scope
 
 ### In scope
 
-- Delete legacy v4 runtime APIs and compatibility facades.
-- Collapse observation ownership to one implementation.
-- Make `ProjectRuntime` the actual project-wide graph owner.
-- Make publisher patches authoritative for authored and adopted graph Tracks.
-- Finish the three formal ports: `Clock`, `Interpolator`, and `Scheduler`.
-- Make `Motion` the sole composite and `Track` a leaf.
-- Enable cross-motion and free-track graph membership after their prerequisites pass.
-- Rewrite tests around v5 contracts.
+- remove legacy Track observation APIs and `LegacyObservationFacade`;
+- remove ownership and publisher rollout flags;
+- use one project-scoped `ObservationState` and one mutation coordinator;
+- qualify graph IDs internally;
+- use one project-wide graph runtime, publisher, patch registry, and clock subscription;
+- make published patches authoritative for graph-owned Tracks;
+- make `Clock`, `Interpolator`, and `Scheduler` real ports;
+- move topology and playback completely to `Motion`;
+- enable cross-motion and free-track membership after qualified identity works;
+- complete authored graph input validation;
+- update tests, types, exports, docs, and demos alongside each break.
 
-### Deliberately not in the first break
+### Not in scope
 
-- Do not break the v4 authored project JSON schema yet. Keep `schemaVersion: 4`.
-- Do not preserve old runtime aliases such as `setObserved` or `createMotionHost`.
-- Do not merge half-migrated compatibility states into the main branch.
-- Do not enable cross-motion before qualified graph IDs exist.
-- Do not delete cycle protection until one authoritative validator is active.
+- changing the authored project JSON schema;
+- preserving runtime aliases such as `setObserved` or `createMotionHost`;
+- supporting two observation ownership implementations;
+- preserving the publisher-off rendering path;
+- carrying migration-only parity infrastructure into the released package.
 
-**Principle:** break runtime code, keep authored data.
+## Delivery strategy
 
-## Phase 0: freeze behavior and establish rollback
+Use five phases. A phase is a reviewable vertical capability, not necessarily one commit. Keep each PR under roughly 20 changed source files and exclude repository-wide formatting.
 
-Create a break branch from the current head, but first preserve rollback and behavioral evidence.
+Every phase must leave unit tests, typecheck, build, package, boundary checks, and relevant benchmarks green. No “temporarily red” integration branches.
 
-1. Tag the current compatibility implementation as `v4.3-final`.
-2. Close or freeze PR #145. Do not spend more time perfecting the compatibility slice.
-3. Cherry-pick only genuine runtime fixes from PR #145:
-   - shared adapter ownership;
-   - destroy re-entrancy guard;
-   - GraphBinding unsubscribe bug;
-   - public Track identity fix.
-4. Capture current parity scenarios as golden fixtures:
-   - source destruction;
-   - observer cleanup;
-   - input and output edges;
-   - edge replacement;
-   - mutual observation;
-   - diamond composition;
-   - rollback after failed mutation;
-   - invalidation and retry;
-   - nested composition;
-   - paused, seeking, and reversed timelines.
-5. Record patch outputs and dependency closure, not only `old === new` assertions.
-6. Cut `v5-break` from the captured head if the work is not being performed directly on the active feature branch.
+## Phase 0: clean baseline and executable evidence
 
-The compatibility implementation becomes a git tag and fixture generator, not a runtime dependency.
+Create `v5-break` from the clean `v5` base, not from the full PR #145 diff.
 
-**Exit gate:** golden fixtures exist, the base commit is recorded, and the v4.3 tag can reproduce the pre-break behavior.
+1. Freeze PR #145 and record its final head.
+2. Tag the compatibility snapshot `v5-compat-snapshot`. Do not call it `v4.3-final`; it contains v5 migration code, not the v4.3 release.
+3. Port only independently verified fixes, each as an isolated commit:
+   - destroy re-entrancy and idempotent teardown;
+   - source-edge cleanup before unregister;
+   - public Track identity preservation;
+   - GraphBinding lifecycle unsubscribe cleanup.
+4. Capture a compact golden suite:
+   - input and output composition;
+   - edge add, remove, and replace;
+   - failed mutation rollback, including `mapFn`;
+   - source destruction and observer cleanup;
+   - diamond memoization;
+   - paused, seeking, reversed, and nested scheduling.
+5. Record patches, order, dependency closure, lifecycle events, and subscription counts. Do not rely only on `old === new` assertions.
 
-## Phase 1: remove the compatibility API
+**Exit gate:** clean branch, green matrix, reproducible compatibility snapshot, and golden fixtures that can run without the compatibility implementation being imported by production code.
 
-Delete the v4 projection first.
+## Phase 1: establish one graph authority
 
-Remove:
+This phase removes compatibility and duplicate ownership together. Splitting them recreates the dual-write state that caused the PR #145 churn.
 
-```text
-packages/core/src/usecases/LegacyObservationFacade.js
-```
-
-From `createTrack.js`, replace:
-
-```js
-return installLegacyObservationFacade(new Track(...));
-```
-
-with:
-
-```js
-return new Track(...);
-```
-
-Remove from `Track`:
-
-```text
-_adoptObservationOwner
-setObserved
-removeObserved
-replaceObserved
-observedSources
-observedEdges
-observerCount
-observerIds
-```
-
-Move lifecycle payload construction into a neutral module such as:
-
-```text
-packages/core/src/usecases/observationEvents.js
-```
-
-`Track` may ask its injected runtime owner for observer IDs during destruction, but it must not expose graph mutation or legacy observation getters.
-
-New mutation API:
+1. Delete `LegacyObservationFacade` and all legacy Track observation methods and getters.
+2. Move destroy-event payload construction to a neutral lifecycle module.
+3. Remove:
+   - `observationOwnership` modes;
+   - `TrackObservationOwner`;
+   - `createObservationOwner`;
+   - `StandaloneObservationAdapter`;
+   - implicit owner adoption;
+   - compatibility mutation hooks.
+4. Keep one project-scoped owner implementation, backed directly by one long-lived `ObservationState`.
+5. Delete `ObservationStateBridge`. Move its useful parity checks into `ObservationState` and transaction tests.
+6. Make `GraphBinding` the only mutation coordinator.
+7. Remove graph mutation methods from `GraphPublisher`; keep only graph application, invalidation, caching, retry, and publication.
+8. Introduce the runtime API:
 
 ```js
-runtime.addEdge(...)
-runtime.removeEdge(...)
-runtime.replaceEdge(...)
+runtime.addEdge(edge);
+runtime.removeEdge(edge);
+runtime.replaceEdge(oldEdge, newEdge);
 ```
 
-No user-facing code mutates observation through `Track`.
+9. Reject cross-runtime objects before any mutation.
+10. Migrate or delete affected tests, types, exports, and demos in the same commits.
 
-### Exit gate
-
-- Authored Engine Tracks have no legacy observation symbols at runtime.
-- `createTrack()` does not install properties dynamically.
-- No source imports `LegacyObservationFacade`.
-- No compatibility names appear in public TypeScript declarations.
-- Direct Track tests use the new owner/runtime API.
-
-## Phase 2: collapse ownership to one implementation
-
-Delete the fake ownership rollout.
-
-Remove:
+A mutation must follow:
 
 ```text
-observationOwnership: "compatibility" | "scoped"
-OBSERVATION_OWNERSHIP_MODES
-resolveObservationOwnership()
-TrackObservationOwner
-createObservationOwner
-StandaloneObservationAdapter
+prepare candidate
+  -> resolve identities
+  -> validate candidate
+  -> apply live state with undo journal
+  -> apply publisher graph
+  -> commit
+  -> invalidate
 ```
 
-Keep one adapter contract, preferably the stronger scoped implementation, and inject it from `ProjectRuntime`.
+A failure must leave graph IR, live edges, publisher cache, lifecycle subscriptions, and Track ownership unchanged.
 
-The key rule:
+**Exit gate:** one owner, one live state instance, one mutation API, no legacy symbols, no bridge rebuild, and rollback tests green.
 
-> A Track never changes observation owners because another Track is passed to it.
+## Phase 2: qualified project graph and authoritative publication
 
-Cross-owner mutation must fail before changing either side:
+This is the architecture's critical path. Do identity and project-wide ownership in one phase because each is only useful when the other is mounted.
 
-```js
-runtimeA.addEdge(trackFromRuntimeB, trackFromRuntimeA);
-// throws: cross-runtime observation ownership is not allowed
-```
-
-If transfer is ever needed, make it a separate explicit transaction. Do not hide transfer inside `setObserved`.
-
-### Exit gate
-
-- One observation adapter implementation.
-- One owner per ProjectRuntime.
-- No implicit owner adoption.
-- Cross-owner attempts leave both runtimes unchanged.
-- Destroying and recreating ProjectRuntime preserves the architecture without mode flags.
-
-## Phase 3: make ObservationState the sole live owner
-
-Do not delete `ObservationState`. Delete its competitors.
-
-### ObservationGraph owns
-
-- normalized nodes;
-- immutable edges;
-- diagnostics;
-- canonical topological order;
-- adjacency indexes;
-- graph-level identity.
-
-### ObservationState owns
-
-- registered runtime Track instances;
-- mutable live edges;
-- reverse observer indexes;
-- cycle checking;
-- invalidation;
-- recursive composition state;
-- lifecycle cleanup.
-
-### GraphBinding owns only
-
-- prepare;
-- validate;
-- apply;
-- rollback;
-- commit;
-- subscription coordination.
-
-It must not maintain a second independent graph truth.
-
-Delete `ObservationStateBridge` after golden fixtures are captured. Its parity assertions are migration scaffolding, not product behavior.
-
-Keep `ObservationTrackController` only if it remains a thin mutation port. If it duplicates `ObservationState` logic, delete it and call `ObservationState` through `GraphBinding`.
-
-### Exit gate
-
-Every mutation follows:
-
-```text
-prepare -> resolve -> validate -> wire -> commit -> invalidate
-```
-
-A failed operation leaves the graph IR, live ObservationState, Track ownership, publisher cache, and lifecycle subscriptions unchanged.
-
-## Phase 4: unify graph identity
-
-The current system has multiple ID models:
-
-```text
-local graph IDs:       trackA
-project IDs:           motionA/trackA
-free-track IDs:        ~/trackA
-```
-
-Unify them before enabling project-wide graphs.
-
-Use qualified IDs internally:
+1. Normalize every internal node ID to:
 
 ```text
 motionId/trackId
 ~/trackId
 ```
 
-Preserve bare IDs only as an authored-schema convenience. Resolve them during normalization:
+2. Resolve bare authored IDs inside their Motion during normalization.
+3. Reject ambiguous, duplicate, unknown, malformed, and self-referential qualified IDs.
+4. Use canonical qualified-ID ordering as the deterministic tie-breaker.
+5. Construct exactly one `GraphRuntime` when a project commits.
+6. Mount and unmount Motion membership through a ProjectRuntime transaction.
+7. Remove per-Motion graph bindings, publishers, graph order, and graph runtime ownership.
+8. Start exactly one project clock subscription.
+9. Make publisher composition call `ObservationState` with Track-local composition. Do not call recursive graph composition through `Track.compose()`.
+10. Make React and DOM subscribers consume immutable `PatchRegistry` batches for graph-owned Tracks.
+11. Remove `publisherRendering`, the publisher-off branch, `Motion.composeGraph()`, and `applyGraphOrder()`.
 
-```js
-{
-  source: "parent";
-}
-```
-
-becomes internally:
-
-```js
-{
-  source: "motionA/parent",
-  target: "motionA/child"
-}
-```
-
-A qualified source explicitly crosses motion scope:
-
-```js
-{
-  source: "motionB/parent",
-  role: "input",
-  target: "parentWorld"
-}
-```
-
-Add validation for:
-
-- ambiguous bare IDs;
-- unknown qualified IDs;
-- duplicate qualified IDs;
-- invalid free-track namespaces;
-- cross-motion references when the capability is disabled;
-- self-reference after qualification.
-
-Replace declaration-index tie-breaking with canonical qualified-ID ordering.
-
-### Exit gate
-
-The same graph produces the same order regardless of declaration order, mount order, reload order, mutation history, or motion registration order.
-
-## Phase 5: wire one project-wide GraphRuntime
-
-This is the largest architectural correction.
-
-Currently, `Engine.#mountMotion()` creates a graph runtime per Motion. Change it so:
+Minimum integration proof:
 
 ```text
-Engine
-  -> ProjectRuntime
-       -> one GraphRuntime
-            -> one GraphBinding
-                 -> one ObservationState
-                      -> all mounted tracks
+Motion A source
+  -> Motion B observer
+  -> one project flush
+  -> one immutable batch
+  -> unmount A
+  -> B invalidated with a stable diagnostic
 ```
 
-Mounting a Motion:
+**Exit gate:** one graph runtime, one publisher, one clock subscription, deterministic qualified order, one composition per dirty node per tick, and no half-published batches.
 
-1. Build its Track objects.
-2. Qualify their IDs.
-3. Register them into the ProjectRuntime candidate.
-4. Add their edges to the project graph.
-5. Validate the complete candidate.
-6. Commit atomically.
-7. Let the shared publisher flush them.
+## Phase 3: finish the domain boundary
 
-Unmounting:
+With the graph stable, finish the object model and external dependencies.
 
-1. Remove the Motion's tracks from the project graph.
-2. Remove dependent edges.
-3. Invalidate downstream nodes.
-4. Unregister instances.
-5. Dispose only resources owned by that Motion.
-
-Delete the per-Motion `GraphPublisher` and `GraphBinding` construction path from `Engine`.
-
-`Motion` no longer owns a graph binding or graph order. It owns scheduling only.
-
-### Exit gate
-
-- Exactly one publisher per loaded project.
-- Exactly one clock subscription per project.
-- `ProjectRuntime.flush()` actually flushes mounted graph nodes.
-- Unmounting one Motion invalidates affected nodes in another Motion.
-- No graph object is unreachable after mount.
-- Destroying Engine tears down the graph exactly once.
-
-## Phase 6: make publisher rendering authoritative
-
-Remove the alternate rendering branch.
-
-Current shape:
-
-```js
-if (publisherRendering) {
-  GraphRuntime;
-} else {
-  GraphPublisher + GraphBinding;
-}
-```
-
-Choose one path and delete the flag. The target path is:
-
-```text
-clock tick
-  -> GraphPublisher.flush()
-  -> PatchRegistry
-  -> React / DOM / Canvas adapter
-```
-
-`Track.compose()` remains valid only for genuinely standalone Tracks that are not adopted into a ProjectRuntime. Authored and adopted Tracks render from published patches.
-
-Delete:
-
-- `publisherRendering`;
-- the publisher-off path;
-- `Motion.composeGraph()`;
-- `applyGraphOrder()`;
-- recursive subscriber composition for graph-owned Tracks.
-
-Keep the one-argument user transform contract only for standalone composition.
-
-### Exit gate
-
-- One composition per dirty graph node per tick.
-- Multiple subscribers do not multiply composition work.
-- No graph-owned Track recursively composes sources from each subscriber.
-- Patch subscribers see complete batches, never half-flushed state.
-- Patch revision and immutability tests remain green.
-
-## Phase 7: finish the port boundary
-
-Keep exactly the three formal ports from the original architecture:
-
-```text
-Clock
-Interpolator
-Scheduler
-```
-
-Make them real instead of assertion-only seams.
-
-### Clock
-
-Keep the existing strengths:
-
-- manual clock;
-- GSAP ticker adapter;
-- subscription multiplexing;
-- deterministic tick numbers;
-- disposal.
-
-### Interpolator
-
-Make Track construction receive an interpolator:
-
-```js
-const tween = interpolator.create(vars);
-```
-
-GSAP implements the production adapter. Tests use a fake interpolator.
-
-### Scheduler
-
-Make Motion receive a scheduler:
-
-```js
-scheduler.to(track, vars);
-scheduler.timeline(vars);
-```
-
-GSAP implements the production scheduler. Tests use a fake scheduler.
-
-Do not turn every registry, event bus, or helper into a formal port. Those are dependency objects, not architectural boundaries.
-
-### Exit gate
-
-- Core tests run without importing GSAP.
-- Production GSAP imports exist only under adapters.
-- Fake Clock, Fake Interpolator, and Fake Scheduler cover core lifecycle and graph tests.
-- The GSAP quarantine list shrinks to zero.
-
-## Phase 8: move topology and playback completely into Motion
-
-Delete from Track:
+1. Inject `Interpolator` into Track construction.
+2. Inject `Scheduler` into Motion.
+3. Keep `Clock` at ProjectRuntime/GraphRuntime level.
+4. Move all production GSAP imports under adapters.
+5. Remove topology and playback from Track:
 
 ```text
 addChild
@@ -459,270 +251,96 @@ play
 pause
 seek
 reverse
-groupHost
-host
 parent
 children
+host
 ```
 
-Motion becomes the only object that mounts children, unmounts children, calculates layout, applies reflow, schedules timelines, owns playback, and recursively destroys child Motions and Tracks.
-
-Replace the old host API with:
-
-```js
-engine.createMotion({
-  id,
-  trigger: {
-    type: "manual",
-    autoplay,
-  },
-  staggerTransition,
-});
-```
-
-Do not preserve `createMotionHost()` as a compatibility alias.
-
-### Exit gate
-
-- Track is a leaf.
-- Motion is the sole composite.
-- Nested Motion depth-three tests pass.
-- Reflow and removal are owned by Motion.
-- Repeated initialization does not reuse destroyed delegates.
-- Playback controls exist only on Motion.
-
-## Phase 9: complete authored graph validation
-
-Upgrade plugin metadata from:
-
-```js
-inputs: ["parentWorld"];
-```
-
-to:
-
-```js
-inputs: {
-  parentWorld: {
-    requiredInGraph: true,
-    standaloneDefault: {
-      x: 0,
-      y: 0,
-      rotation: 0,
-    },
-  },
-}
-```
-
-Validate missing required input, unknown input, duplicate input, role mismatch, incompatible source/output, standalone fallback, and cross-motion qualified source.
-
-Use stable diagnostics:
+6. Make `Motion` own recursive children, layout, reflow, scheduling, triggers, playback, and child destruction.
+7. Replace `createMotionHost()` with `engine.createMotion(...)`; do not add an alias.
+8. Complete plugin input metadata and stable graph diagnostics:
 
 ```text
 GRAPH_INPUT_MISSING
 GRAPH_INPUT_UNKNOWN
 GRAPH_INPUT_DUPLICATE
 GRAPH_INPUT_ROLE_MISMATCH
+GRAPH_SOURCE_INCOMPATIBLE
 ```
 
-The current validator catches some of these. Finish the contract instead of leaving a half-migrated flat `inputs` shape.
+9. Prove core graph and lifecycle tests with fake Clock, Interpolator, and Scheduler and no GSAP import.
 
-### Exit gate
+**Exit gate:** Track is a leaf, Motion is the sole composite, core tests are renderer-neutral, and malformed authored rigs fail before mount.
 
-- Malformed authored FK rigs fail before runtime mount.
-- Standalone FK tracks use documented defaults.
-- Authored graph mode cannot silently fall back to standalone behavior.
-- Plugin metadata and TypeScript declarations agree.
+## Phase 4: enable membership and release the break
 
-## Phase 10: enable capabilities after prerequisites
+Cross-motion and free Tracks are now small features because qualified identity and the shared runtime already exist.
 
-Once the unified project graph is real, remove the flags and enable the capabilities that were previously gated:
+1. Enable cross-motion references without a capability flag.
+2. Make `engine.adopt(track)` register `~/trackId` in the same graph, state, publisher, clock, and lifecycle system.
+3. Remove `crossMotion`, `freeTracks`, ownership, and publisher rollout flags.
+4. Update public exports, TypeScript declarations, README, API docs, examples, demos, and package export maps.
+5. Delete compatibility-only tests, migration status documents, stale allowlists, parity ceremonies, comment-ratio gates, and exact-head process checks.
+6. Keep one authoritative CI matrix covering:
+   - unit and integration tests;
+   - typecheck and build;
+   - package dry run;
+   - architecture boundaries;
+   - lifecycle and rollback;
+   - graph benchmarks;
+   - documentation integrity.
+7. Publish a breaking-change table with old API, replacement, and migration example.
+
+**Exit gate:** cross-motion and adopted free Tracks work end to end, all rollout flags are gone, public surfaces describe only v5 behavior, and the full matrix is green.
+
+## Recommended commit sequence
+
+Keep the phases short, but keep commits surgical:
 
 ```text
-crossMotion: always on
-freeTracks: always on
-publisherRendering: removed because always on
-observationOwnership: removed because only one owner exists
+1. test: capture v5 compatibility golden fixtures
+2. fix: port verified lifecycle and identity fixes
+3. refactor: remove legacy observation API and ownership modes
+4. refactor: make ObservationState and GraphBinding authoritative
+5. refactor: qualify project graph identity
+6. refactor: mount one project-wide GraphRuntime
+7. refactor: make published patches the only graph render path
+8. refactor: inject Interpolator and Scheduler ports
+9. refactor: make Motion the sole composite
+10. feat: finish graph validation and project membership
+11. chore: publish v5 API and remove migration machinery
 ```
 
-Do not enable them before Phases 4 through 9 are complete. Otherwise namespace, lifecycle, and ownership failures become impossible to isolate.
+Do not mix formatting-only changes into these commits.
 
-For free Tracks:
+## Non-negotiable sequencing rules
 
-```js
-engine.adopt(track);
-```
-
-registers the Track as:
-
-```text
-~/trackId
-```
-
-and includes it in the same graph, publisher, clock, and lifecycle system.
-
-### Exit gate
-
-- Cross-motion edges work end to end.
-- Free Tracks participate in graph publication.
-- Unmount removes references and produces diagnostics.
-- Re-adding a source does not silently recreate removed edges.
-- Timeline independence is preserved.
-
-## Phase 11: rewrite tests around the new contract
-
-Delete tests whose only purpose is compatibility projection:
-
-```text
-Track.v43.test.js
-ObservationStateBridge.test.js
-ScopedObservationAdapter.parity.test.js
-ObservationAdapter.scenario-parity.test.js
-Track.owner-first.test.js
-createTrack.standalone-adapter.test.js
-```
-
-Do not delete their behavior. Rewrite the scenarios against:
-
-```text
-graph normalization
-graph identity
-graph cycle rejection
-state mutation
-transaction rollback
-publisher invalidation
-publisher caching
-project membership
-cross-motion references
-free-track adoption
-motion topology
-track leaf behavior
-clock and scheduler ports
-plugin input validation
-lifecycle disposal
-```
-
-The v4.3 tests become golden fixture sources, not active API contracts.
-
-## Phase 12: update public API and schema policy
-
-Break the runtime API deliberately:
-
-- remove legacy Track observation methods;
-- remove `createMotionHost`;
-- remove ownership mode options;
-- remove publisher flags;
-- remove compatibility facade imports;
-- remove internal graph exports from the public package;
-- expose only intended v5 runtime contracts.
-
-Keep the v4 project JSON schema for now:
-
-```text
-schemaVersion: 4
-```
-
-Update:
-
-- `index.js`;
-- `internal.js`;
-- TypeScript declarations;
-- README;
-- API reference;
-- demo imports;
-- examples;
-- package export map.
-
-## Phase 13: remove migration-only process machinery
-
-Delete or simplify:
-
-- exact-head parity ceremony;
-- compatibility parity gates;
-- runtime symbol-ban tests for APIs that no longer exist;
-- comment-ratio gate;
-- stale compatibility allowlists;
-- migration-only status documents.
-
-Keep unit, typecheck, build, package, boundary, benchmark, lifecycle, rollback, and one authoritative CI matrix.
-
-Add a documentation integrity check so an architecture document cannot be silently replaced again:
-
-```text
-- architecture document contains AD-1 through AD-11;
-- architecture document contains all implementation phases;
-- architecture document contains rollback policy;
-- architecture document exceeds a minimum section/content threshold.
-```
-
-## Recommended commit order
-
-Use focused commits, but do not merge intermediate compatibility states into the main branch:
-
-```text
-1. chore: tag v4.3-final and capture golden graph fixtures
-2. refactor: remove legacy observation facade from Track creation
-3. refactor: collapse observation ownership to one runtime implementation
-4. refactor: formalize ObservationGraph IR and ObservationState runtime ownership
-5. fix: unify qualified graph identity and canonical ordering
-6. refactor: make ProjectRuntime the single graph owner
-7. refactor: make publisher patches the only authored render path
-8. refactor: wire Interpolator and Scheduler ports
-9. refactor: move topology and playback fully into Motion
-10. feat: complete authored plugin input contracts
-11. feat: enable cross-motion and free-track graph membership
-12. test: rewrite suites around v5 contracts
-13. chore: remove compatibility flags and migration gates
-14. docs: publish v5 breaking API and architecture status
-```
-
-## Critical sequencing rules
-
-Do not start by deleting `ObservationState`; it is the live runtime state needed by the target architecture.
-
-Do not enable cross-motion before qualified IDs exist.
-
-Do not delete cycle checks until one authoritative cycle validator is active.
-
-Do not wire publisher rendering before `GraphBinding` is reachable from the mounted runtime.
-
-Do not pull P2-04 into the same first commit as facade deletion. They belong in the same final architecture, but staging the work keeps failures diagnosable.
-
-The correct sequence is:
-
-```text
-freeze behavior
-  -> delete compatibility projection
-  -> collapse ownership
-  -> unify graph identity
-  -> wire one project runtime
-  -> make publisher authoritative
-  -> finish ports
-  -> make Motion the sole composite
-  -> enable capabilities
-  -> rewrite tests
-  -> publish breaking API
-```
+- Do not delete `ObservationState`; delete its competitors.
+- Do not recreate `ObservationState` after a successful mutation.
+- Do not let `GraphPublisher` and `GraphBinding` both mutate graph topology.
+- Do not enable cross-motion or free Tracks before qualified IDs and the shared runtime exist.
+- Do not make publisher rendering authoritative while it still delegates recursive graph composition to Track.
+- Do not remove the last cycle validator until the candidate graph validator is active.
+- Do not replace a borrowed/injected ProjectRuntime during `Engine.destroy()`.
+- Do not postpone test, type, export, or demo migration to the end.
+- Do not merge a PR with a failing unit-test gate.
 
 ## Definition of done
 
-- Runtime compatibility facade is deleted.
-- Track exposes no legacy observation mutation or state API.
-- One observation ownership implementation exists.
-- ObservationGraph is immutable IR and ObservationState is the sole live wiring store.
-- GraphBinding is the only mutation coordinator.
-- One project-wide GraphRuntime owns graph publication and clock flushes.
-- Graph IDs are qualified internally and ordered canonically.
-- Authored rendering consumes immutable publisher patches.
-- Track is a leaf and Motion is the sole composite.
-- Clock, Interpolator, and Scheduler are real, tested ports.
-- Authored plugin inputs are validated with stable diagnostics.
-- Cross-motion and free-track behavior work without rollout flags.
-- v4 authored schema remains supported.
-- Tests assert v5 contracts, not compatibility projections.
-- Build, typecheck, package, boundary, benchmark, lifecycle, rollback, and integration gates are green.
-- Architecture docs include an integrity check and current-state status.
+- v4 authored projects still load with `schemaVersion: 4`.
+- No runtime compatibility facade or legacy Track observation API exists.
+- One qualified ObservationGraph and one long-lived ObservationState exist per loaded project.
+- GraphBinding is the sole mutation coordinator.
+- GraphPublisher cannot mutate topology.
+- One project-wide GraphRuntime, PatchRegistry, publisher, and clock subscription exist.
+- Graph-owned Tracks publish immutable batches and never recursively compose graph dependencies.
+- Track is a leaf; Motion owns topology and playback.
+- Clock, Interpolator, and Scheduler are real tested ports.
+- Cross-motion and free-track membership work without flags.
+- Lifecycle teardown is owner-first, idempotent, and leak-free.
+- Tests, types, exports, docs, and demos describe only the v5 runtime contract.
+- Unit, integration, typecheck, build, package, boundary, lifecycle, rollback, benchmark, and documentation gates are green.
 
 ## Bottom line
 
-Drop compatibility aggressively, but preserve the runtime state and publication architecture. The assets are `ObservationGraph`, `ObservationState`, `GraphBinding`, `GraphPublisher`, `ProjectRuntime`, `PatchRegistry`, and the three formal ports. The waste is the legacy projection, duplicate ownership modes, alternate rendering paths, and migration scaffolding that keeps both systems alive.
+The architecture is recoverable, but PR #145 is carrying too much migration history to be the implementation vehicle. Reset the delivery branch, collapse the duplicated ownership model immediately, and drive the rest through one project-wide vertical slice. Five phases are enough; fourteen were protecting scaffolding that the hard break is supposed to delete.
