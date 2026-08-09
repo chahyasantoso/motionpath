@@ -2,30 +2,30 @@
 
 **Date:** 2026-08-09, Asia/Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
-**Scope:** failure-log analysis, PR #142 repair baseline, and scoped-adapter migration review
+**Latest verified code head:** `48b6799`
 
-## Current decision
+## Session result
 
-PR #142 remains the frozen green repair baseline. The first PR #143 scoped-adapter implementation was reverted after its Node 24 run expanded to 33 failures. The current PR #143 branch is green with characterization-only changes; the proven adapter implementation remains unchanged.
+PR #142 remains the frozen green repair baseline. PR #143 is green on the latest code commit with all eight Node 24 checks passed. The scoped-owner work is still draft and default-off.
 
-## What is retained
+## Delivered
 
-- Explicit-null handling in `createTrack`.
-- GraphBinding rollback that restores ObservationState and Track wiring, including `mapFn`.
-- O(1) lookup improvements on the hot observation path.
-- Readability and destroy re-entrancy fixes.
+The session repaired the original 3-failure run, isolated and documented the 33-failure composition-protocol regression, then added a safe scoped migration path:
 
-## Characterization now locked
+- locked characterization tests for folds, public IDs, cycles, memoization, replacement, duplicate IDs, lightweight tracks, lifecycle snapshots, and disposal;
+- a private-owner scoped adapter harness;
+- a default-off ProjectRuntime ownership selector;
+- direct compatibility-vs-scoped parity coverage;
+- current status and handoff documentation.
 
-The dedicated protocol suite covers output folds, input-before-local ordering, public Track-ID context keys, mutual-cycle fallback, diamond memoization, repeated-edge mapper replacement, duplicate public IDs inside one scope, and lightweight tracks without `.compose()`. Existing ProjectRuntime tests cover adapter lifetime and disposal.
+## Decision record
 
-These tests are intentionally a contract lock. They prevent the next ownership implementation from quietly changing composition semantics while moving state between registries.
+The key architectural decision is separation of behavior from ownership. The existing compose protocol is the contract. Scoped ownership may replace the registry only behind that contract, with compatibility mode as the default until the full matrix proves equivalence.
 
-## Correct next design
+## Next
 
-1. Add the remaining Track-level destroy observer snapshot characterization.
-2. Extract a scoped ownership interface behind the unchanged adapter API.
-3. Switch one ProjectRuntime path at a time, preserving the global fallback until equivalence is proven.
-4. Run full Node 24 CI after every slice.
+Use one shared scenario runner to compare compatibility and scoped adapters across every locked contract, then run Node 24 CI. Keep the global fallback until parity is complete. Only afterward integrate scoped ownership into a controlled runtime path.
 
-Do not merge PR #143 as a scoped migration yet. Do not flip publisher rendering, cross-motion, or free-track defaults.
+## Guardrails
+
+Never fix a scoped test by weakening a locked assertion. Preserve public Track IDs, `COMPOSING` fallback, mapFn semantics, lifecycle ordering, and default-off runtime flags.
