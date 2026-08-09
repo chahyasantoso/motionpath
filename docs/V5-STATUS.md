@@ -1,41 +1,47 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-09 15:00 Jakarta  
+**Status captured:** 2026-08-09 16:15 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
-**Last green baseline:** `c74601f`, 129 files and 712 tests green  
-**Latest fix:** `7f04915`, verification pending  
-**Safe frozen baseline:** PR #142 at `184f194`  
+**Reviewed behavior head:** `32ada3e`, all eight original Node 24 checks green  
+**Latest closure head:** follow-up commits after the implementor review  
 **Canonical index:** [`V5-README.md`](./V5-README.md)  
-**Implementation report:** [`V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md`](./V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md)  
-**Next implementor handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)
+**Implementor review:** [`V5-P2-03-IMPLEMENTOR-REVIEW-2026-08-09.md`](./V5-P2-03-IMPLEMENTOR-REVIEW-2026-08-09.md)  
+**Next handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)
 
 ## Executive status
 
-The owner-backed Track projection cut is implemented, but the first verification
-run found four failures: 22 readability violations in `Track.js`, one missing
-comment-ratio point, and one replacement lifecycle event with `role: undefined`.
-The fix is `7f04915`: Track formatting and explanatory comments are restored, and
-replacement/removal events now carry the owner edge role and input. Full matrix
-verification is pending; do not call this head green yet.
+The P2-03 behavior slice is green and reviewed. Adapter parity, scoped runtime
+integration, GraphBinding rollback, source cleanup, readability, build, typecheck,
+packaging, boundary reporting, and the cache fuzz suite pass. P2-03 is not yet
+architecturally closed because the legacy facade, direct-construction fallback,
+second cycle authority, authored dual-write path, and strict CI evidence were
+still being closed in the follow-up.
 
-## Current architecture
+## Evidence-backed architecture
 
-- ProjectRuntime owns one observation adapter; process-wide adapter globals are gone.
-- ObservationState is authoritative after construction hydration.
-- GraphBinding injects an ObservationTrackController into authored Tracks.
-- Track forwards observation mutation, composition, reads, and lifecycle through
-  the owner facade; it no longer stores a local edge map or reverse observer map.
-- Compatibility remains the default. Scoped ownership remains explicit opt-in.
+- Engine-created standalone Tracks share the injected ProjectRuntime adapter.
+- Scoped ownership isolates duplicate IDs and preserves compose-context memoization.
+- ObservationState owns authored graph state after construction hydration.
+- GraphBinding injects the state-backed controller and preserves rollback metadata.
+- Track has no local edge or reverse-observer maps.
+- Compatibility remains the default; scoped ownership is explicit opt-in.
+- Strict boundary enforcement and non-optional benchmark jobs are now wired into CI.
 
-## Remaining work
+## Closure checklist
 
-Run build first, then the full Node 24 matrix and both boundary modes. If green,
-close the session with the handoff and keep the next slice focused on deleting the
-remaining compatibility forwarding symbols from Track and migrating any direct
-callers. Do not mix P2-04 child topology/playback removal into this session.
+- [x] Behavioral matrix and full Node 24 suite green at reviewed behavior head.
+- [x] Strict boundary command added as a blocking PR job.
+- [x] Benchmark and baseline jobs no longer continue on error.
+- [x] Public ownership docs corrected.
+- [ ] Remove Track-installed legacy facade after production caller migration.
+- [ ] Remove direct singleton fallback or explicitly close it with isolation evidence.
+- [ ] Make ObservationState/controller the sole runtime cycle authority.
+- [ ] Remove authored GraphBinding dual-write.
+- [ ] Add hot-path benchmark threshold and repeated teardown evidence.
+- [ ] Refresh this file again on the final closure head.
 
 ## Guardrails
 
-Never weaken parity assertions or hide boundary findings with scanner exceptions.
 Keep `publisherRendering`, `crossMotion`, `freeTracks`, and `observationOwnership`
-default-off/default-compatibility.
+default-off/default-compatibility. Keep P2-04 topology/playback removal separate.
+Never weaken assertions or hide boundary findings with scanner exceptions.
