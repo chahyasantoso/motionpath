@@ -1,4 +1,5 @@
 import { composePatch } from "../usecases/ComposeTrackPatch.js";
+import { COMPOSING } from "../usecases/composeContext.js";
 import { createDestroyEvent } from "../usecases/LegacyObservationFacade.js";
 import { StandaloneObservationAdapter } from "../usecases/StandaloneObservationAdapter.js";
 import { defaultGaplessLayoutDelegate } from "./GaplessLayoutDelegate.js";
@@ -80,7 +81,19 @@ export class Track {
 
   compose(raw, context) {
     this.#assertAlive();
-    return this.#owner()?.compose(this, raw, context) ?? this.composeLocal(raw);
+    const ctx = context ?? new Map();
+    const cached = ctx.get(this.#id);
+    if (cached === COMPOSING) return this.composeLocal(raw);
+    if (cached !== undefined) return cached;
+    ctx.set(this.#id, COMPOSING);
+    try {
+      const patch = this.#owner()?.compose(this, raw, ctx) ?? this.composeLocal(raw);
+      ctx.set(this.#id, patch);
+      return patch;
+    } catch (error) {
+      ctx.delete(this.#id);
+      throw error;
+    }
   }
 
   getObservationOwner() { return this.#owner(); }
