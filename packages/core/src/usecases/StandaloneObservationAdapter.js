@@ -126,7 +126,10 @@ export class StandaloneObservationAdapter {
     const target = this.#keys.get(observer);
     if (!target) return;
     for (const edge of this.#owner.getEdges(target)) {
-      this.#owner.removeEdge({ source: edge.source, target, role: edge.role, input: edge.input });
+      // getEdges returns Track objects and removeEdge matches on the private
+      // identity key, so passing the Track straight through removed nothing.
+      const source = this.#keys.get(edge.source) ?? globalKeys.get(edge.source);
+      this.#owner.removeEdge({ source, target, role: edge.role, input: edge.input });
     }
   }
 

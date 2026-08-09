@@ -29,6 +29,7 @@ const PROTECTED_FILES = [
   "contract/immutableValue.js",
   "lib/Track.js",
   "usecases/GraphPublisher.js",
+  "usecases/ScopedObservationAdapter.js",
   "usecases/StandaloneObservationAdapter.js",
   "usecases/TrackObservationOwner.js",
 ];
