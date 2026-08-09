@@ -66,7 +66,7 @@ export class ObservationStateBridge {
       }
     }
     if (actual.size !== expected.size || [...actual].some((key) => !expected.has(key))) {
-      throw new Error("ObservationState is out of parity with normalized graph IR.");
+      throw new Error("ObservationState mismatch: live Track wiring does not match declared edges in normalized graph IR.");
     }
     return true;
   }
