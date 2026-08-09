@@ -1,20 +1,26 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 12:09 Jakarta  
+**Captured:** 2026-08-09 12:11 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
 **Base:** green PR #142 at `184f194`
 
 ## Current truth
 
-PR #143's pre-harness head was green. The opt-in scoped harness exposed two protocol bugs in its own tests: it returned internal edge source keys incorrectly and pre-seeded the root `COMPOSING` marker, skipping the root's edges. Both are corrected in the harness only; production adapter behavior remains untouched.
+The opt-in `ScopedObservationAdapter` harness is green on its dedicated tests. Production Track and ProjectRuntime behavior remain unchanged. The harness now has focused parity coverage for output-fold values and public edge shape.
 
-## Required verification
+## Completed in this slice
 
-Run the full Node 24 matrix on commit `854f256` before integrating the harness. Do not wire it into Track or ProjectRuntime until the harness and protocol comparison suite are green.
+- Scoped private owner lifetime.
+- Public Track-ID context and `COMPOSING` fallback.
+- Duplicate-ID isolation and lifecycle tests.
+- Adapter parity test for output folds and edge shape.
 
-## Next work
+## Required next sequence
 
-Compare the scoped harness against the existing adapter across the locked characterization suite, then add a default-off ProjectRuntime selector. Remove the global fallback only after equivalence is proven.
+1. Expand parity coverage to input folds, repeated mapper replacement, mutual cycles, diamond memoization, lightweight tracks, and destroy snapshots.
+2. Add a default-off ProjectRuntime selector for the scoped adapter.
+3. Run full Node 24 CI and compare both paths.
+4. Remove the global fallback only after equivalent behavior is proven.
 
 ## Guardrails
 
