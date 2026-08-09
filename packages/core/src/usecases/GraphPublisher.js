@@ -2,7 +2,26 @@ import { buildTopologicalOrder, topologicalTrackOrder } from "./normalizeObserva
 
 const RETRY_OPTIONS = new Set(["maxAttempts", "backoff"]);
 
-/** Ordered, incremental publish pipeline for an observation graph. */
+/**
+ * Ordered, incremental publish pipeline for an observation graph.
+ *
+ * GraphPublisher deliberately owns scheduling and publication only. Authored
+ * graph mutations and cycle validation belong to GraphBinding and its
+ * ObservationState owner. Keeping those responsibilities separate prevents a
+ * publisher from reconstructing graph meaning by walking Track objects.
+ *
+ * The publisher maintains a private registry because callers may continue to
+ * own and mutate their source Map. Every candidate graph is prepared and
+ * validated before it is committed, so rejected updates cannot leave a
+ * partial schedule installed.
+ *
+ * Flush is intentionally conservative: a failed upstream composition blocks
+ * downstream publication for that pass, and a failed publish retains retry
+ * state without falsely invalidating unchanged dependents.
+ *
+ * Lifecycle hooks are limited to invalidation and disposal bookkeeping. They
+ * never install mutation guards or alter authored observation ownership.
+ */
 export class GraphPublisher {
   #order = [];
   #tracks = new Map();
@@ -67,6 +86,7 @@ export class GraphPublisher {
     this.#publishPending.add(id);
   }
 
+  /** Compose each affected node once, in parent-before-child order. */
   flush() {
     if (this.#destroyed) return 0;
     this.#flushNumber++;
@@ -132,6 +152,7 @@ export class GraphPublisher {
     return published;
   }
 
+  /** Atomically replace the complete schedule after validating the candidate. */
   applyGraph(graph, tracks = this.#tracks) {
     this.#assertAlive();
     const order = topologicalTrackOrder(graph, { strict: true });
@@ -191,12 +212,7 @@ export class GraphPublisher {
 
   addEdge(edge) {
     this.#assertAlive();
-    const edges = [...this.#edges, {
-      source: edge.source,
-      target: edge.target,
-      role: edge.role ?? "output",
-      input: edge.role === "input" ? edge.target : undefined,
-    }];
+    const edges = [...this.#edges, { source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.role === "input" ? edge.target : undefined }];
     const nodes = this.#order.map((id) => ({ id }));
     this.#commitGraph(this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), this.#tracks));
     this.#marked.add(edge.target);
@@ -205,11 +221,7 @@ export class GraphPublisher {
 
   removeEdge(edge) {
     this.#assertAlive();
-    const edges = this.#edges.filter((existing) => !(
-      existing.source === edge.source &&
-      existing.target === edge.target &&
-      (edge.role === undefined || existing.role === edge.role)
-    ));
+    const edges = this.#edges.filter((existing) => !(existing.source === edge.source && existing.target === edge.target && (edge.role === undefined || existing.role === edge.role)));
     const nodes = this.#order.map((id) => ({ id }));
     this.#commitGraph(this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), this.#tracks));
     this.#marked.add(edge.target);
@@ -254,9 +266,7 @@ export class GraphPublisher {
     this.#order = [];
   }
 
-  #assertAlive() {
-    if (this.#destroyed) throw new Error("GraphPublisher destroyed");
-  }
+  #assertAlive() { if (this.#destroyed) throw new Error("GraphPublisher destroyed"); }
 
   #prepareGraph(nodes, edges, order, tracks) {
     const nodeIds = new Set();
@@ -272,28 +282,19 @@ export class GraphPublisher {
     }
     const nextOrder = [...order];
     const rank = new Map();
-    if (nextOrder.length !== nodeIds.size) {
-      throw new Error(`Publish order covers ${nextOrder.length} of ${nodeIds.size} graph nodes.`);
-    }
+    if (nextOrder.length !== nodeIds.size) throw new Error(`Publish order covers ${nextOrder.length} of ${nodeIds.size} graph nodes.`);
     for (const id of nextOrder) {
       if (!nodeIds.has(id)) throw new Error(`Publish order references unknown node '${id}'.`);
       if (rank.has(id)) throw new Error(`Publish order lists '${id}' more than once.`);
       rank.set(id, rank.size);
     }
-    const nextEdges = edges.map((edge) => ({
-      source: edge.source,
-      target: edge.target,
-      role: edge.role ?? "output",
-      input: edge.input,
-    }));
+    const nextEdges = edges.map((edge) => ({ source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.input }));
     const upstream = new Map([...nodeIds].map((id) => [id, []]));
     const downstream = new Map([...nodeIds].map((id) => [id, []]));
     for (const edge of nextEdges) {
       if (!upstream.has(edge.source)) throw new Error(`Graph edge sources unknown track '${edge.source}'.`);
       if (!upstream.has(edge.target)) throw new Error(`Graph edge targets unknown track '${edge.target}'.`);
-      if (rank.get(edge.source) >= rank.get(edge.target)) {
-        throw new Error(`Publish order violates edge '${edge.source}' -> '${edge.target}'.`);
-      }
+      if (rank.get(edge.source) >= rank.get(edge.target)) throw new Error(`Publish order violates edge '${edge.source}' -> '${edge.target}'.`);
       upstream.get(edge.target).push(edge.source);
       downstream.get(edge.source).push(edge.target);
     }
@@ -309,9 +310,7 @@ export class GraphPublisher {
   }
 
   #isWarm() {
-    for (const [id, track] of this.#tracks) {
-      if (!track?.isDestroyed && !this.#cache.has(id)) return false;
-    }
+    for (const [id, track] of this.#tracks) if (!track?.isDestroyed && !this.#cache.has(id)) return false;
     return true;
   }
 
@@ -324,34 +323,17 @@ export class GraphPublisher {
     const previous = this.#retryState.get(id);
     const attempts = (previous?.attempts ?? 0) + 1;
     const exhausted = attempts >= this.#retry.maxAttempts;
-    this.#retryState.set(id, {
-      attempts,
-      exhausted,
-      nextRetryFlush: this.#flushNumber + this.#retry.backoff + 1,
-    });
+    this.#retryState.set(id, { attempts, exhausted, nextRetryFlush: this.#flushNumber + this.#retry.backoff + 1 });
     if (!exhausted) this.#publishPending.add(id);
     else this.#publishPending.delete(id);
   }
 
   #normalizeRetry(retry = {}) {
-    if (retry === null || typeof retry !== "object" || Array.isArray(retry)) {
-      throw new TypeError("retry must be an object.");
-    }
-    for (const key of Object.keys(retry)) {
-      if (!RETRY_OPTIONS.has(key)) {
-        throw new TypeError(`Unknown retry option '${key}'. Supported options are maxAttempts and backoff.`);
-      }
-    }
+    if (retry === null || typeof retry !== "object" || Array.isArray(retry)) throw new TypeError("retry must be an object.");
+    for (const key of Object.keys(retry)) if (!RETRY_OPTIONS.has(key)) throw new TypeError(`Unknown retry option '${key}'. Supported options are maxAttempts and backoff.`);
     const maxAttempts = retry.maxAttempts === undefined ? Infinity : Number(retry.maxAttempts);
     const backoff = retry.backoff === undefined ? 0 : Number(retry.backoff);
-    if (
-      !(maxAttempts > 0) ||
-      (!Number.isInteger(maxAttempts) && maxAttempts !== Infinity) ||
-      !(backoff >= 0) ||
-      !Number.isInteger(backoff)
-    ) {
-      throw new TypeError("invalid retry configuration");
-    }
+    if (!(maxAttempts > 0) || (!Number.isInteger(maxAttempts) && maxAttempts !== Infinity) || !(backoff >= 0) || !Number.isInteger(backoff)) throw new TypeError("invalid retry configuration");
     return { maxAttempts, backoff };
   }
 
@@ -390,7 +372,5 @@ export class GraphPublisher {
     this.#hooks.delete(id);
   }
 
-  #detachHooks() {
-    for (const id of [...this.#hooks.keys()]) this.#detachHook(id);
-  }
+  #detachHooks() { for (const id of [...this.#hooks.keys()]) this.#detachHook(id); }
 }
