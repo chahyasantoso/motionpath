@@ -1,60 +1,74 @@
 # MotionPath v5 next implementor handoff
 
-**Captured:** 2026-08-09 13:05 Jakarta  
+**Captured:** 2026-08-09 13:20 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
-**Latest code head:** `99e37de` (CI re-run pending)  
-**Last fully green head:** `48b6799`  
+**Verified head:** `99e37de`, full Node 24 matrix green  
+**Integration head:** `44c3f7c`, CI re-run pending  
 **Base:** green PR #142 at `184f194`
 
 ## Current truth
 
-PR #143 is draft and red as of `51ec544`. The expanded parity runner caught a
-real defect in **compatibility** ownership, not in the scoped adapter: the
-`unregisterObserver` scenario failed the locked contract in compatibility mode and
-the two modes disagreed. Fixed at `8456f8c`, regression-locked at `99e37de`. The
-Node 24 matrix has not been re-run, so treat green as unproven until it is.
-
-Production defaults are unchanged. Compatibility ownership is still the default
-and nothing constructs Tracks against the scoped adapter.
+P2-03 adapter parity is proven and green. Scoped ownership is reachable end to end
+through one explicit option and is exercised by tests through the real `Engine`
+construction path. Compatibility ownership is still the default and still the only
+thing any existing caller gets.
 
 ## Completed
 
 - PR #142 repair baseline frozen and preserved.
-- Scoped private owner harness with explicit lifecycle boundary.
-- Public Track-ID context and `COMPOSING` fallback preserved.
-- Full parity through one scenario runner across both ownership modes, checked
-  twice: mode against mode, and both against locked literals.
+- Scoped private owner with the full compatibility adapter contract.
+- One scenario runner across both ownership modes, every result checked twice:
+  mode against mode, and both against locked literals.
 - `ProjectRuntime` disposal parity and public adapter surface parity.
-- Compatibility refcount fix: `globalRefs` counts holders, not `register()`
-  calls, so the last holder's `unregister` actually tears down the owner entry.
+- Compatibility `clearObserved` fixed: it matched on Track objects where the
+  owner matches on private identity keys, so it removed nothing.
+- Compatibility refcount fixed: `globalRefs` counts holders, not `register()`
+  calls, so the last holder's `unregister` actually tears the owner entry down.
 - Compatibility lifecycle watching latched on `#watched`, matching scoped.
-- Default-off `ProjectRuntime({ observationOwnership: "scoped" })` selector.
-- Status/report/handoff docs kept current.
+- **Controlled runtime integration path:** `Engine({ observationOwnership })`
+  forwards to its `ProjectRuntime`, which already injects one adapter into every
+  standalone Track it builds. F-02 is closed for the Engine path.
+- Ownership mode survives `Engine.destroy()`, which rebuilds the runtime.
+- Public type surface declares the option.
 
-## Next implementor job
+## Next slice: delete the module globals
 
-1. Run the complete Node 24 matrix on `99e37de` and confirm all eight checks.
-2. If green, parity is proven. Build the controlled runtime integration path:
-   scoped ownership reachable only through the explicit `observationOwnership`
-   option, with the compatibility fallback intact.
-3. Only after that path is exercised end to end should the default move.
+The default cannot move by flipping a flag. Every remaining compatibility-only
+hazard lives in the process-wide registry in `StandaloneObservationAdapter.js`,
+and none of them is fixable inside the adapter:
 
-## Known hazard the fix deliberately left alone
+1. **Cross-scope id resolution.** `#findTrack(id)` reads the global `tracksById`,
+   so the first engine to register a public id wins for every engine. Two engines
+   with a track called `root` resolve the same Track by string id. Scoped already
+   resolves inside its own scope; there is a test asserting the scoped side.
+2. **Two holders, half a teardown.** When two adapters hold one Track and one
+   releases it, that adapter drops only the Track's outgoing edges, because the
+   refcount is still above zero. Same shape as the bug just fixed, one level up.
+3. **Unbounded lifetime.** Entries leave only on `Track.destroy()`, so anything
+   O(registry) is unbounded and a suite that drops Tracks without destroying them
+   grows it forever. This is why nothing reads `#owner.tracks`.
 
-When two adapters hold the same Track and one of them unregisters it, that
-adapter's `#unregister` still drops only the track's **outgoing** edges through
-`removeSourceEdges`. The incoming half survives because the refcount is still
-above zero. That is the same shape as the bug just fixed, one level up, and it is
-reachable only through the module globals, which is the thing scoped ownership
-deletes. Do not paper over it in the compatibility adapter: prove it cannot
-happen in the scoped path and remove the globals instead.
+Suggested order:
+
+1. Make `ProjectRuntime` the only place a standalone adapter is constructed.
+   `createTrack` and the `Track` constructor still fall back to building their own
+   when no adapter is injected, which is the last per-Track adapter path.
+2. Point that construction at `ScopedObservationAdapter` and delete
+   `StandaloneObservationAdapter`'s globals with it. Keep the class name if it
+   reduces churn; the globals are the thing being removed, not the file.
+3. Then, and only then, delete the Track-side compatibility reverse index named in
+   [`V5-P2-03-SYMBOL-BAN.md`](./V5-P2-03-SYMBOL-BAN.md). It exists because
+   independently constructed Tracks could hold different adapters, which stops
+   being true after step 1.
+4. Widen the boundary scan to strict once the symbols are gone.
 
 ## Do not do yet
 
-Do not change the default ownership mode. Do not remove the compatibility/global
-fallback. Do not wire scoped ownership into Track construction. Do not flip
-`publisherRendering`, `crossMotion`, or `freeTracks` defaults. Do not relax a
-`LOCKED` parity entry to make a run green.
+Do not change the default ownership mode before step 1 above. Do not remove the
+compatibility fallback while `createTrack` can still build its own adapter. Do not
+flip `publisherRendering`, `crossMotion`, or `freeTracks` defaults. Do not relax a
+`LOCKED` parity entry to make a run green, and do not assume the scoped side is
+the wrong one when parity fails: it has been the correct side both times.
 
 ## Verification commands
 
