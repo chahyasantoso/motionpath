@@ -3,7 +3,7 @@
 **Status captured:** 2026-08-09 11:58 Jakarta  
 **Branch:** `feat/pass2-scoped-adapter-migration`  
 **Canonical index:** [`docs/V5-README.md`](./V5-README.md)  
-**Implementation report:** [`V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md`](./V5-PASS-2-IMPLEMENTOR-REPORT-2026-08-09.md)  
+**Implementation report:** [`V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md`](./V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md)  
 **Next implementor handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)
 
 ## Executive status
