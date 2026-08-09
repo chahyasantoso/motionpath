@@ -21,6 +21,17 @@ describe("P2-03 scoped adapter harness", () => {
     second.destroy();
   });
 
+  it("supports the COMPOSING fallback for a mutual edge", () => {
+    const a = track("a");
+    const b = track("b");
+    const adapter = new ScopedObservationAdapter({ tracks: [a, b] });
+    adapter.setObserved(a, b, (patch) => ({ fromB: patch.leaf }));
+    adapter.setObserved(b, a, (patch) => ({ fromA: patch.leaf }));
+    expect(() => adapter.compose(a)).not.toThrow();
+    expect(adapter.compose(a)).toEqual({ leaf: "a", fromB: "b" });
+    adapter.destroy();
+  });
+
   it("keeps lifecycle local and rejects use after destroy", () => {
     const adapter = new ScopedObservationAdapter({ tracks: [track("one")] });
     adapter.destroy();

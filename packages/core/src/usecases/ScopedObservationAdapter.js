@@ -1,4 +1,5 @@
 import { TrackObservationOwner } from "./TrackObservationOwner.js";
+import { COMPOSING } from "./composeContext.js";
 
 /**
  * Scoped owner harness with the same public adapter contract.
@@ -18,7 +19,7 @@ export class ScopedObservationAdapter {
   constructor({ tracks = [] } = {}) {
     this.#owner = new TrackObservationOwner({
       validateCycles: false,
-      composeSource: (source, ctx) => source.compose(undefined, ctx),
+      composeSource: (source, ctx) => this.#composeSource(source, ctx),
     });
     for (const track of tracks instanceof Map ? tracks.values() : tracks) {
       this.register(track);
@@ -68,13 +69,18 @@ export class ScopedObservationAdapter {
     this.#assertAlive();
     this.register(track);
     const ctx = context ?? new Map();
+    const marker = ctx.get(track.id);
+    if (marker === COMPOSING) return track.composeLocal?.(rawData) ?? track.getSnapshot?.() ?? {};
+    if (marker !== undefined) return marker;
     const internal = new Map();
     for (const [publicId, patch] of ctx) {
-      const known = [...this.#tracks.values()].find((candidate) => candidate.id === publicId);
+      const known = this.#findTrack(publicId);
       if (known) internal.set(this.#keys.get(known), patch);
     }
+    ctx.set(track.id, COMPOSING);
+    internal.set(this.#keys.get(track), COMPOSING);
     const patch = this.#owner.compose(this.#keys.get(track), rawData, internal);
-    if (context) context.set(track.id, patch);
+    ctx.set(track.id, patch);
     return patch;
   }
 
@@ -83,6 +89,29 @@ export class ScopedObservationAdapter {
     this.#destroyed = true;
     this.#owner.destroy();
     this.#tracks.clear();
+  }
+
+  #findTrack(id) {
+    for (const track of this.#tracks.values()) {
+      if (track.id === id) return track;
+    }
+    return null;
+  }
+
+  #composeSource(source, ctx) {
+    if (typeof source.compose === "function") {
+      return source.compose(undefined, this.#publicContext(ctx));
+    }
+    return this.#owner.compose(this.#keys.get(source), undefined, ctx);
+  }
+
+  #publicContext(ctx) {
+    const publicContext = new Map();
+    for (const [key, patch] of ctx) {
+      const track = this.#owner.getTrack(key);
+      if (track) publicContext.set(track.id, patch);
+    }
+    return publicContext;
   }
 
   #assertAlive() {
