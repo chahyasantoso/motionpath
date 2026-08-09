@@ -1,6 +1,27 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-09 09:52 Asia/Jakarta  
-**Branch:** `v5` at `e4fc9b9`  
+**Status captured:** 2026-08-09 11:11 Asia/Jakarta  
+**Branch:** `fix/pass2-f02-regressions-v2`  
 **Canonical index:** [`docs/V5-README.md`](./V5-README.md)  
-**Next implementor handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)\n\n## Executive status\n\nPR-00 through PR-21 and supplemental PR-22/23 remain merged on `v5`. Pass-2 is **not complete**. Draft [PR #142](https://github.com/chahyasantoso/motionpath/pull/142) is the active repair branch; PR #141 is closed as superseded. Do not merge #142 yet: its latest known unit gate failed, while the other workflow jobs passed.\n\n## Critical root cause found in the last run\n\nThe 78-failure run at merge ref `0b9bc30` was a cascade from one construction bug: `createTrack` used `options.observationAdapter ?? fallback`, so an explicit `observationAdapter: null` for authored-graph Tracks was replaced with a standalone adapter. GraphBinding then saw 0 live edges against declared edges, producing failures across Engine, GraphBinding, publisher, runtime, fixture, immutability, and observation tests. The explicit-null distinction was patched in #142 at `createTrack.js`; verify it before further changes.\n\n## Current blockers\n\n- **F-01:** ObservationState is still derived from Track, not authoritative.\n- **F-02:** The current #142 implementation uses module-global standalone ownership (`sharedOwner`, global identity maps) as a compatibility bridge. This is not an acceptable final design: it risks cross-test/runtime leakage and violates runtime-scoped ownership.\n- **F-03:** Track still has duplicate observation maps and compatibility mutators.\n- **Lifecycle:** observer IDs must be snapshotted before adapter cleanup; the last 5-failure run showed empty IDs during destroy.\n- **GraphBinding:** stale-edge filtering was added, but the authoritative ownership inversion is still undone.\n- **Readability:** Track and StandaloneObservationAdapter still violate the readability guard on the last known run.\n- **CI:** branch trigger duplication was fixed on #142: feature/fix/test branches should not run both push and PR workflows.\n\n## Next session sequence\n\n1. Verify #142's explicit-null fix with focused authored-graph and Engine graph ownership tests.\n2. Replace module-global standalone state with explicit ProjectRuntime/caller-scoped ownership and stable pre-cleanup observer snapshots.\n3. Invert GraphBinding/ObservationState ownership, migrating all `Track.observedEdges` consumers before symbol deletion.\n4. Format Track and StandaloneObservationAdapter to the existing guard without weakening it.\n5. Run the full unit, typecheck, build, package, and boundary gates; only then update the matrix.\n\nKeep `publisherRendering`, `crossMotion`, and `freeTracks` default-off.\n
+**Implementation report:** [`V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md`](./V5-PASS-2-IMPLEMENTATION-REPORT-2026-08-09.md)  
+**Next implementor handoff:** [`V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md`](./V5-NEXT-IMPLEMENTOR-HANDOFF-2026-08-09.md)
+
+## Executive status
+
+Pass-2 repair work is green on the current branch after resolving the attached three-failure run. PR #142 remains draft pending review. The fixes cover rollback integrity, fuzz-path performance, Track readability, and scoped standalone ownership.
+
+## Completed
+
+- Explicit-null handling in `createTrack` preserves authored-graph Tracks without standalone adapters.
+- GraphBinding rollback restores ObservationState and live Track wiring, including map functions.
+- O(1) observation lookups remove the registry-clone timeout path.
+- Track readability reasoning and destroy re-entrancy protection are restored.
+- Standalone observation ownership is now scoped to ProjectRuntime or an explicitly injected adapter, with no module-global registry.
+
+## Next in line
+
+F-01 ownership inversion: ObservationState becomes the writer and graph authority. Migrate remaining Track observation readers in GraphBinding, ObservationStateBridge, and GraphPublisher before deleting Track's duplicate observation maps.
+
+## Guardrails
+
+Keep `publisherRendering`, `crossMotion`, and `freeTracks` default-off. Do not weaken readability or boundary tests. Run the full verification checklist before merging.
