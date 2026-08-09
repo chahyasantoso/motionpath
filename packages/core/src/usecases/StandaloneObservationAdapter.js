@@ -15,11 +15,16 @@ const internalContexts = new WeakSet();
  * explicit shared ownership object scoped to a ProjectRuntime or Motion, injected
  * into the adapter. Do not build anything new on top of these globals.
  *
- * Two consequences to keep in mind while it is still here:
+ * Three consequences to keep in mind while it is still here:
  * - it lives for the whole process, so anything O(registry) inside it is
  *   effectively unbounded. That is why nothing below reads `#owner.tracks`.
  * - entries only leave on Track.destroy(), so a suite that drops Tracks without
  *   destroying them keeps growing it.
+ * - `globalRefs` counts ADAPTERS holding a key, never `register()` calls. Every
+ *   edge mutation re-registers both of its endpoints, so counting calls made the
+ *   count unreachable from zero: `#unregister` skipped `#owner.unregister`, the
+ *   incoming edges survived, and a source kept listing an unregistered observer
+ *   forever. The `unregisterObserver` parity scenario is that regression.
  */
 const sharedOwner = new TrackObservationOwner({
   validateCycles: false,
@@ -33,6 +38,7 @@ export class StandaloneObservationAdapter {
   #owner = sharedOwner;
   #keys = new WeakMap();
   #tracks = new Map();
+  #watched = new WeakSet();
   #sourceUnsubscribers = new Map();
   #lifecycleUnsubscribers = new Map();
   #destroyed = false;
@@ -60,9 +66,18 @@ export class StandaloneObservationAdapter {
     }
     const existingKey = globalKeys.get(track);
     if (existingKey) {
-      this.#keys.set(track, existingKey);
-      this.#tracks.set(existingKey, track);
-      globalRefs.set(existingKey, (globalRefs.get(existingKey) ?? 0) + 1);
+      const heldKey = this.#keys.get(track);
+      // One hold per adapter. A repeated register is a no-op, otherwise the
+      // refcount tracks call volume instead of holders and never releases.
+      // `heldKey !== existingKey` also covers a stale hold: the global entry was
+      // released and re-created under a new identity while this adapter was
+      // still pointing at the old one.
+      if (heldKey !== existingKey) {
+        if (heldKey) this.#tracks.delete(heldKey);
+        this.#keys.set(track, existingKey);
+        this.#tracks.set(existingKey, track);
+        globalRefs.set(existingKey, (globalRefs.get(existingKey) ?? 0) + 1);
+      }
       this.#watchTrack(track);
       return track;
     }
@@ -201,9 +216,13 @@ export class StandaloneObservationAdapter {
     this.#sourceUnsubscribers.delete(track);
     this.#lifecycleUnsubscribers.get(track)?.();
     this.#lifecycleUnsubscribers.delete(track);
+    this.#watched.delete(track);
     this.#owner.removeSourceEdges(key);
     const refs = (globalRefs.get(key) ?? 1) - 1;
     if (refs <= 0) {
+      // Last holder out tears down the owner entry, which is what also removes
+      // this track's INCOMING edges and drops it from every source's observer
+      // set. `removeSourceEdges` above only covers the outgoing half.
       this.#owner.unregister(key);
       globalRefs.delete(key);
       globalTracks.delete(key);
@@ -252,8 +271,17 @@ export class StandaloneObservationAdapter {
     return tracksById.get(id)?.values().next().value;
   }
 
+  /**
+   * Lifecycle watching latches on `#watched`, not on the unsubscriber maps.
+   *
+   * The maps are populated conditionally, so a Track without `onLifecycle` never
+   * latched the old guard: every re-register resubscribed `onSourceDestroyed`
+   * and overwrote the previous unsubscribe, leaking the subscription. Matches
+   * ScopedObservationAdapter.
+   */
   #watchTrack(track) {
-    if (!track || this.#lifecycleUnsubscribers.has(track)) return;
+    if (!track || this.#watched.has(track)) return;
+    this.#watched.add(track);
     if (typeof track.onLifecycle === "function") {
       this.#lifecycleUnsubscribers.set(track, track.onLifecycle((event) => {
         if (event?.type === "detached") this.#owner.removeSourceEdges(this.#keys.get(track));
