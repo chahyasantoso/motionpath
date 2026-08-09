@@ -1,41 +1,14 @@
 import { TrackObservationOwner } from "./TrackObservationOwner.js";
 
 /**
- * Scoped observation ownership.
- *
- * The same public adapter contract as `StandaloneObservationAdapter`, without the
- * module globals. Every identity key, registry entry and edge below belongs to
- * this instance, so two adapters can hold Tracks with the same public id and
- * never see each other's edges. That is the point: F-02 opened the hole that the
- * compatibility adapter closes with a process-wide shared owner, and this is the
- * replacement that does not need one.
- *
- * ## Why this looks like a copy of the compatibility adapter
- *
- * `ObservationAdapter.scenario-parity.test.js` runs one scenario set against both
- * adapters and compares the results, so the resemblance is load bearing. Four
- * things in particular were divergences, each caught by that runner:
- *
- * - **reads never register.** A read that registers turns `getEdges(unknown)`
- *   into a mutation and hides missing wiring behind an empty result.
- * - **`getSources` dedupes by Track identity, not public id.** Duplicate ids are
- *   legal inside one scope, and one source observed as both an input and an
- *   output is still one source.
- * - **the compose context is mirrored, not rebuilt.** The public context is keyed
- *   by public Track id, the owner is keyed by private identity, so the mirror is
- *   cached per public context. Rebuilding it per call re-composes shared
- *   upstreams once per hop and silently loses diamond memoization.
- * - **lifecycle is watched at registration.** `detached` drops the Track's
- *   outgoing edges, and the destroy snapshot is rewritten in place because a
- *   destroy subscriber reads `observerIds` before edge teardown.
- *
- * Still opt-in. `ProjectRuntime` only builds this when scoped ownership is
- * requested explicitly, and nothing constructs Tracks against it by default.
+ * Scoped observation ownership without module globals. Each adapter owns its
+ * identity space, while public-ID lookup keeps first-registration semantics.
  */
 export class ScopedObservationAdapter {
   #owner;
   #keys = new WeakMap();
   #tracks = new Map();
+  #tracksById = new Map();
   #contextMirrors = new WeakMap();
   #internalContexts = new WeakSet();
   #watched = new WeakSet();
@@ -53,13 +26,6 @@ export class ScopedObservationAdapter {
     for (const track of registry) this.register(track);
   }
 
-  /**
-   * Legacy state surface, for the Track getters that still read it.
-   *
-   * `getSources` returns private keys on purpose. That is the internal-key half
-   * of the contract; the public `getSources(track)` returns Track objects and
-   * must never leak a key.
-   */
   get state() {
     return {
       tracks: new Map(this.#tracks),
@@ -68,27 +34,17 @@ export class ScopedObservationAdapter {
       getObserverIds: (source) => this.getObserverIds(source),
     };
   }
-
-  get isDestroyed() {
-    return this.#destroyed;
-  }
-
-  get tracks() {
-    return new Map(this.#tracks);
-  }
+  get isDestroyed() { return this.#destroyed; }
+  get tracks() { return new Map(this.#tracks); }
 
   register(track) {
     this.#assertAlive();
-    if (!track?.id) {
-      throw new TypeError("ScopedObservationAdapter requires a track with an id.");
-    }
-    if (this.#keys.has(track)) {
-      this.#watchTrack(track);
-      return track;
-    }
+    if (!track?.id) throw new TypeError("ScopedObservationAdapter requires a track with an id.");
+    if (this.#keys.has(track)) { this.#watchTrack(track); return track; }
     const key = `${track.id}#${++this.#nextIdentity}`;
     this.#keys.set(track, key);
     this.#tracks.set(key, track);
+    if (!this.#tracksById.has(track.id)) this.#tracksById.set(track.id, track);
     this.#owner.register(track, key);
     this.#watchTrack(track);
     return track;
@@ -129,8 +85,7 @@ export class ScopedObservationAdapter {
   getObserverIds(sourceOrTrack) {
     const source = this.#resolveTrack(sourceOrTrack);
     if (!source) return [];
-    return this.#owner
-      .getObserverIds(this.#keys.get(source))
+    return this.#owner.getObserverIds(this.#keys.get(source))
       .map((key) => this.#owner.getTrack(key)?.id)
       .filter(Boolean);
   }
@@ -140,8 +95,6 @@ export class ScopedObservationAdapter {
     const target = this.#keys.get(observer);
     if (!target) return;
     for (const edge of this.#owner.getEdges(target)) {
-      // getEdges hands back Track objects; removeEdge matches on the private
-      // key. Passing the Track straight through matches nothing.
       const source = this.#keys.get(edge.source);
       this.#owner.removeEdge({ source, target, role: edge.role, input: edge.input });
     }
@@ -170,28 +123,13 @@ export class ScopedObservationAdapter {
     });
   }
 
-  /**
-   * The old source is deliberately not registered here. An unknown old source
-   * must fail as "does not observe", not quietly become a new scope member with
-   * no edges.
-   */
   replaceObserved(observer, oldSource, newSource, mapFn, opts = {}) {
     this.#assertAlive();
     this.register(observer);
     this.register(newSource);
     return this.#owner.replaceEdge(
-      {
-        source: this.#keys.get(oldSource),
-        target: this.#keys.get(observer),
-        role: opts.role,
-      },
-      {
-        source: this.#keys.get(newSource),
-        target: this.#keys.get(observer),
-        role: opts.role,
-        input: opts.target,
-        mapFn,
-      },
+      { source: this.#keys.get(oldSource), target: this.#keys.get(observer), role: opts.role },
+      { source: this.#keys.get(newSource), target: this.#keys.get(observer), role: opts.role, input: opts.target, mapFn },
     );
   }
 
@@ -206,14 +144,13 @@ export class ScopedObservationAdapter {
 
   destroy() {
     if (this.#destroyed) return;
-    // Unregister first, while the owner is still alive, so every lifecycle
-    // subscription is released instead of being dropped on the floor.
     for (const track of [...this.#tracks.values()]) this.#unregister(track);
     this.#destroyed = true;
     this.#sourceUnsubscribers.clear();
     this.#lifecycleUnsubscribers.clear();
     this.#owner.destroy();
     this.#tracks.clear();
+    this.#tracksById.clear();
   }
 
   #unregister(trackOrId) {
@@ -225,11 +162,15 @@ export class ScopedObservationAdapter {
     this.#lifecycleUnsubscribers.get(track)?.();
     this.#lifecycleUnsubscribers.delete(track);
     this.#watched.delete(track);
-    // Incoming and outgoing edges are two separate removals, and there is no
-    // refcount: a scoped key belongs to one adapter, which is the whole point.
     this.#owner.removeSourceEdges(key);
     this.#owner.unregister(key);
     this.#tracks.delete(key);
+    if (this.#tracksById.get(track.id) === track) {
+      this.#tracksById.delete(track.id);
+      for (const candidate of this.#tracks.values()) {
+        if (candidate.id === track.id) { this.#tracksById.set(track.id, candidate); break; }
+      }
+    }
     this.#keys.delete(track);
   }
 
@@ -265,18 +206,8 @@ export class ScopedObservationAdapter {
     return this.#findTrack(trackOrId);
   }
 
-  #findTrack(id) {
-    for (const track of this.#tracks.values()) {
-      if (track.id === id) return track;
-    }
-    return null;
-  }
+  #findTrack(id) { return this.#tracksById.get(id) ?? null; }
 
-  /**
-   * Detach drops the Track's outgoing edges only. The destroy snapshot is
-   * rewritten in place because subscribers read `observerIds` off the event
-   * before the edges are torn down, so a fresh array would be ignored.
-   */
   #watchTrack(track) {
     if (!track || this.#watched.has(track)) return;
     this.#watched.add(track);
