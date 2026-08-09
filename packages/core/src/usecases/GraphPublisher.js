@@ -40,13 +40,17 @@ export class GraphPublisher {
   #destroyed = false;
 
   constructor({ graph, order, tracks = new Map(), publish, strict = true, retry } = {}) {
-    if (typeof publish !== "function") throw new TypeError("GraphPublisher requires a publish callback.");
+    if (typeof publish !== "function") {
+      throw new TypeError("GraphPublisher requires a publish callback.");
+    }
     this.#publish = publish;
     this.#strict = strict;
     this.#retry = this.#normalizeRetry(retry);
     const nextTracks = new Map(tracks);
     for (const [id, track] of nextTracks) {
-      if (!track || track.id !== id) throw new Error(`Track registration mismatch for '${id}'.`);
+      if (!track || track.id !== id) {
+        throw new Error(`Track registration mismatch for '${id}'.`);
+      }
     }
     const nodes = graph
       ? (graph.nodes?.map(({ id }) => ({ id })) ?? [])
@@ -73,7 +77,9 @@ export class GraphPublisher {
   }
 
   markAllDirty() {
-    if (!this.#destroyed) for (const id of this.#tracks.keys()) this.#marked.add(id);
+    if (!this.#destroyed) {
+      for (const id of this.#tracks.keys()) this.#marked.add(id);
+    }
   }
 
   resetRetry(id) {
@@ -140,13 +146,19 @@ export class GraphPublisher {
       }
     }
     for (const id of [...this.#marked]) {
-      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#marked.delete(id);
+      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) {
+        this.#marked.delete(id);
+      }
     }
     for (const id of [...this.#publishPending]) {
-      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#publishPending.delete(id);
+      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) {
+        this.#publishPending.delete(id);
+      }
     }
     for (const id of [...this.#retryState.keys()]) {
-      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#retryState.delete(id);
+      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) {
+        this.#retryState.delete(id);
+      }
     }
     if (failures.length) throw new AggregateError(failures, "GraphPublisher flush failed.");
     return published;
@@ -164,10 +176,13 @@ export class GraphPublisher {
     const invalidationSeeds = new Set();
     const previousIds = new Set(previousTracks.keys());
     for (const [id, track] of nextTracks) {
-      if (!previousTracks.has(id) || previousTracks.get(id) !== track) invalidationSeeds.add(id);
+      if (!previousTracks.has(id) || previousTracks.get(id) !== track) {
+        invalidationSeeds.add(id);
+      }
     }
     for (const id of previousIds) if (!nextTracks.has(id)) invalidationSeeds.add(id);
-    const edgeKey = (edge) => `${edge.source}${edge.target}${edge.role ?? "output"}${edge.input ?? ""}`;
+    const edgeKey = (edge) =>
+      `${edge.source}${edge.target}${edge.role ?? "output"}${edge.input ?? ""}`;
     const oldEdges = new Map(previousEdges.map((edge) => [edgeKey(edge), edge]));
     const newEdges = new Map(state.edges.map((edge) => [edgeKey(edge), edge]));
     for (const [key, edge] of oldEdges) if (!newEdges.has(key)) invalidationSeeds.add(edge.target);
@@ -199,31 +214,59 @@ export class GraphPublisher {
     const track = idFirst ? trackOrOptions : idOrTrack;
     const id = idFirst ? idOrTrack : track?.id;
     const options = (idFirst ? maybeOptions : trackOrOptions) ?? {};
-    if (!track || typeof track.compose !== "function") throw new TypeError("addTrack requires a Track.");
-    if (track.id !== id) throw new Error(`Track id '${track.id}' does not match registration id '${id}'.`);
+    if (!track || typeof track.compose !== "function") {
+      throw new TypeError("addTrack requires a Track.");
+    }
+    if (track.id !== id) {
+      throw new Error(`Track id '${track.id}' does not match registration id '${id}'.`);
+    }
     if (this.#tracks.has(id)) throw new Error(`Duplicate track id '${id}'.`);
     const nodes = [...this.#order.map((existing) => ({ id: existing })), { id }];
-    const edges = [...this.#edges, ...(options.observes ?? []).map((edge) => ({ ...edge, target: id }))];
+    const edges = [
+      ...this.#edges,
+      ...(options.observes ?? []).map((edge) => ({ ...edge, target: id })),
+    ];
     const nextTracks = new Map(this.#tracks).set(id, track);
-    this.#commitGraph(this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), nextTracks));
+    this.#commitGraph(
+      this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), nextTracks),
+    );
     this.#attachHooks();
     this.#marked.add(id);
   }
 
   addEdge(edge) {
     this.#assertAlive();
-    const edges = [...this.#edges, { source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.role === "input" ? edge.target : undefined }];
+    const edges = [
+      ...this.#edges,
+      {
+        source: edge.source,
+        target: edge.target,
+        role: edge.role ?? "output",
+        input: edge.role === "input" ? edge.target : undefined,
+      },
+    ];
     const nodes = this.#order.map((id) => ({ id }));
-    this.#commitGraph(this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), this.#tracks));
+    this.#commitGraph(
+      this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), this.#tracks),
+    );
     this.#marked.add(edge.target);
     this.#cache.delete(edge.target);
   }
 
   removeEdge(edge) {
     this.#assertAlive();
-    const edges = this.#edges.filter((existing) => !(existing.source === edge.source && existing.target === edge.target && (edge.role === undefined || existing.role === edge.role)));
+    const edges = this.#edges.filter(
+      (existing) =>
+        !(
+          existing.source === edge.source &&
+          existing.target === edge.target &&
+          (edge.role === undefined || existing.role === edge.role)
+        ),
+    );
     const nodes = this.#order.map((id) => ({ id }));
-    this.#commitGraph(this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), this.#tracks));
+    this.#commitGraph(
+      this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), this.#tracks),
+    );
     this.#marked.add(edge.target);
     this.#cache.delete(edge.target);
   }
@@ -231,11 +274,18 @@ export class GraphPublisher {
   removeTrack(id, { invalidateDependents = false } = {}) {
     if (this.#destroyed || !this.#tracks.has(id)) return;
     const dependents = invalidateDependents ? [...(this.#downstream.get(id) ?? [])] : [];
-    const nodes = this.#order.filter((existing) => existing !== id).map((existing) => ({ id: existing }));
+    const nodes = this.#order
+      .filter((existing) => existing !== id)
+      .map((existing) => ({ id: existing }));
     const edges = this.#edges.filter((edge) => edge.source !== id && edge.target !== id);
     const nextTracks = new Map(this.#tracks);
     nextTracks.delete(id);
-    const state = this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), nextTracks);
+    const state = this.#prepareGraph(
+      nodes,
+      edges,
+      buildTopologicalOrder(nodes, edges),
+      nextTracks,
+    );
     this.#detachHook(id);
     this.#commitGraph(state);
     this.#cache.delete(id);
@@ -266,7 +316,9 @@ export class GraphPublisher {
     this.#order = [];
   }
 
-  #assertAlive() { if (this.#destroyed) throw new Error("GraphPublisher destroyed"); }
+  #assertAlive() {
+    if (this.#destroyed) throw new Error("GraphPublisher destroyed");
+  }
 
   #prepareGraph(nodes, edges, order, tracks) {
     const nodeIds = new Set();
@@ -278,23 +330,38 @@ export class GraphPublisher {
       if (!tracks.has(id)) throw new Error(`Graph node '${id}' has no registered track.`);
     }
     for (const id of tracks.keys()) {
-      if (!nodeIds.has(id)) throw new Error(`Registered track '${id}' is missing from the graph.`);
+      if (!nodeIds.has(id)) {
+        throw new Error(`Registered track '${id}' is missing from the graph.`);
+      }
     }
     const nextOrder = [...order];
     const rank = new Map();
-    if (nextOrder.length !== nodeIds.size) throw new Error(`Publish order covers ${nextOrder.length} of ${nodeIds.size} graph nodes.`);
+    if (nextOrder.length !== nodeIds.size) {
+      throw new Error(`Publish order covers ${nextOrder.length} of ${nodeIds.size} graph nodes.`);
+    }
     for (const id of nextOrder) {
       if (!nodeIds.has(id)) throw new Error(`Publish order references unknown node '${id}'.`);
       if (rank.has(id)) throw new Error(`Publish order lists '${id}' more than once.`);
       rank.set(id, rank.size);
     }
-    const nextEdges = edges.map((edge) => ({ source: edge.source, target: edge.target, role: edge.role ?? "output", input: edge.input }));
+    const nextEdges = edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      role: edge.role ?? "output",
+      input: edge.input,
+    }));
     const upstream = new Map([...nodeIds].map((id) => [id, []]));
     const downstream = new Map([...nodeIds].map((id) => [id, []]));
     for (const edge of nextEdges) {
-      if (!upstream.has(edge.source)) throw new Error(`Graph edge sources unknown track '${edge.source}'.`);
-      if (!upstream.has(edge.target)) throw new Error(`Graph edge targets unknown track '${edge.target}'.`);
-      if (rank.get(edge.source) >= rank.get(edge.target)) throw new Error(`Publish order violates edge '${edge.source}' -> '${edge.target}'.`);
+      if (!upstream.has(edge.source)) {
+        throw new Error(`Graph edge sources unknown track '${edge.source}'.`);
+      }
+      if (!upstream.has(edge.target)) {
+        throw new Error(`Graph edge targets unknown track '${edge.target}'.`);
+      }
+      if (rank.get(edge.source) >= rank.get(edge.target)) {
+        throw new Error(`Publish order violates edge '${edge.source}' -> '${edge.target}'.`);
+      }
       upstream.get(edge.target).push(edge.source);
       downstream.get(edge.source).push(edge.target);
     }
@@ -310,7 +377,9 @@ export class GraphPublisher {
   }
 
   #isWarm() {
-    for (const [id, track] of this.#tracks) if (!track?.isDestroyed && !this.#cache.has(id)) return false;
+    for (const [id, track] of this.#tracks) {
+      if (!track?.isDestroyed && !this.#cache.has(id)) return false;
+    }
     return true;
   }
 
@@ -323,17 +392,36 @@ export class GraphPublisher {
     const previous = this.#retryState.get(id);
     const attempts = (previous?.attempts ?? 0) + 1;
     const exhausted = attempts >= this.#retry.maxAttempts;
-    this.#retryState.set(id, { attempts, exhausted, nextRetryFlush: this.#flushNumber + this.#retry.backoff + 1 });
+    this.#retryState.set(id, {
+      attempts,
+      exhausted,
+      nextRetryFlush: this.#flushNumber + this.#retry.backoff + 1,
+    });
     if (!exhausted) this.#publishPending.add(id);
     else this.#publishPending.delete(id);
   }
 
   #normalizeRetry(retry = {}) {
-    if (retry === null || typeof retry !== "object" || Array.isArray(retry)) throw new TypeError("retry must be an object.");
-    for (const key of Object.keys(retry)) if (!RETRY_OPTIONS.has(key)) throw new TypeError(`Unknown retry option '${key}'. Supported options are maxAttempts and backoff.`);
+    if (retry === null || typeof retry !== "object" || Array.isArray(retry)) {
+      throw new TypeError("retry must be an object.");
+    }
+    for (const key of Object.keys(retry)) {
+      if (!RETRY_OPTIONS.has(key)) {
+        throw new TypeError(
+          `Unknown retry option '${key}'. Supported options are maxAttempts and backoff.`,
+        );
+      }
+    }
     const maxAttempts = retry.maxAttempts === undefined ? Infinity : Number(retry.maxAttempts);
     const backoff = retry.backoff === undefined ? 0 : Number(retry.backoff);
-    if (!(maxAttempts > 0) || (!Number.isInteger(maxAttempts) && maxAttempts !== Infinity) || !(backoff >= 0) || !Number.isInteger(backoff)) throw new TypeError("invalid retry configuration");
+    if (
+      !(maxAttempts > 0) ||
+      (!Number.isInteger(maxAttempts) && maxAttempts !== Infinity) ||
+      !(backoff >= 0) ||
+      !Number.isInteger(backoff)
+    ) {
+      throw new TypeError("invalid retry configuration");
+    }
     return { maxAttempts, backoff };
   }
 
@@ -361,7 +449,9 @@ export class GraphPublisher {
       const unsubscribe = track.onLifecycle?.((event) => {
         if (event.type === "invalidated") this.markDirty(id);
         if (event.type === "destroyed") this.removeTrack(id);
-        if (event.type === "detached") this.removeTrack(id, { invalidateDependents: true });
+        if (event.type === "detached") {
+          this.removeTrack(id, { invalidateDependents: true });
+        }
       });
       this.#hooks.set(id, unsubscribe ?? (() => {}));
     }
@@ -372,5 +462,7 @@ export class GraphPublisher {
     this.#hooks.delete(id);
   }
 
-  #detachHooks() { for (const id of [...this.#hooks.keys()]) this.#detachHook(id); }
+  #detachHooks() {
+    for (const id of [...this.#hooks.keys()]) this.#detachHook(id);
+  }
 }
