@@ -3,6 +3,20 @@ import { TrackObservationOwner } from "./TrackObservationOwner.js";
 /**
  * Scoped observation ownership without module globals. Each adapter owns its
  * identity space, while public-ID lookup keeps first-registration semantics.
+ *
+ * Private keys are the owner boundary. Public Track IDs remain the compatibility
+ * boundary, so callers never receive private identity tokens from reads.
+ *
+ * The separate ID index is intentional: fuzz and publish paths resolve tracks on
+ * every composition hop, and scanning the full registry turns that hot path into
+ * avoidable O(registry) work.
+ *
+ * Compose contexts are mirrored once per public context. This preserves shared
+ * ancestor memoization while allowing the owner to use private identity keys.
+ *
+ * Lifecycle subscriptions are released before owner entries disappear. Source
+ * destruction therefore reports observers from live state, then removes both
+ * incoming and outgoing edges without leaving stale registry references.
  */
 export class ScopedObservationAdapter {
   #owner;
