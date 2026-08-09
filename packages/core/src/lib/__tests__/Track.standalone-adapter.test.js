@@ -19,6 +19,19 @@ describe("P2-03 Track standalone adapter routing", () => {
     adapter.destroy();
   });
 
+  it("isolates duplicate local ids by Track identity", () => {
+    const adapter = new StandaloneObservationAdapter();
+    const left = makeTrack("bone", adapter);
+    const right = makeTrack("bone", adapter);
+    left.setObserved(right, (patch) => ({ fromRight: patch.value }));
+    expect(left.compose()).toEqual({ value: "bone", fromRight: "bone" });
+    expect(left.observedSources).toEqual([right]);
+    expect(right.observerIds).toEqual([left.id]);
+    left.destroy();
+    right.destroy();
+    adapter.destroy();
+  });
+
   it("keeps adapter-backed observer cleanup idempotent", () => {
     const adapter = new StandaloneObservationAdapter();
     const source = makeTrack("source", adapter);
