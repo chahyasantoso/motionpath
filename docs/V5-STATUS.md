@@ -1,34 +1,34 @@
 # MotionPath v5 status
 
-**Status captured:** 2026-08-10 07:12 Asia/Jakarta  
+**Status captured:** 2026-08-10 07:21 Asia/Jakarta  
 **Branch:** `v5-break` from clean `v5` at `e4fc9b9`  
 **Draft PR:** [#146](https://github.com/chahyasantoso/motionpath/pull/146)  
 **Historical PR:** [#145](https://github.com/chahyasantoso/motionpath/pull/145), frozen evidence only  
-**Session state:** Phase 0 baseline reconciliation in progress
+**Session state:** Phase 1 in progress
 
 ## Executive status
 
-The clean v5 baseline's unit job failed because ten suites are explicitly future-contract or compatibility-contract tests. They are not silently deleted or weakened. They are now isolated into a dedicated Phase 1 contract command while the ordinary `npm test` baseline runs the remaining current v5 suite.
+Phase 0 is closed with an exact-head green matrix. Phase 1 has started on the correct clean branch and the first authority cut is landed. The branch now returns plain Tracks from `createTrack`, constructs lifecycle payloads outside the compatibility facade, and routes GraphBinding late-track wiring through its controller only.
 
-## Reconciliation decision
+## Phase 1 cut landed
 
-The failing suites remain intact and are not part of the Phase 0 gate until their owning phase lands:
+- `321ce97`: removed factory-level facade installation.
+- Added neutral `usecases/observationEvents.js` and removed Track's direct lifecycle-helper dependency on the legacy facade.
+- Removed GraphBinding's legacy mutation-override branch.
+- Preserved existing topology behavior until the planned P2-04 phase.
 
-- Track observation lifecycle and legacy surface: Phase 1;
-- standalone adapter ownership: Phase 1;
-- GraphBinding ownership, initial wiring, and rollback: Phase 1;
-- GraphPublisher contract and incremental publication: Phase 2.
+## Phase 1 remaining work
 
-Run them explicitly with `npm run test:phase1-contract`. This is a phase gate, not a permanent exclusion. The suites must return to the authoritative full matrix as their contracts become current.
-
-## Phase 0 remaining gate
-
-Run `npm test` on the exact head, then typecheck, build, package, Prettier, boundaries, and benchmarks. Phase 0 closes only when the current v5 baseline is green and the excluded future-contract suites are listed as intentional, with no assertion changes.
+- Remove the remaining compatibility facade and ownership-mode machinery.
+- Reject implicit cross-owner mutation.
+- Replace bridge recreation with one long-lived ObservationState and an undo journal.
+- Remove GraphPublisher topology mutation methods.
+- Activate and pass the Phase 1 contract suites, including lifecycle, rollback, stale-owner, and runtime-surface checks.
 
 ## Next executable action
 
-Verify `npm test` and the full Phase 0 matrix. Then update all four phase docs with exact results before starting Phase 1.
+Continue the single authority cut. Do not begin qualified cross-motion identity, free-track enablement, publisher rollout, or P2-04 topology/playback removal.
 
-## Guardrails
+## Verification policy
 
-Do not continue implementation on PR #145. Do not touch qualified cross-motion identity, free-track enablement, publisher rollout, or P2-04 topology/playback before Phase 1 gates are closed.
+The Phase 1 contract command remains intentionally separate until its owning behavior lands. Phase 1 closes only with the contract suites, full exact-head matrix, and all four phase docs refreshed together.

@@ -1,7 +1,7 @@
 # MotionPath v5 pass-2 completion matrix
 
-**Status captured:** 2026-08-10 07:12 Asia/Jakarta  
-**Implementation:** `v5-break` from clean `v5` at `e4fc9b9`  
+**Status captured:** 2026-08-10 07:21 Asia/Jakarta  
+**Implementation:** Phase 1 on `v5-break` from clean `v5` at `e4fc9b9`  
 **Draft PR:** [#146](https://github.com/chahyasantoso/motionpath/pull/146)  
 **Historical context:** [#145](https://github.com/chahyasantoso/motionpath/pull/145), frozen evidence only
 
@@ -9,8 +9,8 @@ No row closes from stale CI, partial runs, or docs-only claims. Every phase clos
 
 | Phase / target | Status | Required closure evidence |
 | --- | --- | --- |
-| Phase 0: clean baseline and evidence | **Reconciliation in progress** | Ten future-contract suites isolated without assertion changes; current-suite `npm test` and exact-head matrix still required. |
-| Phase 1: one graph authority | Blocked | Re-enable and make Track, adapter, GraphBinding, and lifecycle contract suites green through the owner cut. |
+| Phase 0: clean baseline and evidence | **Closed** | Exact-head PR #146 matrix green after manifest and alias fixes. |
+| Phase 1: one graph authority | **In progress** | First authority cut at `321ce97`: factory facade removed and GraphBinding override seam removed. Remaining: one owner, stable ObservationState, no bridge rebuild, cross-owner rejection, publisher mutation cut, contract suite green. |
 | Qualified graph identity | Blocked | Canonical qualified IDs, ambiguity and cycle tests. |
 | Project-wide GraphRuntime | Blocked | Two-motion shared graph, one publisher, PatchRegistry, and clock subscription. |
 | Authoritative patch publication | Blocked | ObservationState plus local Track composition, immutable batches. |
@@ -21,16 +21,10 @@ No row closes from stale CI, partial runs, or docs-only claims. Every phase clos
 | Lifecycle/rollback | Open | Owner-first teardown, idempotence, mapper-preserving rollback, stale-owner regression. |
 | Handoff discipline | Active | Update plan, status, matrix, and handoff every phase close. |
 
-## Test commands
-
-- `npm test` or `npm run test:phase0`: current v5 baseline gate.
-- `npm run test:phase1-contract`: intentionally red future-contract suites, preserved for Phase 1/2 work.
-
-The contract suites are not deleted, skipped inside their files, or weakened. They are excluded only from the Phase 0 baseline command and must be promoted back as each owning phase closes.
-
-## Required exact-head verification
+## Phase 1 required commands
 
 ```sh
+npm run test:phase1-contract
 npm test
 npm run typecheck
 npm run build
