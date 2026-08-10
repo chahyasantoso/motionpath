@@ -15,5 +15,26 @@ import GraphSpiralPage from "./components/Spiral/GraphSpiralPage.jsx";
 import WalkerPage from "./components/Walker/WalkerPage";
 
 export default function App() {
-  return (<><GlobalNav /><Routes><Route path="/" element={<HubPage />} /><Route path="/hooks-demo" element={<DemoPage />} /><Route path="/burst" element={<BurstPage />} /><Route path="/moto" element={<MotorcyclePage />} /><Route path="/pasarmalam" element={<PasarMalamPage />} /><Route path="/pasarmalam-observer" element={<PasarMalamObserverPage />} /><Route path="/spike-refresh" element={<RefreshSpikePage />} /><Route path="/spike-stagger" element={<StaggerSpikePage />} /><Route path="/tower-defense" element={<TowerDefensePage />} /><Route path="/spiral" element={<SpiralPage />} /><Route path="/spiral-graph" element={<GraphSpiralPage />} /><Route path="/walker" element={<WalkerPage />} /></Routes></>);
+  return (
+    <>
+      <GlobalNav />
+      <Routes>
+        <Route path="/" element={<HubPage />} />
+        <Route path="/hooks-demo" element={<DemoPage />} />
+        <Route path="/burst" element={<BurstPage />} />
+        <Route path="/moto" element={<MotorcyclePage />} />
+        <Route path="/pasarmalam" element={<PasarMalamPage />} />
+        <Route
+          path="/pasarmalam-observer"
+          element={<PasarMalamObserverPage />}
+        />
+        <Route path="/spike-refresh" element={<RefreshSpikePage />} />
+        <Route path="/spike-stagger" element={<StaggerSpikePage />} />
+        <Route path="/tower-defense" element={<TowerDefensePage />} />
+        <Route path="/spiral" element={<SpiralPage />} />
+        <Route path="/spiral-graph" element={<GraphSpiralPage />} />
+        <Route path="/walker" element={<WalkerPage />} />
+      </Routes>
+    </>
+  );
 }

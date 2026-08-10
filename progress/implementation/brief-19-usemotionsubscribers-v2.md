@@ -8,6 +8,7 @@ Supersedes the previous draft of this brief. That draft extracted a shared `moti
 
 - `useMotionSubscribers(sources, ref, mergeFn?)` is the only real implementation. `sources` is `Array<{ instance, trackId, transformFn? }>`.
 - `useMotionSubscriber(instance, trackId, ref, transformFn)` becomes exactly this, in full:
+
   ```js
   import useMotionSubscribers from "./useMotionSubscribers.js";
 
@@ -20,7 +21,9 @@ Supersedes the previous draft of this brief. That draft extracted a shared `moti
     useMotionSubscribers([{ instance, trackId, transformFn }], ref);
   }
   ```
+
   No `useRef`, no `useEffect`, no independent subscribe logic in this file. If you find yourself adding either back in, stop — that means the plural hook isn't doing its job.
+
 - Resubscription in `useMotionSubscribers` is keyed on `instance.id` + `trackId` identity only, not array reference and not `transformFn` identity. A fresh `sources` array literal on every render (which is what the `useMotionSubscriber` wrapper now always produces) must not cause resubscribe churn as long as the underlying instance/trackId pairs are unchanged.
 - Default merge with no `mergeFn`: `Object.assign({}, ...patches)` in array order — later sources win on overlapping keys.
 - `transformFn` per source must always read the latest closure at tick time (ref-based array, one slot per source index), and must never be part of the resubscription signature.

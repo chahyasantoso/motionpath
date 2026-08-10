@@ -18,8 +18,17 @@ describe("P2-03 Track composition routing", () => {
 
     const patch = tracks.get("n2").compose();
 
-    expect(compose).toHaveBeenCalledWith("n2", undefined, undefined, expect.any(Function));
-    expect(patch).toEqual(state.compose("n2", undefined, new Map(), (track, rawData) => track.composeLocal(rawData)));
+    expect(compose).toHaveBeenCalledWith(
+      "n2",
+      undefined,
+      undefined,
+      expect.any(Function),
+    );
+    expect(patch).toEqual(
+      state.compose("n2", undefined, new Map(), (track, rawData) =>
+        track.composeLocal(rawData),
+      ),
+    );
     binding.destroy();
   });
 
@@ -27,7 +36,12 @@ describe("P2-03 Track composition routing", () => {
     const { binding, tracks } = bind(chainMotion(3));
     const previousState = binding.observationState;
 
-    binding.addEdge({ source: "n0", target: "n2", role: "output", mapFn: (patch) => ({ direct: patch.transform }) });
+    binding.addEdge({
+      source: "n0",
+      target: "n2",
+      role: "output",
+      mapFn: (patch) => ({ direct: patch.transform }),
+    });
 
     expect(previousState.isDestroyed).toBe(true);
     const currentState = binding.observationState;

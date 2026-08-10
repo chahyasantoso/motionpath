@@ -157,7 +157,14 @@ const carouselScene = {
   },
   stagger: 0.14,
   staggerTransition: { duration: 0.4, ease: "power3.out" },
-  tracks: [{ id: "card-track", keyframes: {/* ... */} }],
+  tracks: [
+    {
+      id: "card-track",
+      keyframes: {
+        /* ... */
+      },
+    },
+  ],
 };
 ```
 

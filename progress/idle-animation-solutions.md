@@ -229,6 +229,7 @@ We add a `velocityScale` parameter inside the time-based scenario trigger config
 1. **Low-overhead Velocity Readings**: Rather than adding custom event listeners, `ProductionEngine.js` will query `ScrollTrigger.getVelocity()` inside the existing GSAP ticker loop.
 2. **Timeline Target Identification**: During project load, scenarios carrying `velocityScale` are collected.
 3. **Speed Interpolation**: The ticker loop updates the master timeline's speed:
+
    ```javascript
    const velocity = ScrollTrigger.getVelocity();
    const targetScale = Math.max(0, 1 - Math.abs(velocity) * sensitivity);

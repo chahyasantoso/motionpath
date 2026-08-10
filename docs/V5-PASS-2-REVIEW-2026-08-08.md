@@ -43,7 +43,7 @@ This also means the symbol-ban is larger than #140's list implies. `Track.observ
 
 #### F-02 (High): per-Track standalone adapters reverse a recorded decision
 
-`V5-STATUS.md` records: *"A standalone adapter must be shared across related Tracks. Creating an isolated adapter per Track makes valid cross-track edges look unknown."* #139 then made both `createTrack` and the `Track` constructor create `new StandaloneObservationAdapter()` per Track when `mode === "standalone"`, and deleted the comment that explained why they must not. `Engine.mountInstance`, `Engine.createTrackInstance`, and `Engine.createMotionHost` all take that path.
+`V5-STATUS.md` records: _"A standalone adapter must be shared across related Tracks. Creating an isolated adapter per Track makes valid cross-track edges look unknown."_ #139 then made both `createTrack` and the `Track` constructor create `new StandaloneObservationAdapter()` per Track when `mode === "standalone"`, and deleted the comment that explained why they must not. `Engine.mountInstance`, `Engine.createTrackInstance`, and `Engine.createMotionHost` all take that path.
 
 The "unknown track" failure is avoided by having `setObserved`/`compose` auto-register both endpoints, which means the **observer's** adapter becomes the de-facto owner of the edge while the **source's** own adapter keeps an empty view of its own observers. Consequences visible in the source:
 

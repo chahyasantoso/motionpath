@@ -39,8 +39,12 @@ describe("P2-03 GraphBinding and ObservationState parity", () => {
   it("keeps parity after a rejected transaction", () => {
     const { binding, publisher, tracks } = bind(chainMotion(3));
     const apply = publisher.applyGraph.bind(publisher);
-    publisher.applyGraph = () => { throw new Error("forced parity rejection"); };
-    expect(() => binding.addEdge({ source: "n0", target: "n2" })).toThrow(/parity rejection/);
+    publisher.applyGraph = () => {
+      throw new Error("forced parity rejection");
+    };
+    expect(() => binding.addEdge({ source: "n0", target: "n2" })).toThrow(
+      /parity rejection/,
+    );
     publisher.applyGraph = apply;
     expect(assertParity(tracks)).toBe(true);
     binding.destroy();

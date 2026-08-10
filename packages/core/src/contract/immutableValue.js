@@ -39,7 +39,8 @@
  */
 
 export function isPlainObject(value) {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
@@ -59,7 +60,8 @@ export function toImmutableValue(value, seen = new WeakMap()) {
   if (existing) return existing;
   const clone = {};
   seen.set(value, clone);
-  for (const [key, entry] of Object.entries(value)) clone[key] = toImmutableValue(entry, seen);
+  for (const [key, entry] of Object.entries(value))
+    clone[key] = toImmutableValue(entry, seen);
   return Object.freeze(clone);
 }
 
@@ -69,7 +71,8 @@ export function toImmutableValue(value, seen = new WeakMap()) {
  */
 export function toImmutableValues(values, seen = new WeakMap()) {
   const frozen = {};
-  for (const [key, value] of Object.entries(values ?? {})) frozen[key] = toImmutableValue(value, seen);
+  for (const [key, value] of Object.entries(values ?? {}))
+    frozen[key] = toImmutableValue(value, seen);
   return Object.freeze(frozen);
 }
 
@@ -79,5 +82,7 @@ export function toImmutableValues(values, seen = new WeakMap()) {
  * only shallow copies.
  */
 export function toImmutableList(items, seen = new WeakMap()) {
-  return Object.freeze((items ?? []).map((item) => toImmutableValue(item, seen)));
+  return Object.freeze(
+    (items ?? []).map((item) => toImmutableValue(item, seen)),
+  );
 }

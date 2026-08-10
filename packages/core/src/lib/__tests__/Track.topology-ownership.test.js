@@ -7,8 +7,16 @@ const trackPath = fileURLToPath(new URL("../Track.js", import.meta.url));
 describe("P2-04 Track topology ownership", () => {
   it("documents the remaining topology seams before their removal", async () => {
     const source = await readFile(trackPath, "utf8");
-    for (const symbol of ["addChild", "removeChild", "_attachGroupHost", "childCount", "getChild"]) {
-      expect(source, `expected current topology seam: ${symbol}`).toContain(symbol);
+    for (const symbol of [
+      "addChild",
+      "removeChild",
+      "_attachGroupHost",
+      "childCount",
+      "getChild",
+    ]) {
+      expect(source, `expected current topology seam: ${symbol}`).toContain(
+        symbol,
+      );
     }
   });
 

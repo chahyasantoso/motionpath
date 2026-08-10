@@ -21,7 +21,10 @@ describe("element-uniqueness rule", () => {
   });
 
   it("should allow the same track ID across different motions (PR-17: bare IDs are motion-local)", () => {
-    const motions = [{ tracks: [{ id: "el-1" }] }, { tracks: [{ id: "el-1" }] }];
+    const motions = [
+      { tracks: [{ id: "el-1" }] },
+      { tracks: [{ id: "el-1" }] },
+    ];
     expect(elementUniquenessRule(motions)).toHaveLength(0);
   });
 

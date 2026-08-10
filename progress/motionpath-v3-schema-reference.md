@@ -22,8 +22,12 @@ schema (JSON) → validateProject() → [throws on error] → engine.loadProject
 {
   "schemaVersion": 2, // REQUIRED, must be exactly 2 (current constant)
   "perspective": "1000px", // optional; if 3D props used without this, WARNING (not error)
-  "templates": [/* Template[] */],
-  "motions": [/* Motion[] */],
+  "templates": [
+    /* Template[] */
+  ],
+  "motions": [
+    /* Motion[] */
+  ],
 }
 ```
 
@@ -55,10 +59,14 @@ Reusable keyframe fragments. Referenced by tracks via `track.use`.
 ```jsonc
 {
   "motionId": "hero-reveal", // REQUIRED, non-empty string, unique project-wide
-  "driver": {/* Driver — REQUIRED */},
+  "driver": {
+    /* Driver — REQUIRED */
+  },
   "stagger": 0.1, // optional, plain number only, see §7
   "staggerTransition": { "duration": 0.3, "ease": "power2.out" }, // optional, used by addChild/removeChild reflow only
-  "tracks": [/* Track[], REQUIRED, min 1 */],
+  "tracks": [
+    /* Track[], REQUIRED, min 1 */
+  ],
 }
 ```
 
@@ -74,7 +82,9 @@ Reusable keyframe fragments. Referenced by tracks via `track.use`.
   "sectionId": "hero", // default trigger-anchor id (used when trigger.trigger is absent)
   "timelineId": "hero-group", // optional — groups this motion into a shared master timeline, see §8
   "primary": true, // required exactly once per timelineId group
-  "trigger": {/* Trigger — REQUIRED */},
+  "trigger": {
+    /* Trigger — REQUIRED */
+  },
 }
 ```
 
@@ -124,7 +134,9 @@ Delegate motions are resolved on-demand via `engine.resolveMotion(motionId, prog
   "use": "fade-in", // optional — merge in a template (whole-key replace, see §3)
   "duration": 2, // optional — per-track override; forbidden on scrub (see §5 matrix)
   "transformOrigin": "50% 50%", // optional passthrough to GSAP
-  "keyframes": {/* PropertyKeyframes, keyed by property name */},
+  "keyframes": {
+    /* PropertyKeyframes, keyed by property name */
+  },
 }
 ```
 

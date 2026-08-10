@@ -22,17 +22,26 @@ describe("P2-03 StandaloneObservationAdapter", () => {
   it("supports input and output edges from one source", () => {
     const source = track("source", { value: 3 });
     const target = track("target", { value: 0 });
-    const adapter = new StandaloneObservationAdapter({ tracks: [source, target] });
+    const adapter = new StandaloneObservationAdapter({
+      tracks: [source, target],
+    });
 
-    adapter.setObserved(target, source, () => ({ value: 7 }), { role: "input", target: "target" });
-    adapter.setObserved(target, source, () => ({ extra: true }), { role: "output" });
+    adapter.setObserved(target, source, () => ({ value: 7 }), {
+      role: "input",
+      target: "target",
+    });
+    adapter.setObserved(target, source, () => ({ extra: true }), {
+      role: "output",
+    });
 
     expect(adapter.state.getEdges("target")).toHaveLength(2);
     adapter.destroy();
   });
 
   it("is explicit about lifecycle and does not expose mutable ownership maps", () => {
-    const adapter = new StandaloneObservationAdapter({ tracks: [track("one")] });
+    const adapter = new StandaloneObservationAdapter({
+      tracks: [track("one")],
+    });
     expect(adapter.tracks).toBeInstanceOf(Map);
     adapter.destroy();
     expect(() => adapter.compose(track("one"))).toThrow(/destroyed/i);

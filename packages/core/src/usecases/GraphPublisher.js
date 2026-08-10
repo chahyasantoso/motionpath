@@ -1,4 +1,7 @@
-import { buildTopologicalOrder, topologicalTrackOrder } from "./normalizeObservationGraph.js";
+import {
+  buildTopologicalOrder,
+  topologicalTrackOrder,
+} from "./normalizeObservationGraph.js";
 
 const RETRY_OPTIONS = new Set(["maxAttempts", "backoff"]);
 
@@ -40,8 +43,16 @@ export class GraphPublisher {
   #strict;
   #destroyed = false;
 
-  constructor({ graph, order, tracks = new Map(), publish, strict = true, retry } = {}) {
-    if (typeof publish !== "function") throw new TypeError("GraphPublisher requires a publish callback.");
+  constructor({
+    graph,
+    order,
+    tracks = new Map(),
+    publish,
+    strict = true,
+    retry,
+  } = {}) {
+    if (typeof publish !== "function")
+      throw new TypeError("GraphPublisher requires a publish callback.");
     this.#publish = publish;
     this.#strict = strict;
     this.#retry = this.#normalizeRetry(retry);
@@ -51,7 +62,8 @@ export class GraphPublisher {
     // undetectable afterwards because both sides were the same object.
     const nextTracks = new Map(tracks);
     for (const [id, track] of nextTracks) {
-      if (!track || track.id !== id) throw new Error(`Track registration mismatch for '${id}'.`);
+      if (!track || track.id !== id)
+        throw new Error(`Track registration mismatch for '${id}'.`);
     }
     const nodes = graph
       ? (graph.nodes?.map(({ id }) => ({ id })) ?? [])
@@ -60,7 +72,9 @@ export class GraphPublisher {
     const resolvedOrder = graph
       ? topologicalTrackOrder(graph, { strict: true })
       : [...(order ?? nextTracks.keys())];
-    this.#commitGraph(this.#prepareGraph(nodes, edges, resolvedOrder, nextTracks));
+    this.#commitGraph(
+      this.#prepareGraph(nodes, edges, resolvedOrder, nextTracks),
+    );
     this.#attachHooks();
   }
 
@@ -86,7 +100,8 @@ export class GraphPublisher {
   }
 
   markAllDirty() {
-    if (!this.#destroyed) for (const id of this.#tracks.keys()) this.#marked.add(id);
+    if (!this.#destroyed)
+      for (const id of this.#tracks.keys()) this.#marked.add(id);
   }
 
   resetRetry(id) {
@@ -107,9 +122,12 @@ export class GraphPublisher {
   flush() {
     if (this.#destroyed) return 0;
     this.#flushNumber++;
-    if (!this.#marked.size && !this.#publishPending.size && this.#isWarm()) return 0;
+    if (!this.#marked.size && !this.#publishPending.size && this.#isWarm())
+      return 0;
     const marked = new Set(this.#marked);
-    const retrying = new Set([...this.#publishPending].filter((id) => this.#canRetry(id)));
+    const retrying = new Set(
+      [...this.#publishPending].filter((id) => this.#canRetry(id)),
+    );
     const changed = new Set();
     const blocked = new Set();
     const failures = [];
@@ -126,7 +144,8 @@ export class GraphPublisher {
         this.#marked.add(id);
         continue;
       }
-      const stateChanged = marked.has(id) || upstream.some((source) => changed.has(source));
+      const stateChanged =
+        marked.has(id) || upstream.some((source) => changed.has(source));
       const shouldRetry = retrying.has(id);
       const needsCompose = stateChanged || shouldRetry || !this.#cache.has(id);
       if (!needsCompose) {
@@ -162,15 +181,19 @@ export class GraphPublisher {
     }
     // Drop bookkeeping for tracks that disappeared or died mid-flush.
     for (const id of [...this.#marked]) {
-      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#marked.delete(id);
+      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed)
+        this.#marked.delete(id);
     }
     for (const id of [...this.#publishPending]) {
-      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#publishPending.delete(id);
+      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed)
+        this.#publishPending.delete(id);
     }
     for (const id of [...this.#retryState.keys()]) {
-      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed) this.#retryState.delete(id);
+      if (!this.#tracks.has(id) || this.#tracks.get(id)?.isDestroyed)
+        this.#retryState.delete(id);
     }
-    if (failures.length) throw new AggregateError(failures, "GraphPublisher flush failed.");
+    if (failures.length)
+      throw new AggregateError(failures, "GraphPublisher flush failed.");
     return published;
   }
 
@@ -185,22 +208,34 @@ export class GraphPublisher {
     const order = topologicalTrackOrder(graph, { strict: true });
     const nextTracks = new Map(tracks);
     const nodes = graph.nodes?.map(({ id }) => ({ id })) ?? [];
-    const state = this.#prepareGraph(nodes, graph.edges ?? [], order, nextTracks);
+    const state = this.#prepareGraph(
+      nodes,
+      graph.edges ?? [],
+      order,
+      nextTracks,
+    );
     const previousTracks = this.#tracks;
     const previousEdges = this.#edges;
     const invalidationSeeds = new Set();
     const previousIds = new Set(previousTracks.keys());
     for (const [id, track] of nextTracks) {
-      if (!previousTracks.has(id) || previousTracks.get(id) !== track) invalidationSeeds.add(id);
+      if (!previousTracks.has(id) || previousTracks.get(id) !== track)
+        invalidationSeeds.add(id);
     }
-    for (const id of previousIds) if (!nextTracks.has(id)) invalidationSeeds.add(id);
+    for (const id of previousIds)
+      if (!nextTracks.has(id)) invalidationSeeds.add(id);
     // Edge-level diff, not a wholesale invalidation: a one-edge change should
     // not force every node in the graph to recompose.
-    const edgeKey = (edge) => `${edge.source}${edge.target}${edge.role ?? "output"}${edge.input ?? ""}`;
-    const oldEdges = new Map(previousEdges.map((edge) => [edgeKey(edge), edge]));
+    const edgeKey = (edge) =>
+      `${edge.source}${edge.target}${edge.role ?? "output"}${edge.input ?? ""}`;
+    const oldEdges = new Map(
+      previousEdges.map((edge) => [edgeKey(edge), edge]),
+    );
     const newEdges = new Map(state.edges.map((edge) => [edgeKey(edge), edge]));
-    for (const [key, edge] of oldEdges) if (!newEdges.has(key)) invalidationSeeds.add(edge.target);
-    for (const [key, edge] of newEdges) if (!oldEdges.has(key)) invalidationSeeds.add(edge.target);
+    for (const [key, edge] of oldEdges)
+      if (!newEdges.has(key)) invalidationSeeds.add(edge.target);
+    for (const [key, edge] of newEdges)
+      if (!oldEdges.has(key)) invalidationSeeds.add(edge.target);
     this.#detachHooks();
     this.#commitGraph(state);
     this.#attachHooks();
@@ -234,15 +269,31 @@ export class GraphPublisher {
     const track = idFirst ? trackOrOptions : idOrTrack;
     const id = idFirst ? idOrTrack : track?.id;
     const options = (idFirst ? maybeOptions : trackOrOptions) ?? {};
-    if (!track || typeof track.compose !== "function") throw new TypeError("addTrack requires a Track.");
+    if (!track || typeof track.compose !== "function")
+      throw new TypeError("addTrack requires a Track.");
     if (track.id !== id) {
-      throw new Error(`Track id '${track.id}' does not match registration id '${id}'.`);
+      throw new Error(
+        `Track id '${track.id}' does not match registration id '${id}'.`,
+      );
     }
     if (this.#tracks.has(id)) throw new Error(`Duplicate track id '${id}'.`);
-    const nodes = [...this.#order.map((existing) => ({ id: existing })), { id }];
-    const edges = [...this.#edges, ...(options.observes ?? []).map((edge) => ({ ...edge, target: id }))];
+    const nodes = [
+      ...this.#order.map((existing) => ({ id: existing })),
+      { id },
+    ];
+    const edges = [
+      ...this.#edges,
+      ...(options.observes ?? []).map((edge) => ({ ...edge, target: id })),
+    ];
     const nextTracks = new Map(this.#tracks).set(id, track);
-    this.#commitGraph(this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), nextTracks));
+    this.#commitGraph(
+      this.#prepareGraph(
+        nodes,
+        edges,
+        buildTopologicalOrder(nodes, edges),
+        nextTracks,
+      ),
+    );
     this.#attachHooks();
     this.#marked.add(id);
   }
@@ -259,7 +310,14 @@ export class GraphPublisher {
       },
     ];
     const nodes = this.#order.map((id) => ({ id }));
-    this.#commitGraph(this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), this.#tracks));
+    this.#commitGraph(
+      this.#prepareGraph(
+        nodes,
+        edges,
+        buildTopologicalOrder(nodes, edges),
+        this.#tracks,
+      ),
+    );
     this.#marked.add(edge.target);
     this.#cache.delete(edge.target);
   }
@@ -275,7 +333,14 @@ export class GraphPublisher {
         ),
     );
     const nodes = this.#order.map((id) => ({ id }));
-    this.#commitGraph(this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), this.#tracks));
+    this.#commitGraph(
+      this.#prepareGraph(
+        nodes,
+        edges,
+        buildTopologicalOrder(nodes, edges),
+        this.#tracks,
+      ),
+    );
     this.#marked.add(edge.target);
     this.#cache.delete(edge.target);
   }
@@ -296,12 +361,23 @@ export class GraphPublisher {
    */
   removeTrack(id, { invalidateDependents = false } = {}) {
     if (this.#destroyed || !this.#tracks.has(id)) return;
-    const dependents = invalidateDependents ? [...(this.#downstream.get(id) ?? [])] : [];
-    const nodes = this.#order.filter((existing) => existing !== id).map((existing) => ({ id: existing }));
-    const edges = this.#edges.filter((edge) => edge.source !== id && edge.target !== id);
+    const dependents = invalidateDependents
+      ? [...(this.#downstream.get(id) ?? [])]
+      : [];
+    const nodes = this.#order
+      .filter((existing) => existing !== id)
+      .map((existing) => ({ id: existing }));
+    const edges = this.#edges.filter(
+      (edge) => edge.source !== id && edge.target !== id,
+    );
     const nextTracks = new Map(this.#tracks);
     nextTracks.delete(id);
-    const state = this.#prepareGraph(nodes, edges, buildTopologicalOrder(nodes, edges), nextTracks);
+    const state = this.#prepareGraph(
+      nodes,
+      edges,
+      buildTopologicalOrder(nodes, edges),
+      nextTracks,
+    );
     this.#detachHook(id);
     this.#commitGraph(state);
     this.#cache.delete(id);
@@ -353,23 +429,30 @@ export class GraphPublisher {
   #prepareGraph(nodes, edges, order, tracks) {
     const nodeIds = new Set();
     for (const { id } of nodes) {
-      if (nodeIds.has(id)) throw new Error(`Graph declares node '${id}' more than once.`);
+      if (nodeIds.has(id))
+        throw new Error(`Graph declares node '${id}' more than once.`);
       nodeIds.add(id);
     }
     for (const id of nodeIds) {
-      if (!tracks.has(id)) throw new Error(`Graph node '${id}' has no registered track.`);
+      if (!tracks.has(id))
+        throw new Error(`Graph node '${id}' has no registered track.`);
     }
     for (const id of tracks.keys()) {
-      if (!nodeIds.has(id)) throw new Error(`Registered track '${id}' is missing from the graph.`);
+      if (!nodeIds.has(id))
+        throw new Error(`Registered track '${id}' is missing from the graph.`);
     }
     const nextOrder = [...order];
     const rank = new Map();
     if (nextOrder.length !== nodeIds.size) {
-      throw new Error(`Publish order covers ${nextOrder.length} of ${nodeIds.size} graph nodes.`);
+      throw new Error(
+        `Publish order covers ${nextOrder.length} of ${nodeIds.size} graph nodes.`,
+      );
     }
     for (const id of nextOrder) {
-      if (!nodeIds.has(id)) throw new Error(`Publish order references unknown node '${id}'.`);
-      if (rank.has(id)) throw new Error(`Publish order lists '${id}' more than once.`);
+      if (!nodeIds.has(id))
+        throw new Error(`Publish order references unknown node '${id}'.`);
+      if (rank.has(id))
+        throw new Error(`Publish order lists '${id}' more than once.`);
       rank.set(id, rank.size);
     }
     const nextEdges = edges.map((edge) => ({
@@ -381,12 +464,16 @@ export class GraphPublisher {
     const upstream = new Map([...nodeIds].map((id) => [id, []]));
     const downstream = new Map([...nodeIds].map((id) => [id, []]));
     for (const edge of nextEdges) {
-      if (!upstream.has(edge.source)) throw new Error(`Graph edge sources unknown track '${edge.source}'.`);
-      if (!upstream.has(edge.target)) throw new Error(`Graph edge targets unknown track '${edge.target}'.`);
+      if (!upstream.has(edge.source))
+        throw new Error(`Graph edge sources unknown track '${edge.source}'.`);
+      if (!upstream.has(edge.target))
+        throw new Error(`Graph edge targets unknown track '${edge.target}'.`);
       // The order is the schedule. An edge it does not respect means a
       // dependent composes before its source and reads a stale patch.
       if (rank.get(edge.source) >= rank.get(edge.target)) {
-        throw new Error(`Publish order violates edge '${edge.source}' -> '${edge.target}'.`);
+        throw new Error(
+          `Publish order violates edge '${edge.source}' -> '${edge.target}'.`,
+        );
       }
       upstream.get(edge.target).push(edge.source);
       downstream.get(edge.source).push(edge.target);
@@ -446,10 +533,13 @@ export class GraphPublisher {
     }
     for (const key of Object.keys(retry)) {
       if (!RETRY_OPTIONS.has(key)) {
-        throw new TypeError(`Unknown retry option '${key}'. Supported options are maxAttempts and backoff.`);
+        throw new TypeError(
+          `Unknown retry option '${key}'. Supported options are maxAttempts and backoff.`,
+        );
       }
     }
-    const maxAttempts = retry.maxAttempts === undefined ? Infinity : Number(retry.maxAttempts);
+    const maxAttempts =
+      retry.maxAttempts === undefined ? Infinity : Number(retry.maxAttempts);
     const backoff = retry.backoff === undefined ? 0 : Number(retry.backoff);
     if (
       !(maxAttempts > 0) ||
@@ -497,7 +587,9 @@ export class GraphPublisher {
     while (queue.length) {
       const current = queue.shift();
       if (current === observer) {
-        throw new Error(`Observing "${source.id}" from "${observer.id}" would create a cycle.`);
+        throw new Error(
+          `Observing "${source.id}" from "${observer.id}" would create a cycle.`,
+        );
       }
       if (seen.has(current.id)) continue;
       seen.add(current.id);
@@ -513,7 +605,8 @@ export class GraphPublisher {
       const unsubscribe = track.onLifecycle?.((event) => {
         if (event.type === "invalidated") this.markDirty(id);
         if (event.type === "destroyed") this.removeTrack(id);
-        if (event.type === "detached") this.removeTrack(id, { invalidateDependents: true });
+        if (event.type === "detached")
+          this.removeTrack(id, { invalidateDependents: true });
       });
       this.#hooks.set(id, unsubscribe ?? (() => {}));
     }

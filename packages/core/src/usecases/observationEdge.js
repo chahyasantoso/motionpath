@@ -13,10 +13,17 @@ export function observationEdgeKey(sourceId, role = "output", input) {
 }
 
 export function observationGraphEdgeKey(edge) {
-  return [observationEdgeKey(edge.source, edge.role, edge.input), edge.target].join(EDGE_KEY_DELIMITER);
+  return [
+    observationEdgeKey(edge.source, edge.role, edge.input),
+    edge.target,
+  ].join(EDGE_KEY_DELIMITER);
 }
 
 export function observationEdgeEquals(a, b) {
   if (!a || !b) return false;
-  return a.target === b.target && observationEdgeKey(a.source, a.role, a.input) === observationEdgeKey(b.source, b.role, b.input);
+  return (
+    a.target === b.target &&
+    observationEdgeKey(a.source, a.role, a.input) ===
+      observationEdgeKey(b.source, b.role, b.input)
+  );
 }

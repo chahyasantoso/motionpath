@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { GraphRuntime } from "../GraphRuntime.js";
 import { FakeClock } from "../FakeClock.js";
 import { PatchRegistry } from "../PatchRegistry.js";
-import { buildRealGraph, chainMotion, makeTrack } from "../../__fixtures__/graphTracks.js";
+import {
+  buildRealGraph,
+  chainMotion,
+  makeTrack,
+} from "../../__fixtures__/graphTracks.js";
 
 describe("GraphRuntime", () => {
   it("registers, flushes and publishes immutable patches", () => {
@@ -32,7 +36,9 @@ describe("GraphRuntime", () => {
     const { graph, tracks } = buildRealGraph(chainMotion(1));
     const runtime = new GraphRuntime({ graph, tracks });
     const late = makeTrack("late");
-    runtime.register(late, [{ source: "n0", mapFn: (patch) => ({ from_n0: patch.transform }) }]);
+    runtime.register(late, [
+      { source: "n0", mapFn: (patch) => ({ from_n0: patch.transform }) },
+    ]);
     expect(runtime.graph.nodes.map(({ id }) => id)).toContain("late");
   });
 

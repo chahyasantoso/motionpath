@@ -5,10 +5,14 @@ import { performance } from "node:perf_hooks";
 
 const startedAt = new Date().toISOString();
 const start = performance.now();
-const output = execFileSync(process.execPath, ["performance/rig-graph-benchmark.mjs"], {
-  cwd: process.cwd(),
-  encoding: "utf8",
-});
+const output = execFileSync(
+  process.execPath,
+  ["performance/rig-graph-benchmark.mjs"],
+  {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  },
+);
 const durationMs = Number((performance.now() - start).toFixed(3));
 const results = JSON.parse(output);
 const report = {

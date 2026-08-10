@@ -16,7 +16,7 @@ publisher = new GraphPublisher({ graph, tracks: trackMap, publish: () => {} });
 
 Nothing else closed the loop either. `Engine` imported `ProjectRuntime` and nothing else from `runtime/`: no `PatchRegistry`, no `GraphRuntime`, no clock. `GraphPublisher.flush()` had no caller anywhere in the mount path, so in production it was never even reached.
 
-The consequence is narrow and total. Everything PR-17 through PR-19 built (qualified IDs, staged membership, capability gates, reference validation) is real and tested, but all of it governs a graph whose output had nowhere to go. The PR-16 merge gate, *same-motion rendering is publisher-backed*, was unimplemented, so Checkpoint D could not pass, and Checkpoints E and F were certified above it.
+The consequence is narrow and total. Everything PR-17 through PR-19 built (qualified IDs, staged membership, capability gates, reference validation) is real and tested, but all of it governs a graph whose output had nowhere to go. The PR-16 merge gate, _same-motion rendering is publisher-backed_, was unimplemented, so Checkpoint D could not pass, and Checkpoints E and F were certified above it.
 
 ## The fix
 
@@ -35,7 +35,7 @@ The runtime is constructed **without** a clock and started only after `motion.in
 
 ```js
 motion.init();
-this.#register(motion, 'motion');
+this.#register(motion, "motion");
 runtime?.start(this.#resolveClock());
 ```
 
@@ -80,16 +80,16 @@ The two PR-16 CI requirements that had no committed suite now do.
 
 `packages/core/src/runtime/__tests__/PublisherEvidence.test.js`
 
-| Claim | Assertion |
-| --- | --- |
-| Compose once per node per tick | Diamond `a -> {b,c} -> d`: exactly `{a:1, b:1, c:1, d:1}` after one tick. A shared ancestor feeding two edges composes once. |
-| No work when clean | Chain of 4: 4 composes on the first tick, still 4 after two further ticks, 8 after one invalidation. |
-| One flush per tick | A subscriber that re-enters `flush()` is refused, not queued. |
-| Subscriber scaling | 1, 10 and 50 subscribers on a 4-node chain: composes stay `[4, 4, 4]`, deliveries are `[1, 10, 50]`. |
-| Shared instance | All 5 subscribers receive the identical frozen patch object, not 5 copies. |
-| Cost replaced | The legacy per-subscriber path on the same fixture: 10 subscribers x 4 chain nodes = 40 composes. |
-| Failure isolation | A throwing plugin blocks its own node, leaves the upstream patch published, records a diagnostic, and never throws into the ticker. |
-| Clock hygiene | Dispose detaches; ticking afterwards is inert. |
+| Claim                          | Assertion                                                                                                                           |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Compose once per node per tick | Diamond `a -> {b,c} -> d`: exactly `{a:1, b:1, c:1, d:1}` after one tick. A shared ancestor feeding two edges composes once.        |
+| No work when clean             | Chain of 4: 4 composes on the first tick, still 4 after two further ticks, 8 after one invalidation.                                |
+| One flush per tick             | A subscriber that re-enters `flush()` is refused, not queued.                                                                       |
+| Subscriber scaling             | 1, 10 and 50 subscribers on a 4-node chain: composes stay `[4, 4, 4]`, deliveries are `[1, 10, 50]`.                                |
+| Shared instance                | All 5 subscribers receive the identical frozen patch object, not 5 copies.                                                          |
+| Cost replaced                  | The legacy per-subscriber path on the same fixture: 10 subscribers x 4 chain nodes = 40 composes.                                   |
+| Failure isolation              | A throwing plugin blocks its own node, leaves the upstream patch published, records a diagnostic, and never throws into the ticker. |
+| Clock hygiene                  | Dispose detaches; ticking afterwards is inert.                                                                                      |
 
 `packages/core/src/engines/__tests__/Engine.publisher-sink.test.js` covers the gate (off by default, literal-`true` only, no hot-swap of a mounted motion), delivery (patches on tick, immediate emit to a late subscriber, compose equivalence, revision advance), the no-partial-graph ordering, and lifecycle (destroy, repeat destroy, engine unmount, repeat `init()`, project reload, and refusing to attach a runtime to a destroyed Motion).
 

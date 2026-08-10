@@ -28,14 +28,14 @@ npm run boundary:v5:pass2:strict
 
 ## What automation actually runs
 
-| Check | In CI? | Notes |
-|---|---|---|
-| GSAP import boundary | **Yes, blocking** | `packages/core/src/gsap-boundary.test.js` under `npm test` |
-| Readability boundary | **Yes, blocking** | `packages/core/src/readability-boundary.test.js`, protected-file list that may only grow (F-11) |
-| `boundary:v5:pass2` | **Yes, blocking** | `boundary-scan` job, added for F-12. Fails on new core violations and stale quarantine entries |
-| `boundary:v5:pass2:strict` | Not yet | Becomes the gate when P2-03 removal lands |
-| `format:check` on all source | **No** | CI runs `format:check:ci`, two files only. A repo-wide prettier job fails today, see below |
-| Benchmarks | Yes, non-blocking | Both `continue-on-error: true`, no regression thresholds (F-13) |
+| Check                        | In CI?            | Notes                                                                                           |
+| ---------------------------- | ----------------- | ----------------------------------------------------------------------------------------------- |
+| GSAP import boundary         | **Yes, blocking** | `packages/core/src/gsap-boundary.test.js` under `npm test`                                      |
+| Readability boundary         | **Yes, blocking** | `packages/core/src/readability-boundary.test.js`, protected-file list that may only grow (F-11) |
+| `boundary:v5:pass2`          | **Yes, blocking** | `boundary-scan` job, added for F-12. Fails on new core violations and stale quarantine entries  |
+| `boundary:v5:pass2:strict`   | Not yet           | Becomes the gate when P2-03 removal lands                                                       |
+| `format:check` on all source | **No**            | CI runs `format:check:ci`, two files only. A repo-wide prettier job fails today, see below      |
+| Benchmarks                   | Yes, non-blocking | Both `continue-on-error: true`, no regression thresholds (F-13)                                 |
 
 ### Why prettier is not repo-wide yet
 
@@ -51,12 +51,12 @@ P2-00 shipped the scan in pure audit mode: it printed every violation and always
 exited zero. That is the right call for a baseline and the wrong call for a
 boundary, because an advisory scan is one that everyone stops reading.
 
-| Tier | Meaning | Behavior |
-|---|---|---|
-| Approved | Anything under `packages/core/src/adapters/` | Silent, this is where GSAP belongs |
-| Quarantined | Named entries in `scripts/v5-gsap-allowlist.mjs` | Reported, non-blocking, **may only shrink** |
-| Renderer surface | `packages/react/src/` | Reported, strict-blocking, classification pending |
-| Unapproved | Anything else in core importing `gsap` | **Fails immediately**, both modes |
+| Tier             | Meaning                                          | Behavior                                          |
+| ---------------- | ------------------------------------------------ | ------------------------------------------------- |
+| Approved         | Anything under `packages/core/src/adapters/`     | Silent, this is where GSAP belongs                |
+| Quarantined      | Named entries in `scripts/v5-gsap-allowlist.mjs` | Reported, non-blocking, **may only shrink**       |
+| Renderer surface | `packages/react/src/`                            | Reported, strict-blocking, classification pending |
+| Unapproved       | Anything else in core importing `gsap`           | **Fails immediately**, both modes                 |
 
 A stale quarantine entry, meaning a file that was cleaned up but left in the
 list, is also a blocking failure. The list cannot silently grow and cannot

@@ -27,8 +27,11 @@ Per `useMotionSubscribers.js`:
 
 ```js
 return targetTrack.subscribe((raw) => {
-  const compose = (data) => targetTrack.compose(data);   // one argument — fresh ctx every call
-  const patch = typeof transformFn === "function" ? transformFn(raw, compose) : compose(raw);
+  const compose = (data) => targetTrack.compose(data); // one argument — fresh ctx every call
+  const patch =
+    typeof transformFn === "function"
+      ? transformFn(raw, compose)
+      : compose(raw);
   onPatch(applyAnchor(patch, getAnchor()));
 });
 ```
@@ -60,20 +63,20 @@ sharing between subscribers of a common source.
 
 ## 1. Verdict on findings #6–#15
 
-| # | Verdict | Note |
-|---|---------|------|
-| 6 | **Confirmed** | `input: edge.role === "input" ? edge.target : undefined` — verbatim, still there. |
-| 7 | **Confirmed** | `#markDownstream` does `upstream.includes(sourceId)` inside a full `#upstream` scan. Latent (§0). |
-| 8 | **Confirmed** | `throw new AggregateError(...)` is the last statement after all publishes and cache writes. |
-| 9 | **Confirmed** | `#graphGuard` BFS walks live `observedEdges`. And per §0/#27 it is the *only* part of the graph layer with a live effect today. |
-| 10 | **Confirmed, and worse** | Not merely "callable directly with mismatched inputs" — it becomes reachable in production the moment fix #13 is applied. See **#18**. |
-| 11 | **Confirmed** | `addEdge`/`addTrack`/`removeEdge`/`removeTrack` all route through `buildTopologicalOrder`, which checks only unknown refs + cycles. |
-| 12 | **Confirmed as code, misprioritized** | The `findIndex`+`splice` O(n²) pattern is duplicated in both sorters exactly as described. Not on any executing path today — but see §6, which changes this. |
-| 13 | **Confirmed as description, recommendation is dangerous** | The redundancy is real. Deleting `onSourceDestroyed` breaks the graph. See **#18**. |
-| 14 | **Partly wrong** | See below. |
-| 15 | **Confirmed as a no-op, recommendation is wrong** | See below. |
-| — | Mount-time pre-wiring split | **Confirmed.** And see **#16**, **#27**. |
-| — | Per-motion graph scoping | **Confirmed**, but understated: the binding of a mounted motion isn't merely motion-scoped, it's unreachable. See **#27** and §6. |
+| #   | Verdict                                                   | Note                                                                                                                                                         |
+| --- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 6   | **Confirmed**                                             | `input: edge.role === "input" ? edge.target : undefined` — verbatim, still there.                                                                            |
+| 7   | **Confirmed**                                             | `#markDownstream` does `upstream.includes(sourceId)` inside a full `#upstream` scan. Latent (§0).                                                            |
+| 8   | **Confirmed**                                             | `throw new AggregateError(...)` is the last statement after all publishes and cache writes.                                                                  |
+| 9   | **Confirmed**                                             | `#graphGuard` BFS walks live `observedEdges`. And per §0/#27 it is the _only_ part of the graph layer with a live effect today.                              |
+| 10  | **Confirmed, and worse**                                  | Not merely "callable directly with mismatched inputs" — it becomes reachable in production the moment fix #13 is applied. See **#18**.                       |
+| 11  | **Confirmed**                                             | `addEdge`/`addTrack`/`removeEdge`/`removeTrack` all route through `buildTopologicalOrder`, which checks only unknown refs + cycles.                          |
+| 12  | **Confirmed as code, misprioritized**                     | The `findIndex`+`splice` O(n²) pattern is duplicated in both sorters exactly as described. Not on any executing path today — but see §6, which changes this. |
+| 13  | **Confirmed as description, recommendation is dangerous** | The redundancy is real. Deleting `onSourceDestroyed` breaks the graph. See **#18**.                                                                          |
+| 14  | **Partly wrong**                                          | See below.                                                                                                                                                   |
+| 15  | **Confirmed as a no-op, recommendation is wrong**         | See below.                                                                                                                                                   |
+| —   | Mount-time pre-wiring split                               | **Confirmed.** And see **#16**, **#27**.                                                                                                                     |
+| —   | Per-motion graph scoping                                  | **Confirmed**, but understated: the binding of a mounted motion isn't merely motion-scoped, it's unreachable. See **#27** and §6.                            |
 
 ### #14 is overstated on the destroy path
 
@@ -82,7 +85,8 @@ destroyed. On the destroy path that is not what happens. `GraphBinding.removeTra
 `applyGraph`, and `applyGraph` contains:
 
 ```js
-for (const [key, edge] of previousEdgeKeys) if (!nextEdgeKeys.has(key)) invalidationSeeds.add(edge.target);
+for (const [key, edge] of previousEdgeKeys)
+  if (!nextEdgeKeys.has(key)) invalidationSeeds.add(edge.target);
 ```
 
 Every edge that disappears seeds **its target** — i.e. exactly the dependents in question — which
@@ -163,7 +167,7 @@ you also leak a GSAP timeline per destroyed track. Deleting the other three plus
 
 ```js
 for (const callback of [...this.#destroySubscribers]) callback(event); // onSourceDestroyed — first
-this.#emitLifecycle({ type: "destroyed", track: this, observerIds });  // onLifecycle — second
+this.#emitLifecycle({ type: "destroyed", track: this, observerIds }); // onLifecycle — second
 ```
 
 And within `onLifecycle`, insertion order decides. `GraphPublisher` subscribes in its own
@@ -184,7 +188,7 @@ finding #10**, now live in production rather than hypothetical.
 
 `onSourceDestroyed` is not redundant. It is load-bearing by accident. Fix the ordering explicitly
 (single destroy channel, binding tears down first, publisher never touches the shared map) and
-*then* delete it.
+_then_ delete it.
 
 ### #19 — `Track.removeChild()` strips observation edges and tells nobody. (High)
 
@@ -210,7 +214,7 @@ failures at once:
 
 **Directly relevant to the spiral demo:** pop-and-reflow must call
 `GraphBinding.removeTrack`/`replaceEdge` explicitly. `removeChild`'s automatic teardown prevents a
-dangling reference but does *not* keep the graph honest. State this as a hard requirement.
+dangling reference but does _not_ keep the graph honest. State this as a hard requirement.
 
 ### #20 — `replaceObserved` emits removals but never announces additions. (Medium)
 
@@ -242,7 +246,7 @@ one.
 
 `normalizeObservationGraph` tie-breaks on the track's **declaration index**. `buildTopologicalOrder`
 tie-breaks on the position in the `nodes` array it was handed — and `GraphPublisher.addEdge`/
-`removeEdge` build that array from `this.#order`, i.e. the *previous sort's output*. So the tie-break
+`removeEdge` build that array from `this.#order`, i.e. the _previous sort's output_. So the tie-break
 key drifts on every mutation, and the same logical graph yields different valid orders depending on
 which path produced it. Non-reproducible ordering for independent nodes. One more argument for
 keeping exactly one sorter (see #17).
@@ -260,7 +264,7 @@ try {
 If the third of five edges throws (unknown source, or the cycle guard fires), edges one and two are
 already wired into live `Track` state, and their source tracks hold `_addObserver` back-references
 to a track that has just been dropped from the binding. Nothing unwinds them; the new track is never
-destroyed. `Track.replaceObserved` carries an explicit *"Atomic pop-and-rewire"* comment — `addTrack`
+destroyed. `Track.replaceObserved` carries an explicit _"Atomic pop-and-rewire"_ comment — `addTrack`
 should hold the same bar: resolve and validate **all** sources first, then wire, and on failure
 unwire what was applied and destroy the track.
 
@@ -289,7 +293,7 @@ subscriptions are never torn down. One line fixes both. See #27 for the full con
 stale `#graphOrder` currently harms nothing. It becomes a real bug the instant anything calls
 `composeGraph()`. Treat it as a trap laid for whoever wires option A(2) in §4, not as a live defect.
 
-### #27 — `binding` and `publisher` are unreachable after mount, but *not* collected — they leak and stay partly active. (High)
+### #27 — `binding` and `publisher` are unreachable after mount, but _not_ collected — they leak and stay partly active. (High)
 
 In `#mountMotion`, `let binding;` is assigned inside the `try` and read only in the `catch`
 (`binding?.destroy()`). `publisher` is a `const` local held only by `binding`. Neither is stored on
@@ -322,31 +326,31 @@ removes cycle protection from every mounted track. Note this before choosing.
 
 ## 3. Corrected summary table
 
-| # | Finding | Location | Severity | Live today? |
-|---|---------|----------|----------|-------------|
-| 0 | Three composition systems; the live one is the naive per-subscriber recursion | whole graph layer | **High** | Yes |
-| 27 | Binding/publisher unreachable after mount, retained by track closures, guard still active | `Engine` | **High** | Yes |
-| 25 | Engine never calls `motion.setGraphBinding` — binding never destroyed | `Engine` | High | Yes |
-| 19 | `removeChild` strips edges without notifying the binding or publisher | `Track` | High | Yes |
-| 16 | Publisher and binding share one mutable `tracks` Map | `GraphPublisher` | High | Yes (latent) |
-| 18 | Deleting `onSourceDestroyed` desyncs the binding permanently | `Track`/`GraphBinding` | High | On applying prior fix |
-| 17 | `removeTrack` is not dead code; prior fix breaks destroy + leaks a timeline | `GraphPublisher` | High | On applying prior fix |
-| 6 | `addEdge` loses the `input` slot name | `GraphPublisher` | High | No |
-| 10 | `applyGraph` silently accepts nodes with no track | `GraphPublisher` | High | Only via #18 |
-| 11 | Publisher's own mutation API skips schema validation | `GraphPublisher` | High | No |
-| 26 | `#graphOrder` frozen at mount | `Motion`/`TrackGroup` | Medium | No (composeGraph unused) |
-| 24 | `GraphBinding.addTrack` leaves partial wiring on failure | `GraphBinding` | Medium | Yes |
-| 22 | Ungraphed registered track permanently disables the flush fast path | `GraphPublisher` | Medium | Latent |
-| 20 | `replaceObserved` emits no `edge-added` event | `Track` | Medium | Yes |
-| 14 | Auto edge cleanup skips invalidation | `Track` | Medium | Only via #19 |
-| 15 | `replaceObserved`'s `ignoring` arg is discarded (and unnecessary) | `Track` | Low | Yes, harmless |
-| 12 | O(n²) topological tie-break on every mutation | `normalizeObservationGraph` | Low → **High under §6** | Latent |
-| 7 | O(n²) downstream propagation | `GraphPublisher` | Low → **High under §6** | Latent |
-| 8 | `AggregateError` thrown after side effects | `GraphPublisher` | Low | Latent |
-| 21 | `retry.onExhausted` validated then ignored | `GraphPublisher` | Low | Yes |
-| 23 | Two sorters tie-break on different indices | both | Low | Yes |
-| 13 | `onSourceDestroyed` redundant, payload unused | `Track` | Low | Yes |
-| 9 | `#graphGuard` "redundant" — actually the only live graph behavior | `GraphPublisher` | Low | Yes |
+| #   | Finding                                                                                   | Location                    | Severity                | Live today?              |
+| --- | ----------------------------------------------------------------------------------------- | --------------------------- | ----------------------- | ------------------------ |
+| 0   | Three composition systems; the live one is the naive per-subscriber recursion             | whole graph layer           | **High**                | Yes                      |
+| 27  | Binding/publisher unreachable after mount, retained by track closures, guard still active | `Engine`                    | **High**                | Yes                      |
+| 25  | Engine never calls `motion.setGraphBinding` — binding never destroyed                     | `Engine`                    | High                    | Yes                      |
+| 19  | `removeChild` strips edges without notifying the binding or publisher                     | `Track`                     | High                    | Yes                      |
+| 16  | Publisher and binding share one mutable `tracks` Map                                      | `GraphPublisher`            | High                    | Yes (latent)             |
+| 18  | Deleting `onSourceDestroyed` desyncs the binding permanently                              | `Track`/`GraphBinding`      | High                    | On applying prior fix    |
+| 17  | `removeTrack` is not dead code; prior fix breaks destroy + leaks a timeline               | `GraphPublisher`            | High                    | On applying prior fix    |
+| 6   | `addEdge` loses the `input` slot name                                                     | `GraphPublisher`            | High                    | No                       |
+| 10  | `applyGraph` silently accepts nodes with no track                                         | `GraphPublisher`            | High                    | Only via #18             |
+| 11  | Publisher's own mutation API skips schema validation                                      | `GraphPublisher`            | High                    | No                       |
+| 26  | `#graphOrder` frozen at mount                                                             | `Motion`/`TrackGroup`       | Medium                  | No (composeGraph unused) |
+| 24  | `GraphBinding.addTrack` leaves partial wiring on failure                                  | `GraphBinding`              | Medium                  | Yes                      |
+| 22  | Ungraphed registered track permanently disables the flush fast path                       | `GraphPublisher`            | Medium                  | Latent                   |
+| 20  | `replaceObserved` emits no `edge-added` event                                             | `Track`                     | Medium                  | Yes                      |
+| 14  | Auto edge cleanup skips invalidation                                                      | `Track`                     | Medium                  | Only via #19             |
+| 15  | `replaceObserved`'s `ignoring` arg is discarded (and unnecessary)                         | `Track`                     | Low                     | Yes, harmless            |
+| 12  | O(n²) topological tie-break on every mutation                                             | `normalizeObservationGraph` | Low → **High under §6** | Latent                   |
+| 7   | O(n²) downstream propagation                                                              | `GraphPublisher`            | Low → **High under §6** | Latent                   |
+| 8   | `AggregateError` thrown after side effects                                                | `GraphPublisher`            | Low                     | Latent                   |
+| 21  | `retry.onExhausted` validated then ignored                                                | `GraphPublisher`            | Low                     | Yes                      |
+| 23  | Two sorters tie-break on different indices                                                | both                        | Low                     | Yes                      |
+| 13  | `onSourceDestroyed` redundant, payload unused                                             | `Track`                     | Low                     | Yes                      |
+| 9   | `#graphGuard` "redundant" — actually the only live graph behavior                         | `GraphPublisher`            | Low                     | Yes                      |
 
 ---
 
@@ -475,8 +479,8 @@ not one:
    by the schema" — it is reported as `Unknown source track 'X'`.
 
 And free tracks (`createTrackInstance`, `createGroupHost`, `adopt`) never touch the graph layer at
-all: no `_setGraphGuard`, no publisher registration. `Track`'s own comment — *"Installed by the
-graph layer. Absent for standalone tracks, which stay permissive"* — makes that explicit and
+all: no `_setGraphGuard`, no publisher registration. `Track`'s own comment — _"Installed by the
+graph layer. Absent for standalone tracks, which stay permissive"_ — makes that explicit and
 deliberate. A project graph has to change that contract.
 
 ### Shape of the target
@@ -506,13 +510,13 @@ deliberate. A project graph has to change that contract.
   reachable in ways per-motion validation never had to consider. Keep `#graphGuard`, and keep it
   correct.
 - **#7 and #12 get promoted from Low to High.** n becomes every track in the project. Every runtime
-  rewire re-validates and re-sorts the *whole project graph*, and `#markDownstream`'s
+  rewire re-validates and re-sorts the _whole project graph_, and `#markDownstream`'s
   O(tracks × edges) scan walks all of it. The heap-based Kahn's rewrite goes from speculative to
   probably-necessary — still gated on a benchmark, but now benchmark at project scale.
 - **#16 becomes critical.** One long-lived shared `tracks` Map mutated by two owners across every
   motion mount and unmount, instead of a short-lived per-motion one. Fix it before, not after.
 - **#22's failure mode gets permanent.** A single ungraphed registered track anywhere in the project
-  disables the flush fast path for *everything*, for the life of the process.
+  disables the flush fast path for _everything_, for the life of the process.
 - **Partial-failure atomicity (#24) stops being a local concern.** A failed `addTrack` during a
   mount would leave the project graph — shared by every other motion — in a half-wired state.
 

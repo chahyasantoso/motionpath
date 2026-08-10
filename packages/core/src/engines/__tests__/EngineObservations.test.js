@@ -12,16 +12,38 @@ const project = {
         {
           id: "parent",
           keyframes: {
-            x: { stops: [{ p: 0, v: 10 }, { p: 1, v: 30 }] },
-            y: { stops: [{ p: 0, v: 5 }, { p: 1, v: 15 }] },
-            rotation: { stops: [{ p: 0, v: 0 }, { p: 1, v: 90 }] },
+            x: {
+              stops: [
+                { p: 0, v: 10 },
+                { p: 1, v: 30 },
+              ],
+            },
+            y: {
+              stops: [
+                { p: 0, v: 5 },
+                { p: 1, v: 15 },
+              ],
+            },
+            rotation: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 90 },
+              ],
+            },
           },
         },
         {
           id: "child",
-          observes: [{ source: "parent", role: "input", target: "parentWorld" }],
+          observes: [
+            { source: "parent", role: "input", target: "parentWorld" },
+          ],
           keyframes: {
-            boneLength: { stops: [{ p: 0, v: 10 }, { p: 1, v: 20 }] },
+            boneLength: {
+              stops: [
+                { p: 0, v: 10 },
+                { p: 1, v: 20 },
+              ],
+            },
           },
         },
       ],

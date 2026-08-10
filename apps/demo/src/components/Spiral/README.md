@@ -24,14 +24,14 @@ Contract tests cover normalized order and edge ownership. Remaining sign-off wor
 
 The Zuma Spiral uses a ViewModel-driven architecture (MVVM/Controller pattern) to decouple the motion engine lifecycle, game logic, and React rendering.
 
-| Layer | Responsibility | File |
-| --- | --- | --- |
-| Config & constants | Static dimensions, colors, speeds | `spiralConfig.js` |
-| Path geometry | Archimedean spiral generation and uniform segment spacing | `spiralPath.js` |
-| Original motion schemas | Parent timelines, path followers, transitions | `spiralMotions.js` |
-| Original controller | Queue management, wave loop, transition lifecycle | `useSpiralWaveController.js` |
-| Original view page | Reference scene and SVG details | `SpiralPage.jsx` |
-| Original ball view | DOM subscriber bound to the active track | `SpiralBall.jsx` |
+| Layer                   | Responsibility                                            | File                         |
+| ----------------------- | --------------------------------------------------------- | ---------------------------- |
+| Config & constants      | Static dimensions, colors, speeds                         | `spiralConfig.js`            |
+| Path geometry           | Archimedean spiral generation and uniform segment spacing | `spiralPath.js`              |
+| Original motion schemas | Parent timelines, path followers, transitions             | `spiralMotions.js`           |
+| Original controller     | Queue management, wave loop, transition lifecycle         | `useSpiralWaveController.js` |
+| Original view page      | Reference scene and SVG details                           | `SpiralPage.jsx`             |
+| Original ball view      | DOM subscriber bound to the active track                  | `SpiralBall.jsx`             |
 
 Do not edit the original controller to implement graph behavior. Add or change graph-specific files instead.
 

@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { PatchRegistry } from "../PatchRegistry.js";
-import { toImmutablePatchValue, toImmutablePatchValues } from "../immutablePatchValue.js";
+import {
+  toImmutablePatchValue,
+  toImmutablePatchValues,
+} from "../immutablePatchValue.js";
 
 describe("PR-06 follow-up: deep patch immutability", () => {
   it("freezes every level of the supported value shape", () => {
     const registry = new PatchRegistry();
-    const patch = registry.publish("n0", { transform: { scale: { x: 1 } }, path: [{ x: 0 }] });
+    const patch = registry.publish("n0", {
+      transform: { scale: { x: 1 } },
+      path: [{ x: 0 }],
+    });
     expect(Object.isFrozen(patch)).toBe(true);
     expect(Object.isFrozen(patch.values)).toBe(true);
     expect(Object.isFrozen(patch.values.transform)).toBe(true);
@@ -16,9 +22,16 @@ describe("PR-06 follow-up: deep patch immutability", () => {
 
   it("rejects nested mutation instead of silently accepting it", () => {
     const registry = new PatchRegistry();
-    const patch = registry.publish("n0", { transform: { scale: 1 }, path: [0] });
-    expect(() => { patch.values.transform.scale = 2; }).toThrow(TypeError);
-    expect(() => { patch.values.path.push(1); }).toThrow(TypeError);
+    const patch = registry.publish("n0", {
+      transform: { scale: 1 },
+      path: [0],
+    });
+    expect(() => {
+      patch.values.transform.scale = 2;
+    }).toThrow(TypeError);
+    expect(() => {
+      patch.values.path.push(1);
+    }).toThrow(TypeError);
     expect(patch.values.transform.scale).toBe(1);
   });
 
@@ -41,7 +54,11 @@ describe("PR-06 follow-up: deep patch immutability", () => {
   });
 
   it("passes foreign references through by identity without freezing them", () => {
-    class Sprite { constructor() { this.frame = 0; } }
+    class Sprite {
+      constructor() {
+        this.frame = 0;
+      }
+    }
     const sprite = new Sprite();
     const registry = new PatchRegistry();
     const patch = registry.publish("n0", { sprite });

@@ -14,18 +14,37 @@ const findings = [];
 const SCAN_ROOTS = ["packages/core/src/", "packages/react/src/"];
 const RENDERER_SURFACE = "packages/react/";
 const TRACK_OBSERVATION_SYMBOLS = [
-  /#observed\b/, /#observers\b/, /#graphGuard\b/, /\b_setGraphGuard\b/,
-  /\b_setObservationComposer\b/, /\b_addObserver\b/, /\b_removeObserver\b/,
-  /\bsetObserved\b/, /\bremoveObserved\b/, /\breplaceObserved\b/,
-  /\bobservedSources\b/, /\bobservedEdges\b/, /\bobserverCount\b/, /\bobserverIds\b/,
+  /#observed\b/,
+  /#observers\b/,
+  /#graphGuard\b/,
+  /\b_setGraphGuard\b/,
+  /\b_setObservationComposer\b/,
+  /\b_addObserver\b/,
+  /\b_removeObserver\b/,
+  /\bsetObserved\b/,
+  /\bremoveObserved\b/,
+  /\breplaceObserved\b/,
+  /\bobservedSources\b/,
+  /\bobservedEdges\b/,
+  /\bobserverCount\b/,
+  /\bobserverIds\b/,
 ];
 const TRACK_TOPOLOGY_SYMBOLS = [
-  /\baddChild\b/, /\bremoveChild\b/, /\b_attachGroupHost\b/, /\bgroupHost\b/,
+  /\baddChild\b/,
+  /\bremoveChild\b/,
+  /\b_attachGroupHost\b/,
+  /\bgroupHost\b/,
 ];
-function toPosix(absolutePath) { return relative(repoRoot, absolutePath).split(sep).join("/"); }
+function toPosix(absolutePath) {
+  return relative(repoRoot, absolutePath).split(sep).join("/");
+}
 async function walk(dir) {
   let entries;
-  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return []; }
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
   const files = [];
   for (const entry of entries) {
     if (["node_modules", ".git", "dist"].includes(entry.name)) continue;
@@ -36,35 +55,104 @@ async function walk(dir) {
   return files;
 }
 function addFinding(kind, file, detail, blocking, symbols) {
-  findings.push(symbols ? { kind, file, detail, blocking, symbols } : { kind, file, detail, blocking });
+  findings.push(
+    symbols
+      ? { kind, file, detail, blocking, symbols }
+      : { kind, file, detail, blocking },
+  );
 }
-function matched(patterns, text) { return patterns.filter((pattern) => pattern.test(text)).map(String); }
+function matched(patterns, text) {
+  return patterns.filter((pattern) => pattern.test(text)).map(String);
+}
 const files = [];
-for (const root of SCAN_ROOTS) files.push(...(await walk(join(repoRoot, root))));
+for (const root of SCAN_ROOTS)
+  files.push(...(await walk(join(repoRoot, root))));
 for (const file of files) {
   const rel = toPosix(file);
   if (rel === "packages/core/src/gsap-boundary.test.js") continue;
   const text = await readFile(file, "utf8");
   if (GSAP_IMPORT_PATTERN.test(text) && !isApprovedGsapPath(rel)) {
     if (rel.startsWith(RENDERER_SURFACE)) {
-      addFinding("renderer-gsap-import", rel, "react hooks layer imports gsap directly; classify as adapter or migrate (F-14)", false);
+      addFinding(
+        "renderer-gsap-import",
+        rel,
+        "react hooks layer imports gsap directly; classify as adapter or migrate (F-14)",
+        false,
+      );
     } else {
       const quarantined = isQuarantinedGsapPath(rel);
-      addFinding("gsap-import", rel, quarantined ? "quarantined: known test/fixture import awaiting fake-port migration" : "unapproved direct vendor import outside adapters/", !quarantined);
+      addFinding(
+        "gsap-import",
+        rel,
+        quarantined
+          ? "quarantined: known test/fixture import awaiting fake-port migration"
+          : "unapproved direct vendor import outside adapters/",
+        !quarantined,
+      );
     }
   }
   if (rel.endsWith("/Track.js")) {
     const observation = matched(TRACK_OBSERVATION_SYMBOLS, text);
-    if (observation.length) addFinding("track-observation", rel, "Track still exposes observation ownership, state or mutation (P2-03)", false, observation);
+    if (observation.length)
+      addFinding(
+        "track-observation",
+        rel,
+        "Track still exposes observation ownership, state or mutation (P2-03)",
+        false,
+        observation,
+      );
     const topology = matched(TRACK_TOPOLOGY_SYMBOLS, text);
-    if (topology.length) addFinding("track-topology-playback", rel, "Track still exposes topology or playback bridge responsibilities (P2-04)", false, topology);
+    if (topology.length)
+      addFinding(
+        "track-topology-playback",
+        rel,
+        "Track still exposes topology or playback bridge responsibilities (P2-04)",
+        false,
+        topology,
+      );
   }
 }
 for (const path of QUARANTINED_GSAP_FILES) {
-  if (!findings.some((finding) => finding.kind === "gsap-import" && finding.file === path)) {
-    addFinding("gsap-quarantine-stale", path, "quarantine entry no longer imports gsap; delete it, the list may only shrink", true);
+  if (
+    !findings.some(
+      (finding) => finding.kind === "gsap-import" && finding.file === path,
+    )
+  ) {
+    addFinding(
+      "gsap-quarantine-stale",
+      path,
+      "quarantine entry no longer imports gsap; delete it, the list may only shrink",
+      true,
+    );
   }
 }
 const blocking = findings.filter((finding) => finding.blocking);
-console.log(JSON.stringify({ generatedAt: new Date().toISOString(), strict, scanRoots: SCAN_ROOTS, findings, summary: { findingCount: findings.length, blockingCount: blocking.length, gsapImports: findings.filter(({ kind }) => kind === "gsap-import").length, gsapQuarantined: findings.filter(({ kind, blocking: isBlocking }) => kind === "gsap-import" && !isBlocking).length, rendererGsapImports: findings.filter(({ kind }) => kind === "renderer-gsap-import").length, trackOwnershipFindings: findings.filter(({ kind }) => kind.startsWith("track-")).length } }, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      generatedAt: new Date().toISOString(),
+      strict,
+      scanRoots: SCAN_ROOTS,
+      findings,
+      summary: {
+        findingCount: findings.length,
+        blockingCount: blocking.length,
+        gsapImports: findings.filter(({ kind }) => kind === "gsap-import")
+          .length,
+        gsapQuarantined: findings.filter(
+          ({ kind, blocking: isBlocking }) =>
+            kind === "gsap-import" && !isBlocking,
+        ).length,
+        rendererGsapImports: findings.filter(
+          ({ kind }) => kind === "renderer-gsap-import",
+        ).length,
+        trackOwnershipFindings: findings.filter(({ kind }) =>
+          kind.startsWith("track-"),
+        ).length,
+      },
+    },
+    null,
+    2,
+  ),
+);
 if (blocking.length) process.exitCode = 1;

@@ -5,7 +5,9 @@ import { domRenderer, clearRendererTarget } from "../domRenderer.js";
 vi.mock("gsap", () => ({ gsap: { set: vi.fn() } }));
 
 describe("domRenderer", () => {
-  beforeEach(() => { gsap.set.mockClear(); });
+  beforeEach(() => {
+    gsap.set.mockClear();
+  });
   it("skips identical patches and removes omitted properties", () => {
     const target = {};
     domRenderer(target, { x: 10, opacity: 1 });
