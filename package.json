@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.phase0.config.js",
+    "test:phase0": "vitest run --config vitest.phase0.config.js",
+    "test:phase1-contract": "vitest run --config vitest.phase1-contract.config.js",
     "test:watch": "vitest",
-    "test:deterministic": "vitest run --reporter=dot",
+    "test:deterministic": "vitest run --config vitest.phase0.config.js --reporter=dot",
     "typecheck": "npm exec --yes --package=typescript@5.8.3 -- tsc --noEmit -p tsconfig.json",
     "pack:check": "npm pack --dry-run",
     "format": "prettier . --write",
@@ -32,6 +34,8 @@
     "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^6.0.3",
     "jsdom": "^29.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "prettier": "3.6.2",
     "vitest": "^4.1.10"
   }
 }
