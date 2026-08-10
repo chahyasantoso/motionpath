@@ -72,13 +72,11 @@ export class StandaloneObservationAdapter {
     const track = this.#resolveTrack(targetOrId);
     if (!track) return [];
     const target = this.#keys.get(track);
-    return this.#owner
-      .getEdges(target)
-      .map((edge) => ({
-        ...edge,
-        source: this.#tracks.get(this.#keys.get(edge.source)) ?? edge.source,
-        target: track.id,
-      }));
+    return this.#owner.getEdges(target).map((edge) => ({
+      ...edge,
+      source: this.#tracks.get(this.#keys.get(edge.source)) ?? edge.source,
+      target: track.id,
+    }));
   }
   getSources(targetOrId) {
     return this.getEdges(targetOrId)
