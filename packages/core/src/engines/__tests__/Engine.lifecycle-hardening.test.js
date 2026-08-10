@@ -10,8 +10,28 @@ const project = {
       id: "motion",
       trigger: { type: "manual" },
       tracks: [
-        { id: "good", keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } },
-        { id: "bad", keyframes: { missingAtMount: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } },
+        {
+          id: "good",
+          keyframes: {
+            opacity: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 1 },
+              ],
+            },
+          },
+        },
+        {
+          id: "bad",
+          keyframes: {
+            missingAtMount: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 1 },
+              ],
+            },
+          },
+        },
       ],
     },
   ],
@@ -23,7 +43,9 @@ describe("Engine lifecycle hardening", () => {
     plugins.register(
       createAnimationPlugin({
         keys: ["missingAtMount"],
-        contribute: () => { throw new Error("compile failed"); },
+        contribute: () => {
+          throw new Error("compile failed");
+        },
       }),
     );
     const engine = new Engine({ plugins });
@@ -36,7 +58,25 @@ describe("Engine lifecycle hardening", () => {
     const engine = new Engine();
     await engine.loadProject({
       schemaVersion: 4,
-      motions: [{ id: "motion", trigger: { type: "manual" }, tracks: [{ id: "track", keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } } }] }],
+      motions: [
+        {
+          id: "motion",
+          trigger: { type: "manual" },
+          tracks: [
+            {
+              id: "track",
+              keyframes: {
+                opacity: {
+                  stops: [
+                    { p: 0, v: 0 },
+                    { p: 1, v: 1 },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      ],
     });
     const motion = engine.mountInstance("motion");
     expect(engine.unmount(motion)).toBe(true);
@@ -52,7 +92,11 @@ describe("Engine lifecycle hardening", () => {
     const engine = new Engine();
     await engine.loadProject({ schemaVersion: 4, motions: [] });
     let destroyed = false;
-    const foreign = { destroy: () => { destroyed = true; } };
+    const foreign = {
+      destroy: () => {
+        destroyed = true;
+      },
+    };
     expect(engine.unmount(foreign)).toBe(false);
     expect(destroyed).toBe(false);
   });

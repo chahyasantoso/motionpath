@@ -3,7 +3,13 @@ import { StandaloneObservationAdapter } from "../../usecases/StandaloneObservati
 import { Track } from "../Track.js";
 
 function makeTrack(id, adapter) {
-  return new Track({ id, observationAdapter: adapter, proxyState: { value: id }, plugins: [{ keys: ["value"], compose: (raw) => ({ value: raw.value }) }], resolvedTrack: { id, keyframes: {} } });
+  return new Track({
+    id,
+    observationAdapter: adapter,
+    proxyState: { value: id },
+    plugins: [{ keys: ["value"], compose: (raw) => ({ value: raw.value }) }],
+    resolvedTrack: { id, keyframes: {} },
+  });
 }
 
 describe("P2-03 Track standalone adapter routing", () => {

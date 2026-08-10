@@ -25,8 +25,13 @@ describe("Track v4.3 lifecycle contract", () => {
   it("supports two semantic edges from one source", () => {
     const source = makeTrack("source");
     const observer = makeTrack("observer");
-    observer.setObserved(source, () => ({ fromInput: true }), { role: "input", target: "parentWorld" });
-    observer.setObserved(source, () => ({ fromOutput: true }), { role: "output" });
+    observer.setObserved(source, () => ({ fromInput: true }), {
+      role: "input",
+      target: "parentWorld",
+    });
+    observer.setObserved(source, () => ({ fromOutput: true }), {
+      role: "output",
+    });
 
     expect(observer.observedSources).toEqual([source]);
     expect(observer.observedEdges).toHaveLength(2);

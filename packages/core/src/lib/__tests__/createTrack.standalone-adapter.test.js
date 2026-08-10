@@ -5,8 +5,16 @@ import { StandaloneObservationAdapter } from "../../usecases/StandaloneObservati
 describe("P2-03 createTrack standalone ownership", () => {
   it("constructs standalone tracks with an explicit adapter by default", () => {
     const adapter = new StandaloneObservationAdapter();
-    const source = createTrack({ id: "source", duration: 1, keyframes: {} }, [], { observationAdapter: adapter });
-    const observer = createTrack({ id: "observer", duration: 1, keyframes: {} }, [], { observationAdapter: adapter });
+    const source = createTrack(
+      { id: "source", duration: 1, keyframes: {} },
+      [],
+      { observationAdapter: adapter },
+    );
+    const observer = createTrack(
+      { id: "observer", duration: 1, keyframes: {} },
+      [],
+      { observationAdapter: adapter },
+    );
 
     observer.setObserved(source, () => ({ sourceSeen: true }));
 
@@ -18,7 +26,12 @@ describe("P2-03 createTrack standalone ownership", () => {
   });
 
   it("does not attach authored-graph tracks to standalone ownership", () => {
-    const track = createTrack({ id: "authored", mode: "authored-graph", duration: 1, keyframes: {} });
+    const track = createTrack({
+      id: "authored",
+      mode: "authored-graph",
+      duration: 1,
+      keyframes: {},
+    });
     expect(track.observedSources).toEqual([]);
     track.destroy();
   });

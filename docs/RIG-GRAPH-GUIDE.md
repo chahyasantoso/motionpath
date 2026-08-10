@@ -49,7 +49,7 @@ The graph catches mistakes before GSAP mounts anything:
 Most rig relationships use an input edge:
 
 ```js
-observes: [{ source: "parent", role: "input", target: "parentWorld" }]
+observes: [{ source: "parent", role: "input", target: "parentWorld" }];
 ```
 
 The parent patch is wrapped as `{ parentWorld: parentPatch }` before the child composes.
@@ -57,7 +57,7 @@ The parent patch is wrapped as `{ parentWorld: parentPatch }` before the child c
 An output edge has no `target` and merges the source patch over the target patch:
 
 ```js
-observes: [{ source: "overlay", role: "output" }]
+observes: [{ source: "overlay", role: "output" }];
 ```
 
 Use input edges for data that a plugin consumes. Use output edges for a composed patch that should be merged into another result. Role and target are part of an edge's identity, so one source can legally provide both an input and an output edge to the same observer.

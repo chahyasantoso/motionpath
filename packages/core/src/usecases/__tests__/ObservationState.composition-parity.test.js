@@ -2,8 +2,16 @@ import { describe, expect, it } from "vitest";
 import { Track } from "../../lib/Track.js";
 import { ObservationState } from "../ObservationState.js";
 import { ObservationStateBridge } from "../ObservationStateBridge.js";
-import { COMPOSING, patchesEqual, trackComposeLeaf } from "../composeContext.js";
-import { buildRealGraph, chainMotion, diamondMotion } from "../../__fixtures__/graphTracks.js";
+import {
+  COMPOSING,
+  patchesEqual,
+  trackComposeLeaf,
+} from "../composeContext.js";
+import {
+  buildRealGraph,
+  chainMotion,
+  diamondMotion,
+} from "../../__fixtures__/graphTracks.js";
 
 /**
  * P2-03 composition-ownership evidence.
@@ -20,17 +28,38 @@ import { buildRealGraph, chainMotion, diamondMotion } from "../../__fixtures__/g
  */
 
 function realTrack(id, plugins, proxyState = { x: 1, y: 2 }) {
-  return new Track({ id, proxyState, plugins, resolvedTrack: { id, keyframes: {} } });
+  return new Track({
+    id,
+    proxyState,
+    plugins,
+    resolvedTrack: { id, keyframes: {} },
+  });
 }
 
 /** Leaf output with a nested object, which is the normal patch shape. */
 function nestedPlugin() {
-  return [{ keys: ["x", "y"], compose: (raw) => ({ style: { opacity: raw.x ?? 0, color: "red" }, tag: "leaf" }) }];
+  return [
+    {
+      keys: ["x", "y"],
+      compose: (raw) => ({
+        style: { opacity: raw.x ?? 0, color: "red" },
+        tag: "leaf",
+      }),
+    },
+  ];
 }
 
 /** Leaf output that reports what the walker handed it as its source. */
 function echoSourcePlugin() {
-  return [{ keys: ["x"], compose: (raw) => ({ readX: raw?.x ?? null, sawSource: raw !== undefined }) }];
+  return [
+    {
+      keys: ["x"],
+      compose: (raw) => ({
+        readX: raw?.x ?? null,
+        sawSource: raw !== undefined,
+      }),
+    },
+  ];
 }
 
 /** Mirror the live Track wiring into a shadow ObservationState. */
@@ -38,7 +67,13 @@ function shadowOf(tracks) {
   const state = new ObservationState({ tracks });
   for (const track of tracks.values()) {
     for (const edge of track.observedEdges) {
-      state.addEdge({ source: edge.source.id, target: track.id, role: edge.role, input: edge.input, mapFn: edge.mapFn });
+      state.addEdge({
+        source: edge.source.id,
+        target: track.id,
+        role: edge.role,
+        input: edge.input,
+        mapFn: edge.mapFn,
+      });
     }
   }
   return state;
@@ -47,7 +82,12 @@ function shadowOf(tracks) {
 function expectComposeParity(tracks, state) {
   for (const track of tracks.values()) {
     const live = track.compose();
-    const shadow = state.compose(track.id, undefined, new Map(), trackComposeLeaf);
+    const shadow = state.compose(
+      track.id,
+      undefined,
+      new Map(),
+      trackComposeLeaf,
+    );
     expect(shadow, `composition parity for '${track.id}'`).toEqual(live);
     expect(patchesEqual(live, shadow)).toBe(true);
   }
@@ -74,7 +114,10 @@ describe("P2-03 ObservationState composition equivalence", () => {
     const source = realTrack("src", nestedPlugin());
     const observer = realTrack("obs", nestedPlugin());
     observer.setObserved(source, () => ({ style: { color: "blue" } }));
-    const tracks = new Map([["src", source], ["obs", observer]]);
+    const tracks = new Map([
+      ["src", source],
+      ["obs", observer],
+    ]);
 
     const live = observer.compose();
     // A shallow spread would drop `opacity` here. mergePatches keeps it.
@@ -86,8 +129,14 @@ describe("P2-03 ObservationState composition equivalence", () => {
   it("folds input-role contributions into the leaf source identically", () => {
     const source = realTrack("src", echoSourcePlugin());
     const observer = realTrack("obs", echoSourcePlugin());
-    observer.setObserved(source, () => ({ x: 99 }), { role: "input", target: "obs" });
-    const tracks = new Map([["src", source], ["obs", observer]]);
+    observer.setObserved(source, () => ({ x: 99 }), {
+      role: "input",
+      target: "obs",
+    });
+    const tracks = new Map([
+      ["src", source],
+      ["obs", observer],
+    ]);
 
     expect(observer.compose().readX).toBe(99);
     expectComposeParity(tracks, shadowOf(tracks));
@@ -105,12 +154,21 @@ describe("P2-03 ObservationState composition equivalence", () => {
   it("holds an input and an output edge from one source with the same result", () => {
     const source = realTrack("src", nestedPlugin());
     const observer = realTrack("obs", nestedPlugin());
-    observer.setObserved(source, () => ({ x: 7 }), { role: "input", target: "obs" });
+    observer.setObserved(source, () => ({ x: 7 }), {
+      role: "input",
+      target: "obs",
+    });
     observer.setObserved(source, () => ({ tag: "out" }), { role: "output" });
-    const tracks = new Map([["src", source], ["obs", observer]]);
+    const tracks = new Map([
+      ["src", source],
+      ["obs", observer],
+    ]);
 
     expect(observer.observedEdges).toHaveLength(2);
-    expect(observer.compose()).toMatchObject({ tag: "out", style: { opacity: 7 } });
+    expect(observer.compose()).toMatchObject({
+      tag: "out",
+      style: { opacity: 7 },
+    });
     expectComposeParity(tracks, shadowOf(tracks));
   });
 
@@ -118,7 +176,10 @@ describe("P2-03 ObservationState composition equivalence", () => {
     const source = realTrack("src", nestedPlugin());
     const observer = realTrack("obs", nestedPlugin());
     observer.setObserved(source, null);
-    const tracks = new Map([["src", source], ["obs", observer]]);
+    const tracks = new Map([
+      ["src", source],
+      ["obs", observer],
+    ]);
     expectComposeParity(tracks, shadowOf(tracks));
   });
 });
@@ -130,7 +191,12 @@ describe("P2-03 compose-context protocol", () => {
 
     // A legal standalone back-edge re-enters with COMPOSING already in the ctx.
     // Checking the cache first returned this marker Symbol to the caller.
-    const patch = state.compose("solo", undefined, new Map([["solo", COMPOSING]]), trackComposeLeaf);
+    const patch = state.compose(
+      "solo",
+      undefined,
+      new Map([["solo", COMPOSING]]),
+      trackComposeLeaf,
+    );
     expect(typeof patch).toBe("object");
     expect(patch).toEqual(track.composeLocal());
   });
@@ -149,11 +215,22 @@ describe("P2-03 compose-context protocol", () => {
   it("keeps cycle rejection a graph-side concern", () => {
     const a = realTrack("cycle-a", nestedPlugin());
     const b = realTrack("cycle-b", nestedPlugin());
-    const state = new ObservationState({ tracks: new Map([["cycle-a", a], ["cycle-b", b]]) });
-    state.addEdge({ source: "cycle-a", target: "cycle-b", mapFn: (patch) => ({ fromA: patch.tag }) });
+    const state = new ObservationState({
+      tracks: new Map([
+        ["cycle-a", a],
+        ["cycle-b", b],
+      ]),
+    });
+    state.addEdge({
+      source: "cycle-a",
+      target: "cycle-b",
+      mapFn: (patch) => ({ fromA: patch.tag }),
+    });
     // Graph-registered tracks may not close a loop, so a standalone mutual pair
     // cannot be mirrored into graph state. That boundary is deliberate.
-    expect(() => state.addEdge({ source: "cycle-b", target: "cycle-a" })).toThrow(/cycle/i);
+    expect(() =>
+      state.addEdge({ source: "cycle-b", target: "cycle-a" }),
+    ).toThrow(/cycle/i);
   });
 });
 
@@ -171,9 +248,13 @@ describe("P2-03 bridge composition parity", () => {
 
     // Same source, role and input, so edge identity is unchanged and wiring
     // parity still passes. Only the composed value moves.
-    tracks.get("n1").setObserved(tracks.get("n0"), () => ({ from_n0: "diverged" }));
+    tracks
+      .get("n1")
+      .setObserved(tracks.get("n0"), () => ({ from_n0: "diverged" }));
 
     expect(bridge.assertParity()).toBe(true);
-    expect(() => bridge.assertCompositionParity()).toThrow(/composition differs/i);
+    expect(() => bridge.assertCompositionParity()).toThrow(
+      /composition differs/i,
+    );
   });
 });

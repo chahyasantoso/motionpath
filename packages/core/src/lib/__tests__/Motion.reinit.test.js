@@ -6,7 +6,17 @@ import { Track } from "../Track.js";
 
 function track(id) {
   const proxy = { opacity: 0 };
-  return new Track({ id, interpolationTimeline: gsap.to(proxy, { opacity: 1, duration: 1, paused: true }), proxyState: proxy, plugins: [], resolvedTrack: { id, keyframes: {} } });
+  return new Track({
+    id,
+    interpolationTimeline: gsap.to(proxy, {
+      opacity: 1,
+      duration: 1,
+      paused: true,
+    }),
+    proxyState: proxy,
+    plugins: [],
+    resolvedTrack: { id, keyframes: {} },
+  });
 }
 
 function activeMotion(id = "motion") {
@@ -60,14 +70,20 @@ describe("repeated Motion initialization", () => {
     motion.init();
     const toSpy = vi.spyOn(gsap, "to");
     motion.init();
-    expect(toSpy.mock.calls.filter(([target]) => target === parent)).toHaveLength(1);
+    expect(
+      toSpy.mock.calls.filter(([target]) => target === parent),
+    ).toHaveLength(1);
     toSpy.mockRestore();
     motion.destroy();
   });
 
   it("preserves the graph binding across a restart and releases it on destroy", () => {
     let destroyed = 0;
-    const binding = { destroy() { destroyed += 1; } };
+    const binding = {
+      destroy() {
+        destroyed += 1;
+      },
+    };
     const motion = activeMotion();
     motion.setGraphBinding(binding);
     motion.init();

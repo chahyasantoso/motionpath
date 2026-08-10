@@ -325,15 +325,15 @@ Keep each PR narrow and mergeable:
 
 ## Risk register
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Contract changes break demo scenes | High | Normalize fixtures first; add migration diagnostics |
-| GSAP timing behavior changes during adapter work | High | Characterization tests around progress, repeat, scrub, and teardown |
-| TypeScript migration expands scope | Medium | Migrate core in dependency order; leave demos for last |
-| Global plugin consumers regress | Medium | Compatibility layer plus deprecation window |
-| Package extraction breaks deep imports | Medium | Export map, consumer fixture, and migration guide |
-| Performance regresses through extra normalization | Medium | Benchmark before and after; cache normalized configs |
-| Browser-only triggers fail in CI | Low | Use explicit browser adapters and headless trigger tests |
+| Risk                                              | Impact | Mitigation                                                          |
+| ------------------------------------------------- | ------ | ------------------------------------------------------------------- |
+| Contract changes break demo scenes                | High   | Normalize fixtures first; add migration diagnostics                 |
+| GSAP timing behavior changes during adapter work  | High   | Characterization tests around progress, repeat, scrub, and teardown |
+| TypeScript migration expands scope                | Medium | Migrate core in dependency order; leave demos for last              |
+| Global plugin consumers regress                   | Medium | Compatibility layer plus deprecation window                         |
+| Package extraction breaks deep imports            | Medium | Export map, consumer fixture, and migration guide                   |
+| Performance regresses through extra normalization | Medium | Benchmark before and after; cache normalized configs                |
+| Browser-only triggers fail in CI                  | Low    | Use explicit browser adapters and headless trigger tests            |
 
 ## Working cadence to save review and AI cost
 

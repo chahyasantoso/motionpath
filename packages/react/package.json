@@ -17,5 +17,8 @@
     "./useSmoothScroll": "./src/hooks/useSmoothScroll.js",
     "./useDynamicHeight": "./src/hooks/useDynamicHeight.js"
   },
-  "dependencies": { "@motionpath/core": "0.0.0-v4.2", "react": ">=19" }
+  "dependencies": {
+    "@motionpath/core": "0.0.0-v4.2",
+    "react": ">=19"
+  }
 }

@@ -18,13 +18,16 @@ function liveEdgeKeys(tracks) {
   const keys = [];
   for (const [id, track] of tracks) {
     if (track.isDestroyed) continue;
-    for (const edge of track.observedEdges ?? []) keys.push(edgeKey(edge.source.id, id, edge.role, edge.input));
+    for (const edge of track.observedEdges ?? [])
+      keys.push(edgeKey(edge.source.id, id, edge.role, edge.input));
   }
   return keys.sort();
 }
 
 function declaredEdgeKeys(graph) {
-  return graph.edges.map((edge) => edgeKey(edge.source, edge.target, edge.role, edge.input)).sort();
+  return graph.edges
+    .map((edge) => edgeKey(edge.source, edge.target, edge.role, edge.input))
+    .sort();
 }
 
 function expectTopological(order, graph, label) {
@@ -63,12 +66,18 @@ describe("GraphPublisher — invalidation fuzz", () => {
       const motion = randomDagMotion(nodeCount, 0.3, rand);
       const { graph, tracks } = buildRealGraph(motion);
       const published = [];
-      const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+      const publisher = new GraphPublisher({
+        graph,
+        tracks,
+        publish: (id) => published.push(id),
+      });
       const marked = motion.tracks.map((t) => t.id).filter(() => rand() < 0.25);
       if (marked.length === 0) marked.push(motion.tracks[0].id);
       for (const id of marked) publisher.markDirty(id);
       publisher.flush();
-      expect(new Set(published), `seed ${seed}: publish set mismatch`).toEqual(downstreamClosure(motion, marked));
+      expect(new Set(published), `seed ${seed}: publish set mismatch`).toEqual(
+        downstreamClosure(motion, marked),
+      );
     }
   });
 
@@ -79,12 +88,19 @@ describe("GraphPublisher — invalidation fuzz", () => {
       const motion = randomDagMotion(nodeCount, 0.35, rand);
       const { graph, tracks } = buildRealGraph(motion);
       const published = [];
-      const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+      const publisher = new GraphPublisher({
+        graph,
+        tracks,
+        publish: (id) => published.push(id),
+      });
       publisher.markDirty(motion.tracks[0].id);
       publisher.flush();
       const rank = new Map(graph.order.map((id, index) => [id, index]));
       for (let i = 1; i < published.length; i += 1) {
-        expect(rank.get(published[i - 1]) < rank.get(published[i]), `seed ${seed}: ${published[i - 1]} published after ${published[i]}`).toBe(true);
+        expect(
+          rank.get(published[i - 1]) < rank.get(published[i]),
+          `seed ${seed}: ${published[i - 1]} published after ${published[i]}`,
+        ).toBe(true);
       }
     }
   });
@@ -96,11 +112,19 @@ describe("GraphPublisher — invalidation fuzz", () => {
       const motion = randomDagMotion(nodeCount, 0.3, rand);
       const { graph, tracks } = buildRealGraph(motion);
       const patches = new Map();
-      const publisher = new GraphPublisher({ graph, tracks, publish: (id, patch) => patches.set(id, patch) });
-      for (const config of motion.tracks) tracks.get(config.id).progress(rand());
+      const publisher = new GraphPublisher({
+        graph,
+        tracks,
+        publish: (id, patch) => patches.set(id, patch),
+      });
+      for (const config of motion.tracks)
+        tracks.get(config.id).progress(rand());
       publisher.markDirty(motion.tracks[0].id);
       publisher.flush();
-      for (const [id, patch] of patches) expect(patch, `seed ${seed}: stale patch for ${id}`).toEqual(tracks.get(id).compose());
+      for (const [id, patch] of patches)
+        expect(patch, `seed ${seed}: stale patch for ${id}`).toEqual(
+          tracks.get(id).compose(),
+        );
     }
   });
 });
@@ -115,15 +139,24 @@ describe("GraphPublisher — cross-flush cache fuzz", () => {
       const { graph, tracks } = buildRealGraph(motion);
       const ids = motion.tracks.map((t) => t.id);
       const lastPublished = new Map();
-      const publisher = new GraphPublisher({ graph, tracks, publish: (id, patch) => lastPublished.set(id, patch) });
+      const publisher = new GraphPublisher({
+        graph,
+        tracks,
+        publish: (id, patch) => lastPublished.set(id, patch),
+      });
       publisher.markAllDirty();
       publisher.flush();
       for (let round = 0; round < ROUNDS; round += 1) {
         const touched = ids.filter(() => rand() < 0.3);
-        if (touched.length === 0) touched.push(ids[Math.floor(rand() * ids.length)]);
+        if (touched.length === 0)
+          touched.push(ids[Math.floor(rand() * ids.length)]);
         for (const id of touched) tracks.get(id).progress(rand());
         publisher.flush();
-        for (const id of ids) expect(lastPublished.get(id), `seed ${seed} round ${round}: stale published patch for ${id} after touching [${touched.join(", ")}]`).toEqual(tracks.get(id).compose());
+        for (const id of ids)
+          expect(
+            lastPublished.get(id),
+            `seed ${seed} round ${round}: stale published patch for ${id} after touching [${touched.join(", ")}]`,
+          ).toEqual(tracks.get(id).compose());
       }
     }
   });
@@ -135,7 +168,13 @@ describe("GraphPublisher — cross-flush cache fuzz", () => {
       const motion = randomDagMotion(nodeCount, 0.3, rand);
       const { graph, tracks } = buildRealGraph(motion);
       let publishes = 0;
-      const publisher = new GraphPublisher({ graph, tracks, publish: () => { publishes += 1; } });
+      const publisher = new GraphPublisher({
+        graph,
+        tracks,
+        publish: () => {
+          publishes += 1;
+        },
+      });
       publisher.markAllDirty();
       publisher.flush();
       publishes = 0;
@@ -155,7 +194,11 @@ describe("GraphBinding — mutation agreement fuzz", () => {
       const { graph, tracks } = buildRealGraph(motion);
       const ids = motion.tracks.map((t) => t.id);
       const published = [];
-      const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+      const publisher = new GraphPublisher({
+        graph,
+        tracks,
+        publish: (id) => published.push(id),
+      });
       const binding = new GraphBinding({ graph, tracks, publisher });
 
       for (let step = 0; step < MUTATIONS; step += 1) {
@@ -163,7 +206,9 @@ describe("GraphBinding — mutation agreement fuzz", () => {
         const declaredBefore = declaredEdgeKeys(binding.graph);
         const liveBefore = liveEdgeKeys(binding.tracks);
         const label = `seed ${seed} step ${step}`;
-        expect(liveBefore, `${label}: live edges drifted from the IR`).toEqual(declaredBefore);
+        expect(liveBefore, `${label}: live edges drifted from the IR`).toEqual(
+          declaredBefore,
+        );
         const existing = binding.graph.edges;
         const removing = existing.length > 0 && rand() < 0.4;
         const mutationSeeds = new Set();
@@ -172,26 +217,52 @@ describe("GraphBinding — mutation agreement fuzz", () => {
           if (removing) {
             const edge = existing[Math.floor(rand() * existing.length)];
             mutationSeeds.add(edge.target);
-            binding.removeEdge({ source: edge.source, target: edge.target, role: edge.role });
+            binding.removeEdge({
+              source: edge.source,
+              target: edge.target,
+              role: edge.role,
+            });
           } else {
             const source = ids[Math.floor(rand() * ids.length)];
             const target = ids[Math.floor(rand() * ids.length)];
             mutationSeeds.add(target);
-            binding.addEdge({ source, target, role: "output", mapFn: (patch) => ({ [`from_${source}`]: patch.transform }) });
+            binding.addEdge({
+              source,
+              target,
+              role: "output",
+              mapFn: (patch) => ({ [`from_${source}`]: patch.transform }),
+            });
           }
         } catch {
-          expect(publisher.graphOrder, `${label}: order changed on a rejected mutation`).toEqual(orderBefore);
-          expect(declaredEdgeKeys(binding.graph), `${label}: IR changed on a rejected mutation`).toEqual(declaredBefore);
-          expect(liveEdgeKeys(binding.tracks), `${label}: Track wiring changed on a rejected mutation`).toEqual(liveBefore);
+          expect(
+            publisher.graphOrder,
+            `${label}: order changed on a rejected mutation`,
+          ).toEqual(orderBefore);
+          expect(
+            declaredEdgeKeys(binding.graph),
+            `${label}: IR changed on a rejected mutation`,
+          ).toEqual(declaredBefore);
+          expect(
+            liveEdgeKeys(binding.tracks),
+            `${label}: Track wiring changed on a rejected mutation`,
+          ).toEqual(liveBefore);
           continue;
         }
 
-        expect(liveEdgeKeys(binding.tracks), `${label}: live edges drifted after commit`).toEqual(declaredEdgeKeys(binding.graph));
+        expect(
+          liveEdgeKeys(binding.tracks),
+          `${label}: live edges drifted after commit`,
+        ).toEqual(declaredEdgeKeys(binding.graph));
         expectTopological(publisher.graphOrder, binding.graph, label);
         published.length = 0;
         publisher.flush();
-        const expected = downstreamClosure(graphMotion(binding.graph), [...mutationSeeds]);
-        expect(new Set(published), `${label}: mutation invalidated the wrong closure`).toEqual(expected);
+        const expected = downstreamClosure(graphMotion(binding.graph), [
+          ...mutationSeeds,
+        ]);
+        expect(
+          new Set(published),
+          `${label}: mutation invalidated the wrong closure`,
+        ).toEqual(expected);
         expectTopological(published, binding.graph, `${label}: publish order`);
       }
       binding.destroy();

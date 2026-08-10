@@ -8,7 +8,16 @@ const frames = 120;
 function chainGraph(size) {
   const tracks = Array.from({ length: size }, (_, index) => ({
     id: `track-${index}`,
-    observes: index === 0 ? [] : [{ source: `track-${index - 1}`, role: "input", target: "parentWorld" }],
+    observes:
+      index === 0
+        ? []
+        : [
+            {
+              source: `track-${index - 1}`,
+              role: "input",
+              target: "parentWorld",
+            },
+          ],
   }));
   return normalizeObservationGraph({ tracks });
 }
@@ -20,7 +29,16 @@ function forestGraph(chains, depth) {
     for (let level = 0; level < depth; level += 1) {
       tracks.push({
         id: `c${chain}-n${level}`,
-        observes: level === 0 ? [] : [{ source: `c${chain}-n${level - 1}`, role: "input", target: "parentWorld" }],
+        observes:
+          level === 0
+            ? []
+            : [
+                {
+                  source: `c${chain}-n${level - 1}`,
+                  role: "input",
+                  target: "parentWorld",
+                },
+              ],
       });
     }
   }
@@ -30,16 +48,24 @@ function forestGraph(chains, depth) {
 function stubTracks(graph, counter) {
   const upstream = new Map(graph.nodes.map(({ id }) => [id, []]));
   for (const edge of graph.edges) upstream.get(edge.target).push(edge.source);
-  return new Map(graph.order.map((id) => [id, {
-    id,
-    isDestroyed: false,
-    compose: (_raw, composed) => {
-      counter.composes += 1;
-      const sources = upstream.get(id) ?? [];
-      const inherited = sources.reduce((total, source) => total + (composed.get(source)?.value ?? 0), 0);
-      return { value: inherited + 1 };
-    },
-  }]));
+  return new Map(
+    graph.order.map((id) => [
+      id,
+      {
+        id,
+        isDestroyed: false,
+        compose: (_raw, composed) => {
+          counter.composes += 1;
+          const sources = upstream.get(id) ?? [];
+          const inherited = sources.reduce(
+            (total, source) => total + (composed.get(source)?.value ?? 0),
+            0,
+          );
+          return { value: inherited + 1 };
+        },
+      },
+    ]),
+  );
 }
 
 function runChain(name, size) {
@@ -49,7 +75,13 @@ function runChain(name, size) {
   const counter = { composes: 0 };
   const tracks = stubTracks(graph, counter);
   let writes = 0;
-  const publisher = new GraphPublisher({ graph, tracks, publish: () => { writes += 1; } });
+  const publisher = new GraphPublisher({
+    graph,
+    tracks,
+    publish: () => {
+      writes += 1;
+    },
+  });
 
   const composeStart = performance.now();
   for (let frame = 0; frame < frames; frame += 1) {
@@ -78,7 +110,13 @@ function runIdleMajority(chains, depth) {
   const counter = { composes: 0 };
   const tracks = stubTracks(graph, counter);
   let writes = 0;
-  const publisher = new GraphPublisher({ graph, tracks, publish: () => { writes += 1; } });
+  const publisher = new GraphPublisher({
+    graph,
+    tracks,
+    publish: () => {
+      writes += 1;
+    },
+  });
 
   // Warm the cache once so steady-state cost is what gets measured.
   publisher.markAllDirty();

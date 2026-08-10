@@ -8,7 +8,14 @@ const authored = {
       templateId: "fade",
       duration: 0.75,
       transformOrigin: "center",
-      keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } },
+      keyframes: {
+        opacity: {
+          stops: [
+            { p: 0, v: 0 },
+            { p: 1, v: 1 },
+          ],
+        },
+      },
     },
   ],
   motions: [
@@ -45,7 +52,12 @@ describe("normalizeProject", () => {
               id: "hero-track",
               use: "fade",
               keyframes: {
-                x: { stops: [{ p: 0, v: 1 }, { p: 1, v: 2 }] },
+                x: {
+                  stops: [
+                    { p: 0, v: 1 },
+                    { p: 1, v: 2 },
+                  ],
+                },
               },
             },
           ],
@@ -61,7 +73,12 @@ describe("normalizeProject", () => {
       input.motions[0].tracks[0].keyframes,
     );
     expect(input.motions[0].tracks[0].keyframes).toEqual({
-      x: { stops: [{ p: 0, v: 1 }, { p: 1, v: 2 }] },
+      x: {
+        stops: [
+          { p: 0, v: 1 },
+          { p: 1, v: 2 },
+        ],
+      },
     });
   });
 });

@@ -4,11 +4,11 @@ This is the compact reference for humans and AI agents. The executable contract 
 
 ## Packages and ownership
 
-| Package | Owns | Must not import |
-| --- | --- | --- |
-| `@motionpath/core` | schema, graph IR, validators, plugins, Engine, Motion, Track, composition, publishers, adapters | React, JSX, demo components |
-| `@motionpath/react` | React hooks and subscriber bindings | demo scenes |
-| `apps/demo` | routes, scenes, visual components, CSS, fixtures | private core internals |
+| Package             | Owns                                                                                            | Must not import             |
+| ------------------- | ----------------------------------------------------------------------------------------------- | --------------------------- |
+| `@motionpath/core`  | schema, graph IR, validators, plugins, Engine, Motion, Track, composition, publishers, adapters | React, JSX, demo components |
+| `@motionpath/react` | React hooks and subscriber bindings                                                             | demo scenes                 |
+| `apps/demo`         | routes, scenes, visual components, CSS, fixtures                                                | private core internals      |
 
 ## Public core entrypoint
 
@@ -60,15 +60,26 @@ Every project uses `schemaVersion: 4`. A motion has `id`, `trigger`, and `tracks
 ```js
 const project = {
   schemaVersion: 4,
-  motions: [{
-    id: "hero",
-    trigger: { type: "time", autoplay: false },
-    tracks: [{
-      id: "hero-opacity",
-      duration: 1,
-      keyframes: { opacity: { stops: [{ p: 0, v: 0 }, { p: 1, v: 1 }] } }
-    }]
-  }]
+  motions: [
+    {
+      id: "hero",
+      trigger: { type: "time", autoplay: false },
+      tracks: [
+        {
+          id: "hero-opacity",
+          duration: 1,
+          keyframes: {
+            opacity: {
+              stops: [
+                { p: 0, v: 0 },
+                { p: 1, v: 1 },
+              ],
+            },
+          },
+        },
+      ],
+    },
+  ],
 };
 ```
 
@@ -77,7 +88,7 @@ const project = {
 Use JSON-safe edges for authored dependencies:
 
 ```js
-observes: [{ source: "shoulder", role: "input", target: "parentWorld" }]
+observes: [{ source: "shoulder", role: "input", target: "parentWorld" }];
 ```
 
 Input edges wrap the source patch under `target`; output edges merge the source patch over the target patch. Cycles, missing sources, duplicate edges, invalid roles, and invalid targets are diagnosed by the graph IR. One source may provide both an input and an output edge to the same observer: role and target are part of edge identity. See `docs/RIG-GRAPH-GUIDE.md`, `docs/RIG-GRAPH-ARCHITECTURE.md`, and the React `/walker` demo.

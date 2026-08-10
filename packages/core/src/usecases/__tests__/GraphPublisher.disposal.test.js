@@ -13,7 +13,11 @@ import { buildRealGraph, chainMotion } from "../../__fixtures__/graphTracks.js";
 function publisherFor(motion) {
   const { graph, tracks } = buildRealGraph(motion);
   const published = [];
-  const publisher = new GraphPublisher({ graph, tracks, publish: (id) => published.push(id) });
+  const publisher = new GraphPublisher({
+    graph,
+    tracks,
+    publish: (id) => published.push(id),
+  });
   return { graph, tracks, publisher, published };
 }
 
@@ -68,8 +72,12 @@ describe("GraphPublisher disposal", () => {
     publisher.destroy();
 
     expect(() => publisher.applyGraph(graph, tracks)).toThrow(/destroyed/i);
-    expect(() => publisher.addEdge({ source: "n0", target: "n1" })).toThrow(/destroyed/i);
-    expect(() => publisher.removeEdge({ source: "n0", target: "n1" })).toThrow(/destroyed/i);
+    expect(() => publisher.addEdge({ source: "n0", target: "n1" })).toThrow(
+      /destroyed/i,
+    );
+    expect(() => publisher.removeEdge({ source: "n0", target: "n1" })).toThrow(
+      /destroyed/i,
+    );
     // removeTrack stays a no-op: it is the destroy path a Track lifecycle event
     // lands on, and a late event must not blow up teardown.
     expect(() => publisher.removeTrack("n0")).not.toThrow();
@@ -80,11 +88,15 @@ describe("GraphPublisher disposal", () => {
     const n0 = tracks.get("n0");
     const n1 = tracks.get("n1");
 
-    expect(() => n0.setObserved(n1, (patch) => patch, { role: "output" })).toThrow(/cycle/i);
+    expect(() =>
+      n0.setObserved(n1, (patch) => patch, { role: "output" }),
+    ).toThrow(/cycle/i);
 
     publisher.destroy();
 
-    expect(() => n0.setObserved(n1, (patch) => patch, { role: "output" })).not.toThrow();
+    expect(() =>
+      n0.setObserved(n1, (patch) => patch, { role: "output" }),
+    ).not.toThrow();
   });
 
   it("survives repeated destroy of its tracks after disposal", () => {

@@ -41,7 +41,9 @@ function fakePublisher() {
 describe("P2-03 GraphBinding subscription disposal", () => {
   it("releases every subscription it took, exactly once", () => {
     const track = countingTrack("a");
-    const graph = normalizeObservationGraph({ tracks: [{ id: "a", observes: [] }] });
+    const graph = normalizeObservationGraph({
+      tracks: [{ id: "a", observes: [] }],
+    });
     const binding = new GraphBinding({
       graph,
       tracks: new Map([["a", track]]),
@@ -62,7 +64,9 @@ describe("P2-03 GraphBinding subscription disposal", () => {
   it("releases subscriptions for tracks added after construction", () => {
     const first = countingTrack("a");
     const second = countingTrack("b");
-    const graph = normalizeObservationGraph({ tracks: [{ id: "a", observes: [] }] });
+    const graph = normalizeObservationGraph({
+      tracks: [{ id: "a", observes: [] }],
+    });
     const binding = new GraphBinding({
       graph,
       tracks: new Map([["a", first]]),

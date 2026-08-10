@@ -33,15 +33,21 @@ describe("P2-04 Track ownership baseline", () => {
   it("keeps every current Track-owned seam explicit and discoverable", async () => {
     const source = await readFile(trackPath, "utf8");
     for (const symbol of [...observationSymbols, ...topologyPlaybackSymbols]) {
-      expect(source, `documented Track seam missing: ${symbol}`).toContain(symbol);
+      expect(source, `documented Track seam missing: ${symbol}`).toContain(
+        symbol,
+      );
     }
   });
 
   it("does not let the baseline inventory silently grow", async () => {
     const source = await readFile(trackPath, "utf8");
-    const discovered = new Set([
-      ...source.matchAll(/\b(setObserved|removeObserved|replaceObserved|observedSources|observedEdges|_setGraphGuard|addChild|removeChild|_attachGroupHost|groupHost|play|pause|seek|reverse)\b/g),
-    ].map(([symbol]) => symbol));
+    const discovered = new Set(
+      [
+        ...source.matchAll(
+          /\b(setObserved|removeObserved|replaceObserved|observedSources|observedEdges|_setGraphGuard|addChild|removeChild|_attachGroupHost|groupHost|play|pause|seek|reverse)\b/g,
+        ),
+      ].map(([symbol]) => symbol),
+    );
     const documented = new Set([
       ...observationSymbols,
       "addChild",
@@ -53,6 +59,8 @@ describe("P2-04 Track ownership baseline", () => {
       "seek",
       "reverse",
     ]);
-    expect([...discovered].filter((symbol) => !documented.has(symbol))).toEqual([]);
+    expect([...discovered].filter((symbol) => !documented.has(symbol))).toEqual(
+      [],
+    );
   });
 });

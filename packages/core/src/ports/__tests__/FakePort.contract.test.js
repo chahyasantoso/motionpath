@@ -5,8 +5,13 @@ import { assertScheduler } from "../Scheduler.js";
 
 describe("P2-02 renderer-neutral port contracts", () => {
   it("accepts fake scheduler and interpolator ports without GSAP", () => {
-    const scheduler = { to: () => ({ kill() {} }), timeline: () => ({ add() {}, render() {}, kill() {} }) };
-    const interpolator = { create: () => ({ progress() {}, duration: () => 0, kill() {} }) };
+    const scheduler = {
+      to: () => ({ kill() {} }),
+      timeline: () => ({ add() {}, render() {}, kill() {} }),
+    };
+    const interpolator = {
+      create: () => ({ progress() {}, duration: () => 0, kill() {} }),
+    };
     expect(assertScheduler(scheduler)).toBe(scheduler);
     expect(assertInterpolator(interpolator)).toBe(interpolator);
   });
