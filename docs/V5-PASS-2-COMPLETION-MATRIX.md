@@ -1,12 +1,41 @@
 # MotionPath v5 pass-2 completion matrix
 
-**Status captured:** 2026-08-09 08:30 Asia/Jakarta  
-**Control sheet:** pass-2 revision A  
-**Review:** [`V5-PASS-2-REVIEW-2026-08-08.md`](./V5-PASS-2-REVIEW-2026-08-08.md)  
-**Resolution log:** [`V5-PASS-2-REVIEW-STATUS.md`](./V5-PASS-2-REVIEW-STATUS.md)
+**Status captured:** 2026-08-10 07:05 Asia/Jakarta  
+**Implementation:** `v5-break` from clean `v5` at `e4fc9b9`  
+**Historical context:** [PR #145](https://github.com/chahyasantoso/motionpath/pull/145), frozen evidence only
 
-The current F-02 implementation uses one adapter per ProjectRuntime, with identity-keyed internal state so duplicate motion-local ids remain legal across qualified instances. The adapter preserves public ids while isolating state by Track object.
+No row closes from stale CI, partial runs, or docs-only claims. Every phase closes with one exact-head matrix and simultaneous plan/status/matrix/handoff updates.
 
-The remaining matrix is unchanged: F-01 inversion of the bridge is next; F-03 duplicate Track bookkeeping, F-06/F-07 duplicate mutation and cycle paths, F-08 owner-layer decision, and F-10 full-model rebuild remain open. Track topology/playback and publisher rollout remain separate.
+| Phase / target | Status | Required closure evidence |
+| --- | --- | --- |
+| Phase 0: clean baseline and evidence | **In progress** | Clean branch and gate cleanup committed; exact-head matrix still required. |
+| Phase 1: one graph authority | Blocked | Remove facade and ownership modes; one long-lived ObservationState; no bridge rebuild; GraphBinding sole coordinator. |
+| Qualified graph identity | Blocked | Canonical qualified IDs, ambiguity and cycle tests. |
+| Project-wide GraphRuntime | Blocked | Two-motion shared graph, one publisher, PatchRegistry, and clock subscription. |
+| Authoritative patch publication | Blocked | ObservationState plus local Track composition, immutable batches. |
+| Motion composite / Track leaf | Blocked | Move topology/playback to Motion and migrate host API. |
+| Graph input validation | Open | Stable missing/unknown/duplicate/role/source diagnostics. |
+| Cross-motion/free-track membership | Blocked | Enable only after qualified identity and shared runtime. |
+| Public API/type parity | Open | Runtime break reflected in exports, types, docs, and examples. |
+| Lifecycle/rollback | Open | Owner-first teardown, idempotence, mapper-preserving rollback, stale-owner regression. |
+| Handoff discipline | Active | Update plan, status, matrix, and handoff every phase close. |
 
-PR #140 is merged as `72e7289`; its 8-check run passed. The F-02 follow-up is on `v5` commit `8f33f4e` and awaits its CI run.
+## Phase 0 changes
+
+- Clean branch created from `v5`.
+- Self-blocking readability allowlist and duplicate readability suites removed.
+- No PR #145 implementation commits ported.
+
+## Required exact-head verification
+
+```sh
+npm test -- --reporter=verbose
+npm run typecheck
+npm run build
+npm run pack:check
+npm run format:check
+npm run boundary:v5:pass2
+npm run boundary:v5:pass2:strict
+npm run benchmark:rig
+npm run benchmark:v5:baseline
+```
